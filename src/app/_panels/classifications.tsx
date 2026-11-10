@@ -20,7 +20,7 @@ import {
 import { useAction } from "@/app/_components/use-action";
 import { classificationImpact, type ClassificationImpact } from "@/domain/commands/classification";
 import type { Uuid } from "@/domain/ids";
-import { byListOrder, groupOf, isDataVault, nameTakenBy, TAKEN_NAME, whatStops } from "@/domain/model/classifications";
+import { byListOrder, groupOf, isBuiltin, isDataVault, nameTakenBy, TAKEN_NAME, whatStops } from "@/domain/model/classifications";
 import { dataVaultReading, READING_EMPTY, READING_FOOTER, readingText, type ReadingLine } from "@/domain/model/data-vault-reading";
 import type { Classification, ClassificationScope, SourceTable } from "@/domain/types";
 import { NOTE_REMOVED, NOTE_SAVED } from "@/domain/commands/source";
@@ -191,7 +191,7 @@ export function ClassificationsDialog({ onClose }: { onClose: () => void }) {
   const [removing, setRemoving] = useState<Classification | null>(null);
   const all = p.ix.model.classifications;
   const live = p.ix.classes.list;
-  const removed = useMemo(() => all.filter((c) => c.deleted_at !== null && c.code !== null).sort(byListOrder), [all]);
+  const removed = useMemo(() => all.filter((c) => c.deleted_at !== null && isBuiltin(c)).sort(byListOrder), [all]);
   const impact = useMemo<ClassificationImpact | null>(
     () =>
       removing
@@ -371,7 +371,7 @@ function Row({ c, all, onRemove }: { c: Classification; all: readonly Classifica
         <span className="whitespace-nowrap text-[12px] text-im-ink-3" data-testid="classification-uses">
           {uses ? `used ${uses}×` : "unused"}
         </span>
-        {c.code !== null && <span className="text-[12px] text-im-ink-3">built in</span>}
+        {isBuiltin(c) && <span className="text-[12px] text-im-ink-3">built in</span>}
         {p.editable && (
           <button type="button" className={smallButtonClass} onClick={onRemove} data-testid="button-remove-classification">
             Remove

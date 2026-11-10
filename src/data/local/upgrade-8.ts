@@ -70,7 +70,7 @@ export function upgradeTo8(db: DevDb, now: string, newId: () => string): Upgrade
     const byCode = new Map(db.classification.filter((c) => c.workspace_id === ws.id && c.code !== null).map((c) => [c.code!, c]));
     for (const b of BUILTIN_CLASSIFICATIONS) {
       if (byCode.has(b.code)) continue;
-      const row: Classification = { id: newId(), ...audit, code: b.code, name: b.name, name_key: normClassification(b.name), scope: b.scope, origin: b.origin };
+      const row: Classification = { id: newId(), ...audit, code: b.code, name: b.name, name_key: normClassification(b.name), scope: b.scope, origin: b.origin, definition: null };
       db.classification.push(row);
       byCode.set(b.code, row);
       events.push(event("classification", row.id, null, row));

@@ -9,7 +9,7 @@ import { domainError, notFound, staleVersion, type DomainError } from "../errors
 import type { Uuid } from "../ids";
 import { BUILTIN_CLASSIFICATIONS } from "../model/classifications";
 import { checkOrganizationAccess, type WorkspaceAccess } from "../permissions";
-import type { AppUser, Organization, OrganizationAccess, OrganizationMember } from "../types";
+import { DOC_LANGUAGES, type AppUser, type DocLanguage, type Organization, type OrganizationAccess, type OrganizationMember } from "../types";
 import { parseInput, uuidSchema, versionSchema } from "../validation";
 import { newWorkspaceRows } from "./workspace";
 
@@ -74,6 +74,8 @@ export const ACCOUNT_EXISTS_MESSAGE =
 const newOrganizationFields = {
   organizationName: organizationNameSchema,
   workspaceName: workspaceNameSchema,
+  /** The first workspace's documentation language (slice 23, F1): its built-in classifications' texts; English if absent. */
+  workspaceLanguage: z.enum(DOC_LANGUAGES).optional(),
 };
 
 const createOrganizationForm = z
@@ -162,7 +164,7 @@ export function createOrganization(
   if (state.accountWithEmail) return fail(domainError("conflict", ACCOUNT_EXISTS_MESSAGE, { email: ACCOUNT_EXISTS_MESSAGE }));
 
   const user: AppUser = { id: ctx.actorId, email: p.email, display_name: p.name, created_at: ctx.now, last_seen_at: null };
-  return newOrganization(ctx, p.organizationName, p.workspaceName, p.accessHash, [{ kind: "insert", table: "app_user", row: user }]);
+  return newOrganization(ctx, p.organizationName, p.workspaceName, p.workspaceLanguage ?? "en", p.accessHash, [{ kind: "insert", table: "app_user", row: user }]);
 }
 
 /** "New organization…" for a signed-in person (item 9): the same rows without the person. */
@@ -175,13 +177,14 @@ export function createOrganizationForUser(
   const parsed = parseInput(newOrganizationInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const p = parsed.data;
-  return newOrganization(ctx, p.organizationName, p.workspaceName, p.accessHash, []);
+  return newOrganization(ctx, p.organizationName, p.workspaceName, p.workspaceLanguage ?? "en", p.accessHash, []);
 }
 
 function newOrganization(
   ctx: CommandContext,
   name: string,
   workspaceName: string,
+  workspaceLanguage: DocLanguage,
   accessHash: string,
   personWrites: Write[],
 ): CommandResult<CreatedOrganization> {
@@ -194,7 +197,7 @@ function newOrganization(
     version: 1,
   };
   const owner: OrganizationMember = { organization_id: organization.id, user_id: ctx.actorId, role: "owner", created_at: ctx.now };
-  const workspace = newWorkspaceRows(ctx, organization.id, workspaceName);
+  const workspace = newWorkspaceRows(ctx, organization.id, workspaceName, workspaceLanguage);
   return {
     ok: true,
     value: {

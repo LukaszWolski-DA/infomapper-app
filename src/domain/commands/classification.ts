@@ -2,6 +2,8 @@
 // classification, rename any one, remove any one with its links (its impact shown first, D-47), restore a removed
 // built-in one empty, and set or clear a classification on a source table or column. Each is one change group and one
 // undo step. Owners, admins and modelers, in a workspace that is not archived (item 12, AD-05, AD-09).
+// Slice 23 (D-78): an own one may get a code when it is added (never changed: no other command takes one), every one a
+// definition (plain text, its own command); a removed own one is never restored (only built-in ones, told by origin).
 // Open changes to resolve that a removed Business key decides settle through `settleAfterWrites` (Q7), as every
 // command's do, so the toggle, the removal and a deleted column settle the same way.
 
@@ -9,12 +11,12 @@ import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound, staleVersion } from "../errors";
 import type { Uuid } from "../ids";
-import { fitsScope, nameTakenBy, normClassification, TAKEN_NAME, whatStops } from "../model/classifications";
+import { codeRefusal, fitsScope, isBuiltin, nameTakenBy, normClassification, TAKEN_CODE, TAKEN_NAME, typedCode, whatStops } from "../model/classifications";
 import type { WorkspaceAccess } from "../permissions";
 import { businessKeySettlements } from "../source-changes/settle";
 import { CLASSIFICATION_SCOPES, type Classification, type ClassificationLink, type SourceChange, type SourceColumn, type SourceTable } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
-import { begin, current, done, isLive, softDelete } from "./shared";
+import { begin, current, done, isLive, nothingToChange, plainTextSchema, softDelete } from "./shared";
 
 /** A name as typed: trimmed, up to 80 characters, with at least one letter or digit (`norm` must not be empty). */
 const classificationNameSchema = z
@@ -32,17 +34,34 @@ const takenError = () => domainError("conflict", TAKEN_NAME, { name: TAKEN_NAME 
 
 // ---- add (own ones) ----
 
-const addInput = z.object({ scope: z.enum(CLASSIFICATION_SCOPES), name: classificationNameSchema }).strict();
+const addInput = z
+  .object({
+    scope: z.enum(CLASSIFICATION_SCOPES),
+    name: classificationNameSchema,
+    /** Slice 23: optional; trimmed and upper-cased here, empty is none. */
+    code: z.string().max(200).optional(),
+  })
+  .strict();
 export type AddClassificationInput = z.input<typeof addInput>;
 
-/** An own classification (item 8): no code, matched by name in an import file. */
+/**
+ * An own classification (item 8), matched by name in an import file and, with a code (slice 23, decision 3), by its
+ * code too. The code: upper-cased; letters, digits and `_`, starting with a letter, at most 30; unique as the import
+ * compares, against every code of the workspace (removed and deleted rows, built-in codes) and the scope's names (F4).
+ */
 export function addClassification(ctx: CommandContext, access: WorkspaceAccess, state: { classifications: readonly Classification[] }, input: unknown): CommandResult<{ classification: Classification }> {
   const parsed = begin(access, "model.edit", addInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const { scope, name } = parsed.data;
   const ws = access.workspace.id;
-  if (nameTakenBy(state.classifications.filter((c) => c.workspace_id === ws), scope, name)) return fail(takenError());
-  const row: Classification = { ...newRowColumns(ctx), workspace_id: ws, code: null, name, name_key: normClassification(name), scope, origin: "own" };
+  const list = state.classifications.filter((c) => c.workspace_id === ws);
+  if (nameTakenBy(list, scope, name)) return fail(takenError());
+  const code = typedCode(parsed.data.code ?? "");
+  if (code !== null) {
+    const refusal = codeRefusal(list, scope, code);
+    if (refusal) return fail(domainError(refusal === TAKEN_CODE ? "conflict" : "invalid", refusal, { code: refusal }));
+  }
+  const row: Classification = { ...newRowColumns(ctx), workspace_id: ws, code, name, name_key: normClassification(name), scope, origin: "own", definition: null };
   return done(ctx, access, { classification: row }, [{ kind: "insert", table: "classification", row }]);
 }
 
@@ -63,6 +82,33 @@ export function renameClassification(ctx: CommandContext, access: WorkspaceAcces
   if (nameTakenBy(state.classifications.filter((c) => c.workspace_id === access.workspace.id), before.scope, name, before.id)) return fail(takenError());
   const row = nextVersion(ctx, before, { name, name_key: normClassification(name) });
   return done(ctx, access, { classification: row }, [{ kind: "update", table: "classification", before, row }]);
+}
+
+// ---- a definition (any one; slice 23, item 5) ----
+
+const definitionInput = z.object({ classificationId: uuidSchema, expectedVersion: versionSchema, definition: plainTextSchema }).strict();
+export type SetClassificationDefinitionInput = z.input<typeof definitionInput>;
+
+/** The toasts (slice 23). */
+export const DEFINITION_SAVED = (name: string) => `Saved the definition of ${name}.`;
+export const DEFINITION_CLEARED = (name: string) => `Cleared the definition of ${name}.`;
+/** The undo history's name. */
+export const DEFINITION_LABEL = (name: string) => `Change definition of ${name}`;
+
+/** A definition, plain text like a note (D-57): trimmed, empty clears it (null). One undo step. */
+export function setClassificationDefinition(ctx: CommandContext, access: WorkspaceAccess, state: { classifications: readonly Classification[] }, input: unknown): CommandResult<{ classification: Classification; name: string; removed: boolean }> {
+  const parsed = begin(access, "model.edit", definitionInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { classificationId, expectedVersion } = parsed.data;
+  const got = current(state.classifications.find((c) => c.id === classificationId), access, classificationId, expectedVersion, "classification");
+  if (!got.ok) return fail(got.error);
+  const before = got.row;
+  const definition = parsed.data.definition?.trim() || null;
+  if (definition === before.definition) return fail(nothingToChange());
+  const row = nextVersion(ctx, before, { definition });
+  const r = done(ctx, access, { classification: row, name: before.name, removed: definition === null }, [{ kind: "update", table: "classification", before, row }]);
+  if (r.ok) r.writeSet.label = DEFINITION_LABEL(before.name);
+  return r;
 }
 
 // ---- remove (any one), with its impact first ----
@@ -149,7 +195,8 @@ export function restoreClassification(ctx: CommandContext, access: WorkspaceAcce
   const before = state.classifications.find((c) => c.id === classificationId && c.workspace_id === ws);
   if (!before) return fail(notFound("classification"));
   if (before.deleted_at === null) return fail(domainError("conflict", NOT_REMOVED));
-  if (before.code === null) return fail(domainError("invalid", ONLY_BUILTIN_RESTORED));
+  // told by origin (slice 23, F5): a removed own one, with a code or not, is never restored
+  if (!isBuiltin(before)) return fail(domainError("invalid", ONLY_BUILTIN_RESTORED));
   if (before.version !== expectedVersion) return fail(staleVersion());
   const other = nameTakenBy(state.classifications.filter((c) => c.workspace_id === ws), before.scope, before.name, before.id);
   if (other) return fail(domainError("conflict", RESTORE_TAKEN(other.name, before.name)));

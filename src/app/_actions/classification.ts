@@ -15,7 +15,9 @@ import {
   renameClassification,
   restoreClassification,
   setClassification,
+  setClassificationDefinition,
   type AddClassificationInput,
+  type SetClassificationDefinitionInput,
   type ClassificationImpact,
   type RemoveClassificationInput,
   type RenameClassificationInput,
@@ -58,6 +60,13 @@ export async function addClassificationAction(workspaceId: string, input: AddCla
 
 export async function renameClassificationAction(workspaceId: string, input: RenameClassificationInput): Promise<ActionResult<Saved<{ name: string }>>> {
   return command(workspaceId, (ctx, access, m) => value(renameClassification(ctx, access, m, input), (v) => ({ name: v.classification.name, version: v.classification.version })));
+}
+
+/** A classification's definition (slice 23, item 5): one undo step, on the classification's save chain. */
+export async function setClassificationDefinitionAction(workspaceId: string, input: SetClassificationDefinitionInput): Promise<ActionResult<Saved<{ name: string; removed: boolean }>>> {
+  return command(workspaceId, (ctx, access, m) =>
+    value(setClassificationDefinition(ctx, access, m, input), (v) => ({ name: v.name, removed: v.removed, version: v.classification.version })),
+  );
 }
 
 export async function removeClassificationAction(workspaceId: string, input: RemoveClassificationInput): Promise<ActionResult<{ name: string; tables: number; columns: number }>> {

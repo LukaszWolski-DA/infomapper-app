@@ -1,7 +1,7 @@
 // Test fixtures for domain unit tests. Not used by application code.
 
 import type { CommandContext } from "../changes";
-import { BUILTIN_CLASSIFICATIONS, normClassification, type ClassificationCode } from "../model/classifications";
+import { BUILTIN_CLASSIFICATIONS, BUILTIN_TEXTS, normClassification, type ClassificationCode } from "../model/classifications";
 import type { WorkspaceAccess } from "../permissions";
 import {
   DEFAULT_CANVAS_LOOK,
@@ -131,6 +131,7 @@ export const workspace = (over: Partial<Workspace> = {}): Workspace => ({
   dv2_mode: false,
   four_eyes: false,
   infocube: false,
+  naming_conventions: null,
   archived_at: null,
   archived_by: null,
   requirement_key_next: 101,
@@ -481,6 +482,7 @@ export const builtins = (): Classification[] =>
     name_key: normClassification(b.name),
     scope: b.scope,
     origin: b.origin,
+    definition: BUILTIN_TEXTS.en[b.code].definition,
   }));
 
 /** One built-in classification of `builtins()` by its code. */
@@ -495,6 +497,7 @@ export const ownClassification = (id: string, name: string, scope: Classificatio
   name_key: normClassification(name),
   scope,
   origin: "own",
+  definition: null,
   ...over,
 });
 

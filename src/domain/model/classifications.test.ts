@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { builtin, builtins, classificationLink, ids, makeCtx, NOW, ownClassification } from "../__fixtures__/domain";
 import {
+  BAD_CODE,
   BUILTIN_CLASSIFICATIONS,
+  BUILTIN_TEXTS,
   builtinClassificationRows,
+  byListOrder,
+  codeRefusal,
+  isBuiltin,
+  TAKEN_CODE,
+  typedCode,
   CLASSIFICATION_CODES,
   classificationIndex,
   DATA_VAULT_MODE_TEXT,
@@ -48,10 +55,96 @@ describe("the built-in list (item 1, P2, S7C-01)", () => {
   });
 
   it("gives a new workspace its rows: one per built-in, with the code, the normalized name and the creator", () => {
-    const rows = builtinClassificationRows(makeCtx(), ids.ws);
+    const rows = builtinClassificationRows(makeCtx(), ids.ws, "en");
     expect(rows).toHaveLength(19);
     expect(rows[1]).toMatchObject({ workspace_id: ids.ws, code: "PII", name: "Personal data", name_key: "personaldata", scope: "column", origin: "builtin", version: 1, created_by: ids.actor, deleted_at: null });
+    expect(rows[1]!.definition).toBe("The column holds personal data in the sense of the GDPR.");
     expect(new Set(rows.map((r) => r.id)).size).toBe(19);
+  });
+});
+
+describe("built-in texts per documentation language (slice 23, items 9–11, Appendix A)", () => {
+  it("has a name and a definition for every code in English, Polish and German; English names are the list's", () => {
+    for (const language of ["en", "pl", "de"] as const) {
+      expect(Object.keys(BUILTIN_TEXTS[language])).toEqual([...CLASSIFICATION_CODES]);
+      for (const code of CLASSIFICATION_CODES) {
+        const t = BUILTIN_TEXTS[language][code];
+        expect(t.name.trim()).toBe(t.name);
+        expect(t.definition.length).toBeGreaterThan(5);
+      }
+    }
+    expect(BUILTIN_CLASSIFICATIONS.map((b) => BUILTIN_TEXTS.en[b.code].name)).toEqual(BUILTIN_CLASSIFICATIONS.map((b) => b.name));
+  });
+
+  it("writes a Polish or a German workspace's rows in its language (S23-05)", () => {
+    const pl = builtinClassificationRows(makeCtx(), ids.ws, "pl");
+    expect(pl[0]).toMatchObject({ code: "BK", name: "Klucz biznesowy", name_key: "kluczbiznesowy", definition: "Kolumna identyfikuje obiekt biznesowy w źródle; przetrwa zmiany systemu." });
+    const de = builtinClassificationRows(makeCtx(), ids.ws, "de");
+    expect(de[0]).toMatchObject({ code: "BK", name: "Fachlicher Schlüssel", definition: "Die Spalte identifiziert das Geschäftsobjekt in der Quelle; sie überdauert Systemwechsel." });
+  });
+
+  it("keeps every language's names unique per scope and clear of every code, as D-57 requires of a list", () => {
+    for (const language of ["en", "pl", "de"] as const) {
+      const rows = builtinClassificationRows(makeCtx(), ids.ws, language);
+      for (const r of rows) expect(nameTakenBy(rows, r.scope, r.name, r.id)).toBeNull();
+    }
+  });
+});
+
+describe("built-in by origin, own codes (slice 23, F4, F5)", () => {
+  const hash = ownClassification(ids.labelCr23, "Hash candidate", "column", { code: "HASH" });
+  const list = [...builtins(), hash];
+
+  it("tells built-in ones by origin, not by a code", () => {
+    expect(isBuiltin(builtin("BK"))).toBe(true);
+    expect(isBuiltin(builtin("LK"))).toBe(true);
+    expect(isBuiltin(hash)).toBe(false);
+  });
+
+  it("orders own ones by name, with a code or not, after the built-in ones", () => {
+    const zeta = ownClassification(ids.labelJira, "Alpha", "column");
+    const sorted = [hash, zeta, builtin("BK")].sort(byListOrder).map((c) => c.name);
+    expect(sorted).toEqual(["Business key", "Alpha", "Hash candidate"]);
+  });
+
+  it("keeps an own code out of the rules' index by code", () => {
+    const ix = classificationIndex(list, []);
+    expect([...ix.byCode.keys()]).not.toContain("HASH");
+    expect(ix.byCode.get("BK")?.code).toBe("BK");
+  });
+
+  it("reads a typed code trimmed and upper-cased, empty as none", () => {
+    expect(typedCode("  hash ")).toBe("HASH");
+    expect(typedCode("   ")).toBeNull();
+  });
+
+  it("refuses a code of the wrong shape", () => {
+    for (const bad of ["1ABC", "_A", "A-B", "A B", "Ä", "A".repeat(31)]) expect(codeRefusal(list, "column", bad)).toBe(BAD_CODE);
+    expect(codeRefusal(list, "column", "A".repeat(30))).toBeNull();
+  });
+
+  it("refuses a code taken as the import compares: built-in codes, own ones, removed and deleted ones, either scope", () => {
+    expect(codeRefusal(list, "column", "BK")).toBe(TAKEN_CODE);
+    expect(codeRefusal(list, "column", "THUB")).toBe(TAKEN_CODE); // T_HUB, a table code
+    expect(codeRefusal(list, "table", "HASH")).toBe(TAKEN_CODE); // a column one's, another scope
+    expect(codeRefusal(list, "column", "HA_SH")).toBe(TAKEN_CODE);
+    const removed = [...builtins(), { ...hash, deleted_at: NOW }];
+    expect(codeRefusal(removed, "column", "HASH")).toBe(TAKEN_CODE);
+    // a built-in code even without its row (a removed and purged one can never come back under another)
+    expect(codeRefusal([], "column", "PII")).toBe(TAKEN_CODE);
+  });
+
+  it("refuses a code equal to a live name of its scope; another scope's name or a removed one's is fine", () => {
+    expect(codeRefusal(list, "column", "BUSINESS_KEY")).toBe(TAKEN_CODE);
+    expect(codeRefusal(list, "column", "MASTER_DATA")).toBeNull(); // a table classification's name
+    const gone = builtins().map((c) => (c.code === "PII" ? { ...c, deleted_at: NOW } : c));
+    expect(codeRefusal(gone, "column", "PERSONALDATA")).toBeNull();
+  });
+
+  it("refuses a name equal to an own code of its scope, removed too (nameTakenBy)", () => {
+    expect(nameTakenBy(list, "column", "hash")?.id).toBe(hash.id);
+    expect(nameTakenBy([...builtins(), { ...hash, deleted_at: NOW }], "column", "Hash")?.id).toBe(hash.id);
+    expect(nameTakenBy(list, "table", "hash")).toBeNull();
   });
 });
 

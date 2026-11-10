@@ -180,7 +180,7 @@ export const HINT_WHY = {
 /** One warning per value and table (answer F13; Łukasz's texts, step 2). */
 const where = (row: number, n: number) => `(row ${row}${n ? `; ${n.toLocaleString("en-GB")} more row${n === 1 ? "" : "s"} in this table` : ""})`;
 export const UNKNOWN_CLASSIFICATION = (row: number, value: string, column: string, others: number) =>
-  `Unknown classification “${value}” on ${column} ${where(row, others)}, ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it.`;
+  `Unknown classification “${value}” on ${column} ${where(row, others)}, ignored. Add it in Metadata conventions on the workspace home to use it.`;
 export const TABLE_CLASSIFICATION_ON_COLUMN = (row: number, value: string, column: string, others: number) =>
   `“${value}” is a table classification; ignored on ${column} ${where(row, others)}.`;
 

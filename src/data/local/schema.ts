@@ -92,11 +92,12 @@ import {
  * change events, no log line), a format-12 file every relationship's two roles null (slice 15b: no change events, no log
  * line). 12 = slice 15a (`model_level` on entities, `infocube` on workspaces, `organization_licence`), 13 = slice 15b
  * (`from_role` and `to_role` on relationships), 14 = slice 18 (`is_calculated` false and `calc_rule` null on attributes,
- * `attribute_input`; no change events, no log line). It is written back at once; an older file no upgrade reaches is refused with a hint to
+ * `attribute_input`; no change events, no log line), 15 = slice 23 (`definition` on classifications, the built-in ones' in
+ * their workspace's documentation language, and `naming_conventions` on workspaces, null; no change events, no log line). It is written back at once; an older file no upgrade reaches is refused with a hint to
  * run "npm run reset-dev-data", a newer one (a newer branch wrote it) with the advice to switch back to that branch or
  * restore a backup, never a reset (`newerFormatMessage`, slice 15a). A module's tables are not part of the format (AD-33): a file without one has none of its rows yet.
  */
-export const DEV_DB_FORMAT = 14;
+export const DEV_DB_FORMAT = 15;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -258,7 +259,11 @@ export const RULES: Record<DevTable, TableRules> = {
   workspace: {
     key: ["id"],
     foreignKeys: { organization_id: "organization", archived_by: "app_user", ...audit },
-    checks: [{ name: "workspace_doc_language_ck", test: oneOf(DOC_LANGUAGES, "doc_language") }],
+    checks: [
+      { name: "workspace_doc_language_ck", test: oneOf(DOC_LANGUAGES, "doc_language") },
+      // slice 23: plain text, never empty (null when not set)
+      { name: "workspace_naming_conventions_ck", test: (r) => !isSet(r.naming_conventions) || (typeof r.naming_conventions === "string" && r.naming_conventions.length > 0) },
+    ],
   },
   workspace_member: {
     key: ["workspace_id", "user_id"],
@@ -412,7 +417,10 @@ export const RULES: Record<DevTable, TableRules> = {
     checks: [
       { name: "classification_scope_ck", test: oneOf(CLASSIFICATION_SCOPES, "scope") },
       { name: "classification_origin_ck", test: oneOf(CLASSIFICATION_ORIGINS, "origin") },
-      { name: "classification_code_ck", test: (r) => (r.origin === "own") === !isSet(r.code) },
+      // slice 23 (F3): an own one may have a code; a built-in one always has one, and every code has one shape
+      { name: "classification_code_ck", test: (r) => r.origin === "own" || isSet(r.code) },
+      { name: "classification_code_format_ck", test: (r) => !isSet(r.code) || (typeof r.code === "string" && /^[A-Z][A-Z0-9_]{0,29}$/.test(r.code)) },
+      { name: "classification_definition_ck", test: (r) => !isSet(r.definition) || (typeof r.definition === "string" && r.definition.length > 0) },
     ],
   },
   classification_link: {

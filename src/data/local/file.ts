@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { uuidv7 } from "@/domain/ids";
+import { builtinText, CLASSIFICATION_CODES, isBuiltin, type ClassificationCode } from "@/domain/model/classifications";
 import { deriveSourceChanges } from "@/domain/source-changes/derive";
 import type { ChangeEvent } from "@/domain/types";
 import { isLocalModeAllowed } from "./measure-mode";
@@ -89,7 +90,9 @@ export async function readDb(file: string): Promise<DevDb> {
  * file an empty `organization_licence` (slice 15a; no change events, no log line). From 12, every relationship gets
  * `from_role` and `to_role` null (slice 15b; no change events, no log line). From 13, every attribute gets
  * `is_calculated` false and `calc_rule` null, and the file an empty `attribute_input` (slice 18, Q2; no change events, no
- * log line).
+ * log line). From 14, every built-in classification without a definition gets its definition in its workspace's
+ * documentation language, own ones and every other row `definition` null, and every workspace `naming_conventions`
+ * null; names are kept (slice 23, F2, F15; no change events, no log line).
  */
 export function upgradeDb(db: DevDb, now: string, newId: () => string): { report: Upgrade8Report | null; passwordsGiven: number } {
   let report: Upgrade8Report | null = null;
@@ -178,7 +181,18 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): { report
   // slice 18: no attribute is calculated yet, and there are no inputs (Q2; no change events, no log line)
   if ((db.format as number) === 13) {
     for (const a of db.attribute) Object.assign(a, { is_calculated: a.is_calculated ?? false, calc_rule: a.calc_rule ?? null });
-    Object.assign(db, { format: DEV_DB_FORMAT, attribute_input: (db as Partial<DevDb>).attribute_input ?? [] });
+    Object.assign(db, { format: 14, attribute_input: (db as Partial<DevDb>).attribute_input ?? [] });
+  }
+  // slice 23: the built-in classifications' definitions in their workspace's language, names kept (F2; no change events,
+  // no log line); own ones none; no naming conventions yet
+  if ((db.format as number) === 14) {
+    const language = new Map(db.workspace.map((w) => [w.id, w.doc_language]));
+    for (const c of db.classification) {
+      const code = isBuiltin(c) && c.code !== null && (CLASSIFICATION_CODES as readonly string[]).includes(c.code) ? (c.code as ClassificationCode) : null;
+      c.definition ??= code ? builtinText(code, language.get(c.workspace_id) ?? "en").definition : null;
+    }
+    for (const w of db.workspace) w.naming_conventions ??= null;
+    Object.assign(db, { format: DEV_DB_FORMAT });
   }
   return { report, passwordsGiven };
 }

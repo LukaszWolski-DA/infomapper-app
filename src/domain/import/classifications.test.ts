@@ -26,6 +26,32 @@ const nameOf = (model: ImportModel) => (id: string) => model.classifications!.fi
 const hash = ownClassification("01900000-0000-7000-8000-c100000000d1", "Hash candidate");
 const withOwn = (): ImportModel => ({ ...emptyModel(), classifications: [...builtins(), hash] });
 
+describe("an own classification's code (slice 23, item 14, S23-03)", () => {
+  const coded = ownClassification("01900000-0000-7000-8000-c100000000d2", "Hash candidate", "column", { code: "HASH_KEY" });
+  const removed = ownClassification("01900000-0000-7000-8000-c100000000d3", "Old one", "column", { code: "OLD", deleted_at: NOW });
+  const model = (): ImportModel => ({ ...emptyModel(), classifications: [...builtins(), coded, removed] });
+  const FILE = fileOf([
+    ["t", "a", "int", { cls: "HASH_KEY" }],
+    ["t", "b", "int", { cls: "hash key" }],
+    ["t", "c", "int", { cls: "Hash candidate" }],
+    ["t", "d", "int", { cls: "OLD" }],
+  ]);
+
+  it("matches it by its code as the import compares, and by its current name; a removed one's code is unknown", () => {
+    const m = model();
+    const plan = buildPlan(m, FILE, { newName: "S" }, allOf(FILE));
+    for (const c of ["a", "b", "c"]) expect(column(plan, "t", c).classificationIds.map(nameOf(m))).toEqual(["Hash candidate"]);
+    expect(column(plan, "t", "d").classificationIds).toEqual([]);
+    expect(plan.warnings).toContain(UNKNOWN_CLASSIFICATION(5, "OLD", "s.t.d", 0));
+  });
+
+  it("writes the matched own classification on a new column", () => {
+    const m = model();
+    const { model: after } = importInto(m, fileOf([["t", "a", "int", { cls: "hash_key" }]]), { newName: "S" });
+    expect(codesOf(after, columnNamed(after, "t", "a").id)).toEqual(["HASH_KEY"]);
+  });
+});
+
 describe("reading the file's classifications (P6, S7C-10)", () => {
   const FILE = fileOf([
     ["t", "a", "int", { pk: true, cls: "bk" }],
@@ -52,10 +78,10 @@ describe("reading the file's classifications (P6, S7C-10)", () => {
     const plan = buildPlan(withOwn(), FILE, { newName: "S" }, allOf(FILE));
     expect(plan.warnings).toEqual([
       "“Master data” is a table classification; ignored on s.t.d (row 5).",
-      "Unknown classification “XYZ” on s.t.e (row 6; 1 more row in this table), ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it.",
-      "Unknown classification “XYZ” on s.u.a (row 8), ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it.",
+      "Unknown classification “XYZ” on s.t.e (row 6; 1 more row in this table), ignored. Add it in Metadata conventions on the workspace home to use it.",
+      "Unknown classification “XYZ” on s.u.a (row 8), ignored. Add it in Metadata conventions on the workspace home to use it.",
     ]);
-    expect(UNKNOWN_CLASSIFICATION(2, "Q", "s.t.a", 2)).toBe("Unknown classification “Q” on s.t.a (row 2; 2 more rows in this table), ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it.");
+    expect(UNKNOWN_CLASSIFICATION(2, "Q", "s.t.a", 2)).toBe("Unknown classification “Q” on s.t.a (row 2; 2 more rows in this table), ignored. Add it in Metadata conventions on the workspace home to use it.");
     expect(TABLE_CLASSIFICATION_ON_COLUMN(2, "Staging", "s.t.a", 0)).toBe("“Staging” is a table classification; ignored on s.t.a (row 2).");
     expect(column(plan, "t", "d").classificationIds).toEqual([]);
     expect(column(plan, "t", "e").classificationIds).toEqual([]);

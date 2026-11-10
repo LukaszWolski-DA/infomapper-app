@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CommandResult } from "../changes";
 import { access, archived, builtin, builtins, classificationLink, fixtureLinks, ids, makeCtx, NOW, ownClassification, sourceColumn, sourceTable } from "../__fixtures__/domain";
-import { TAKEN_NAME, WHAT_STOPS } from "../model/classifications";
+import { BAD_CODE, TAKEN_CODE, TAKEN_NAME, WHAT_STOPS } from "../model/classifications";
 import type { Classification, SourceChange } from "../types";
 import {
   addClassification,
@@ -13,6 +13,8 @@ import {
   restoreClassification,
   RESTORE_TAKEN,
   setClassification,
+  setClassificationDefinition,
+  DEFINITION_LABEL,
   WRONG_SCOPE,
 } from "./classification";
 
@@ -41,6 +43,69 @@ describe("add an own classification (item 8, S7C-04)", () => {
   it("refuses reviewers, readers and an archived workspace (item 12)", () => {
     for (const a of [access("reviewer"), access("reader"), access("owner", archived)]) {
       expect(addClassification(makeCtx(), a, { classifications: list() }, { scope: "column", name: "Hash candidate" }).ok).toBe(false);
+    }
+  });
+});
+
+describe("an own classification with a code (slice 23, items 6, decision 3, F4)", () => {
+  const add = (input: object, classifications: Classification[] = list()) => addClassification(makeCtx(), access("modeler"), { classifications }, input);
+
+  it("stores the code trimmed and upper-cased; without one the classification has none", () => {
+    const r = add({ scope: "column", name: "Hash candidate", code: " hash " });
+    expect(r.ok && r.value.classification).toMatchObject({ code: "HASH", origin: "own", definition: null });
+    expect(add({ scope: "column", name: "Hash candidate", code: "  " })).toMatchObject({ ok: true, value: { classification: { code: null } } });
+    expect(add({ scope: "column", name: "Hash candidate" })).toMatchObject({ ok: true, value: { classification: { code: null } } });
+  });
+
+  it("refuses a bad code and a taken one (a built-in code, an earlier own code, a removed one's, the import's comparison)", () => {
+    expect(add({ scope: "column", name: "Hash candidate", code: "9x" })).toMatchObject({ ok: false, error: { code: "invalid", message: BAD_CODE, fields: { code: BAD_CODE } } });
+    const earlier = ownClassification("01900000-0000-7000-8000-c100000000a3", "Hash", "column", { code: "HASH_KEY" });
+    const removed = ownClassification("01900000-0000-7000-8000-c100000000a4", "Old", "table", { code: "GOLD", deleted_at: NOW });
+    const state = [...list(), earlier, removed];
+    for (const code of ["BK", "bk", "HASH_KEY", "HASHKEY", "GOLD", "T_HUB", "THUB"]) {
+      expect(add({ scope: "column", name: "Something new", code }, state)).toMatchObject({ ok: false, error: { code: "conflict", message: TAKEN_CODE } });
+    }
+    // a code equal to a live name of the scope
+    expect(add({ scope: "column", name: "Something new", code: "HASH" }, state)).toMatchObject({ ok: false, error: { message: TAKEN_CODE } });
+  });
+
+  it("refuses a name equal to an own code of its scope (D-57 as for built-in codes)", () => {
+    const earlier = ownClassification("01900000-0000-7000-8000-c100000000a3", "Hash", "column", { code: "HASH_KEY" });
+    expect(add({ scope: "column", name: "hash key" }, [...list(), earlier])).toMatchObject({ ok: false, error: { message: TAKEN_NAME } });
+    expect(add({ scope: "table", name: "hash key" }, [...list(), earlier]).ok).toBe(true);
+  });
+
+  it("never changes a code afterwards: the rename takes none, and only add accepts one", () => {
+    const own = ownClassification("01900000-0000-7000-8000-c100000000a3", "Hash", "column", { code: "HASH" });
+    const state = { classifications: [...list(), own] };
+    expect(renameClassification(makeCtx(), access("owner"), state, { classificationId: own.id, expectedVersion: 1, name: "Hash 2", code: "OTHER" }).ok).toBe(false);
+    const r = renameClassification(makeCtx(), access("owner"), state, { classificationId: own.id, expectedVersion: 1, name: "Hash 2" });
+    expect(writes(r)[0]).toMatchObject({ row: { code: "HASH", name: "Hash 2" } });
+    expect(setClassificationDefinition(makeCtx(), access("owner"), state, { classificationId: own.id, expectedVersion: 1, definition: "x", code: "OTHER" }).ok).toBe(false);
+  });
+});
+
+describe("a definition (slice 23, item 5)", () => {
+  const bk = builtin("BK", { definition: null });
+  const state = { classifications: [...list().filter((c) => c.code !== "BK"), bk] };
+
+  it("saves it trimmed as one change named for the undo history; empty clears it", () => {
+    const r = setClassificationDefinition(makeCtx(), access("modeler"), state, { classificationId: bk.id, expectedVersion: 1, definition: "  The business key.  " });
+    expect(writes(r)).toEqual([expect.objectContaining({ kind: "update", table: "classification", row: expect.objectContaining({ definition: "The business key.", version: 2, name: "Business key" }) })]);
+    expect(r.ok && r.writeSet.label).toBe(DEFINITION_LABEL("Business key"));
+    expect(r.ok && r.value.removed).toBe(false);
+    const withText = { classifications: [...list().filter((c) => c.code !== "BK"), { ...bk, definition: "Text" }] };
+    const cleared = setClassificationDefinition(makeCtx(), access("modeler"), withText, { classificationId: bk.id, expectedVersion: 1, definition: "   " });
+    expect(writes(cleared)[0]).toMatchObject({ row: { definition: null } });
+    expect(cleared.ok && cleared.value.removed).toBe(true);
+  });
+
+  it("refuses nothing to change, a stale version, too long a text, a reviewer, a reader and an archived workspace", () => {
+    expect(setClassificationDefinition(makeCtx(), access("modeler"), state, { classificationId: bk.id, expectedVersion: 1, definition: "" })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(setClassificationDefinition(makeCtx(), access("modeler"), state, { classificationId: bk.id, expectedVersion: 2, definition: "x" })).toMatchObject({ ok: false, error: { code: "stale_version" } });
+    expect(setClassificationDefinition(makeCtx(), access("modeler"), state, { classificationId: bk.id, expectedVersion: 1, definition: "x".repeat(20001) })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    for (const a of [access("reviewer"), access("reader"), access("owner", archived)]) {
+      expect(setClassificationDefinition(makeCtx(), a, state, { classificationId: bk.id, expectedVersion: 1, definition: "x" }).ok).toBe(false);
     }
   });
 });
@@ -128,6 +193,13 @@ describe("restore a removed built-in one (item 11, S7C-05)", () => {
     expect(restoreClassification(makeCtx(), access("modeler"), { classifications: [removedOwn] }, { classificationId: golden.id, expectedVersion: 1 })).toMatchObject({ ok: false, error: { message: ONLY_BUILTIN_RESTORED } });
     expect(restoreClassification(makeCtx(), access("modeler"), state, { classificationId: removedBk.id, expectedVersion: 1 })).toMatchObject({ ok: false, error: { code: "stale_version" } });
     expect(restoreClassification(makeCtx(), access("reader"), state, { classificationId: removedBk.id, expectedVersion: 2 }).ok).toBe(false);
+  });
+});
+
+describe("a removed own classification is never restored (slice 23, F5)", () => {
+  it("refuses one with a code as it refuses one without", () => {
+    const own = ownClassification("01900000-0000-7000-8000-c100000000a5", "Hash", "column", { code: "HASH", deleted_at: NOW });
+    expect(restoreClassification(makeCtx(), access("owner"), { classifications: [...list(), own] }, { classificationId: own.id, expectedVersion: 1 })).toMatchObject({ ok: false, error: { message: ONLY_BUILTIN_RESTORED } });
   });
 });
 

@@ -30,6 +30,8 @@ export interface CreateOrganizationFormInput {
   name: string;
   email: string;
   workspaceName: string;
+  /** The first workspace's documentation language (slice 23, F1); English if absent. */
+  workspaceLanguage?: string;
   password: string;
   passwordAgain: string;
 }
@@ -37,6 +39,8 @@ export interface CreateOrganizationFormInput {
 export interface NewOrganizationFormInput {
   organizationName: string;
   workspaceName: string;
+  /** The first workspace's documentation language (slice 23, F1); English if absent. */
+  workspaceLanguage?: string;
   password: string;
   passwordAgain: string;
 }
@@ -69,9 +73,9 @@ export async function createOrganizationAction(input: CreateOrganizationFormInpu
   const checked = checkCreateOrganizationForm({ accountWithEmail }, input);
   if (!checked.ok) return refused(checked.error);
   const accessHash = await scryptHasher.hash(input.password);
-  const { organizationName, name, email, workspaceName } = input;
+  const { organizationName, name, email, workspaceName, workspaceLanguage } = input;
   const result = await runCommandAs(uuidv7(), async (ctx) =>
-    createOrganization(ctx, { accountWithEmail }, { organizationName, name, email, workspaceName, accessHash }),
+    createOrganization(ctx, { accountWithEmail }, { organizationName, name, email, workspaceName, workspaceLanguage, accessHash }),
   );
   if (!result.ok) return result;
   await writeSession(result.value.userId, [result.value.organizationId]);
@@ -93,8 +97,8 @@ export async function createOrganizationFromMenuAction(input: NewOrganizationFor
   const checked = checkNewOrganizationForm(input);
   if (!checked.ok) return refused(checked.error);
   const accessHash = await scryptHasher.hash(input.password);
-  const { organizationName, workspaceName } = input;
-  const result = await runCommand(async (ctx, _store, user) => createOrganizationForUser(ctx, { user }, { organizationName, workspaceName, accessHash }));
+  const { organizationName, workspaceName, workspaceLanguage } = input;
+  const result = await runCommand(async (ctx, _store, user) => createOrganizationForUser(ctx, { user }, { organizationName, workspaceName, workspaceLanguage, accessHash }));
   if (!result.ok) return result;
   await writeSession(session.user.id, [...session.unlocked, result.value.organizationId]);
   revalidatePath("/", "layout");

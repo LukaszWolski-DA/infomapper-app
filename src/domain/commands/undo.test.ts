@@ -42,7 +42,7 @@ import { changeLabel } from "../model/change-label";
 import { deleteMapping, mergeMappings, setMappingStatus } from "./mapping";
 import { createProject, deleteProject } from "./project";
 import { createRelationship, deleteRelationship } from "./relationship";
-import { addClassification, removeClassification, setClassification } from "./classification";
+import { addClassification, removeClassification, renameClassification, setClassification, setClassificationDefinition } from "./classification";
 import {
   CLASSIFICATION_NAME_CLASH,
   isUndoable,
@@ -767,6 +767,35 @@ describe("classifications (slice 7c): each change is one undo step", () => {
       ok: false,
       error: { code: "conflict", message: CLASSIFICATION_NAME_CLASH("Hash candidate") },
     });
+  });
+
+  it("refuses to bring back a name that is another one's code now (slice 23, F4)", () => {
+    const own = ownClassification("01900000-0000-7000-8000-c100000000b1", "Hash");
+    const rows: Rows = { ...withList(), classification: [...builtins(), own] };
+    const renamed = ok(renameClassification(makeCtx(), modeler, { classifications: listOf(rows) }, { classificationId: own.id, expectedVersion: 1, name: "Hash 2" }));
+    const afterRename = apply(rows, renamed);
+    const added = ok(addClassification(makeCtx(ids.someoneElse), modeler, { classifications: listOf(afterRename) }, { scope: "column", name: "Hash key", code: "HASH" }));
+    const afterAdd = apply(afterRename, added);
+    expect(revertChangeGroup(makeCtx(), modeler, { events: renamed.events, rows: afterAdd }, "undo")).toMatchObject({
+      ok: false,
+      error: { code: "conflict", message: CLASSIFICATION_NAME_CLASH("Hash") },
+    });
+  });
+
+  it("undoes and redoes a definition (slice 23, item 5)", () => {
+    const rows = withList();
+    const bk = builtin("BK");
+    const { undone, afterUndo } = doAndUndo(rows, (r) => ok(setClassificationDefinition(ctx, modeler, { classifications: listOf(r) }, { classificationId: bk.id, expectedVersion: 1, definition: "Mine" })));
+    expect(undone.ok).toBe(true);
+    expect(find(afterUndo, "classification", bk.id).definition).toBe(bk.definition);
+  });
+
+  it("keeps an own code taken after its add is undone (slice 23, F16)", () => {
+    const rows = withList();
+    const { undone, afterUndo } = doAndUndo(rows, (r) => ok(addClassification(ctx, modeler, { classifications: listOf(r) }, { scope: "column", name: "Hash candidate", code: "HASH" })));
+    expect(undone.ok).toBe(true);
+    expect(addClassification(makeCtx(), modeler, { classifications: listOf(afterUndo) }, { scope: "column", name: "Hash candidate", code: "HASH" })).toMatchObject({ ok: false, error: { message: "That code is taken" } });
+    expect(addClassification(makeCtx(), modeler, { classifications: listOf(afterUndo) }, { scope: "column", name: "Hash candidate" }).ok).toBe(true);
   });
 });
 
