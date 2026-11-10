@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 22's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 23's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`); at slice 15b's close (5 November 2026) the fact's and dimension's descriptions and role-playing dimensions were marked present, with their deliberate differences; at slice 15c's close (5 November 2026) dimensional mappings and "fed" coverage were marked present, with their deliberate differences. At slice 16's close (6 November 2026) the prototype was replaced by its version with the canvas menus (`docs/prd/slice-16-canvas-menus.md`), and its items 1 to 3 and 7 were marked present, with their deliberate differences (`docs/prd/slice-16-acceptance.md`). At slice 17's close (8 November 2026) the prototype was replaced by its version with the modelling ergonomics (`docs/prd/slice-17-modelling-ergonomics.md`), and its five items were marked present, with their deliberate differences (`docs/prd/slice-17-acceptance.md`, P1 to P12). At slice 18's close (8 November 2026) the prototype was replaced by its version with derivations (`docs/prd/slice-18-derivations.md`): calculated attributes and lookups were marked present, with their deliberate differences (`docs/prd/slice-18-acceptance.md`, P1 to P13). The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`); at slice 15b's close (5 November 2026) the fact's and dimension's descriptions and role-playing dimensions were marked present, with their deliberate differences; at slice 15c's close (5 November 2026) dimensional mappings and "fed" coverage were marked present, with their deliberate differences. At slice 16's close (6 November 2026) the prototype was replaced by its version with the canvas menus (`docs/prd/slice-16-canvas-menus.md`), and its items 1 to 3 and 7 were marked present, with their deliberate differences (`docs/prd/slice-16-acceptance.md`). At slice 17's close (8 November 2026) the prototype was replaced by its version with the modelling ergonomics (`docs/prd/slice-17-modelling-ergonomics.md`), and its five items were marked present, with their deliberate differences (`docs/prd/slice-17-acceptance.md`, P1 to P12). At slice 18's close (8 November 2026) the prototype was replaced by its version with derivations (`docs/prd/slice-18-derivations.md`): calculated attributes and lookups were marked present, with their deliberate differences (`docs/prd/slice-18-acceptance.md`, P1 to P13). At slice 23's close (10 November 2026) the prototype was replaced by its version with the Metadata conventions tab (`docs/prd/slice-23-metadata-conventions.md`): the tab, Settings' "Model conventions" box and the language at a workspace's creation were marked present, with their deliberate differences (`docs/prd/slice-23-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -232,8 +232,30 @@ reading every classification and suggesting some, and the Data Vault reading of 
 | Readings that use Link candidate and Satellite source | the prototype lists both table classifications; its reading reads neither | `DEFAULT_CLASSES` | idea |
 
 Beyond the prototype, slice 7c's other ideas are in `docs/ideas.md`: a panel-only write that does not redraw the canvas,
-rich text for all notes at once, built-in names per documentation language, a `table_classifications` column in the
-source standard, own classifications with a code (and, under Model, the entity panel's Data Vault hints).
+rich text for all notes at once, a `table_classifications` column in the source standard (and, under Model, the entity
+panel's Data Vault hints). Built-in names per documentation language and own classifications with a code came in slice
+23 (below).
+
+**Present since slice 23 (D-78):** the workspace home's "Metadata conventions" tab (prototype `CONV`), between People and
+Settings, for every member: the classification list with definitions, codes (built-in and own), uses, Remove and
+Restore; the concepts' colours (moved from Settings); the naming conventions; "Edit the list…" in the table and column
+panels opens it (`data-imx-opencls`); a new workspace's built-in names and definitions in its documentation language.
+
+**Deliberate differences (slice 23, step 1 answers):**
+- a "Documentation language" select where a workspace is created (the top bar's "New workspace", the start page's and
+  the organization menu's organization forms); the prototype's new workspace takes a name only (F1);
+- Settings' "Model conventions" box has the sentence and the button to the tab only, without the prototype's chips of
+  stereotypes, classifications and the type map (F12);
+- a restore refused while the name is taken says the app's "Rename {other} first: {name} is taken.", not the
+  prototype's toast (F6);
+- removing one that is used or that a rule reads shows D-57's form in a small dialog, not the browser's `confirm`; any
+  other is removed at once with Undo (F7);
+- codes are unique in the import's comparison and against the names of their scope; a removed own one keeps its code
+  (F3, F4, F16); the prototype frees a removed own one's code and compares codes exactly;
+- an existing workspace kept its names when slice 23 was installed and got only the definitions in its language; the
+  prototype's seeding also renames (F2);
+- the hint names no language (F13); a taken name shows under the field, not as a toast (F19);
+- the naming conventions are a workspace setting outside undo (F11).
 
 **Deliberate differences (slice 7a, PRD section 8 and `docs/prd/slice-07a-acceptance.md`):**
 - mappings have inputs (AD-26): conflicts, business key changes and rule rewrites are judged per input;
@@ -345,10 +367,11 @@ draws it for everyone and refuses the change. The armed button disarms after 4 s
 and re-importing only for owners, admins and modelers in a workspace that is not archived (7a, item 40). Since slice 8,
 in the development form (D-58): "Add a person" (name, e-mail, role, a summary; the account at once, reached through the
 organization's link and password), the role select and Remove per member for owners and admins, and the "Organization
-access" box (the link, changing the password). Since slice 21 (D-76): the settings' "Concept colours" box (prototype
-`data-ccol`), for those who may edit the model, one undo step per change. Still missing from the settings: the
-prototype's "Model conventions" box (stereotypes, column classification, type mapping chips) and its "Statuses" and
-"Requirement templates" lines.
+access" box (the link, changing the password). Since slice 21 (D-76): "Concept colours" (prototype `data-ccol`), for
+those who may edit the model, one undo step per change; since slice 23 (D-78) in the Metadata conventions tab, and the
+settings' "Model conventions" box points there (its sentence and button; the prototype's chips are a deliberate
+difference, see Sources). Still missing from the settings: the prototype's "Statuses" and "Requirement templates"
+lines.
 
 **Deliberate differences (slice 8, PRD section 8):** a start page with signing in and creating an organization; adding
 makes the account at once instead of an invitation; Remove asks first and says when the person leaves the organization;

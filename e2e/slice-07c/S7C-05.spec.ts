@@ -5,7 +5,7 @@
 import { WHAT_STOPS } from "../../src/domain/model/classifications";
 import { expect, test } from "./fixtures";
 import { setClassification } from "../../src/domain/commands/classification";
-import { asPerson, classesOf, classification, columnId, expectToast, groups, listRow, loadModel, openColumn, openList, SEED_IDS, toggle, undo } from "./helpers";
+import { asPerson, backToColumn, classesOf, classification, columnId, expectToast, groups, listRow, loadModel, openColumn, openList, SEED_IDS, toggle, undo } from "./helpers";
 
 const piiLinks = async () => {
   const m = await loadModel();
@@ -17,7 +17,7 @@ test("S7C-05: remove Personal data: its uses and what stops first, Cancel, Remov
   await openColumn(page, "customers", "fname");
   await expect(toggle(page, "Personal data")).toHaveAttribute("aria-pressed", "true");
   await openList(page);
-  const dialog = page.getByTestId("dialog-classifications");
+  const dialog = page; // slice 23: the list is the Metadata conventions tab, the form in its own small dialog
   await listRow(page, "Personal data").getByTestId("button-remove-classification").click();
   const form = dialog.getByTestId("form-remove-classification");
   await expect(form.getByTestId("remove-classification-uses")).toHaveText("Personal data is used on 0 tables and 6 columns.");
@@ -43,7 +43,7 @@ test("S7C-05: remove Personal data: its uses and what stops first, Cancel, Remov
   await expect(dialog.getByTestId("removed-classification")).toHaveText(/Personal data/);
 
   // Undo brings the classification and its links back
-  await page.keyboard.press("Escape");
+  await backToColumn(page, "customers", "fname");
   await expect(toggle(page, "Personal data")).toHaveCount(0);
   await undo(page);
   await expect.poll(async () => (await classification("PII")).deleted_at).toBeNull();
@@ -59,7 +59,7 @@ test("S7C-05: remove Personal data: its uses and what stops first, Cancel, Remov
   await expectToast(page, "Restored Personal data.");
   await expect.poll(async () => (await classification("PII")).deleted_at).toBeNull();
   expect(await piiLinks()).toBe(0);
-  await page.keyboard.press("Escape");
+  await backToColumn(page, "customers", "fname");
   await expect(groups(page)).toHaveText(["General"]);
   await expect(toggle(page, "Personal data")).toHaveAttribute("aria-pressed", "false");
 });
@@ -67,7 +67,7 @@ test("S7C-05: remove Personal data: its uses and what stops first, Cancel, Remov
 test("S7C-05: the form whenever a rule reads it, even unused; an unused own one and a built-in no rule reads go at once (Łukasz, step 4)", async ({ page }) => {
   await openColumn(page, "customers", "cust_no");
   await openList(page);
-  const dialog = page.getByTestId("dialog-classifications");
+  const dialog = page; // slice 23: the list is the Metadata conventions tab, the form in its own small dialog
   // used: its uses and what stops
   await listRow(page, "Business key").getByTestId("button-remove-classification").click();
   await expect(dialog.getByTestId("remove-classification-uses")).toHaveText("Business key is used on 0 tables and 4 columns.");
@@ -105,7 +105,7 @@ test("S7C-05: an unused Business key shows the form with what stops", async ({ p
   }
   await openColumn(page, "customers", "cust_no");
   await openList(page);
-  const dialog = page.getByTestId("dialog-classifications");
+  const dialog = page; // slice 23: the list is the Metadata conventions tab, the form in its own small dialog
   await expect(listRow(page, "Business key").getByTestId("classification-uses")).toHaveText("unused");
   await listRow(page, "Business key").getByTestId("button-remove-classification").click();
   await expect(dialog.getByTestId("remove-classification-uses")).toHaveText("Business key is unused.");

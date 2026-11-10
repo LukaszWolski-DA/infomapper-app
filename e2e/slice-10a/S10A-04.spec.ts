@@ -166,16 +166,16 @@ test("S10A-04: delete a working label (label panel), after its name", async ({ p
   await noConflict(page);
 });
 
-test("S10A-04: remove and restore a classification (list dialog), between saves of its name", async ({ page }) => {
+test("S10A-04: remove and restore a classification (Metadata conventions), between saves of its name", async ({ page }) => {
   await recordToasts(page);
   await openColumn(page, "customers", "cust_no");
   await openList(page);
-  const dialog = page.getByTestId("dialog-classifications");
+  const dialog = page; // slice 23: the Metadata conventions tab, the removal form in its own small dialog
   const row = dialog.locator('[data-testid="classification-row"][data-code="LDTS"]');
   await typeAndLeave(row.getByTestId("input-classification-name"), "Load time A");
   await row.getByTestId("button-remove-classification").click();
   const confirm = dialog.getByTestId("button-confirm-remove-classification");
-  if (await confirm.isVisible().catch(() => false)) await confirm.click();
+  await confirm.click(); // slice 23: Load date has what stops, so the form always shows (read when the dialog opens)
   await dialog.getByTestId("removed-classification").filter({ hasText: "Load time A" }).getByTestId("button-restore-classification").click();
   await typeAndLeave(row.getByTestId("input-classification-name"), "Load time B");
   await expect.poll(async () => (await loadModel()).classifications.find((c) => c.code === "LDTS")).toMatchObject({ name: "Load time B", deleted_at: null });

@@ -15,7 +15,7 @@ test("S7C-13: a reviewer and a reader see the list, the toggles and the note rea
   const noteId = await captureActionId(page, () => note.blur());
   await expectToast(page, "Note saved on segment");
   await openList(page);
-  const dialog = page.getByTestId("dialog-classifications");
+  const dialog = page.getByTestId("box-classifications");
   await dialog.getByTestId("input-new-column-classification").fill("Hash candidate");
   const addId = await captureActionId(page, () => dialog.getByTestId("button-add-column-classification").click());
   await expect.poll(async () => (await loadModel()).classifications.filter((c) => c.name === "Hash candidate")).toHaveLength(1);
@@ -29,9 +29,11 @@ test("S7C-13: a reviewer and a reader see the list, the toggles and the note rea
     await expect(toggle(other, "Technical / audit")).toBeDisabled();
     await expect(other.getByTestId("panel-source-column").getByTestId("input-source-note")).toHaveAttribute("readonly", "");
     await openList(other);
-    const theirs = other.getByTestId("dialog-classifications");
+    const theirs = other.getByTestId("box-classifications");
     await expect(theirs.getByTestId("classification-row").first()).toBeVisible();
-    await expect(theirs.locator("input, button:not([data-slot='dialog-close'])")).toHaveCount(0);
+    // slice 23: the Metadata conventions tab; its definitions are read-only text areas
+    await expect(theirs.locator("input, button")).toHaveCount(0);
+    await expect(theirs.locator("textarea:not([readonly])")).toHaveCount(0);
     // the server refuses the toggle, the note and the list
     await callActionDirectly(other, toggleId, [RETAIL, { classificationId: tech.id, target: { kind: "source_column", id: segment }, on: false }]);
     await callActionDirectly(other, noteId, [RETAIL, { target: { kind: "source_column", id: segment }, expectedVersion: version, note: "Theirs" }]);
@@ -57,7 +59,8 @@ test("S7C-13: an archived workspace: everything read-only; the server refuses th
   await expect(toggle(page, "Technical / audit")).toBeDisabled();
   await expect(page.getByTestId("panel-source-column").getByTestId("input-source-note")).toHaveAttribute("readonly", "");
   await openList(page);
-  await expect(page.getByTestId("dialog-classifications").locator("input, button:not([data-slot='dialog-close'])")).toHaveCount(0);
+  await expect(page.getByTestId("box-classifications").locator("input, button")).toHaveCount(0);
+  await expect(page.getByTestId("box-classifications").locator("textarea:not([readonly])")).toHaveCount(0);
   await callActionDirectly(page, toggleId, [RETAIL, { classificationId: tech.id, target: { kind: "source_column", id: segment }, on: false }]);
   expect(await classesOf(segment)).toEqual(["TECH"]);
 });

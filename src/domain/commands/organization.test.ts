@@ -155,6 +155,19 @@ describe("createOrganizationForUser (item 9)", () => {
     expect(r.writeSet.events.every((e) => e.user_id === ids.actor && e.workspace_id === r.value.workspaceId)).toBe(true);
   });
 
+  it("writes the first workspace in the chosen documentation language, English when absent (slice 23, F1)", () => {
+    const rowsOf = (input: object) => {
+      const r = createOrganizationForUser(makeCtx(), { user: user() }, input);
+      if (!r.ok) throw new Error(r.error.message);
+      return r.writeSet.writes;
+    };
+    const pl = rowsOf({ ...menuInput, workspaceLanguage: "pl" });
+    expect(pl.find((w) => w.table === "workspace")).toMatchObject({ row: { doc_language: "pl" } });
+    expect(pl.find((w) => w.table === "classification" && (w as { row: { code: string } }).row.code === "BK")).toMatchObject({ row: { name: "Klucz biznesowy" } });
+    expect(rowsOf(menuInput).find((w) => w.table === "workspace")).toMatchObject({ row: { doc_language: "en" } });
+    expect(createOrganizationForUser(makeCtx(), { user: user() }, { ...menuInput, workspaceLanguage: "xx" }).ok).toBe(false);
+  });
+
   it("needs the signed-in person", () => {
     expect(createOrganizationForUser(makeCtx(), { user: null }, menuInput)).toMatchObject({ ok: false, error: { code: "not_found" } });
     expect(createOrganizationForUser(makeCtx(), { user: user({ id: ids.someoneElse }) }, menuInput)).toMatchObject({ ok: false });

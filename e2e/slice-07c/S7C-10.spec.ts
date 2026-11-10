@@ -42,7 +42,7 @@ test("S7C-10: codes and names read, unknown values and a table classification wa
   const warnings = page.getByTestId("review-warnings");
   await expect(warnings).toContainText("“Master data” is a table classification; ignored on s.t.d (row 5).");
   await expect(warnings).toContainText(
-    "Unknown classification “XYZ” on s.t.e (row 6; 1 more row in this table), ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it.",
+    "Unknown classification “XYZ” on s.t.e (row 6; 1 more row in this table), ignored. Add it in Metadata conventions on the workspace home to use it.",
   );
   await expect(warnings).not.toContainText("not read yet");
   await importNow(page, /^Imported into Feed: /);

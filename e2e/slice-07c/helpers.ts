@@ -1,5 +1,6 @@
 // Slice 7c's e2e helpers: a source column's or table's panel opened on "Customer & orders", the Classifications
-// section's toggles and the classification list's dialog on the page, classifications read back from the e2e data file
+// section's toggles and the classification list on the page (since slice 23 the workspace home's Metadata conventions
+// tab, reached by "Edit the list…"), classifications read back from the e2e data file
 // (by code or name), and Data Vault 2.0 mode switched as test data.
 
 import { expect, type Page } from "@playwright/test";
@@ -53,16 +54,23 @@ export const toggle = (page: Page, name: string) => page.getByTestId("section-cl
 /** The group labels the open panel's section shows. */
 export const groups = (page: Page) => page.getByTestId("section-classifications").getByTestId("classification-group").locator("> div:first-child");
 
-/** Opens the classification list from the open panel. */
+/** Opens the classification list from the open panel: since slice 23 "Edit the list…" opens the Metadata conventions tab. */
 export async function openList(page: Page) {
   await page.getByTestId("button-edit-classifications").click();
-  await expect(page.getByTestId("dialog-classifications")).toBeVisible();
+  await expect(page.getByTestId("page-conventions")).toBeVisible();
+  await expect(page.getByTestId("classification-row").first()).toBeVisible();
+}
+
+/** Back to a column's panel on "Customer & orders" from the list (slice 23: the list is a page of its own). */
+export async function backToColumn(page: Page, table: string, column: string) {
+  await openCanvas(page, `${canvasUrl()}?row=${await columnId(table, column)}`);
+  await expect(page.getByTestId("panel-source-column").locator("h2")).toHaveText(column);
 }
 
 /** A row of the list by its current name (read-only rows show the name as text, editable ones in an input). */
 export const listRow = (page: Page, name: string) =>
   page
-    .getByTestId("dialog-classifications")
+    .getByTestId("box-classifications")
     .getByTestId("classification-row")
     .filter({ has: page.locator(`input[value="${name}"], [data-testid="classification-name"]:text-is("${name}")`) });
 

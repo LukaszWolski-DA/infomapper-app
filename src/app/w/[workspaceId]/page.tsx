@@ -18,11 +18,13 @@ import { ArchiveBox, UnarchiveButton } from "./_components/lifecycle";
 import { NewProjectTile } from "./_components/new-project-tile";
 import { AddPersonBox, OrganizationAccessBox, RemovePersonButton, RoleSelect } from "./_components/people";
 import { SettingsForm } from "./_components/settings-form";
+import { Conventions } from "./_components/conventions";
 import { settingsBoxes } from "@/compose/settings";
 import { moduleFeeds } from "@/compose";
 import { workspacePeople } from "@/app/_lib/people";
 
-const TABS = ["overview", "people", "settings"] as const;
+// slice 23: "Metadata conventions" between People and Settings, for every member (item 1)
+const TABS = ["overview", "people", "conventions", "settings"] as const;
 type Tab = (typeof TABS)[number];
 
 export default async function WorkspaceHomePage({ params, searchParams }: PageProps<"/w/[workspaceId]">) {
@@ -138,6 +140,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               [
                 ["overview", "Overview"],
                 ["people", `People (${members.length})`],
+                ["conventions", "Metadata conventions"],
                 ["settings", "Settings"],
               ] as const
             ).map(([key, label]) => (
@@ -307,17 +310,29 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
             </>
           )}
 
+          {tab === "conventions" && (
+            <Conventions
+              workspaceId={workspace.id}
+              workspaceVersion={workspace.version}
+              // D-57's roles for every field of the tab (Q7): owners, admins and modelers, not in an archived workspace
+              editable={can(access, "model.edit")}
+              dataVault={workspace.dv2_mode}
+              classifications={model.classifications}
+              uses={classificationUses(model)}
+              // slice 21 (D-76): "Concept colours", moved here from Settings (item 12)
+              concepts={model.concepts
+                .filter((c) => c.deleted_at === null)
+                .sort((x, y) => x.sort_order - y.sort_order)
+                .map((c) => ({ id: c.id, version: c.version, name: c.name, color: c.color }))}
+              namingConventions={workspace.naming_conventions}
+            />
+          )}
+
           {tab === "settings" && (
             <SettingsForm
               editable={can(access, "workspace.edit_settings")}
               modules={await settingsBoxes(store, access)}
               dataVaultUses={dataVaultUses(indexOf(model))}
-              // slice 21 (D-76): "Concept colours", for those who may edit the model (as a concept's rename)
-              concepts={model.concepts
-                .filter((c) => c.deleted_at === null)
-                .sort((x, y) => x.sort_order - y.sort_order)
-                .map((c) => ({ id: c.id, version: c.version, name: c.name, color: c.color }))}
-              conceptsEditable={can(access, "model.edit")}
               initial={{
                 workspaceId: workspace.id,
                 version: workspace.version,
@@ -335,6 +350,15 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     </AppShell>
     </UndoProvider>
   );
+}
+
+/** Each classification's live uses on tables and columns (slice 23, the tab's "Used"; plain numbers, F7). */
+function classificationUses(model: Parameters<typeof indexOf>[0]): Record<string, number> {
+  const ix = indexOf(model);
+  return Object.fromEntries(ix.list.map((c) => {
+    const u = ix.uses(c.id);
+    return [c.id, u.tables.length + u.columns.length];
+  }));
 }
 
 /** The organization's sign-in link (item 13), on the host this page was asked for. */

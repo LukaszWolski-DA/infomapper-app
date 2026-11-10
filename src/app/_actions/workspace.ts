@@ -6,7 +6,7 @@
 import { revalidatePath } from "next/cache";
 import type { DataStore } from "@/data";
 import { createProject, deleteProject, updateProject } from "@/domain/commands/project";
-import { archiveWorkspace, createWorkspace, unarchiveWorkspace, updateWorkspaceSettings, type InfoCubeSwitchState } from "@/domain/commands/workspace";
+import { archiveWorkspace, createWorkspace, setNamingConventions, unarchiveWorkspace, updateWorkspaceSettings, type InfoCubeSwitchState } from "@/domain/commands/workspace";
 import { dimensionalCount } from "@/domain/model/levels";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
@@ -43,7 +43,8 @@ function done<T>(result: ActionResult<T>): ActionResult<T> {
   return result;
 }
 
-export async function createWorkspaceAction(input: { organizationId: string; name: string }) {
+/** Slice 23 (F1): `docLanguage` (English if absent) gives the built-in classifications their names and definitions. */
+export async function createWorkspaceAction(input: { organizationId: string; name: string; docLanguage?: string }) {
   return done(
     await runCommand(async (ctx, store, user) => {
       const organization = typeof input?.organizationId === "string" ? await store.organizations.get(input.organizationId) : null;
@@ -71,6 +72,18 @@ export async function updateWorkspaceSettingsAction(input: {
       if (!access) return NOT_FOUND;
       const result = updateWorkspaceSettings(ctx, access, input, input?.infocube === undefined ? undefined : await infoCubeSwitch(store, access));
       return result.ok ? { ...result, value: { version: result.value.workspace.version } } : result;
+    }),
+  );
+}
+
+/** The naming conventions (slice 23, F11): a workspace setting outside undo, for owners, admins and modelers. */
+export async function setNamingConventionsAction(input: { workspaceId: string; expectedVersion: number; namingConventions: string | null }): Promise<ActionResult<Saved<{ removed: boolean }>>> {
+  return done(
+    await runCommand(async (ctx, store, user) => {
+      const access = await loadAccess(store, input?.workspaceId, user.id);
+      if (!access) return NOT_FOUND;
+      const result = setNamingConventions(ctx, access, input);
+      return result.ok ? { ...result, value: { removed: result.value.removed, version: result.value.workspace.version } } : result;
     }),
   );
 }

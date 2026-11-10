@@ -434,7 +434,10 @@ The notes on mappings, source tables and source columns are plain text (`plainTe
 while descriptions are rich text (AD-17, D-42). Moving all three notes to the rich-text editor together would keep them
 alike; doing one alone would make the panels differ.
 
-## Built-in classification names per documentation language (slice 7c, PRD section 9)
+## Built-in classification names per documentation language (slice 7c, PRD section 9): done in slice 23
+
+**Done in slice 23** (D-78): a workspace gets the built-in names and definitions in its documentation language (English,
+Polish, German), chosen when it is created; a later change of the language renames nothing.
 
 The 19 built-in classifications get English default names ("Business key", "Personal data", …). A workspace documented
 in another language renames them by hand (P1). Default names per the workspace's documentation language would save it;
@@ -457,7 +460,10 @@ The prototype lists the table classifications Link candidate (`T_LNK`) and Satel
 never reads them; neither does the app's. A reading could, for example, ask about a Link candidate that has fewer than
 two relationships, or name a Satellite source's parent hub.
 
-## Own classifications with a code (slice 7c, PRD section 9)
+## Own classifications with a code (slice 7c, PRD section 9): done in slice 23
+
+**Done in slice 23** (D-78): an own classification may get a code when it is added, never changed, unique in the
+import's comparison; the import matches it by its name or its code.
 
 An import file names an own classification by its current name only; only built-in ones have a code that survives a
 rename. An optional code on own classifications would let a team keep its files stable while renaming in the app.
@@ -863,6 +869,35 @@ What comes later (slice 22, PRD section 9 and the steps):
 - **Per-attribute history** (SCD per attribute) in `cube_attribute`, the table named for such settings.
 - **A check comparing a lookup's no-match value with the unknown member's** (decision 4b, not taken).
 - **Every primary key's value in a fact's Dimensions row** when a dimension has several (the row shows the first key's).
+
+## Metadata conventions: what comes later (slice 23, PRD section 9; step 1, Q8)
+
+Slice 23 (D-78) gave the conventions one place, the workspace home's "Metadata conventions" tab. Left for later, each
+with what step 1 found it needs (`docs/prd/slice-23-acceptance.md`, Q8):
+- **Entity stereotypes' names and definitions** (decision 6a; own stereotypes after that, 6b). The five codes stay
+  (`entity_stereotype_ck` and the local schema's `oneOf(STEREOTYPES)`; a fact or a dimension keeps `object`, unused,
+  C-5). A row per workspace and stereotype code, in the shape of the built-in classifications' texts per language
+  (`BUILTIN_TEXTS`). Four places show a stereotype's name today and must read it: `buildCards` (`card-data.ts`, the
+  card's first line, which `text-fit.ts` measures, so the card's width follows the shown name as aliases did in slice
+  11), `tree-data.ts`, `left-panel.tsx` (twice, the raw code) and the entity panel's select. Own stereotypes need the
+  CHECK dropped (a migration, the local schema, a format) and `entity.stereotype` read as a code of the workspace's
+  list.
+- **The map from physical to logical types** (decision 7). First a decision on approved mappings whose type conflict
+  appears or disappears when the map changes (D-51). The rule is one module, `src/domain/model/type-check.ts`, with the
+  classes as module constants (`PHYSICAL_CLASSES`, `CLASS_OF`); a workspace's map is a parameter through its callers:
+  `card-data.ts`, `line-data.ts`, `model-index.ts`, `attribute-panel.tsx`, `map-column.tsx`, the requirement index
+  (`requirements.ts`), `consistency.ts`, `coverage.ts`, the import's D-51 rules (`rules.ts`), `plan.ts`,
+  `standard.ts`, `column-type.ts` and `logicalTypeOf` (an attribute made from a column), as `AttributeFeeds` went
+  through the requirement index in slice 15d. InfoCube's `typesDiffer` compares logical types only and reads no map.
+- **An organization's default conventions** (decision 8): saved from a workspace and taken over by another, matched by
+  code (built-in codes, and since slice 23 own codes; an own one without a code only by name). A removed own
+  classification keeps its code for good (F16), so taking over a default whose code a removed row holds must bring that
+  row back, not insert a new one: restore, today for built-in ones only, would then take own ones with a code.
+- **Reset built-in names and definitions to a language's defaults**, as an explicit action with a preview (decision 4
+  keeps a later language change from renaming anything). The texts are in the domain (`BUILTIN_TEXTS`); the action
+  would compare each built-in row with them and show what changes.
+- **A check of names against the naming conventions** (they are plain text now, D-78).
+- **InfoDocumenter** printing the definitions, the colours and the naming conventions (its own PRDs).
 
 ## Keep the mapping rule's draft when its panel closes (slice 20, step 1 answer 10)
 

@@ -16,6 +16,7 @@ import {
   type OrganizationMember,
   type Project,
   type ProjectCanvas,
+  type DocLanguage,
   type Workspace,
   type WorkspaceMember,
 } from "../types";
@@ -26,7 +27,8 @@ export const FIRST_CANVAS_NAME = "First canvas";
 
 // ---- create ----
 
-const createWorkspaceInput = z.object({ organizationId: uuidSchema, name: nameSchema });
+/** Slice 23 (F1): the documentation language, English if absent; the built-in classifications' texts follow it. */
+const createWorkspaceInput = z.object({ organizationId: uuidSchema, name: nameSchema, docLanguage: z.enum(DOC_LANGUAGES).optional() });
 export type CreateWorkspaceInput = z.input<typeof createWorkspaceInput>;
 
 export interface CreateWorkspaceState {
@@ -37,7 +39,8 @@ export interface CreateWorkspaceState {
 
 /**
  * Creates an empty workspace in the organization with the creator as owner,
- * one project "First project" and one canvas "First canvas" in it, and the built-in classifications (slice 7c, item 4).
+ * one project "First project" and one canvas "First canvas" in it, and the built-in classifications (slice 7c, item 4) in
+ * its documentation language (slice 23, item 9: names and definitions; a later change of the language renames nothing).
  */
 export function createWorkspace(
   ctx: CommandContext,
@@ -52,7 +55,7 @@ export function createWorkspace(
   if (!parsed.ok) return fail(parsed.error);
   if (parsed.data.organizationId !== organization.id) return fail(notFound("organization"));
 
-  const rows = newWorkspaceRows(ctx, organization.id, parsed.data.name);
+  const rows = newWorkspaceRows(ctx, organization.id, parsed.data.name, parsed.data.docLanguage ?? "en");
   return {
     ok: true,
     value: { workspaceId: rows.workspaceId, projectId: rows.projectId, canvasId: rows.canvasId },
@@ -69,6 +72,7 @@ export function newWorkspaceRows(
   ctx: CommandContext,
   organizationId: Uuid,
   name: string,
+  language: DocLanguage,
 ): { workspaceId: Uuid; projectId: Uuid; canvasId: Uuid; writes: Write[] } {
   const workspace: Workspace = {
     ...newRowColumns(ctx),
@@ -76,13 +80,14 @@ export function newWorkspaceRows(
     name,
     client_name: null,
     description: null,
-    doc_language: "en",
+    doc_language: language,
     dv2_mode: false,
     four_eyes: false,
     infocube: false,
     archived_at: null,
     archived_by: null,
     requirement_key_next: 101,
+    naming_conventions: null,
   };
   const member: WorkspaceMember = {
     workspace_id: workspace.id,
@@ -125,7 +130,7 @@ export function newWorkspaceRows(
       { kind: "insert", table: "project", row: project },
       { kind: "insert", table: "canvas", row: canvas },
       { kind: "insert", table: "project_canvas", row: link },
-      ...builtinClassificationRows(ctx, workspace.id).map((row): Write => ({ kind: "insert", table: "classification", row })),
+      ...builtinClassificationRows(ctx, workspace.id, language).map((row): Write => ({ kind: "insert", table: "classification", row })),
     ],
   };
 }
@@ -197,6 +202,41 @@ export function updateWorkspaceSettings(
   return {
     ok: true,
     value: { workspace: row },
+    writeSet: buildWriteSet(ctx, workspace.id, [{ kind: "update", table: "workspace", before: workspace, row }]),
+  };
+}
+
+// ---- naming conventions (slice 23, item 13, F11) ----
+
+const namingConventionsInput = z
+  .object({ workspaceId: uuidSchema, expectedVersion: versionSchema, namingConventions: z.string().max(20000, "This text is too long.").nullable() })
+  .strict();
+export type SetNamingConventionsInput = z.input<typeof namingConventionsInput>;
+
+/** The toasts (slice 23); no Undo: a workspace setting. */
+export const NAMING_SAVED = "Saved the naming conventions.";
+export const NAMING_CLEARED = "Cleared the naming conventions.";
+
+/**
+ * The workspace's naming conventions, plain text: trimmed, empty clears them (null). A workspace setting outside undo,
+ * like the documentation language (D-12, F11), but for those who edit the classification list (D-57: owners, admins
+ * and modelers, not in an archived workspace), on the workspace row's version (D-59).
+ */
+export function setNamingConventions(ctx: CommandContext, access: WorkspaceAccess, input: unknown): CommandResult<{ workspace: Workspace; removed: boolean }> {
+  const denied = checkPermission(access, "model.edit");
+  if (denied) return fail(denied);
+  const parsed = parseInput(namingConventionsInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { workspace } = access;
+  const p = parsed.data;
+  if (p.workspaceId !== workspace.id) return fail(notFound("workspace"));
+  if (p.expectedVersion !== workspace.version) return fail(staleVersion());
+  const value = p.namingConventions?.trim() || null;
+  if (value === workspace.naming_conventions) return fail(domainError("invalid", "Nothing to change."));
+  const row = nextVersion(ctx, workspace, { naming_conventions: value });
+  return {
+    ok: true,
+    value: { workspace: row, removed: value === null },
     writeSet: buildWriteSet(ctx, workspace.id, [{ kind: "update", table: "workspace", before: workspace, row }]),
   };
 }

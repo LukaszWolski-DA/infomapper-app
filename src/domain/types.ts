@@ -98,6 +98,8 @@ export interface Workspace extends VersionedColumns {
   archived_at: Timestamp | null;
   archived_by: Uuid | null;
   requirement_key_next: number;
+  /** The workspace's naming conventions, plain text, trimmed, never empty (slice 23, F11): a setting outside undo. */
+  naming_conventions: string | null;
 }
 
 export interface WorkspaceMember {
@@ -280,6 +282,8 @@ export type ClassificationOrigin = (typeof CLASSIFICATION_ORIGINS)[number];
  * One entry of the workspace's classification list (P3). A built-in one has a `code` the rules read (`BK`, `PII`…),
  * fixed for good; renaming changes only `name`. `name_key` is the normalized name the server writes (`norm`), unique per
  * workspace and scope among live rows. Removed ones are soft-deleted; restoring a built-in one brings the same row back.
+ * Slice 23 (D-78): an own one may have a code too, set when it is added and never changed; built-in ones are told by
+ * `origin`, never by having a code. Every one has an optional definition, plain text.
  */
 export interface Classification extends StandardColumns {
   code: string | null;
@@ -287,6 +291,8 @@ export interface Classification extends StandardColumns {
   name_key: string;
   scope: ClassificationScope;
   origin: ClassificationOrigin;
+  /** What it means, plain text, trimmed, never empty (slice 23). */
+  definition: string | null;
 }
 
 /** One classification on one source table or column (AD-15): exactly one of the two is set. */

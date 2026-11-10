@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { access, archived, ids, makeCtx, NOW, organization, organizationMember, workspace } from "../__fixtures__/domain";
 import { STALE_VERSION_MESSAGE } from "../errors";
-import { WORKSPACE_ROLES } from "../types";
+import { WORKSPACE_ROLES, type Classification } from "../types";
 import {
   archiveWorkspace,
   createWorkspace,
   FIRST_CANVAS_NAME,
   FIRST_PROJECT_NAME,
+  setNamingConventions,
   unarchiveWorkspace,
   updateWorkspaceSettings,
 } from "./workspace";
@@ -87,6 +88,48 @@ describe("createWorkspace", () => {
       ok: false,
       error: { code: "not_found" },
     });
+  });
+});
+
+describe("createWorkspace in a documentation language (slice 23, F1, items 9, 11)", () => {
+  const state = { organization: organization(), organizationMember: organizationMember() };
+  const builtinRows = (r: ReturnType<typeof createWorkspace>) =>
+    r.ok ? r.writeSet.writes.filter((w) => w.kind === "insert" && w.table === "classification").map((w) => (w as { row: Classification }).row) : [];
+
+  it("writes the language and the built-in names and definitions in it; English when absent", () => {
+    const pl = createWorkspace(makeCtx(), state, { organizationId: ids.org, name: "Polski", docLanguage: "pl" });
+    expect(pl.ok && pl.writeSet.writes.find((w) => w.table === "workspace")).toMatchObject({ row: { doc_language: "pl", naming_conventions: null } });
+    expect(builtinRows(pl).find((c) => c.code === "BK")).toMatchObject({ name: "Klucz biznesowy", definition: "Kolumna identyfikuje obiekt biznesowy w źródle; przetrwa zmiany systemu." });
+    const de = createWorkspace(makeCtx(), state, { organizationId: ids.org, name: "Deutsch", docLanguage: "de" });
+    expect(builtinRows(de).find((c) => c.code === "BK")?.name).toBe("Fachlicher Schlüssel");
+    const en = createWorkspace(makeCtx(), state, { organizationId: ids.org, name: "English" });
+    expect(builtinRows(en).find((c) => c.code === "PII")).toMatchObject({ name: "Personal data", definition: "The column holds personal data in the sense of the GDPR." });
+    expect(createWorkspace(makeCtx(), state, { organizationId: ids.org, name: "X", docLanguage: "fr" }).ok).toBe(false);
+  });
+
+  it("changing the language later renames nothing and rewrites no definition (item 11)", () => {
+    const r = updateWorkspaceSettings(makeCtx(), access("owner", { doc_language: "pl" }), { workspaceId: ids.ws, expectedVersion: 3, docLanguage: "de" });
+    expect(r.ok && r.writeSet.writes.map((w) => w.table)).toEqual(["workspace"]);
+  });
+});
+
+describe("setNamingConventions (slice 23, item 13, F11)", () => {
+  const input = (namingConventions: string | null, expectedVersion = 3) => ({ workspaceId: ids.ws, expectedVersion, namingConventions });
+
+  it("saves them trimmed for owners, admins and modelers; empty clears them; no undo table", () => {
+    for (const role of ["owner", "admin", "modeler"] as const) {
+      const r = setNamingConventions(makeCtx(), access(role), input("  - Entities: singular  "));
+      expect(r.ok && r.writeSet.writes).toEqual([expect.objectContaining({ kind: "update", table: "workspace", row: expect.objectContaining({ naming_conventions: "- Entities: singular", version: 4 }) })]);
+    }
+    const cleared = setNamingConventions(makeCtx(), access("owner", { naming_conventions: "x" }), input("  "));
+    expect(cleared.ok && cleared.value).toMatchObject({ removed: true, workspace: { naming_conventions: null } });
+  });
+
+  it("refuses nothing to change, a stale version, too long a text, a reviewer, a reader and an archived workspace", () => {
+    expect(setNamingConventions(makeCtx(), access("owner"), input(""))).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(setNamingConventions(makeCtx(), access("owner"), input("x", 2))).toMatchObject({ ok: false, error: { message: STALE_VERSION_MESSAGE } });
+    expect(setNamingConventions(makeCtx(), access("owner"), input("x".repeat(20001)))).toMatchObject({ ok: false, error: { code: "invalid" } });
+    for (const a of [access("reviewer"), access("reader"), access("owner", archived)]) expect(setNamingConventions(makeCtx(), a, input("x")).ok).toBe(false);
   });
 });
 

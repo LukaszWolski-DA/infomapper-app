@@ -77,13 +77,14 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
     dv2_mode: false,
     four_eyes: false,
     infocube: false,
+    naming_conventions: null,
     archived_at: null,
     archived_by: null,
     requirement_key_next: 101,
     ...audit,
   });
   db.workspace_member.push({ workspace_id: ws, user_id: by, role: "owner", added_by: by, created_at: at });
-  addBuiltinClassifications(db, ws, by, at);
+  addBuiltinClassifications(db, ws, by, at, "en");
   let columnsSeen = 0, tablesSeen = 0;
   db.project.push({ id: LARGE_IDS.project, workspace_id: ws, name: "Performance", description: null, ...audit });
   db.canvas.push({ id: LARGE_IDS.canvas, workspace_id: ws, name: "100 cards", live_label_id: null, look: { ...DEFAULT_CANVAS_LOOK }, entity_names: null, attribute_names: null, ...audit });

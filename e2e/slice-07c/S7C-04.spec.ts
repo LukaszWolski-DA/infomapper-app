@@ -2,27 +2,29 @@
 // panels and the review; an import matches the new name and the built-in's code.
 
 import { expect, test } from "./fixtures";
-import { classesOf, columnId, expectPressed, fileOf, groups, listRow, loadModel, openColumn, openList, renameBuiltin, reviewFile, reviewRow, toggle } from "./helpers";
+import { backToColumn, classesOf, columnId, expectPressed, fileOf, groups, listRow, loadModel, openColumn, openList, renameBuiltin, reviewFile, reviewRow, toggle } from "./helpers";
 
 test("S7C-04: add an own classification, rename a built-in and an own one; the panels show the new names", async ({ page }) => {
   await openColumn(page, "customers", "cust_no");
   await openList(page);
-  const dialog = page.getByTestId("dialog-classifications");
-  await expect(dialog).toContainText("One list for the workspace. Data Vault ones show while Data Vault 2.0 mode is on in the workspace settings.");
+  // slice 23: the list is the Metadata conventions tab
+  const dialog = page.getByTestId("box-classifications");
+  await expect(dialog).toContainText("One list for the workspace's source tables and columns.");
   await expect(dialog.getByTestId("section-column-classifications").getByTestId("classification-row")).toHaveCount(10);
   await expect(dialog.getByTestId("section-table-classifications").getByTestId("classification-row")).toHaveCount(9);
-  // the Data Vault ones show with their chip whatever the mode (F21); uses and "built in"
-  await expect(listRow(page, "Link key").getByTestId("chip-data-vault")).toHaveText("Data Vault 2.0");
+  // the Data Vault ones show with their chip whatever the mode (F21; slice 23: "hidden while the mode is off"); uses and
+  // the code (slice 23: the Code column says what "built in" said)
+  await expect(listRow(page, "Link key").getByTestId("chip-data-vault")).toHaveText("Data Vault 2.0 · hidden while the mode is off");
   await expect(listRow(page, "Business key").getByTestId("classification-uses")).toHaveText("used 4×");
   await expect(listRow(page, "Personal data").getByTestId("classification-uses")).toHaveText("used 6×");
   await expect(listRow(page, "Load date").getByTestId("classification-uses")).toHaveText("unused");
-  await expect(listRow(page, "Load date")).toContainText("built in");
+  await expect(listRow(page, "Load date").getByTestId("classification-code")).toHaveText("LDTS");
 
   // add an own one
   await dialog.getByTestId("input-new-column-classification").fill("Hash candidate");
   await dialog.getByTestId("button-add-column-classification").click();
   await expect(listRow(page, "Hash candidate")).toBeVisible();
-  await expect(listRow(page, "Hash candidate")).not.toContainText("built in");
+  await expect(listRow(page, "Hash candidate").getByTestId("classification-code")).toHaveText("—");
   await expect.poll(async () => (await loadModel()).classifications.find((c) => c.name === "Hash candidate")).toMatchObject({ code: null, scope: "column", origin: "own" });
 
   // a taken name: another's name or a built-in code, in any case and spacing
@@ -48,8 +50,7 @@ test("S7C-04: add an own classification, rename a built-in and an own one; the p
   await own.fill("Hash key candidate");
   await own.press("Enter");
   await expect.poll(async () => (await loadModel()).classifications.filter((c) => c.name === "Hash key candidate")).toHaveLength(1);
-  await expect(dialog.getByText("A new name is also the name an import file must use; for built-in ones the code (e.g. BK) keeps working.")).toBeVisible();
-  await page.keyboard.press("Escape");
+  await backToColumn(page, "customers", "cust_no");
 
   // the panel: the renamed Business key still pressed (the code), the own one under "This workspace"
   await expect(groups(page)).toHaveText(["General", "This workspace"]);
@@ -63,11 +64,11 @@ test("S7C-04 (the import's part): an import matches a renamed built-in's new nam
   await renameBuiltin("BK", "Klucz biznesowy");
   await openColumn(page, "customers", "cust_no");
   await openList(page);
-  const dialog = page.getByTestId("dialog-classifications");
+  const dialog = page.getByTestId("box-classifications");
   await dialog.getByTestId("input-new-column-classification").fill("Hash candidate");
   await dialog.getByTestId("button-add-column-classification").click();
   await expect(listRow(page, "Hash candidate")).toBeVisible();
-  await page.keyboard.press("Escape");
+  await backToColumn(page, "customers", "cust_no");
   await page.getByTestId("tab-sources").click();
   await page.getByTestId("button-import-sources").click();
   const file = fileOf([

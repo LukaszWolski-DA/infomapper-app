@@ -166,6 +166,7 @@ export function changeLabel(events: readonly ChangeEvent[], nouns: Readonly<Reco
     if (e.operation === "delete") return `Remove classification ${name}`;
     if (e.operation === "restore") return `Restore classification ${name}`;
     if (only(e, ["name", "name_key"])) return `Rename classification ${String(e.before_image?.name ?? "")}`;
+    if (only(e, ["definition"])) return `Change definition of ${name}`;
   }
   if (classLinks.length === 1 && classLinks.length + settles.length === events.length) return classLinks[0]!.operation === "create" ? "Set classification" : "Clear classification";
   const sources = [...of("source_table"), ...of("source_column")];

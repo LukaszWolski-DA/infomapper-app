@@ -20,6 +20,7 @@
 
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
+import { normClassification } from "../model/classifications";
 import { derivationIndex } from "../model/derivations";
 import { followOriginals } from "../model/copies";
 import { levelWritesRefusal } from "../model/levels";
@@ -575,15 +576,23 @@ function requirementKeyClash(rows: Map<string, Map<string, AnyRow>>, touched: re
   return null;
 }
 
-/** Slice 7c: a classification live after the revert whose name another live one of its scope has (answer F10). */
+/**
+ * Slice 7c: a classification live after the revert whose name another live one of its scope has (answer F10). Slice 23
+ * (F4): or whose name is, as the import compares, the code of another one of its scope (removed ones too, as
+ * `nameTakenBy`).
+ */
 export const CLASSIFICATION_NAME_CLASH = (name: string) => `This can't be undone: another classification is called ${name} now.`;
 function classificationNameClash(rows: Map<string, Map<string, AnyRow>>, touched: readonly { table: string; key: string }[]): DomainError | null {
-  const live = [...rows.get("classification")!.values()].filter((r) => r.deleted_at === null);
+  const all = [...rows.get("classification")!.values()];
+  const live = all.filter((r) => r.deleted_at === null);
   for (const { table, key } of touched) {
     if (table !== "classification") continue;
     const row = rows.get("classification")!.get(key);
     if (!row || row.deleted_at !== null) continue;
     if (live.some((o) => o.id !== row.id && o.scope === row.scope && o.name_key === row.name_key)) return domainError("conflict", CLASSIFICATION_NAME_CLASH(String(row.name)));
+    if (all.some((o) => o.id !== row.id && o.scope === row.scope && typeof o.code === "string" && normClassification(o.code) === row.name_key)) {
+      return domainError("conflict", CLASSIFICATION_NAME_CLASH(String(row.name)));
+    }
   }
   return null;
 }

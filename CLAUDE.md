@@ -58,7 +58,10 @@ column maps them as the opposite drag does; the concept picker makes a new conce
 one undo step; a requirement gap says "column left the source"; the mapping rule keeps its draft; the settings set a
 concept's colour (slice 21, D-76). A dimension has an unknown member, on unless turned off, with a value per attribute
 (defaults by type, a value that does not fit its type marked), shown in a fact's Dimensions and as a lookup's placeholder,
-with two model checks (slice 22, D-77).
+with two model checks (slice 22, D-77). A workspace's conventions have one place, the workspace home's "Metadata
+conventions" tab: the classification list (slice 7c's dialog moved there) with definitions and own codes the import
+matches, the concepts' colours and the naming conventions; a new workspace's built-in classifications are named and
+defined in the documentation language chosen when it is created (slice 23, D-78).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -426,6 +429,7 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spe
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
 npx tsx scripts/bench-thumbnails.ts                           # slice 12b: the homes' server work and the thumbnails' cost (index, shapes, paths, bytes, 20 requests, keys; not a gate)
+SCREENS=<folder> npx playwright test e2e/slice-23/S23-screens.spec.ts                     # slice 23: the Metadata conventions tab, the remove dialog, Settings' Model conventions, the new workspace's language; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts                     # slice 22: the unknown member's section (a value, a value that does not fit, off), Fact Sales' Dimensions; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
 npx tsx scripts/bench-checks.ts                               # slice 20: the model checks (marks and counts, the home with its lines; bar 50 ms in Node), synthetic, Performance test, demo
@@ -656,6 +660,14 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - write the e2e file as slice 21 left it (`writeBeforeSlice22`) and with InfoCube off beside its facts and dimensions
     (`writeInfoCubeOff`, which the app never does: C-7).
   Call `recordToasts` before the page is opened: it is an init script (S22-02).
+
+  Slice 23's fixtures are slice 0's (the plain seed). Its helpers do the following:
+  - open the workspace home's Metadata conventions tab (`openConventions`, `conventionsUrl`, `settingsTabUrl`) and find
+    a row by code or name (`rowOf`, `rowNamed`), its fields (`nameInput`, `definitionInput`) and add an own one
+    (`addOwn`); type and leave a field (`typeAndLeave`);
+  - read the e2e data file's classifications and workspaces (`stored`, `workspaceNamed`, `builtinOfWorkspace`).
+  Slice 7c's `openList` opens the tab through "Edit the list…" and `backToColumn` returns to a column's panel; the tab
+  is a page of its own, so a removal's form is in its own dialog on the page.
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,
@@ -1006,6 +1018,13 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   wrote the 19 rows per workspace, turned the flags into links and moved hand-typed column comments into notes; it lists
   them in `.data/upgrade-8-<file>.txt` (column paths only) with one log line. Notes are plain text like a mapping's
   (`setSourceNote`); a column's comment is the source's and read-only.
+  **Slice 23 (D-78):** built-in ones are told by `origin` (`isBuiltin`), never by having a code: an own one may have a code
+  (set by `addClassification` only), unique as the import compares (`codeRefusal`: every code of the workspace, removed
+  and deleted rows included, and the names of its scope; `nameTakenBy` compares names with every code). The built-in
+  texts per documentation language are `BUILTIN_TEXTS` (`builtinClassificationRows(ctx, workspace, language)`). The list
+  is edited in the workspace home's Metadata conventions tab (`src/app/w/[workspaceId]/_components/conventions.tsx`; the
+  page sends the rows and their use counts, the removal reads its impact with `classificationImpactAction`); the naming
+  conventions are `workspace.naming_conventions`, outside undo (`setNamingConventions`, `model.edit`).
 - **Session and unlocked organizations** (slice 8, D-58, F1, F3): the session is a signed cookie
   (`src/app/_lib/dev-session.ts`, HMAC with `INFOMAPPER_SESSION_SECRET` or `.data/session-secret`) holding the person
   and the organizations unlocked in it; `getSession()` (`src/app/_lib/session.ts`) refuses an unsigned or edited

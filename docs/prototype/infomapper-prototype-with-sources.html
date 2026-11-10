@@ -1161,6 +1161,34 @@ body.im-chgmode #lines .lnk.map.im-hit .s{stroke-width:2.6px}
 #imChgBar[hidden]{display:none}
 #imChgBar select{max-width:260px}
 
+/* Metadata conventions tab */
+.cv-intro{color:var(--ink-2);margin:14px 0 4px;max-width:80ch}
+.cv-box{background:var(--surface);border-radius:10px;box-shadow:0 0 0 1px var(--line);padding:14px 16px;margin-top:14px}
+.cv-box h3{margin:0 0 4px;font-size:15px}
+.cv-box h4{margin:14px 0 6px;font-size:13px;color:var(--ink-2)}
+.cv-hint{font-size:12.5px;color:var(--ink-3);margin:0 0 6px;max-width:90ch}
+.cv-wrap{overflow-x:auto}
+.cv-t{width:100%;border-collapse:collapse;font-size:12.5px}
+.cv-t th{text-align:left;font-weight:500;color:var(--ink-3);padding:4px 8px 4px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.cv-t td{padding:5px 8px 5px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.cv-t input,.cv-t textarea,.cv-t select,.cv-add input,.cv-add select,.cv-box>textarea{width:100%;border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:4px 8px;font:inherit;color:inherit}
+.cv-t textarea{min-width:200px;resize:vertical}
+.cv-t td:nth-child(3) input{min-width:140px}
+.cv-n{color:var(--ink-3);white-space:nowrap}
+.cv-t.cv-ty{width:auto}.cv-t.cv-ty select{width:auto}
+.cv-dim td{opacity:.6}
+.cv-chip{display:inline-block;font-size:10.5px;padding:0 6px;border-radius:8px;background:var(--hover);color:var(--ink-2);white-space:nowrap}
+.cv-chip.own{background:var(--logical-soft);color:var(--logical)}
+.cv-add{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:6px;margin-top:10px}
+.cv-box>textarea{font-size:12.5px;line-height:1.5;resize:vertical}
+.cv-gone{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:12.5px;color:var(--ink-3);margin-top:8px}
+.cv-gone>span{display:inline-flex;gap:6px;align-items:center}
+.cv-col{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.cv-col>span{width:140px;font-size:12.5px}
+.cv-later{margin-top:14px;font-style:italic}
+.cv-t td:first-child input{max-width:240px}
+.cv-t textarea{min-width:320px;width:100%}
+.cv-t td:nth-child(3){width:48%}
 </style>
 </head>
 <body>
@@ -1858,6 +1886,7 @@ function cubeDemoV3(S) {          // RP-F: Dim Date plays Order date and Ship da
   S.cube.keys.push({id:"ckey_order_date", rel:"rel_date_sales", attr:"datr_sales_date_key"}, {id:"ckey_ship_date", rel:"rel_date_sales_ship", attr:"datr_sales_ship_date_key"});
 }
 function idx() {
+  if (window.__conv23) try { window.__conv23(); } catch (e) {}   /* slice 23: a workspace's conventions are seeded once, in its documentation language */
   cubeRootMigrate();
   if (!S.cube) cubeDemo(S);                   // InfoCube: once per model (the demo star, or empty)
   cubeDemoV2(S); cubeDemoV3(S); cubeDemoV4(S); cubeDemoV5(S); cubeDemoV6(S); checksDemo(S);
@@ -5939,7 +5968,7 @@ function renderWsHome() {
 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h1 style="margin:0;font-size:24px">${esc(w.name)}</h1>${w.archived ? '<span class="badge arch">Archived · read-only</span>' : ""}${w.settings?.dv2 ? '<span class="badge dv">Data Vault 2.0 mode</span>' : ""}<span class="badge">${esc(myRole())}${(w.members.find(m => m.you) || {}).guest ? " · guest" : ""}</span></div>
 <div style="color:var(--ink-2);margin-top:4px">${esc(w.client ? "Client: " + w.client + ". " : "")}${esc(w.desc || "")}</div>
 ${w.archived ? `<div class="banner">This workspace is archived. Everything is read-only.${owner || myRole() === "Owner" ? ` <button class="btn sm" data-wa="unarchive">Unarchive</button>` : ""}</div>` : perm !== "full" ? `<div class="banner info">You are a ${esc(myRole().toLowerCase())} here: ${perm === "review" ? "you can approve mappings and requirements and add notes, but not edit the model." : "read-only."}</div>` : ""}
-<div class="wh-tabs" role="tablist">${[["overview", "Overview"], ["baselines", `Baselines (${w.baselines.length})`], ["people", `People (${w.members.length})`], ["settings", "Settings"]].map(([k, l]) => `<button role="tab" data-wtab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}</div>`;
+<div class="wh-tabs" role="tablist">${[["overview", "Overview"], ["baselines", `Baselines (${w.baselines.length})`], ["people", `People (${w.members.length})`], ["conv", "Metadata conventions"], ["settings", "Settings"]].map(([k, l]) => `<button role="tab" data-wtab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}</div>`;
   let body = "";
   if (tab === "overview") {
     const empty = !S.entities.length && !S.sources.length;
@@ -5952,6 +5981,8 @@ ${["Owner", "Admin"].includes(myRole()) ? `<h3>Workspace lifecycle</h3><div clas
 <div class="box"><h4>${w.archived ? "Unarchive" : "Archive"}</h4><p>${w.archived ? "Make it editable again." : "Freeze it as read-only, e.g. when the project at the client is over. It stays visible and searchable."}</p><button class="btn sm" data-wa="${w.archived ? "unarchive" : "archive"}" ${myRole() === "Owner" ? "" : "disabled"}>${w.archived ? "Unarchive" : "Archive"}</button></div>
 <div class="box"><h4>Transfer to another organization</h4><p>Hand the model over, e.g. to the client after the project. Only the Owner can do it.</p><div class="row2"><select id="wa-org">${ROOT.orgs.filter(o => o.id !== w.orgId).map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join("")}</select><button class="btn sm" data-wa="transfer" ${owner ? "" : "disabled"}>Transfer</button></div></div>
 <div class="box"><h4>Export and delete</h4><p>Deleting is permanent. A full export of the workspace is shown first, so nothing is lost by accident.</p><div class="row2"><button class="btn sm" data-wa="export">Export</button><button class="btn sm danger" data-wa="delete" ${myRole() === "Owner" ? "" : "disabled"}>Export and delete…</button></div></div></div>` : ""}`;
+  } else if (tab === "conv") {
+    body = CONV.tab();
   } else if (tab === "baselines") {
     body = `<p style="color:var(--ink-2);margin-top:14px">A baseline freezes the model (entities, attributes, sources, mappings, relationships, requirements) with a name, e.g. for a sign-off. Compare it with today, or produce documentation exactly as it was.</p>
 ${perm === "full" ? `<div class="box" style="margin:12px 0 18px"><h4>New baseline</h4><div class="row2"><input type="text" id="bl-name" placeholder="Name, e.g. Stage 2 sign-off" style="flex:1;min-width:220px"><input type="text" id="bl-note" placeholder="Note (optional)" style="flex:2;min-width:220px"><button class="btn sm pri" data-wa="baseline">Create baseline</button></div></div>` : ""}
@@ -5985,8 +6016,8 @@ ${V.cubeRefused ? `<p class="cuberef" style="margin:6px 0 0;color:var(--warn);fo
 <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-wsset="fourEyes" ${w.settings?.fourEyes ? "checked" : ""} ${dis}> Four-eyes approval</label>
 <p style="margin-top:8px">Statuses: <span class="chips" style="display:inline-flex"><span>Draft</span><span>In review</span><span>Approved</span></span></p>
 <p>Requirement templates: built in for now; editable here later (D-45).</p></div>
-<div class="box"><h4>Concept colours</h4><p>Violet is reserved for requirements, so it is not offered here.</p>${S.concepts.map(c => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="width:130px">${esc(c.name)}</span><div class="swatches">${ALLOWED_CONCEPT_COLORS.map(col => `<button style="background:${col}" data-ccol="${c.id}" data-v="${col}" aria-pressed="${String(c.color).toUpperCase() === col}" aria-label="${col}" ${wsPerm() === "full" ? "" : "disabled"}></button>`).join("")}</div></div>`).join("")}</div>
-<div class="box"><h4>Model conventions</h4><p>Entity stereotypes</p><div class="chips">${["Object", "Link", "Dictionary", "Context", "Informative"].map(x => `<span>${x}</span>`).join("")}</div>
+<div class="box" style="display:none"><h4>Concept colours</h4><p>Violet is reserved for requirements, so it is not offered here.</p>${S.concepts.map(c => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="width:130px">${esc(c.name)}</span><div class="swatches">${ALLOWED_CONCEPT_COLORS.map(col => `<button style="background:${col}" data-ccol="${c.id}" data-v="${col}" aria-pressed="${String(c.color).toUpperCase() === col}" aria-label="${col}" ${wsPerm() === "full" ? "" : "disabled"}></button>`).join("")}</div></div>`).join("")}</div>
+<div class="box"><h4>Model conventions</h4><p>Classifications, concept colours and naming conventions are edited in <button class="btn sm" onclick="V.wsTab='conv';renderWsHome()">Metadata conventions</button>.</p><p>Entity stereotypes</p><div class="chips">${["Object", "Link", "Dictionary", "Context", "Informative"].map(x => `<span>${x}</span>`).join("")}</div>
 <p style="margin-top:12px">Column classification</p><div class="chips"><span>BK · business key</span><span>PII · personal data</span></div>
 <p style="margin-top:12px">Physical to logical types</p><div class="chips"><span>varchar, nvarchar, char → String</span><span>int, bigint → Integer</span><span>decimal → Decimal</span><span>date, datetime2 → Date</span></div>
 <p style="margin-top:10px;color:var(--ink-3)">Editable per workspace in the app.</p></div></div>`;
@@ -6002,6 +6033,7 @@ function insWsSide() {
 }
 const wsBox = $("#wshome");
 wsBox.addEventListener("click", ev => {
+  if (V.wsTab === "conv" && CONV.click(ev)) return;
   const lic = ev.target.closest("[data-cubelic]");
   if (lic) { ev.stopImmediatePropagation(); const w = curWs(), o = ROOT.orgs.find(x => x.id === w.orgId), had = cubeLicensed(w);
     rootChange(() => { o.licences = had ? (o.licences || []).filter(x => x !== "infocube") : [...(o.licences || []), "infocube"]; },
@@ -6035,6 +6067,7 @@ wsBox.addEventListener("click", ev => {
 });
 const curOrgName = w => ROOT.orgs.find(o => o.id === w.orgId)?.name || "";
 wsBox.addEventListener("change", ev => {
+  if (V.wsTab === "conv" && CONV.change(ev)) return;
   const w = curWs(), f = ev.target.dataset.ws, st = ev.target.dataset.wsset, rl = ev.target.dataset.role;
   if (f) { const v = ev.target.value.trim(); if (f === "name" && !v) { renderWsHome(); return; } rootChange(() => { w[f] = v; }); return; }
   if (st === "infocube") {
@@ -6585,7 +6618,8 @@ const DEFAULT_CLASSES = [
 /* The workspace list (AD-08 conventions): built-in ones plus the workspace's own. */
 let CLASSES = [...DEFAULT_CLASSES];
 let CLS = {};
-function indexClasses() { CLASSES = [...DEFAULT_CLASSES, ...((S && S.classes) || [])]; CLS = Object.fromEntries(CLASSES.map(c => [c.code, c])); }
+function indexClasses() { const cv = (S && S.conv) || {}, rm = cv.removed || [], own = (S && S.classes) || [];   /* slice 23: names and removals from the conventions */
+  CLASSES = [...DEFAULT_CLASSES.filter(c => !rm.includes(c.code)).map(c => cv.cls?.[c.code]?.name ? {...c, name:cv.cls[c.code].name} : c), ...own.filter(o => !DEFAULT_CLASSES.some(d => d.code === o.code))]; CLS = Object.fromEntries(CLASSES.map(c => [c.code, c])); }
 indexClasses();
 const norm = s => String(s ?? "").toLowerCase().replace(/[\s_\-\/]+/g, "");
 function classOf(text) {
@@ -8329,7 +8363,7 @@ document.addEventListener("click", ev => {
   const imp = t.closest("[data-imx-import]"); if (imp) { ev.stopPropagation(); openWizard({}); return; }
   const re = t.closest("[data-imx-reimport]"); if (re) { ev.stopPropagation(); openWizard({systemId:re.dataset.imxReimport}); return; }
   const sy = t.closest("[data-imx-sys]"); if (sy && sy.dataset.imxSys) { ev.stopPropagation(); ev.preventDefault(); V.home = false; select({t:"system", id:sy.dataset.imxSys}); return; }
-  if (t.closest("[data-imx-opencls]")) { ev.stopPropagation(); openSettings(); return; }
+  if (t.closest("[data-imx-opencls]")) { ev.stopPropagation(); V.wsHome = true; V.wsTab = "conv"; rebuild(); return; }   /* slice 23: the list is edited in Metadata conventions */
   const tg = t.closest("[data-imx-tog]");
   if (tg) {
     ev.stopPropagation();
@@ -8450,6 +8484,110 @@ return {_dev:{toCSV, sampleRows, SAMPLE_CRM, W, readText, renderWizard}, openWiz
 })();
 
 
+/* =========================================================
+   Slice 23: Metadata conventions (workspace home tab). The one place to edit the workspace's classification list
+   (D-57's dialog moves here): every classification gets a definition; an own classification may get a code, set once;
+   a new workspace gets the built-in names and definitions in its documentation language. The tab also holds the
+   concepts' colours (moved from Settings) and the workspace's naming conventions (plain text).
+   Later (not here): stereotypes' names and definitions, the type map, an organization's default conventions.
+   Prototype storage: S.classes holds own classifications ({code, name, scope, builtin:false, own code flag `uc`});
+   S.conv.cls[code] = {name (a built-in's name in this workspace), def}; S.conv.removed = removed built-in codes;
+   S.conv.naming = the naming conventions. The import module's list reads the same (its indexClasses is patched).
+   ========================================================= */
+const CONV = (() => {
+  const BUILTIN = {BK:["Business key", "column"], PII:["Personal data", "column"], TECH:["Technical / audit", "column"], LDTS:["Load date", "column"], RSRC:["Record source", "column"], LK:["Link key", "column", 1], DCK:["Dependent child key", "column", 1],
+    DK:["Driving key", "column", 1], MAK:["Multi-active key", "column", 1], EFF:["Effective date", "column", 1], T_MASTER:["Master data", "table"], T_TXN:["Transactions", "table"], T_REF:["Reference / code list", "table"], T_STG:["Staging", "table"],
+    T_LOG:["Log / audit", "table"], T_HIST:["History (SCD2)", "table"], T_HUB:["Hub candidate", "table", 1], T_LNK:["Link candidate", "table", 1], T_SAT:["Satellite source", "table", 1]};
+  /* the built-in names and definitions per documentation language: what a new workspace starts with */
+  const DEF = {
+    en:{BK:"The column identifies the business object in the source; it survives system changes.", PII:"The column holds personal data in the sense of the GDPR.", TECH:"A technical or audit column of the source system; not business content.",
+      LDTS:"When the row was loaded.", RSRC:"Which system or file the row came from.", LK:"A foreign key that becomes a link between hubs.", DCK:"Part of the key of a link or a satellite, not a hub of its own.",
+      DK:"The side of a link whose change an effectivity satellite tracks.", MAK:"Several rows are valid at the same time for one key.", EFF:"The date from which the row is valid in the business.",
+      T_MASTER:"Master data: customers, products, organisational units.", T_TXN:"Business events: orders, payments, movements.", T_REF:"Codes and their meanings.", T_STG:"A copy for loading, not a source of truth.",
+      T_LOG:"Logs and audit trails.", T_HIST:"The source keeps history itself (SCD type 2).", T_HUB:"Likely the source of a hub.", T_LNK:"Likely the source of a link.", T_SAT:"Likely the source of a satellite."},
+    pl:{BK:["Klucz biznesowy", "Kolumna identyfikuje obiekt biznesowy w źródle; przetrwa zmiany systemu."], PII:["Dane osobowe", "Kolumna zawiera dane osobowe w rozumieniu RODO."],
+      TECH:["Techniczna / audytowa", "Kolumna techniczna lub audytowa systemu źródłowego; nie treść biznesowa."], LDTS:["Data załadowania", "Kiedy wiersz został załadowany."], RSRC:["Źródło rekordu", "Z którego systemu lub pliku pochodzi wiersz."],
+      LK:["Klucz linku", "Klucz obcy, który staje się linkiem między hubami."], DCK:["Zależny klucz podrzędny", "Część klucza linku lub satelity, a nie osobny hub."], DK:["Klucz wiodący", "Strona linku, której zmianę śledzi satelita efektywności."],
+      MAK:["Klucz wieloaktywny", "Dla jednego klucza obowiązuje jednocześnie kilka wierszy."], EFF:["Data obowiązywania", "Data, od której wiersz obowiązuje biznesowo."],
+      T_MASTER:["Dane podstawowe", "Dane podstawowe: klienci, produkty, jednostki organizacyjne."], T_TXN:["Transakcje", "Zdarzenia biznesowe: zamówienia, płatności, ruchy."], T_REF:["Słownik / lista kodów", "Kody i ich znaczenia."],
+      T_STG:["Staging", "Kopia do ładowania, nie źródło prawdy."], T_LOG:["Log / audyt", "Logi i ślady audytowe."], T_HIST:["Historia (SCD2)", "Źródło samo przechowuje historię (SCD typu 2)."],
+      T_HUB:["Kandydat na hub", "Prawdopodobnie źródło huba."], T_LNK:["Kandydat na link", "Prawdopodobnie źródło linku."], T_SAT:["Źródło satelity", "Prawdopodobnie źródło satelity."]},
+    de:{BK:["Fachlicher Schlüssel", "Die Spalte identifiziert das Geschäftsobjekt in der Quelle; sie überdauert Systemwechsel."], PII:["Personenbezogene Daten", "Die Spalte enthält personenbezogene Daten im Sinne der DSGVO."],
+      TECH:["Technisch / Audit", "Eine technische oder Audit-Spalte des Quellsystems; kein fachlicher Inhalt."], LDTS:["Ladedatum", "Wann die Zeile geladen wurde."], RSRC:["Datensatzquelle", "Aus welchem System oder welcher Datei die Zeile stammt."],
+      LK:["Link-Schlüssel", "Ein Fremdschlüssel, der zu einem Link zwischen Hubs wird."], DCK:["Abhängiger Kindschlüssel", "Teil des Schlüssels eines Links oder Satelliten, kein eigener Hub."], DK:["Treiberschlüssel", "Die Seite eines Links, deren Wechsel ein Effektivitätssatellit verfolgt."],
+      MAK:["Multi-aktiver Schlüssel", "Für einen Schlüssel gelten gleichzeitig mehrere Zeilen."], EFF:["Gültigkeitsdatum", "Das Datum, ab dem die Zeile fachlich gilt."],
+      T_MASTER:["Stammdaten", "Stammdaten: Kunden, Produkte, Organisationseinheiten."], T_TXN:["Bewegungsdaten", "Geschäftsereignisse: Bestellungen, Zahlungen, Bewegungen."], T_REF:["Referenz / Codeliste", "Codes und ihre Bedeutungen."],
+      T_STG:["Staging", "Eine Kopie zum Laden, keine führende Quelle."], T_LOG:["Log / Audit", "Logs und Audit-Trails."], T_HIST:["Historie (SCD2)", "Die Quelle führt selbst Historie (SCD Typ 2)."],
+      T_HUB:["Hub-Kandidat", "Wahrscheinlich Quelle eines Hubs."], T_LNK:["Link-Kandidat", "Wahrscheinlich Quelle eines Links."], T_SAT:["Satellitenquelle", "Wahrscheinlich Quelle eines Satelliten."]}};
+  const LANG = {English:"en", Polski:"pl", Deutsch:"de"};
+  const defaults = lg => Object.fromEntries(Object.keys(BUILTIN).map(k => [k, lg === "en" ? {name:BUILTIN[k][0], def:DEF.en[k]} : {name:DEF[lg][k][0], def:DEF[lg][k][1]}]));
+  /* seeded once per workspace, in its documentation language at that moment (= its creation); a later change of the
+     language renames nothing */
+  const conv = () => { S.conv ||= {}; const c = S.conv; c.cls ||= {}; c.removed ||= []; c.naming ??= "";
+    if (!c.v23) { c.v23 = 1; const d = defaults(LANG[curWs()?.lang] || "en"); for (const k in d) { const x = c.cls[k] ||= {}; x.name ||= d[k].name; x.def ||= d[k].def; } (S.classes || []).forEach(o => { o.uc ??= false; }); }
+    return c; };
+  const nk = s => String(s ?? "").toLowerCase().replace(/[\s_\-\/]+/g, "");          // D-57's comparison
+  const bName = code => S?.conv?.cls?.[code]?.name || BUILTIN[code]?.[0] || code;
+  const list = () => { const c = conv(); return [...Object.entries(BUILTIN).filter(([k]) => !c.removed.includes(k)).map(([code, [, scope, dv]]) => ({code, name:bName(code), scope, dv:!!dv, builtin:true})),
+    ...(S.classes || []).filter(o => !BUILTIN[o.code]).map(o => ({...o, builtin:false}))]; };
+  const used = code => S.sources.reduce((n, s) => n + ((s.classes || []).includes(code) ? 1 : 0) + s.columns.filter(c => (c.tags || []).includes(code)).length, 0);
+  const edit = () => wsPerm() === "full" && !curWs().archived;
+  /* D-57: names unique per scope against every name and every built-in code, compared ignoring case, spaces, _ - / */
+  const nameClash = (nm, scope, self) => list().some(x => x.code !== self && x.scope === scope && nk(x.name) === nk(nm)) || Object.entries(BUILTIN).some(([k, [, sc]]) => sc === scope && k !== self && nk(k) === nk(nm));
+  const RULES = {BK:"the business key badge on table cards, the Keys filter, the hub reading and the business key checks", PII:"nothing in the rules (personal data on attributes is the attribute's own flag)", LK:"the link reading", T_HUB:"the hub reading's hint"};
+  function tab() {
+    const c = conv(), ro = edit() ? "" : "disabled", dv = !!curWs().settings?.dv2, lg = curWs()?.lang || "English";
+    const row = x => { const n = used(x.code);
+      return `<tr class="${x.dv && !dv ? "cv-dim" : ""}"><td><input data-cvname="${esc(x.code)}" value="${esc(x.name)}" ${ro} aria-label="Name">${x.dv ? ` <span class="cv-chip">Data Vault 2.0${dv ? "" : " · hidden while the mode is off"}</span>` : ""}${x.builtin ? "" : ` <span class="cv-chip own">own</span>`}</td>
+<td class="mono" style="white-space:nowrap">${x.builtin || x.uc ? esc(x.code) : `<span class="cv-n" title="No code: an import file names it by its name">—</span>`}</td>
+<td><textarea data-cvdef="${esc(x.code)}" rows="2" ${ro} placeholder="What it means, when to use it" aria-label="Definition">${esc(x.builtin ? (c.cls[x.code]?.def || "") : (x.def || ""))}</textarea></td><td class="cv-n">${n ? "used " + n + "×" : "unused"}</td>
+<td>${ro ? "" : `<button class="btn sm danger" data-cvrm="${esc(x.code)}">Remove</button>`}</td></tr>`; };
+    const gone = scope => c.removed.filter(k => BUILTIN[k][1] === scope);
+    const sect = (scope, title) => `<h4>${title}</h4><div class="cv-wrap"><table class="cv-t"><thead><tr><th>Name</th><th>Code</th><th>Definition</th><th>Used</th><th></th></tr></thead><tbody>${list().filter(x => x.scope === scope).map(row).join("")}</tbody></table></div>
+${gone(scope).length ? `<div class="cv-gone">Removed built-in: ${gone(scope).map(k => `<span>${esc(bName(k))} <span class="mono">${esc(k)}</span>${ro ? "" : ` <button class="btn sm" data-cvrestore="${esc(k)}">Restore</button>`}</span>`).join("")}</div>` : ""}
+${ro ? "" : `<div class="cv-add"><input data-cvaddname="${scope}" placeholder="New ${scope} classification, e.g. ${scope === "column" ? "Hash candidate" : "Golden source"}" aria-label="Name"><input data-cvaddcode="${scope}" placeholder="Code (optional), e.g. ${scope === "column" ? "HASH" : "GOLD"}" class="mono" aria-label="Code"><button class="btn sm" data-cvadd="${scope}">Add</button></div>`}`;
+    return `<p class="cv-intro">The workspace's conventions, in one place. The import matches classifications by their name or code; table and column panels set them; documents and exports print their definitions.</p>
+<section class="cv-box"><h3>Classifications</h3><p class="cv-hint">One list for the workspace's source tables and columns. Every name can be changed; built-in ones keep a code the app's rules read (BK, PII, LK…), so a renamed one keeps working and a removed one is absent until it is restored. An own classification may get a code when it is added, for import files that should not depend on its name; the code cannot change later. This workspace started with the names and definitions in ${esc(lg)}; changing the documentation language later renames nothing.</p>
+${sect("column", "For source columns")}${sect("table", "For source tables")}</section>
+<section class="cv-box"><h3>Concept colours</h3><p class="cv-hint">Each concept's colour on canvases and in documents. Violet is reserved for requirements, so it is not offered here; a new concept takes the first colour no concept uses.</p>
+${S.concepts.map(k => `<div class="cv-col"><span>${esc(k.name)}</span><div class="swatches">${ALLOWED_CONCEPT_COLORS.map(col => `<button style="background:${col}" data-ccol="${k.id}" data-v="${col}" aria-pressed="${String(k.color).toUpperCase() === col}" aria-label="${col}" ${ro}></button>`).join("")}</div></div>`).join("") || `<p class="cv-hint">No concepts yet.</p>`}</section>
+<section class="cv-box"><h3>Naming conventions</h3><p class="cv-hint">Your rules for names of entities, attributes, keys and codes, as plain text. Documents print them in their conventions section; nothing checks names against them yet.</p>
+<textarea data-cvnaming rows="7" ${ro} placeholder="- Entities: singular, Title Case (Sales Order)&#10;- Attributes: snake_case (order_date)&#10;- Keys: …_id; surrogate keys: …_key">${esc(c.naming || "")}</textarea></section>
+<p class="cv-hint cv-later">Later, in their own slices: entity stereotypes' names and definitions, the map from physical to logical types, an organization's default conventions.</p>`;
+  }
+  const ch = (fn, msg) => { mutate(fn); renderWsHome(); if (msg) toast(msg, true); };
+  function click(ev) {
+    const g = s => ev.target.closest(s); let x;
+    if ((x = g("[data-cvadd]"))) { const scope = x.dataset.cvadd, ni = $(`[data-cvaddname="${scope}"]`), ci = $(`[data-cvaddcode="${scope}"]`), nm = ni.value.trim(), code = ci.value.trim().toUpperCase();
+      if (!nm) { ni.focus(); return true; }
+      if (nameClash(nm, scope, null)) { ni.setCustomValidity("That name is taken"); ni.reportValidity(); ni.setCustomValidity(""); return true; }
+      if (code && !/^[A-Z][A-Z0-9_]{0,29}$/.test(code)) { ci.setCustomValidity("Letters, digits and _; starting with a letter"); ci.reportValidity(); ci.setCustomValidity(""); return true; }
+      if (code && (BUILTIN[code] || list().some(y => y.code === code) || (S.classes || []).some(y => y.code === code))) { ci.setCustomValidity("That code is taken"); ci.reportValidity(); ci.setCustomValidity(""); return true; }
+      ch(() => { (S.classes ||= []).push({code:code || "X_" + nk(nm).toUpperCase() + "_" + Date.now().toString(36), uc:!!code, name:nm, scope, builtin:false, def:""}); }, `Classification “${nm}” added.`); return true; }
+    if ((x = g("[data-cvrm]"))) { const code = x.dataset.cvrm, c0 = list().find(y => y.code === code), n = used(code);
+      const msg = `Remove ${c0.name}?` + (n ? ` It is used ${n}× and comes off those ${c0.scope}s.` : "") + (c0.builtin ? ` Until it is restored (empty), ${RULES[code] || "nothing in the rules"} stop${RULES[code] && !/^nothing/.test(RULES[code]) ? "" : "s"} reading it.` : "");
+      if (!confirm(msg)) return true;
+      ch(() => { const cv = conv(); if (c0.builtin) cv.removed.push(code); else S.classes = S.classes.filter(y => y.code !== code);
+        S.sources.forEach(s => { s.classes = (s.classes || []).filter(y => y !== code); s.columns.forEach(cl => cl.tags = (cl.tags || []).filter(y => y !== code)); }); }, `${c0.name} removed.`); return true; }
+    if ((x = g("[data-cvrestore]"))) { const code = x.dataset.cvrestore, nm = bName(code), sc = BUILTIN[code][1];
+      if (list().some(y => y.scope === sc && nk(y.name) === nk(nm))) { toast(`“${nm}” is taken by another classification; rename that one first.`); return true; }
+      ch(() => { const cv = conv(); cv.removed = cv.removed.filter(k => k !== code); }, `${nm} restored, unused.`); return true; }
+    return false;
+  }
+  function change(ev) {
+    const s = ev.target.dataset, v = ev.target.value;
+    if (s.cvdef !== undefined) { const code = s.cvdef; ch(() => { if (BUILTIN[code]) (conv().cls[code] ||= {}).def = v.trim(); else { const o = S.classes.find(y => y.code === code); if (o) o.def = v.trim(); } }); return true; }
+    if (s.cvname !== undefined) { const nm = v.trim(), code = s.cvname, me0 = list().find(y => y.code === code);
+      if (!nm || nm === me0.name) { renderWsHome(); return true; }
+      if (nameClash(nm, me0.scope, code)) { toast("That name is taken."); renderWsHome(); return true; }
+      ch(() => { if (BUILTIN[code]) (conv().cls[code] ||= {}).name = nm; else S.classes.find(y => y.code === code).name = nm; }); return true; }
+    if (s.cvnaming !== undefined) { ch(() => { conv().naming = v; }); return true; }
+    return false;
+  }
+  return {tab, click, change, conv};
+})();
+
+window.__conv23 = () => CONV.conv();
 /* =========================================================
    Boot
    ========================================================= */

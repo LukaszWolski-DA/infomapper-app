@@ -5,11 +5,12 @@
 
 import { createHash } from "node:crypto";
 import type { Uuid } from "@/domain/ids";
-import { BUILTIN_CLASSIFICATIONS, normClassification, type ClassificationCode } from "@/domain/model/classifications";
+import { BUILTIN_CLASSIFICATIONS, builtinText, normClassification, type ClassificationCode } from "@/domain/model/classifications";
 import { parseColumnLines } from "@/domain/model/column-lines";
 import { plainTextPair } from "@/domain/model/plain-text";
 import type {
   CanvasItem,
+  DocLanguage,
   Concept,
   Entity,
   LogicalType,
@@ -25,9 +26,13 @@ import type { DevDb } from "./schema";
  * A fixed id for a seed row, derived from its workspace and a readable key (`entity:customer`), so ids stay the same
  * after "npm run reset-dev-data" and tests can name rows. Shaped like the other seed ids (UUID v7 layout).
  */
-/** The 19 built-in classifications of a seeded workspace (slice 7c, item 4), with stable ids. */
-export function addBuiltinClassifications(db: DevDb, workspaceId: Uuid, by: Uuid, at: string): void {
+/**
+ * The 19 built-in classifications of a seeded workspace (slice 7c, item 4), with stable ids, in its documentation
+ * language as a new workspace gets them (slice 23, F2: the Polish demo workspace has the Polish names and definitions).
+ */
+export function addBuiltinClassifications(db: DevDb, workspaceId: Uuid, by: Uuid, at: string, language: DocLanguage): void {
   for (const b of BUILTIN_CLASSIFICATIONS) {
+    const text = builtinText(b.code, language);
     db.classification.push({
       id: seedId(workspaceId, `classification:${b.code}`),
       workspace_id: workspaceId,
@@ -38,10 +43,11 @@ export function addBuiltinClassifications(db: DevDb, workspaceId: Uuid, by: Uuid
       updated_by: by,
       deleted_at: null,
       code: b.code,
-      name: b.name,
-      name_key: normClassification(b.name),
+      name: text.name,
+      name_key: normClassification(text.name),
       scope: b.scope,
       origin: b.origin,
+      definition: text.definition,
     });
   }
 }

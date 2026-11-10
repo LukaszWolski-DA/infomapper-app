@@ -96,13 +96,14 @@ export function buildSeed(now: Date = new Date()): DevDb {
       dv2_mode: w.dv2 ?? false,
       four_eyes: w.fourEyes ?? false,
       infocube: false,
+      naming_conventions: null,
       archived_at: w.archived ? at : null,
       archived_by: w.archived ? users[by].id : null,
       requirement_key_next: 101,
       ...audit(by),
     };
     db.workspace.push(ws);
-    addBuiltinClassifications(db, ws.id, users[by].id, at);
+    addBuiltinClassifications(db, ws.id, users[by].id, at, w.lang);
     for (const [m, role] of members) {
       db.workspace_member.push({ workspace_id: ws.id, user_id: users[m].id, role, added_by: users[by].id, created_at: at });
     }
