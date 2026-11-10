@@ -26,7 +26,9 @@ test("S19-05: Dim Product's snapshot in its panel, the Cube tab, the bus matrix,
   await openEntity(page, "Fact Sales");
   const product = page.locator(`[data-testid="item-cube-dimension"][data-relationship="${relId("prod>sales")}"]`);
   await expect(product.getByTestId("mark-cube-snapshot")).toHaveAttribute("title", "Dim Product is a snapshot dimension: the fact joins it by the snapshot date");
-  await expect(product).toContainText("key product_key · no match → -1 · snapshot");
+  await expect(product).toContainText("key product_key · snapshot");
+  // slice 22: the unknown member's key value on the row's second line
+  await expect(product).toHaveText(/key product_key · snapshot\s*no match → -1$/);
   await expect(page.getByTestId("mark-cube-snapshot")).toHaveCount(1);
 
   // 2 · history hides the period, Snapshot shows it again, kept

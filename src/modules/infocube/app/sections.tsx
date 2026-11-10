@@ -8,7 +8,7 @@
 // every write is a module command on the save chain (slice 9, 10a): grain, SCD and additivity with their row checked,
 // a measure turned on with its attribute held, a key's link and Add key with the rows they write held. Slice 22 (D-77;
 // prototype `unkSection`): a dimension's unknown member, its flag and one value per attribute, each saved with its
-// attribute held and the row the page knows checked; a fact's Dimensions say "no match → {key value}".
+// attribute held and the row the page knows checked; a fact's Dimensions say "no match → {key value}" on a row's second line.
 
 import { useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { useAction } from "@/app/_components/use-action";
@@ -113,21 +113,10 @@ function useAddKey(cube: CubeIndex) {
   };
 }
 
-/**
- * A dimension's key in a fact's Dimensions list; slice 19: "· snapshot" after a snapshot dimension's (`snapshotOf`: its
- * name); slice 22: before it "· no match → {value}", the dimension's unknown member's key value (`noMatch`).
- */
-const keyMeta = (key: Attribute | null, snapshotOf: string | null = null, noMatch: { value: string; dimension: string } | null = null) => (
+/** A dimension's key in a fact's Dimensions list; slice 19: "· snapshot" after a snapshot dimension's (`snapshotOf`: its name). */
+const keyMeta = (key: Attribute | null, snapshotOf: string | null = null) => (
   <>
     {key ? <span>key {key.name}</span> : <span className="text-im-warn">no key</span>}
-    {key && noMatch && (
-      <>
-        {" · "}
-        <span title={UNKNOWN_TEXTS.noMatchTitle(key.name, noMatch.dimension)} data-testid="mark-cube-no-match">
-          {UNKNOWN_TEXTS.noMatch(noMatch.value)}
-        </span>
-      </>
-    )}
     {snapshotOf && (
       <>
         {" · "}
@@ -185,7 +174,7 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
   const snapshotDimension = (id: Uuid) => cube.cubeOf(id)?.history === "snapshot";
   // slice 22: the dimension's unknown member's key value: its first primary key's (as Add key uses the first), stored or default
   const noMatch = (k: { dimensionId: Uuid; pk: Attribute | null }) =>
-    k.pk && cube.unknownOn(k.dimensionId) ? { value: unknownValueOf(cube, k.pk), dimension: cube.nameOf(k.dimensionId) } : null;
+    k.pk && cube.unknownOn(k.dimensionId) ? { value: unknownValueOf(cube, k.pk) } : null;
   return (
     <Fold title="Fact" testId="section-cube-fact">
       <div className="rounded-lg border border-im-line px-3 pb-3 pt-0.5">
@@ -270,9 +259,20 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
               {keys.map((k) => (
                 <div key={k.relationshipId} className="flex items-center gap-2" data-testid="item-cube-dimension" data-relationship={k.relationshipId}>
                   <div className="min-w-0 flex-1">
-                    <Li onClick={() => ui.select({ t: "rel", id: k.relationshipId })} meta={keyMeta(k.key, snapshotDimension(k.dimensionId) ? cube.nameOf(k.dimensionId) : null, noMatch(k))}>
+                    <Li onClick={() => ui.select({ t: "rel", id: k.relationshipId })} meta={keyMeta(k.key, snapshotDimension(k.dimensionId) ? cube.nameOf(k.dimensionId) : null)}>
                       {dimensionAs(cube, k)}
                     </Li>
+                    {/* slice 22 (Łukasz's review of step 3): the unknown member's key value on the row's second line, so
+                        the dimension's name and its key stay whole on the first; this row only, the shared row unchanged */}
+                    {k.key && noMatch(k) && (
+                      <div
+                        className="-mt-1 truncate px-2 pb-1 text-right text-[11.5px] text-im-ink-3"
+                        title={UNKNOWN_TEXTS.noMatchTitle(k.key.name, cube.nameOf(k.dimensionId))}
+                        data-testid="mark-cube-no-match"
+                      >
+                        {UNKNOWN_TEXTS.noMatch(noMatch(k)!.value)}
+                      </div>
+                    )}
                   </div>
                   {!k.key && p.editable && (
                     <button
