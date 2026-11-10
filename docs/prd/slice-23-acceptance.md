@@ -1,0 +1,430 @@
+# Slice 23 – acceptance
+
+PRD: [`slice-23-metadata-conventions.md`](slice-23-metadata-conventions.md). Branch `slice/23-metadata-conventions`.
+
+## Step 1: the PRD checked against the code (10 November 2026)
+
+### The starting point
+
+- **The branch.** `slice/23-metadata-conventions` was cut from the tag `slice-22` (`b40b97f`, the merge of PR 51),
+  which is `origin/main` and the local `main`.
+- **No run in this step.** No dev server, e2e run, unit test, lint or bench ran. One read-only count ran on KB (Q10): a
+  copy of `.data/backups/kb-model-latest.json` (8 November 2026, 22:44) in the scratchpad, counts printed, the copy
+  deleted. `.data/dev-db.json` was not read or written.
+- **The two files from Łukasz's Downloads**, each checked with `cmp` after the copy and with `sha256sum` against the
+  prompt's value, and committed with this document (neither has a carriage return, so the committed bytes are the
+  files'):
+
+  | File | SHA-256 | `cmp` |
+  | --- | --- | --- |
+  | `docs/prd/slice-23-metadata-conventions.md` (new, 23,757 bytes) | `c343169e72f683a1cf4da7c78099f2659f7be220bf1d4cd8855ee1d7f9bfe3e3` | equal |
+  | `docs/prototype/infomapper-prototype-with-sources.html` (736,807 bytes, replaces slice 22's `3b77c53a…`) | `bf7cbb6af3619699128823f1a1cf635f2ffecdc6f097d8fa8b183927f700c8de` | equal |
+
+- **The prototype is built on slice 22's.** Against the file at tag `slice-22` the new one adds 143 lines and removes 5,
+  in 10 places, and every one is on the PRD's list (section 4): the CSS (`.cv-*`, 28 lines); `idx()`'s call of
+  `window.__conv23`; the workspace home's tab bar (`["conv", "Metadata conventions"]` between People and Settings) and
+  its body (`CONV.tab()`); Settings' colours box hidden (`display:none`) and "Model conventions" with its sentence and
+  button; the home's click and change handlers handing over to `CONV`; `indexClasses` reading `S.conv`;
+  `[data-imx-opencls]` opening the tab instead of `openSettings`; the module `CONV` (104 lines). Nothing else differs.
+
+### Summary
+
+The PRD's shape holds and most of it is already prepared by slice 7c: the import's matcher reads every row that has a
+code (`matcherOf`, `src/domain/import/plan.ts`), so an own code matches with no change to the engine; the unique index
+on codes already includes removed rows; the workspace home already loads the whole model; and an impact read for a
+removal exists and is unused (`classificationImpactAction`). Twenty-one places need a decision or a correction. The
+four that change what the slice is:
+
+1. **F1, no language at creation.** A new workspace is always English (`newWorkspaceRows` writes `doc_language: "en"`)
+   and neither the top bar's "New workspace" field nor the organization's creation asks for a language; the prototype
+   doesn't either. S23-05 ("a new workspace with documentation language Polish") cannot happen in the app as it is
+   (question 1).
+2. **F3–F5, an own code breaks three of 7c's assumptions.** The CHECK `classification_code_ck` forbids a code on an own
+   row; six places read "has a code" as "is built in"; and codes are matched normalized (`HASH_KEY` and `HASHKEY`,
+   `T_HUB` and `THUB` are one value to the import), so uniqueness by the exact code is not enough.
+3. **F11, the naming conventions and undo.** The workspace row is outside undo (D-12's rule for settings,
+   `UNDOABLE_TABLES`), and the settings' command is for owners and admins only. The PRD's roles (D-57's) need a command
+   of their own; undo needs either "outside undo" or a table of its own (question 5).
+4. **F12, Settings has no "Model conventions" box.** Item 12 changes a box the app never had (it is on the
+   inventory's "still missing" list, `docs/inventory-prototype-vs-app.md`).
+
+Step 2 changes the local adapter (the format, a CHECK) and undo (the name clash): **both are on the "Test runs"
+exception list, so step 2 has a full run** (S23-08 foresaw it).
+
+### Findings
+
+**F1. A workspace's language at creation (items 9, 11; decision 4; S23-05).**
+- `newWorkspaceRows` (`src/domain/commands/workspace.ts`) writes `doc_language: "en"`; `createWorkspaceInput` is
+  `{ organizationId, name }`, strict. Two callers: `createWorkspaceAction` (the top bar's "New workspace" field,
+  `src/app/_components/top-bar.tsx`, a name and Enter) and creating an organization (`src/domain/commands/organization.ts`,
+  its "First workspace"). The prototype's field is also a name only (`#ws-new`), and its `CONV.conv()` seeds lazily, on
+  the first visit, in the language the workspace has then.
+- So in the app every new workspace starts English, and decision 11 (a later change renames nothing) means a Polish or
+  German workspace could never get the Polish or German texts except by hand.
+- **Proposal (a, recommended):** a "Documentation language" select (English, Polski, Deutsch, default English) next to
+  the name in both places: the top bar's create field and the organization's creation form. `createWorkspace` and
+  `createOrganization` take `docLanguage` (optional, `en` when absent) and write the built-in rows in it. New UI the
+  prototype does not have: Łukasz decides.
+- **(b):** the top bar's new workspace takes the language of the workspace it is created from; an organization's first
+  workspace is English. No new UI, but invisible.
+- **(c):** leave creation English and test S23-05 through the domain only (`createWorkspace` with a language in a unit
+  test); in the app it would never happen. Not recommended.
+
+**F2. Existing workspaces: names kept, definitions filled (items 10, 11; Q2).**
+- The prototype gives an existing workspace both the names and the definitions of its language (`x.name ||= …` on a
+  `S.conv.cls` that is empty before slice 23): a Polish prototype workspace gets Polish names. The PRD says names stay.
+  The PRD is the stricter one and matches decision 11; **proposal: the PRD (names kept, definitions filled where null,
+  own ones none).**
+- **The seed** (`addBuiltinClassifications`, `src/data/local/seed-model.ts`) is a fresh creation. Proposal: it writes
+  each workspace as a new one would be written, in its language: "Sales analytics" (`lang: "pl"`) gets Polish names and
+  definitions, the two English ones English. No earlier spec reads that workspace's classifications (the specs that
+  name it, S0-02, S0-03, S8-06, S8-10 and S15-16, read none). `seed-large.ts` stays English.
+
+**F3. The CHECK on codes (section 3, Q1).**
+- `classification_code_ck check ((origin = 'own') = (code is null))` in `20261026200000_classifications.sql`, mirrored in
+  `src/data/local/schema.ts` (`(r.origin === "own") === !isSet(r.code)`). An own row with a code is refused by both.
+- `classification_code_ux on classification (workspace_id, code) where code is not null` has no `deleted_at`
+  condition, and the local adapter's rule is the same (no `live: true`): **a removed row keeps its code taken today**,
+  as the PRD wants.
+- **Proposal:** a new migration drops the CHECK and adds `classification_code_ck check (origin = 'own' or code is not
+  null)` and `classification_code_format_ck check (code is null or code ~ '^[A-Z][A-Z0-9_]{0,29}$')` (every built-in
+  code fits it), the same two rules in the local schema, and the domain checks the pattern first (its text). A CHECK
+  with a regular expression is a plain constraint, no stored function (CLAUDE.md, Data).
+
+**F4. Codes compared as the import compares them (items 4, 6; D-57).**
+- `matcherOf` keys a classification by `name_key` and by `normClassification(code)`, both in one map per scope; a second
+  key silently replaces the first. D-57's rule ("one value of a file matches at most one classification", 7c's F10) holds
+  today because names are checked against built-in codes. With own codes:
+  - two codes that are equal after `normClassification` (`HASH_KEY`, `HASHKEY`; an own `THUB` against `T_HUB`) pass an
+    exact uniqueness and collide in the import;
+  - a new code equal to an existing name of its scope (an own code `HASH` while "Hash" is a name) collides too. The
+    prototype checks codes only against codes and names only against names and built-in codes.
+- **Proposal:** a code is "taken" when its normalized form equals the normalized code of any row of the workspace
+  (removed and deleted included, both scopes, as the index) **or** the `name_key` of a live row of its scope.
+  `nameTakenBy` already compares a name with every row's code (removed included), so names against own codes follow
+  without a change once own rows carry codes. Both texts stay the PRD's.
+- **Undo** (`classificationNameClash`, `src/domain/commands/undo.ts`) compares `name_key` with `name_key` only; a revert
+  (a rename undone back to "Hash") could make a live name equal a code added since. Proposal: it also refuses a live row
+  whose `name_key` equals the normalized code of another row of its scope, with the same text
+  (`CLASSIFICATION_NAME_CLASH`).
+
+**F5. "Has a code" read as "is built in" (Q1).** Six places, each to read `origin !== "own"` through one predicate
+(`isBuiltin` in `classifications.ts`):
+- `restoreClassification`: `before.code === null` → `ONLY_BUILTIN_RESTORED`; a removed own one with a code would be
+  restorable;
+- `byListOrder`: an own one with a code sorts at 999, before those without (1000); own ones must stay by name;
+- `classificationIndex.byCode` is documented as "live built-in classifications by code"; own codes enter it. Harmless
+  for the rules (`has(id, code: ClassificationCode)`, and no own code can equal a built-in one), but the comment and
+  `whatStops` (by code, fine) are checked;
+- the dialog's removed list (`c.code !== null`) and its "built in" label: both go with the dialog (F7), the tab uses
+  the predicate;
+- `upgrade-8.ts`'s `byCode` reads format-8 files only, unchanged.
+
+**F6. The restore refusal's text (item 7).** The app says `RESTORE_TAKEN`: "Rename {other} first: {name} is taken."
+(slice 7c, unit tests in `classification.test.ts`); the PRD and the prototype say "“{name}” is taken by another
+classification; rename that one first.". **Proposal: keep the app's**, which names the other one; question 6.
+
+**F7. The dialog needs the canvas page's model index (item 8, Q3).**
+- `ClassificationsDialog`, `ListSection`, `Row` and `RemoveForm` (`src/app/_panels/classifications.tsx`) read
+  `usePanel()`: `p.ix.model` (every source table and column, for the removal's labels), `p.ix.classes` (the uses),
+  `p.changes` (the business key changes a removal settles), `p.editable`. The workspace home has no panel context.
+- The home's page already calls `store.model.load(workspaceId)` on every tab (`src/app/w/[workspaceId]/page.tsx`), so
+  the server has it all. Sending every column to the browser for one tab is not needed (20,000 in Performance test).
+- **Proposal:** the page sends the tab plain rows: every classification of the workspace (live and removed: the name
+  check needs the removed codes) with its use count from `indexOf(model).uses`, the workspace's Data Vault mode, the
+  concepts' colour rows (as now) and the naming conventions. The removal's form reads its impact when it opens with the
+  existing `classificationImpactAction` (unused today; it reads the open changes for "settles" too). The components move
+  to `src/app/w/[workspaceId]/_components/conventions.tsx`; `ClassificationsSection` (the toggles) stays in
+  `_panels/classifications.tsx` without the dialog.
+- **The form's place.** In the dialog the form replaced the list. Proposal: a small dialog with `RemoveForm`'s content
+  (uses, what stops, settles, "You can undo it right after.", Cancel and Remove), opened by Remove when the
+  classification is used or a rule reads it, and Remove at once otherwise (Łukasz's rule from 7c's step 4). The prototype
+  uses the browser's `confirm` with its own text; D-57 keeps the form.
+
+**F8. Every way into the dialog (item 8, S23-07).** One: "Edit the list…" (`button-edit-classifications`) in
+`ClassificationsSection`, rendered by the table and the column panels (`src/app/_panels/source-panels.tsx`). Source
+panels exist only on canvas pages. Nothing else opens it. Two texts point to it:
+- the import's warning `UNKNOWN_CLASSIFICATION` (`plan.ts`): "Add it to the classification list (“Edit the list…” in a
+  table or column panel) to use it." Proposal: "Add it in Metadata conventions on the workspace home to use it.";
+- the dialog's own description goes with it.
+
+"Edit the list…" becomes a link to `/w/{workspace}?tab=conventions`: a page change (the leave guard applies; Back
+returns to the canvas, slice 6b). Proposal: a plain push, not `replace`, so Back works.
+
+**F9. The removed built-in ones (item 7).** The dialog lists them in one section, "Removed built-in classifications",
+with "for columns"/"for tables". The PRD and the prototype list them under each table: "Removed built-in: {name}
+{CODE} [Restore]". Proposal: the PRD's.
+
+**F10. The definition's cap (item 5).** A note's text is `plainTextSchema` (`src/domain/commands/shared.ts`): up to
+20,000 characters, "This text is too long.". Proposal: the same for a definition and for the naming conventions,
+trimmed, empty is null.
+
+**F11. The naming conventions: command, roles, undo (item 13, Q5).**
+- Workspace fields are written by `updateWorkspaceSettings` (`workspace.edit_settings`: owners and admins), saved with
+  `saveRow` on the workspace row's chain with the newest version (D-59). The workspace table is outside undo
+  (`UNDOABLE_TABLES`: "Workspace settings and people are outside it").
+- Making the workspace row undoable would let an undo write a whole earlier workspace row (settings included), against
+  D-12 and slice 7c's mode switch. **Proposal (recommended): `workspace.naming_conventions`, outside undo like
+  `doc_language`, written by its own command `setNamingConventions` for `model.edit` (owners, admins, modelers, not
+  archived, D-57's roles), on the workspace row's chain (its version, D-66's draft and conflict line); a toast without
+  Undo.** D-78 then says "every change is one undo step except the naming conventions, a workspace setting".
+- **Alternative:** a table `workspace_convention` (one row per workspace), undoable: a migration with RLS, the
+  registry's three records, undo, the local schema and the format, for one text. More cost; it would be the natural
+  home of an organization's defaults later (F21), but those can be decided then.
+
+**F12. Settings' "Model conventions" box (item 12, Q6).** The app's Settings has General, Methodology (Data Vault 2.0,
+the modules' boxes, Process) and, since slice 21, "Concept colours" (`settings-form.tsx`). There is no "Model
+conventions" box; the prototype's (stereotype, classification and type map chips, "Editable per workspace in the app.")
+is on the inventory's missing list. **Proposal:** Settings loses "Concept colours" and gains a box "Model conventions"
+with only the sentence and its button ("Classifications, concept colours and naming conventions are edited in
+[Metadata conventions]."), not the prototype's chips: they are illustrations, and the type chips describe a map the app
+does not have (decision 7). Question 7.
+
+**F13. The box's language sentence.** The prototype's Classifications hint ends "This workspace started with the names
+and definitions in {language}; changing the documentation language later renames nothing.", where `{language}` is the
+workspace's **current** language: wrong after a change. The app stores no creation language. **Proposal:** "A new
+workspace starts with the built-in names and definitions in its documentation language; changing the language later
+renames nothing." Question 8.
+
+**F14. The migration fills nothing (section 3).** Slice 7c's migration is DDL only (no database holds data, AD-31;
+the local file's upgrade moves data, the database slice seeds and moves). The PRD has the migration fill the
+definitions. **Proposal:** DDL only: `classification.definition text`, the two CHECKs (F3), `workspace.naming_conventions
+text`; the fill is the local file's upgrade (F15) and, later, the database slice (PRD section 9 of 7c, which already
+seeds the 19 rows there).
+
+**F15. The local file's format (section 3).** `DEV_DB_FORMAT` is 14 (slice 18). Core columns are added, so **15**: a
+format-14 file gets `definition` on every classification (the built-in ones' text in their workspace's
+`doc_language`, own ones null) and `naming_conventions` null on every workspace; no change events and no log line, as
+formats 10 to 14. The schema's comment and `file.ts`'s upgrade list grow by one line; `docs/data-model-v2.md` gets the
+three columns and the CHECKs. KB's backup is at format 13 (Q10): its upgrade runs 13 → 14 → 15 in Łukasz's manual
+acceptance, after the backup.
+
+**F16. Undo and removed codes (decision 3).** Undo reverts an insert by soft-deleting the row
+(`revertChangeGroup`: `base = { ...current, deleted_at }`), and the code index includes removed rows. So: "Add" of
+"Hash candidate" `HASH`, Undo, Add again with `HASH` → "That code is taken"; Redo brings the first back. This is what
+"removed ones too" means; it is also what keeps an undo of a removal from ever meeting a reused code. Proposal: accept,
+and say so in `known-limitations.md`.
+
+**F17. The import (item 14, Q4).** Nothing to change in the engine: `matcherOf` keys every row with a code, the server
+plans again from the same list (P8), and the review's chips and "The file says …" use current names (`fileSays`). Step 2
+adds unit tests: an own code matches, a value equal to an own code's normalized form matches, a removed own one's code
+is unknown. Only F8's warning text changes. The source step's hint ("Codes or names separated by ;  e.g. BK;PII")
+stays.
+
+**F18. Built-in texts per language (items 9, 10; Q2).** `BUILTIN_CLASSIFICATIONS` (`classifications.ts`) has one name
+per code; `builtinClassificationRows(ctx, workspaceId)` writes them. Proposal: a table of texts per language beside the
+codes (`BUILTIN_TEXTS: Record<DocLanguage, Record<ClassificationCode, { name, definition }>>`, Appendix A word for word),
+`builtinClassificationRows(ctx, workspaceId, language)`, and the same for the seed's `addBuiltinClassifications` and
+the domain fixture (`__fixtures__/domain.ts`). English names are today's exactly (Appendix A = the app's list), so no
+English workspace and no spec changes name. `builtinOf(code)` (the default name, tests and the upgrade) takes a
+language.
+
+**F19. The tab (items 1–3).**
+- `TABS` (`page.tsx`) gains `conventions` between `people` and `settings`; `?tab=conventions`; the tab bar's `Link`
+  with `replace` as the others (6b: a tab is no place of its own).
+- Everyone who can open the workspace sees it; `can(access, "model.edit")` decides editing, and is false in an archived
+  workspace (S21-05 relies on it).
+- **The rename's refusal shows under the field**, as the dialog does today (`classification-name-error`, "That name is
+  taken", without a full stop, checked in the browser before sending, and the server's refusal the same way); the
+  prototype shows a toast "That name is taken.". Proposal: the app's (D-66 keeps the draft with its message). The PRD's
+  "That name is taken." with a full stop is the prototype's toast; the domain's `TAKEN_NAME` has none.
+- Item 4's "an unchanged name writes nothing" is `useDraft`'s rule already; the command's "Nothing to change." is never
+  reached from the field.
+- The Code column: a built-in one's code and an own one's in monospace; "—" with its title for none. The dialog's
+  "built in" label goes (the Code column says it).
+
+**F20. Colours (item 12, Q6).** The box moves unchanged: `ConceptColours` and `ConceptColourLine` (`settings-form.tsx`,
+`setConceptColorAction`, one undo step, `model.edit`), with the prototype's longer sentence ("Each concept's colour on
+canvases and in documents. Violet is reserved for requirements, so it is not offered here; a new concept takes the
+first colour no concept uses."). The test ids stay (`box-concept-colours`, `concept-colour`), so S21-05 changes only
+where it goes.
+
+**F21. Q8: what later slices need (no change now).** See Q8 below; this slice makes none of them harder if F4's
+normalized code rule and F18's text table are kept as proposed.
+
+### Answers to the PRD's questions
+
+**Q1. `classification`.** Columns today: `id, workspace_id, code, name, name_key, scope, origin, version, created_*,
+updated_*, deleted_at`; `origin` is `builtin | data_vault | own`, own rows have `code` null by CHECK (F3). The code
+index includes removed and deleted rows, in SQL and in the local adapter. New: `definition text` (null, trimmed, never
+empty), the CHECKs of F3. The code's immutability is the domain's: no command takes a code except `addClassification`
+(`renameClassification`'s input is strict and has none), and step 2 adds a unit test that every classification command
+refuses or ignores a code; no CHECK can say "never changed".
+
+**Q2. Built-ins at creation.** `newWorkspaceRows` (shared by `createWorkspace` and `createOrganization`) writes them in
+the creation's change group; `doc_language` is known there (it writes it), but always `en` (F1). Texts per language in
+the domain (F18). Existing workspaces: definitions in their language where null, names kept (F2); the seed per F2.
+
+**Q3. Slice 7c's dialog.** One way in (F8). Components: `ClassificationsDialog`, `ListSection`, `Row`, `RemoveForm` in
+`_panels/classifications.tsx`; the actions `addClassificationAction`, `renameClassificationAction`,
+`removeClassificationAction`, `restoreClassificationAction` and `classificationImpactAction` (`_actions/classification.ts`)
+stay and gain a definition action and the code in `addClassificationAction`. What moves: the list, add, rename, remove
+with its form, restore. What goes: the dialog shell, its description and hint lines, the "built in" label, the
+single removed section. Specs: Q9.
+
+**Q4. The import.** F17: matched by code or current name per scope, normalized; own codes need no engine change.
+
+**Q5. Naming conventions.** F11: proposal outside undo, its own command for D-57's roles, on the workspace row's chain
+with its version (D-59, D-66), cap 20,000 (F10).
+
+**Q6. Colours.** F20 and F12: the box moves, the command does not change (D-76's first unused colour is
+`nextConceptColor` at creation, untouched).
+
+**Q7. Roles.** Every field of the tab (names, definitions, add with code, remove, restore, colours, naming) for
+`model.edit`: owners, admins and modelers in a workspace that is not archived; reviewers, readers and an archived
+workspace see the tab read only (inputs read only, no Add, Remove or Restore, swatches disabled). The tab itself is for
+everyone (`workspace.view`), as the prototype. The server refuses each write by `begin(access, "model.edit", …)`.
+
+**Q8. What later slices need.**
+- **Stereotypes' names and definitions (decision 6a).** `entity.stereotype` is `text not null default 'object'` with
+  `entity_stereotype_ck check (stereotype in ('object', 'link', 'dictionary', 'context', 'informative'))`
+  (`20261002000000_initial_schema.sql`), mirrored by `oneOf(STEREOTYPES)` in the local schema. A dimensional entity keeps
+  `object`, unused (C-5, `20261104100000_model_level_and_licences.sql`; `DIMENSIONAL_STEREOTYPE_MESSAGE` in
+  `levels.ts`). Nothing imports or exports a stereotype. What shows its name: `cap(entity.stereotype)` in
+  `buildCards` (`src/canvas/card-data.ts`, the card's first line, measured by `text-fit.ts`), `tree-data.ts` (the Model
+  tab's meta), `left-panel.tsx` (`meta={e.stereotype}`, twice, raw), and the entity panel's select
+  (`STEREOTYPES.map`). 6a needs one label function fed by the workspace's names in those four places (and the card's
+  width measured with the shown name, as aliases did in slice 11). 6b needs the CHECK dropped (a migration, the local
+  schema, a format) and the five codes kept for InfoCube's C-5. This slice touches none of it. **Proposal for 6a:** the
+  same shape as F18 (built-in texts per language keyed by code), so both lists share one pattern; nothing to build now.
+- **The type map (decision 7).** One module: `src/domain/model/type-check.ts` (`PHYSICAL_CLASSES`, `CLASS_OF` as module
+  constants; `checkColumnType`, `checkMappingTypes`, `logicalTypeOf`). Its callers: `card-data.ts`, `line-data.ts`,
+  `model-index.ts`, `attribute-panel.tsx`, `map-column.tsx`, `requirements.ts` (the requirement index),
+  `consistency.ts`, `coverage.ts`, `rules.ts` (the import's D-51 rules), `plan.ts`, `standard.ts` (`physicalClass`),
+  `column-type.ts` and `attribute.ts` (`logicalTypeOf`, an attribute made from a column). InfoCube's `typesDiffer` and
+  `hasTypeConflict` compare logical with logical and read no map. A workspace's map means a parameter through those
+  callers (as `AttributeFeeds` went through the requirement index in 15d) and a decision on approved mappings first
+  (D-51). This slice touches none of them.
+- **An organization's defaults (decision 8).** Copying by code works for built-in ones (fixed codes) and for own ones
+  with a code. Two things this slice decides that matter then: (1) a removed own row keeps its code (F3, F16), so a
+  default that brings an own code into a workspace where a removed row holds it must restore that row, not insert a
+  new one: today only built-in ones can be restored (`restoreClassification`), so the later slice extends restore to
+  own rows with a code; nothing now. (2) Own ones without a code can be matched only by name. Neither is made harder.
+- **Reported as harder:** nothing, provided codes are unique **normalized** (F4): an exact-only uniqueness would let a
+  workspace hold `HASH_KEY` and `HASHKEY`, which an organization's defaults and the import could not tell apart.
+
+**Q9. Earlier specs and fixtures.** See "Earlier specs and fixtures" below.
+
+**Q10. KB (a copy of the backup of 8 November 2026, 22:44; counts only).** Format 13. Three organizations, four
+workspaces. KB has one workspace: documentation language `en`, 19 built-in classifications, **none renamed, none
+removed, no own ones**, 17 live links, 4 concepts. The other three workspaces (the demo's organizations in that file):
+two `en` (one archived) and one `pl`, each with 19 built-in ones, none renamed or removed, no own ones. So KB's upgrade
+gives its 19 built-in ones the English definitions and changes no name; nothing can clash.
+
+### Differences between the prototype and the app that the slice touches
+
+| # | Prototype | App (today, or as proposed) |
+| --- | --- | --- |
+| 1 | A new workspace: a name only; conventions seeded on the first visit in the language then | F1: always `en` today; proposal (a) a language at creation |
+| 2 | An existing workspace gets names and definitions of its language | F2: names kept, definitions filled (the PRD) |
+| 3 | Effective date is Data Vault | general (D-57; known, PRD section 4) |
+| 4 | A removed own one is dropped and its code is free | F3, F16: soft-deleted, its code stays taken (the PRD) |
+| 5 | Codes checked against codes only (exact), names against names and built-in codes | F4: codes normalized, against every code and the scope's names; names against every code |
+| 6 | Removal: the browser's `confirm` with its own text | F7: D-57's form (uses, what stops, settles) in a small dialog |
+| 7 | Restore refused: "“{name}” is taken by another classification; rename that one first." (toast) | F6: `RESTORE_TAKEN` kept, proposal |
+| 8 | Rename taken: toast "That name is taken." | F19: the message under the field (D-66) |
+| 9 | Toasts "Classification “{name}” added.", "{name} removed.", "{name} restored, unused." | the app's: none on add (the row appears), "Removed {name} from the list.", "Restored {name}." (kept) |
+| 10 | The hint names the current language | F13: no language named |
+| 11 | Settings' "Model conventions" with chips | F12: a box with the sentence and the button only |
+| 12 | The tab key `conv` | `?tab=conventions` |
+| 13 | A built-in one's name and definition in `S.conv`; own ones in `S.classes` with `uc` | D-57's rows with the new columns (PRD section 4) |
+| 14 | The Add row: name, code, Add (a grid) | the same; proposal: Enter in either field adds (the dialog's name field does today) |
+| 15 | Data Vault rows dimmed with the mode off (`.cv-dim`), chip "· hidden while the mode is off" | the same (the dialog showed them undimmed) |
+
+### Every new UI text
+
+The tab (from the prototype unless marked):
+- Tab: "Metadata conventions".
+- Intro: "The workspace's conventions, in one place. The import matches classifications by their name or code; table
+  and column panels set them; documents and exports print their definitions."
+- Box "Classifications", hint: "One list for the workspace's source tables and columns. Every name can be changed;
+  built-in ones keep a code the app's rules read (BK, PII, LK…), so a renamed one keeps working and a removed one is
+  absent until it is restored. An own classification may get a code when it is added, for import files that should not
+  depend on its name; the code cannot change later." + F13's sentence (question 8).
+- Tables "For source columns", "For source tables"; headers "Name", "Code", "Definition", "Used" and an empty one.
+- Chips "Data Vault 2.0", "Data Vault 2.0 · hidden while the mode is off", "own".
+- "—" titled "No code: an import file names it by its name".
+- Definition placeholder "What it means, when to use it"; "used {n}×", "unused"; "Remove".
+- Add: placeholders "New column classification, e.g. Hash candidate", "New table classification, e.g. Golden source"
+  (as the dialog), "Code (optional), e.g. HASH", "Code (optional), e.g. GOLD"; "Add".
+- Code refusals: "Letters, digits and _; starting with a letter", "That code is taken" (no full stop, as `TAKEN_NAME`).
+- "Removed built-in: {name} {CODE}" and "Restore".
+- Box "Concept colours", hint as F20.
+- Box "Naming conventions", hint "Your rules for names of entities, attributes, keys and codes, as plain text.
+  Documents print them in their conventions section; nothing checks names against them yet.", placeholder "- Entities:
+  singular, Title Case (Sales Order)⏎- Attributes: snake_case (order_date)⏎- Keys: …_id; surrogate keys: …_key".
+- Last line: "Later, in their own slices: entity stereotypes' names and definitions, the map from physical to logical
+  types, an organization's default conventions."
+- **Toasts (proposed, the app's style):** "Saved the definition of {name}.", "Cleared the definition of {name}.",
+  "Saved the naming conventions.", "Cleared the naming conventions." Undo names: "Change definition of {name}"
+  (proposal), the others as 7c's.
+
+Elsewhere:
+- Settings: box "Model conventions": "Classifications, concept colours and naming conventions are edited in" +
+  button "Metadata conventions" + "." (F12).
+- The import's warning (F8): "… ignored. Add it in Metadata conventions on the workspace home to use it." (proposal).
+- F1 (a): a select "Documentation language" (English, Polski, Deutsch) in the top bar's new workspace field and the
+  organization's creation form (proposal; its exact place in step 3).
+- Appendix A's 57 names and definitions (domain texts).
+
+### Earlier specs and fixtures each step touches
+
+- **Step 2 (unit):** `src/domain/commands/classification.test.ts` (own code, the pattern, normalized uniqueness,
+  restore by origin, definitions; `RESTORE_TAKEN` if question 6 changes it), `src/domain/model/classifications.test.ts`
+  (list order, `isBuiltin`, texts per language), `src/domain/import/classifications.test.ts` (an own code matches; the
+  warning's text, three expectations), `src/domain/commands/workspace.test.ts` and `organization.test.ts` (the rows in
+  the language, F1), `src/domain/commands/undo.test.ts` (the clash with a code), the local adapter's upgrade and schema
+  tests (format 15, the CHECKs), `src/domain/__fixtures__/domain.ts` (built-in rows with definitions). The full run of
+  step 2 covers every e2e spec; none should change in step 2.
+- **Step 3 (e2e):**
+  - `e2e/slice-07c/helpers.ts` (`openList`, `listRow`: the tab instead of the dialog), `S7C-04` (add, rename, taken
+    name), `S7C-05` (remove with the form, Undo, Restore; the removed list's new form), `S7C-13` (read only for a
+    reviewer, a reader and an archived workspace);
+  - `e2e/slice-09/S9-04.spec.ts` (a classification's rename as one of its panel cases) and
+    `e2e/slice-10a/S10A-04.spec.ts` (a classification's remove after its rename): both opened the dialog from a panel;
+    they go to the tab;
+  - `e2e/slice-21/S21-05.spec.ts` and `e2e/slice-21/helpers.ts` (the colours from Settings → from the tab);
+  - `e2e/slice-08/S8-02.spec.ts`, `S8-07.spec.ts` only if F1 (a) adds the language to the organization's form (their
+    sentence stays; the count of 19 stays);
+  - the element guard (`S3B-15-elements`) and the canvas commit counts: the canvas does not change; removing the dialog
+    from the panel's code may change the page's script count by one (read against slice-08's baseline, CLAUDE.md).
+- **Fixtures:** the seed (`seed-model.ts`, F2) and the e2e reseed take the new texts; no fixture of an earlier slice
+  names a definition.
+
+### The plan for steps 2 to 4
+
+- **Step 2, data and domain** (draft PR at the start). The migration (F3, F14); `types.ts` (`definition`,
+  `naming_conventions`); `classifications.ts` (texts per language, `isBuiltin`, list order, the code rules, F4, F5,
+  F18); the commands: `addClassification` with `code`, `setClassificationDefinition` (one undo step), `restore` by
+  origin, `setNamingConventions` (F11, as decided), `createWorkspace` and `createOrganization` with the language (F1, as
+  decided); undo's clash (F4); the import's text (F8) and tests (F17); the local schema's CHECKs and format 15 (F15);
+  the seed (F2); `data-model-v2.md`'s columns. The actions only where the domain needs them (add's code, the
+  definition, the naming conventions). Unit tests; lint, typecheck, unit tests; **one full run (local adapter and undo
+  change)**.
+- **Step 3, interface.** The tab (`conventions.tsx`: the two tables with rename, definition, code, uses, remove with its
+  dialog, restore, add; the colours box moved; the naming conventions), Settings' boxes (F12), "Edit the list…" as a link
+  (F8), the dialog removed, the language at creation (F1, as decided); specs S23-01 to S23-07 and the earlier specs
+  above; the element guard and the commit counts; screenshots of the tab light and dark beside the prototype's.
+- **Step 4, close.** `decisions.md` (D-78 quoted for approval, D-57 "(Changed by D-78.)"), `data-model-v2.md`,
+  `ideas.md` (the two 7c entries done; section 9's items with their prerequisites from Q8), the inventory, known
+  limitations (F16), README and CLAUDE.md; the full run on the final commit; the manual acceptance steps (KB after its
+  backup).
+
+### Questions for Łukasz before step 2
+
+1. **F1, the language at creation:** (a) a select at both creations (recommended), (b) the language of the workspace
+   it is created from, or (c) English, tested through the domain only?
+2. **F2, the seed:** "Sales analytics" (Polish) gets Polish names and definitions (recommended), or English names with
+   Polish definitions like an upgraded workspace?
+3. **F4, codes:** unique after the import's comparison (case, spaces, `_`, `-`, `/` ignored) and against the scope's
+   names, as proposed?
+4. **F11, the naming conventions:** a workspace column outside undo, editable by owners, admins and modelers
+   (recommended), or a table of its own as an undo step?
+5. **F7, removal's confirmation:** D-57's form in a small dialog (recommended), as proposed?
+6. **F6, restore refused:** keep "Rename {other} first: {name} is taken." (recommended) or the PRD's text?
+7. **F12, Settings:** a new "Model conventions" box with the sentence and the button only (recommended), or with the
+   prototype's chips?
+8. **F13, the hint's last sentence:** "A new workspace starts with the built-in names and definitions in its
+   documentation language; changing the language later renames nothing." (recommended)?
+9. **F16:** a code stays taken after its classification's add is undone: accept and list it in known limitations?
+10. **Toasts and undo names** (the list above): the definition's and the naming conventions' as proposed?
