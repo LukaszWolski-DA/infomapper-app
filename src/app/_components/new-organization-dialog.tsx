@@ -1,7 +1,8 @@
 "use client";
 
 // "New organization…" in the organization menu (slice 8, item 9): the organization's name, the password twice and the
-// first workspace's name; then the summary with Create and Back. The new organization opens unlocked.
+// first workspace's name and, since slice 23 (F1), its documentation language; then the summary with Create and Back.
+// The new organization opens unlocked.
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
@@ -9,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } f
 import { useToast } from "@/ui/components/toast";
 import { createOrganizationFromMenuAction, previewNewOrganizationAction, type NewOrganizationFormInput } from "../_actions/organization";
 import type { ActionResult } from "../_lib/run-command";
+import { DOC_LANGUAGE_LABEL, DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
 
 const input = "h-[30px] w-full rounded-md border border-im-line bg-im-surface px-2 text-[13px]";
 const button = "rounded-md border border-im-line bg-im-surface px-3 py-1.5 text-[13px] hover:bg-im-hover disabled:opacity-50";
@@ -24,7 +26,7 @@ export function NewOrganizationDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
-  const [form, setForm] = useState<NewOrganizationFormInput>({ organizationName: "", password: "", passwordAgain: "", workspaceName: "First workspace" });
+  const [form, setForm] = useState<NewOrganizationFormInput>({ organizationName: "", password: "", passwordAgain: "", workspaceName: "First workspace", workspaceLanguage: "en" });
   const [summary, setSummary] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
@@ -90,6 +92,16 @@ export function NewOrganizationDialog({ onClose }: { onClose: () => void }) {
                 )}
               </label>
             ))}
+            <label className="block">
+              <span className="mb-1 block text-im-ink-2">{DOC_LANGUAGE_LABEL}</span>
+              <select data-testid="select-new-organization-workspaceLanguage" className={input} value={form.workspaceLanguage} onChange={(e) => setForm({ ...form, workspaceLanguage: e.target.value })}>
+                {DOC_LANGUAGE_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
             {message && (
               <p role="alert" data-testid="message-start" className="text-im-warn">
                 {message}

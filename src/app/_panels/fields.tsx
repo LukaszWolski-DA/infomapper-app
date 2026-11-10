@@ -481,18 +481,22 @@ export function TextField({
   );
 }
 
-/** A plain-text area (definitions, notes, rules; AD-30) that saves when it loses the focus. */
+/**
+ * A plain-text area (definitions, notes, rules; AD-30) that saves when it loses the focus. `prepare` (slice 23): the text
+ * as it is saved and compared (a trim, as `TextField`'s), so a saved trimmed text is no draft afterwards.
+ */
 export function TextArea({
   value,
   onSave,
   code,
   ...rest
-}: { value: string; onSave: FieldSave<string>; code?: boolean; keep?: DraftKeep; outside?: OutsideDraft } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
-  const { keep, outside, ...props } = rest;
+}: { value: string; onSave: FieldSave<string>; code?: boolean; keep?: DraftKeep; outside?: OutsideDraft; prepare?: (text: string) => string | null } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
+  const { keep, outside, prepare, ...props } = rest;
   const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLTextAreaElement>(value, onSave, {
     readOnly: !!props.readOnly || !!props.disabled,
     keep,
     outside,
+    prepare,
   });
   return (
     <>

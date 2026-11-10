@@ -10,6 +10,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import type { DocLanguage } from "@/domain/types";
+import { DOC_LANGUAGE_LABEL, DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
 import { cn } from "@/ui/lib/utils";
 import {
   DropdownMenu,
@@ -172,12 +174,7 @@ function WorkspaceSwitcher({ shell }: { shell: ShellData }) {
         <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
         <MenuLink href={workspaceHref(shell.workspace.id)}>Workspace home</MenuLink>
         {shell.canCreateWorkspace && (
-          <NameThenEnter
-            testId="input-new-workspace"
-            placeholder="New workspace, press Enter"
-            create={(name) => createWorkspaceAction({ organizationId: shell.organization.id, name })}
-            success={(name) => `Created the workspace ${name}.`}
-          />
+          <NewWorkspaceField organizationId={shell.organization.id} />
         )}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -224,12 +221,49 @@ function ProjectSwitcher({ shell }: { shell: ShellData }) {
 }
 
 /** "Name, then Enter" field at the bottom of a switcher menu: creates the thing and opens it. */
+/**
+ * "New workspace" with its documentation language (slice 23, F1: a deliberate difference from the prototype, whose field
+ * takes a name only): the built-in classifications get their names and definitions in it; English by default.
+ */
+function NewWorkspaceField({ organizationId }: { organizationId: string }) {
+  const [language, setLanguage] = useState<DocLanguage>("en");
+  return (
+    <div className="flex items-center gap-1 pr-1.5">
+      <NameThenEnter
+        testId="input-new-workspace"
+        className="mb-0.5 ml-1.5 mt-1 min-w-0 flex-1"
+        placeholder="New workspace, press Enter"
+        create={(name) => createWorkspaceAction({ organizationId, name, docLanguage: language })}
+        success={(name) => `Created the workspace ${name}.`}
+      />
+      <select
+        aria-label={DOC_LANGUAGE_LABEL}
+        title={DOC_LANGUAGE_LABEL}
+        data-testid="select-new-workspace-language"
+        value={language}
+        onChange={(e) => setLanguage(e.currentTarget.value as DocLanguage)}
+        // keep the menu's type-ahead and its arrow keys out of the select
+        onKeyDown={(e) => e.stopPropagation()}
+        className="mb-0.5 mt-1 h-[30px] flex-none rounded-md border border-im-line bg-im-surface px-1 text-xs"
+      >
+        {DOC_LANGUAGE_OPTIONS.map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function NameThenEnter({
   testId,
   placeholder,
   create,
   success,
+  className = "mx-1.5 mb-0.5 mt-1 w-[calc(100%-12px)]",
 }: {
+  className?: string;
   testId: string;
   placeholder: string;
   create: (name: string) => Promise<ActionResult<{ href: string }>>;
@@ -244,7 +278,7 @@ function NameThenEnter({
       autoComplete="off"
       spellCheck={false}
       disabled={pending}
-      className="mx-1.5 mb-0.5 mt-1 h-[30px] w-[calc(100%-12px)] rounded-md border border-im-line bg-im-surface px-2"
+      className={`${className} h-[30px] rounded-md border border-im-line bg-im-surface px-2`}
       onKeyDown={async (e) => {
         e.stopPropagation(); // keep the menu's type-ahead out of the field
         const name = e.currentTarget.value.trim();

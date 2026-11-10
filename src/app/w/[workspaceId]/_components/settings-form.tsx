@@ -5,13 +5,17 @@
 // with the domain's message (AD-12), and the refusal brings the fresh page. Slice 13 (D-66): a text field keeps its
 // draft across fresh pages and after a refusal (an empty name goes back with "Enter a name.", D-59); the language and
 // the two modes show the newest stored value after a refusal. Settings are not undo steps; slice 21's concept colours
-// are (they change the model's concepts, D-76). A draft refused for a
+// are (they change the model's concepts, D-76), and since slice 23 they are edited in the Metadata conventions tab: the
+// settings' "Model conventions" box only points there (F12, a deliberate difference: no chips). A draft refused for a
 // permission or the archive stays readable: its field is read-only instead of disabled, so its text can be copied.
 // Slice 7c (item 17, answers F16, F17): the methodology text names the source table panels; switching Data Vault 2.0
 // mode off says how many uses of Data Vault classifications stay stored.
 
 import { DATA_VAULT_MODE_TEXT, dataVaultOffMessage } from "@/domain/model/classifications";
+import Link from "next/link";
 import type { ReactNode } from "react";
+import { CONVENTIONS_TAB, workspaceHref } from "@/app/_lib/paths";
+import { DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
 import type { DocLanguage } from "@/domain/types";
 import { setConceptColorAction } from "@/app/_actions/model";
 import { updateWorkspaceSettingsAction } from "@/app/_actions/workspace";
@@ -32,11 +36,10 @@ export interface SettingsValues {
   fourEyes: boolean;
 }
 
-const LANGUAGES: [DocLanguage, string][] = [
-  ["en", "English"],
-  ["pl", "Polski"],
-  ["de", "Deutsch"],
-];
+const LANGUAGES = DOC_LANGUAGE_OPTIONS;
+
+/** Settings' "Model conventions" box (slice 23, F12): the sentence, then the button that opens the tab. */
+export const MODEL_CONVENTIONS_TEXT = "Classifications, concept colours and naming conventions are edited in";
 
 type Patch = Partial<Omit<SettingsValues, "workspaceId" | "version">>;
 
@@ -66,16 +69,11 @@ export function SettingsForm({
   editable,
   dataVaultUses = 0,
   modules,
-  concepts = [],
-  conceptsEditable = false,
 }: {
   initial: SettingsValues;
   editable: boolean;
   dataVaultUses?: number;
   modules?: ReactNode;
-  /** Slice 21: the live concepts in panel order, and whether this person may edit the model (D-76: as a rename). */
-  concepts?: readonly ConceptColorRow[];
-  conceptsEditable?: boolean;
 }) {
   const { saveRow } = useAction();
   const toast = useToast();
@@ -186,7 +184,21 @@ export function SettingsForm({
         </label>
       </div>
 
-      <ConceptColours workspaceId={initial.workspaceId} concepts={concepts} editable={conceptsEditable} />
+      <div className="rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-model-conventions">
+        <h4 className="m-0 mb-1 text-[13.5px] font-semibold">Model conventions</h4>
+        <p className="m-0 text-[12.5px] text-im-ink-2">
+          {MODEL_CONVENTIONS_TEXT}{" "}
+          <Link
+            href={workspaceHref(initial.workspaceId, CONVENTIONS_TAB)}
+            replace
+            className="inline-flex h-[26px] items-center rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover"
+            data-testid="button-open-conventions"
+          >
+            Metadata conventions
+          </Link>
+          .
+        </p>
+      </div>
     </div>
   );
 }
@@ -195,21 +207,25 @@ export function SettingsForm({
  * "Concept colours" (slice 21, D-76; prototype `data-ccol`): one line per concept with the palette's swatches, violet
  * never offered (D-41). A click is one undo step on the workspace's history, saved on the concept's chain with the
  * newest version known (D-59); a choice keeps no draft (D-66). Those who may edit the model change them, as a
- * concept's rename; everyone else, and an archived workspace, sees them disabled.
+ * concept's rename; everyone else, and an archived workspace, sees them disabled. Since slice 23 a box of the Metadata
+ * conventions tab (item 12), with the prototype's longer sentence.
  */
-function ConceptColours({ workspaceId, concepts, editable }: { workspaceId: string; concepts: readonly ConceptColorRow[]; editable: boolean }) {
+export function ConceptColours({ workspaceId, concepts, editable }: { workspaceId: string; concepts: readonly ConceptColorRow[]; editable: boolean }) {
   return (
-    <div className="rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-concept-colours">
-      <h4 className="m-0 mb-1 text-[13.5px] font-semibold">Concept colours</h4>
-      <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2">Violet is reserved for requirements, so it is not offered here.</p>
+    <section className="mt-3.5 rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-concept-colours">
+      <h3 className="m-0 mb-1 text-[15px] font-semibold">Concept colours</h3>
+      <p className="m-0 mb-2.5 max-w-[90ch] text-[12.5px] text-im-ink-3">{CONCEPT_COLOURS_TEXT}</p>
       {concepts.length ? (
         concepts.map((c) => <ConceptColourLine key={c.id} workspaceId={workspaceId} concept={c} editable={editable} />)
       ) : (
         <p className="m-0 text-[12.5px] text-im-ink-3">No concepts yet.</p>
       )}
-    </div>
+    </section>
   );
 }
+
+export const CONCEPT_COLOURS_TEXT =
+  "Each concept's colour on canvases and in documents. Violet is reserved for requirements, so it is not offered here; a new concept takes the first colour no concept uses.";
 
 function ConceptColourLine({ workspaceId, concept, editable }: { workspaceId: string; concept: ConceptColorRow; editable: boolean }) {
   const { saveRow } = useAction();

@@ -10,6 +10,7 @@ import { useToast } from "@/ui/components/toast";
 import { organizationsForEmailAction, signInWithPasswordAction, type SignInOrganization } from "../_actions/session";
 import { createOrganizationAction, previewCreateOrganizationAction, type CreateOrganizationFormInput } from "../_actions/organization";
 import type { ActionResult } from "../_lib/run-command";
+import { DOC_LANGUAGE_LABEL, DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
 
 const input = "h-[30px] w-full rounded-md border border-im-line bg-im-surface px-2 text-[13px]";
 const button = "rounded-md border border-im-line bg-im-surface px-3 py-1.5 text-[13px] hover:bg-im-hover disabled:opacity-50";
@@ -199,6 +200,7 @@ const EMPTY_FORM: CreateOrganizationFormInput = {
   name: "",
   email: "",
   workspaceName: "First workspace",
+  workspaceLanguage: "en",
   password: "",
   passwordAgain: "",
 };
@@ -263,6 +265,16 @@ export function CreateOrganizationForm() {
               />
             </Field>
           ))}
+          {/* slice 23 (F1): the first workspace's documentation language, a deliberate difference from the prototype */}
+          <Field label={DOC_LANGUAGE_LABEL} error={errors.workspaceLanguage}>
+            <select data-testid="select-create-workspaceLanguage" className={input} value={form.workspaceLanguage} onChange={(e) => setForm({ ...form, workspaceLanguage: e.target.value })}>
+              {DOC_LANGUAGE_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Message text={message} />
           <button type="submit" data-testid="button-create-continue" className={primary} disabled={pending}>
             Continue
