@@ -428,3 +428,26 @@ Elsewhere:
    documentation language; changing the language later renames nothing." (recommended)?
 9. **F16:** a code stays taken after its classification's add is undone: accept and list it in known limitations?
 10. **Toasts and undo names** (the list above): the definition's and the naming conventions' as proposed?
+
+## Step 1: Łukasz's answers (10 November 2026)
+
+1. **F1:** (a). A "Documentation language" select (English, Polski, Deutsch; default English) in both places a
+   workspace is created: the top bar's "New workspace" and creating an organization. **A deliberate difference from the
+   prototype**, whose new workspace has a name only.
+2. **F2:** yes. The seed's "Sales analytics" (Polish) gets the Polish built-in names and definitions.
+3. **F3, F5:** the CHECK changes so an own classification may have a code; built-in ones are recognised by origin, not
+   by having a code, in all six places. A removed own classification is never restorable as a built-in one.
+4. **F4:** both. Codes are unique the way the import compares them (case, spaces, `_`, `-`, `/` ignored) against every
+   code of the workspace, removed and deleted rows and built-in codes included; and codes and names of the same scope
+   never collide in that comparison, in either direction (a new name against own codes too, as D-57 already does for
+   built-in codes).
+5. **F11:** a workspace column outside undo, with a command of its own for owners, admins and modelers, with the version
+   check (D-59).
+6. **F7:** yes: a small dialog with D-57's form (where it is used and what stops), using the existing read of what a
+   removal takes with it.
+7. **F6:** keep the app's text: "Rename {other} first: {name} is taken."
+8. **F12:** yes: a "Model conventions" box in Settings with only the sentence and the button that opens the tab, no
+   chips. **A deliberate difference from the prototype.**
+9. **F13:** yes, the proposed text.
+10. **F16:** accepted; listed in `known-limitations.md`.
+11. **Toasts and undo names:** as listed above.
