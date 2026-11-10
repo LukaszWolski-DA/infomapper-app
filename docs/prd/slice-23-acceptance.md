@@ -523,3 +523,94 @@ Draft PR: https://github.com/LukaszWolski-DA/infomapper-app/pull/52, opened at t
   6: 9.6 min, 1,015 MB · 7: 6.5 min, 1,441 MB · 8: 7.9 min, 1,466 MB.
 - A commit after `c883dfd` that touches only Markdown in `docs/` and the root keeps this run valid
   (`git diff --stat c883dfd..HEAD`).
+
+## Step 3: interface (10 November 2026)
+
+### What changed
+
+- **The tab** (`src/app/w/[workspaceId]/_components/conventions.tsx`, `page.tsx`): "Metadata conventions" between People
+  and Settings (`?tab=conventions`, `CONVENTIONS_TAB` in `src/app/_lib/paths.ts`), for every member; editable with
+  `model.edit` (owners, admins, modelers, not archived). The page sends every classification of the workspace (removed
+  ones too) and each one's use count; nothing else of the sources (F7).
+  - **Classifications:** the prototype's intro and hint (F13's sentence in place of the prototype's language clause),
+    "For source columns" and "For source tables" with Name (D-66's draft, the message under the field), Code (built-in,
+    own, or "—" with its title), Definition (plain text, trimmed, saved on leaving it, one undo step), Used and Remove;
+    the chips "Data Vault 2.0" ("· hidden while the mode is off", the row dimmed) and "own"; "Removed built-in: {name}
+    {CODE} [Restore]" under each table; the Add row (name, code, Add; Enter in either field adds) with the code's
+    refusals under it.
+  - **The remove dialog** (`dialog-remove-classification`, "Remove {name}?"): opened by Remove when the classification
+    is used or a rule reads it; it reads its impact when it opens (`classificationImpactAction`) and shows D-57's form
+    (`RemoveClassificationForm`, moved out of the old dialog); any other is removed at once with Undo (7c's rule).
+  - **Concept colours:** slice 21's box, moved unchanged in behaviour, with the prototype's longer sentence.
+  - **Naming conventions:** the prototype's sentence and placeholder; saved on leaving it, trimmed, empty clears it;
+    outside undo (toasts "Saved the naming conventions." and "Cleared the naming conventions.", no Undo).
+  - The last line: "Later, in their own slices: …".
+- **Settings** (`settings-form.tsx`): no colours box; a box "Model conventions" with the sentence and a button
+  "Metadata conventions" that opens the tab (F12, a deliberate difference: no chips).
+- **"Edit the list…"** in the table and column panels (`_panels/classifications.tsx`) is a link to the tab (a push:
+  Back returns to the canvas); slice 7c's dialog (`ClassificationsDialog`, its list, rows and description) is gone.
+- **The language at creation** (F1, a deliberate difference): a select "Documentation language" (English, Polski,
+  Deutsch; default English) beside the top bar's "New workspace" field, in the start page's "Create an organization" and
+  in "New organization…" (`src/ui/doc-languages.ts` shares the options with the settings).
+- **`TextArea`'s `prepare`** (`src/app/_panels/fields.tsx`): optional, passed to `useDraft` as `TextField` does; the
+  tab's two text areas trim with it, so a text saved trimmed is no draft afterwards (S23-02 found it: an undo did not
+  show the earlier definition while the untrimmed text stayed as a draft). Every other `TextArea` is unchanged.
+
+### New UI texts beyond the acceptance list
+
+- "Reading where it is used…" while the remove dialog reads its impact (usually for a moment only).
+- The dialog's title "Remove {name}?".
+
+### Tests
+
+- **New specs** `e2e/slice-23/` (fresh seed each): S23-01 (3 tests: the tab, Data Vault dimming, read only for a
+  reviewer, a reader and an archived workspace), S23-02 (2: rename and definition with undo and redo, the panel's
+  toggle; empty, unchanged and taken names), S23-03 (2: an own code, the bad and taken codes, "—"; an import file's
+  `HASH` in the review), S23-04 (2: remove with the dialog, Undo, Restore refused while taken, restored unused; at once
+  without the form), S23-05 (2: a Polish workspace from the top bar, a later language change renames nothing; a German
+  first workspace from the start page), S23-06 (2: colours with undo and Settings' box; the naming conventions), S23-07
+  (2: the column's and the table's "Edit the list…"). Locally: **15 passed**. The upgrade of a workspace from before the
+  slice is `upgrade-15.test.ts` (step 2); the import's reading of an own code is `import/classifications.test.ts`.
+- `S23-screens.spec.ts` (only with `SCREENS=<folder>`): `docs/prd/slice-23-screens/step-3/` (the tab, the remove
+  dialog, Settings, the new workspace's language select; light and dark).
+- **Earlier specs, run locally:** `slice-07c` (all), `S0-06`, `S0-07`, `S0-08`, `S0-09`, `S1A-12`, `S8-02`, `S8-07`,
+  `S8-08`, `S9-04`, `S10A-04`, `S13-06`, `slice-15a/S15-03`, `S15-04`, `slice-15b/S15-03`, `S21-05`, and the canvas
+  commit counts `S2C-12`, `S3A-14-idle`, `S3B-15-idle`: **72 passed, 1 skipped** (`S7C-14-commits`, on demand only).
+- **The element guard** (`S3B-15-elements`, measurement build, against `slice-08.json`): passed; viewport 4,508,
+  19,305, 1,465, 4,907 and page totals 6,135, 20,932, 3,002, 6,444, all equal to slice 22's. No measuring sitting.
+- `npm run lint`, `npm run typecheck`: clean; `npm test`: 162 files, 2,035 tests.
+- **No full run in this step:** it changes no table, undo, the save chain's rules, the canvas's layers or the local
+  adapter. One shared component gained an optional prop (`TextArea`'s `prepare`, used only by the new tab); the full run
+  is step 4's.
+
+### Earlier specs changed (all on the acceptance doc's list)
+
+| Spec | Change | Reason |
+| --- | --- | --- |
+| `e2e/slice-07c/helpers.ts` | `openList` opens the tab through "Edit the list…"; `listRow` reads the tab; `backToColumn` (new) | the dialog is the tab (item 8) |
+| `S7C-04` | the tab's hint instead of the dialog's; the chip's "· hidden while the mode is off"; the Code column instead of "built in"; back to the panel by `backToColumn` instead of Escape; the dialog's footer line dropped | items 3, 8 |
+| `S7C-05` | the form found on the page (its own dialog); `backToColumn` instead of Escape | F7, item 8 |
+| `S7C-13` | the tab's box; no fields or buttons, the definitions read-only text areas | Q7 |
+| `S9-04` | the row found in the tab | item 8 |
+| `S10A-04` | the row in the tab; Remove's confirmation clicked when it shows (the form is read when it opens), the test's title | F7 |
+| `S21-05` | the colours opened on the tab; the sentence's longer text | item 12 |
+| `S7C-10` (step 2) | the unknown value's warning text | F8 |
+
+`e2e/slice-21/helpers.ts`, `S8-02` and `S8-07` needed no change (their summary text and counts stay).
+
+### How to check it by hand
+
+On `npm run demo -- --reset` (its own file, `.data/demo-db.json`; never `.data/dev-db.json`):
+
+1. Sign in as Łukasz; open Retail Co – DWH's home, tab "Metadata conventions" (between People and Settings).
+2. Rename Business key, change its definition; Undo and Redo in the top bar; open a column's panel on "Customer &
+   orders": the toggle has the new name.
+3. Add "Hash candidate" with the code `hash` (stored as `HASH`); try `BK`, `9x` and `hash` again; add one without a code
+   ("—").
+4. Remove Personal data: the dialog lists its six columns and what stops; Remove; Undo; remove it again, add an own
+   "Personal data", Restore is refused; rename the own one, Restore.
+5. Change a concept's colour in the tab; Settings has "Model conventions" with the button to the tab.
+6. Write naming conventions, leave the field; reload; sign in as Kasia (reader): read only.
+7. The workspace menu's "New workspace" with "Polski": its tab shows "Klucz biznesowy"; changing its language in
+   Settings renames nothing. "Sales analytics" (Polish) has the Polish names after the reset.
+8. In a column's or a table's panel, "Edit the list…" opens the tab; Back returns to the canvas.
