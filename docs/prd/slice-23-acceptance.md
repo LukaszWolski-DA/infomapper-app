@@ -512,3 +512,14 @@ Draft PR: https://github.com/LukaszWolski-DA/infomapper-app/pull/52, opened at t
 - `npm run lint`, `npm run typecheck`: clean. `npm test`: 162 files, 2,035 tests passed.
 - **Earlier e2e spec changed:** `e2e/slice-07c/S7C-10.spec.ts`, the unknown value's warning text (F8).
 - **The full run** (local adapter and undo changed, the "Test runs" exception): below.
+
+### The full run (step 2: the local adapter and undo changed)
+
+- [Run 42790164033](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42790164033) on `c883dfd`, the
+  workflow "E2E", all eight parts, no retries: **708 passed, 0 failed, 4 skipped, 0 flaky**, no expected failures.
+- Wall-clock 13 min 4 s (09:22:28 to 09:35:32 UTC); the tests 10 min 55 s.
+- Parts (time; heap peak, against the runner's restart threshold of 6,431 MB; no server restart in any part):
+  1: 8.7 min, 1,043 MB · 2: 8.0 min, 1,153 MB · 3: 6.3 min, 1,290 MB · 4: 9.3 min, 912 MB · 5: 10.3 min, 1,029 MB ·
+  6: 9.6 min, 1,015 MB · 7: 6.5 min, 1,441 MB · 8: 7.9 min, 1,466 MB.
+- A commit after `c883dfd` that touches only Markdown in `docs/` and the root keeps this run valid
+  (`git diff --stat c883dfd..HEAD`).
