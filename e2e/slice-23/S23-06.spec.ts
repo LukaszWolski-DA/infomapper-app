@@ -2,6 +2,7 @@
 // undo step); Settings has no colours box, and its "Model conventions" box (a deliberate difference from the prototype:
 // the sentence and the button only) opens the tab; the naming conventions are saved, cleared, outside undo, and read only
 // for a reader.
+// Slice 24 (item 11): the sentence names the entity stereotypes.
 
 import { readDb } from "../../src/data/local/file";
 import { E2E_DB } from "../config";
@@ -34,7 +35,7 @@ test("S23-06: the colours in the tab, one undo step; Settings points to the tab"
   await expect(page.getByTestId("box-concept-colours")).toHaveCount(0);
   const box = page.getByTestId("box-model-conventions");
   await expect(box.locator("h4")).toHaveText("Model conventions");
-  await expect(box.locator("p")).toHaveText("Classifications, concept colours and naming conventions are edited in Metadata conventions.");
+  await expect(box.locator("p")).toHaveText("Classifications, entity stereotypes, concept colours and naming conventions are edited in Metadata conventions.");
   await box.getByTestId("button-open-conventions").click();
   await expect(page).toHaveURL(/\?tab=conventions$/);
   await expect(page.getByTestId("page-conventions")).toBeVisible();

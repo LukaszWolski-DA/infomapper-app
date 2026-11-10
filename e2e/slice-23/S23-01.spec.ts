@@ -1,7 +1,7 @@
 // S23-01 (slice 23, items 1–3, D-78): the workspace home's "Metadata conventions" tab between People and Settings, for
 // every member: both tables with every built-in row of the seed, their codes, their definitions in English and their
 // uses; Data Vault rows dimmed with the mode off and not with it on; read only for a reviewer, a reader and in an archived
-// workspace.
+// workspace. Slice 24 (item 8): the intro names the entity panels' stereotypes and the last line no longer lists them.
 
 import { BUILTIN_TEXTS } from "../../src/domain/model/classifications";
 import { expect, test, type Page } from "./fixtures";
@@ -18,7 +18,7 @@ test("S23-01: the tab between People and Settings with every built-in row, codes
   await expect(page.locator('[role="tablist"] [role="tab"]')).toHaveText(["Overview", /^People \(\d+\)$/, "Metadata conventions", "Settings"]);
   await expect(page.getByTestId("tab-conventions")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("text-conventions-intro")).toHaveText(
-    "The workspace's conventions, in one place. The import matches classifications by their name or code; table and column panels set them; documents and exports print their definitions.",
+    "The workspace's conventions, in one place. The import matches classifications by their name or code; table and column panels set them; entity panels offer the stereotypes; documents and exports print their definitions.",
   );
   await expect(page.getByTestId("box-classifications").locator("h4")).toHaveText(["For source columns", "For source tables"]);
   await expect(page.getByTestId("section-column-classifications").locator("th")).toHaveText(["Name", "Code", "Definition", "Used", ""]);
@@ -32,7 +32,7 @@ test("S23-01: the tab between People and Settings with every built-in row, codes
   await expect(rowOf(page, "BK").getByTestId("classification-uses")).toHaveText("used 4×");
   await expect(rowOf(page, "LDTS").getByTestId("classification-uses")).toHaveText("unused");
   await expect(page.getByTestId("text-conventions-later")).toHaveText(
-    "Later, in their own slices: entity stereotypes' names and definitions, the map from physical to logical types, an organization's default conventions.",
+    "Later, in their own slices: the map from physical to logical types, an organization's default conventions.",
   );
 });
 
