@@ -1,6 +1,6 @@
 # Fix – A field shows its typed text after Undo (S23-02)
 
-Status: **diagnosis done** (10 November 2026), no fix yet; Łukasz decides first. Branch `fix/field-draft-after-undo`
+Status: **diagnosis done** (10 November 2026); **Option 2 chosen by Łukasz and built** (section 5); not merged. Branch `fix/field-draft-after-undo`
 from `main` at `10e342e` (tag `slice-24`). A fix to shared infrastructure (the draft rules, `useDraft` and
 `FieldDraft`), outside slices (CLAUDE.md, the slice cycle, 4). Łukasz's KB file (`.data/dev-db.json`) was not touched:
 every run here used the e2e data file.
@@ -122,3 +122,54 @@ without a version stay as they are.
   `S4A-*` for the requirement panel, `S15C-*` for InfoCube's mapping panel, `S2C`/`S10A` mapping panels).
 - **The single-file check** of both regression tests and `S23-02` on GitHub (3 rounds).
 - **A full run before the merge** (the workflow "E2E" on the final commit): the draft rules are shared infrastructure.
+
+## 5. The fix (Option 2, Łukasz, 10 November 2026)
+
+**The rule** (`FieldDraft`, `src/ui/field-draft.ts`): `send` remembers the text sent; `answered(n, stored, version)`
+remembers the newest save stored with the row's version its answer gives (`versionBy`: a panel action's
+`value.version`, a canvas save's `version`); `settle(stored, version, text, focused)` ends the draft on `stored` when the
+field shows that version or a newer one, the element still holds the text that save sent and has no focus. Text typed
+since ends the rule for that save (the draft stays, as any draft). `receive` takes a fourth argument, the shown version,
+and tries `settle` first. Without a version, the field's or the answer's, nothing changes.
+
+**`useDraft`** (`src/app/_panels/fields.tsx`): the option `version`; the effect runs on `[stored, version]`; a save's
+answer settles against the stored value and version the field was last drawn with (the page may come first); leaving
+the field with the stored save's text untouched takes the stored value and saves nothing (an Undo while the field had
+the focus is not undone by leaving it).
+
+**A prop, not a context.** The fields of one panel do not all save one row: InfoCube's sections sit in the entity panel
+and save `cube_entity`, `cube_measure` and `cube_attribute` rows; the Metadata conventions tab and the settings mix the
+workspace's row with the classifications' and stereotypes'. A context at the panel's level would give those fields the
+entity's or the workspace's version without any error; a context per row would need a provider around every section and
+still fail silently where one is forgotten. `version` is therefore **required** on `TextField` and `TextArea`
+(`number | null`): the compiler lists every call site, and each passes the version of the row its save writes. The
+direct `useDraft` users pass it as an option (the canvas's rename in its tab, the project's name and description, the
+settings' three fields, the classification and stereotype names, the attribute's length, precision and scale, a
+mapping's rule).
+
+**Two deliberate `null`s:** a note's text in its panel (its draft is the canvas's `NoteDrafts`, which the field follows
+through `outside`) and InfoCube's unknown member's value (its row comes and goes with the value, and its answer is that
+row, not a version): for these two the rules stay as before.
+
+**Answers that had no version:** `renameCanvasAction` now answers the canvas's version; a frame's `updateFrame` answers
+`{ ok: true, version }` (`CanvasSave`); the mapping panel's `write` answered a bare `true`, now the action's result when
+stored (`false` when refused, as before: its codes stay out of the field, unchanged).
+
+**`NoteDrafts.stored(id, stored, sent)`** (`src/canvas/note-drafts.ts`): the draft ends when the person's text is the
+stored text or the text that save sent; `useNotes.save` passes the text it sent.
+
+## 6. Tests of the fix (10 November 2026, locally, `ced0b44`)
+
+- **Unit tests:** `src/ui/field-draft.test.ts` (a newer version with the same value, the same version, an older one,
+  no version on either side, the focus held and then the field left, a trimmed value, someone else's value, text typed
+  since, the answer after the page, an older save's answer and a refusal, `versionBy`) and `src/canvas/note-drafts.test.ts`
+  (a trimmed note, an older answer while newer text is on its way). `npm test`: 165 files, 2,089 tests passed; `npm run
+  lint` and `npm run typecheck` pass.
+- **The regression specs:** both pass (they failed on `main`, section 4).
+- **The affected specs** (one local run, 36.8 min): `fixes`, `slice-04a`, `slice-07c`, `slice-09`, `slice-10a`,
+  `slice-13`, `slice-14a`, `slice-14b`, `slice-15c`, `slice-18`, `slice-22`, `slice-23`, `slice-24`: **251 passed, 1
+  failed**. The failure: `S14B-09` "a focused field with typed text asks; once it is saved, nothing" timed out waiting
+  for the name's save answer to finish (`answerOf`), as in slice 21's first full run on `main`'s code
+  (`slice-21-acceptance.md`); its single-file check passed 3/3 locally. Its traces were lost: the rerun cleared
+  `test-results/` before I kept them.
+- **S23-02 repeated:** 5 of 5 local runs passed (3 of 9 failed before the fix).

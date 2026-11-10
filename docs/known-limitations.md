@@ -1148,30 +1148,6 @@ As for classifications: an own stereotype's code is unique among every row of th
 undoing "Add stereotype" keeps the row and its code stays taken ("That code is taken"); a removed own stereotype's code
 is never given again either, and it also blocks a name (F4, F5, accepted by Łukasz on 10 November 2026).
 
-### A text area whose command trims may keep an untrimmed draft (found in slice 23, not checked elsewhere)
-
-A plain-text area saves what was typed and its command stores it trimmed. Without `prepare` the field keeps the typed
-text as a draft (it differs from the stored text by its spaces), so a later stored value (an undo, another person's
-change) does not show in it until the field is left or Escape is pressed. Slice 23 found it on a definition (S23-02) and
-gave `TextArea` an optional `prepare`, which the Metadata conventions tab's two text areas use (a trim, as
-`TextField`'s). The other text areas (a source's note, a mapping's note and rule, a note's text, a requirement's
-fields, a calculation's rule) were not changed or checked; whether they show it, and the fix (`prepare` where the
-command trims), is a `fix/…` branch of its own (The slice cycle, 4), with the next note's fix after slice 24's merge.
-
-### Undo right after a definition's save can leave the typed text in the field (found in slice 24, S23-02)
-
-In S23-02 a classification's definition is typed and left, its toast and its stored value come, and the top bar's Undo
-is pressed about 0.4 s after the save was sent: the toast "Undone: …" shows and the stored value is back, but in 3 of 9
-local runs (on 10 November 2026; also with slice 24's interface taken out) the text area kept the typed, trimmed text
-for the whole 15 s. On GitHub it passed 3 of 3 on `main` and on slice 24's branch, and in slice 24's full runs. The
-trace and the run's log are in `.data/traces/s23-02-20261110/` (git-ignored): every server action answered 200, the
-undo's answer carrying the fresh page. The draft rules (`useDraft`, `src/ui/field-draft.ts`) and the save chain's
-answer after the page (`afterPage`, `rowSaves`) are shared infrastructure, so the slice did not change them or the test.
-
-- **To fix on a `fix/…` branch from `main` after slice 24's merge** (The slice cycle, 4), together with the note above
-  (a text area whose command trims): reproduce it on `main`, find the interleaving from the trace, fix it with its own
-  full run.
-
 ## Organizations and sign-in (slice 8)
 
 Slice 8's sign-in is a development form (D-58; AD-04's note): it exists only where the development sign-in does, and a
