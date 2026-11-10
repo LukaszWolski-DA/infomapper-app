@@ -30,7 +30,7 @@ const rgb = (hex: string) => `rgb(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(h
 const customer = () => liveConceptNamed("Customer");
 
 async function openSettings(page: Page) {
-  await page.goto(settingsUrl());
+  await page.goto(settingsUrl().replace("tab=settings", "tab=conventions")); // slice 23: the colours moved to the tab
   await hydrated(page);
   await expect(page.getByTestId("box-concept-colours")).toBeVisible();
 }
@@ -53,7 +53,7 @@ test("S21-05: a modeler changes a concept's colour: the toast, one undo step fro
   const line = colourLine(page, "Customer");
   await expect(line.locator("button")).toHaveCount(8);
   expect(await line.locator("button").evaluateAll((els) => els.map((e) => e.getAttribute("data-colour")))).toEqual([...CONCEPT_PALETTE]);
-  await expect(page.getByTestId("box-concept-colours")).toContainText("Violet is reserved for requirements, so it is not offered here.");
+  await expect(page.getByTestId("box-concept-colours")).toContainText("Violet is reserved for requirements, so it is not offered here;");
   await expect(swatch(page, "Customer", OLD)).toHaveAttribute("aria-pressed", "true");
   await expect(line.locator('button[aria-pressed="true"]')).toHaveCount(1);
   await expect(swatch(page, "Customer", OLD)).toBeEnabled();

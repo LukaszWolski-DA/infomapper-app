@@ -133,7 +133,7 @@ test("S9-04: classification: the name twice", async ({ page }) => {
   await recordToasts(page);
   await openColumn(page, "customers", "cust_no");
   await openList(page);
-  const name = page.getByTestId("dialog-classifications").locator('[data-testid="classification-row"][data-code="BK"]').getByTestId("input-classification-name");
+  const name = page.getByTestId("box-classifications").locator('[data-testid="classification-row"][data-code="BK"]').getByTestId("input-classification-name");
   await typeAndLeave(name, "Klucz biznesowy");
   await typeAndLeave(name, "Klucz biznesowy (BK)");
   await expect.poll(async () => (await loadModel()).classifications.find((c) => c.code === "BK")?.name).toBe("Klucz biznesowy (BK)");
