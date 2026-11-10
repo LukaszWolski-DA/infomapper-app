@@ -1,5 +1,5 @@
 // The model checks in a browser (slice 20, step 2; Łukasz's step 2 decisions): what a canvas page computes after a
-// write (the checks' items, the marks and one canvas's count; bar 20 ms), the lookup and the cube index apart, bundled with esbuild and run in headless
+// write (the checks' items, the marks and one canvas's count; a reference of 25 ms, not a gate, since slice 20's closing), the lookup and the cube index apart, bundled with esbuild and run in headless
 // Chromium on the synthetic model of `bench-checks.ts`. One warm-up, then 9 rounds; median, fastest, slowest.
 // Run: npx tsx scripts/bench-checks-browser.ts
 
@@ -72,7 +72,7 @@ async function main() {
     );
     console.log(`  lookup (the requirement index's): ${f(r.lookup)}`);
     console.log(`  cube index (the page's sections', apart): ${f(r.cube)}`);
-    console.log(`  marks and counts (a canvas after a write): ${f(r.marks)}; bar 20.0 ms ${r.marks.median! <= 20 ? "met" : "MISSED"}`);
+    console.log(`  marks and counts (a canvas after a write): ${f(r.marks)}; reference 25.0 ms (not a gate) ${r.marks.median! <= 25 ? "within" : "above"}`);
     console.log(`  every line with its words (no bar here): ${f(r.home)}`);
     for (const [part, x] of Object.entries(r.split)) console.log(`    split: ${part}: ${f(x)}`);
   } finally {

@@ -1,4 +1,4 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 20's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 22's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
@@ -51,9 +51,22 @@ several links at once and "Link all attributes…", a requirement card's link dr
 resized from every edge and corner, and "Add attribute below" (17, D-72); calculated attributes ("Calculated from", the
 row's "=" and square, counted as mapped or fed and covered through their inputs, Focus and the delete's second click) and
 InfoCube's lookups (the kind, its relationship, its value for no match, the chip "L") (18, D-73); the model checks: the project home's section and its stats' link, the card
-marks, the status bar's count, the details panel's group and the panels' box (20, D-75).
+marks, the status bar's count, the details panel's group and the panels' box (20, D-75); a dimension's unknown member: the
+panel's section with the flag and a value per attribute, a fact's Dimensions' "no match → {value}", a lookup's
+placeholder and the two checks (22, D-77).
 
 **Deliberate differences:**
+- **Slice 22 (D-77):**
+  - Eight attribute types, not six: Datetime follows Date's rule with its own sentence, and a Custom type takes any
+    value; both default to empty.
+  - Readers, reviewers and an archived workspace see the values in read-only fields (the text can be selected); the
+    prototype disables them.
+  - A value keeps its draft (D-66): after a refused save the field shows the conflict line or "Not saved", and the page
+    asks before it is left; the prototype saves at once.
+  - A value whose attribute is deleted goes with it in the same undo step; the prototype drops it when it builds its
+    index.
+  - The two groups stand among InfoCube's by severity (High first): feeds, unknown member values, fact hints, dimensions
+    without an unknown member, not yet covered.
 - **Slice 20 (D-75):**
   - A copy of a copy counts by the key at the end of its chain, and a foreign key with the primary key's name counts as
     its copy for "no copied key"; the prototype reads only a copy's first link.
@@ -409,14 +422,12 @@ nothing creates or brings one back, so there is no read-only mode, hatch or off 
 2026); the box's text and the "off" toast say so; the role titles have no "is off here: read-only"; each fact is listed
 once in a dimension's delete preview; paste within one level only (the prototype has no paste).
 
-## The app ahead of the prototype (slice 21)
+## The app ahead of the prototype (slice 22)
 
-To be brought into the prototype at its next handover:
+To be brought into the prototype at its next handover (slice 21's two lines are in the prototype since slice 22's):
 
-- **Every picker's filter ignores extra spaces** (and case), as its create item compares (`pickNorm`); the prototype's
-  `pickVisible` trims only, so a name typed with extra spaces shows no item.
-- **A press on a canvas row first ends the editing of a focused panel field** (its blur saves it for its own row); the
-  prototype keeps the focus in the field.
+- **A fact's Dimensions show "no match → {value}" on a line of its own**, under the dimension's name and its key, so both
+  stay whole at the panel's default width (Łukasz, slice 22 step 3); the prototype has it on the key's line.
 
 ## Not product features
 

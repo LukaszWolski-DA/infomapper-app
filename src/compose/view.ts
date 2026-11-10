@@ -50,15 +50,17 @@ const creates = (actions: CreateActions): EntityCreate[] => [
 export async function moduleView(store: DataStore, workspace: Workspace, model: WorkspaceModel, actions: CreateActions, events: readonly ChangeEvent[] = []): Promise<ModuleView> {
   const hasDimensional = model.entities.some((e) => e.model_level === "dimensional");
   if (!workspace.infocube && !hasDimensional) return NO_MODULES;
-  const [cube, measures, keys, cubeMappings, cubeMappingInputs] = hasDimensional
+  const [cube, measures, keys, cubeMappings, cubeMappingInputs, cubeAttributes] = hasDimensional
     ? await Promise.all([
         store.modules.list(workspace.id, "cube_entity"),
         store.modules.list(workspace.id, "cube_measure"),
         store.modules.list(workspace.id, "cube_key"),
         store.modules.list(workspace.id, "cube_mapping"),
         store.modules.list(workspace.id, "cube_mapping_input"),
+        // slice 22: the unknown members' stored values
+        store.modules.list(workspace.id, "cube_attribute"),
       ])
-    : [[], [], [], [], []];
+    : [[], [], [], [], [], []];
   const roles: ModuleView["roles"] = {};
   // slice 19 (D-74): the chip names the type, factless, aggregate, junk, snapshot and outrigger; its title the long text
   const types = typeContext(cube, model.relationships, model.entities);
@@ -76,7 +78,7 @@ export async function moduleView(store: DataStore, workspace: Workspace, model: 
     data: hasDimensional
       ? {
           infocube: {
-            ...cubePageRows(cube, measures, keys, cubeMappings, cubeMappingInputs),
+            ...cubePageRows(cube, measures, keys, cubeMappings, cubeMappingInputs, cubeAttributes),
             contentAuthors: workspace.four_eyes ? contentAuthorsOf(cubeMappings, events) : {},
           },
         }
@@ -150,15 +152,16 @@ export async function moduleHomeData(
 ): Promise<{ rowFeeds: Record<Uuid, { n: number }>; feeds: AttributeFeeds; checks: (input: CheckInput) => ModuleChecks[] }> {
   const on = !!workspace.infocube;
   if (!model.entities.some((e) => e.model_level === "dimensional" && e.deleted_at === null)) return { rowFeeds: {}, feeds: {}, checks: (input) => cubeModuleChecks(on, null, input) };
-  const [cubeEntities, cubeMeasures, cubeKeys, cubeMappings, cubeMappingInputs] = await Promise.all([
+  const [cubeEntities, cubeMeasures, cubeKeys, cubeMappings, cubeMappingInputs, cubeAttributes] = await Promise.all([
     store.modules.list(workspace.id, "cube_entity"),
     store.modules.list(workspace.id, "cube_measure"),
     store.modules.list(workspace.id, "cube_key"),
     store.modules.list(workspace.id, "cube_mapping"),
     store.modules.list(workspace.id, "cube_mapping_input"),
+    store.modules.list(workspace.id, "cube_attribute"),
   ]);
   const index = mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs });
-  const rows = cubePageRows(cubeEntities, cubeMeasures, cubeKeys, cubeMappings, cubeMappingInputs);
+  const rows = cubePageRows(cubeEntities, cubeMeasures, cubeKeys, cubeMappings, cubeMappingInputs, cubeAttributes);
   return { rowFeeds: cubeRowFeeds(index, model.attributes), feeds: cubeRequirementFeeds(index, model.attributes), checks: (input) => cubeModuleChecks(on, rows, input) };
 }
 

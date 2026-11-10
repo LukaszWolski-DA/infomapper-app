@@ -16,12 +16,14 @@ import {
   createCubeEntity,
   linkKey,
   setMeasure,
+  setUnknownValue,
   updateCubeEntity,
   updateMeasure,
   type AddKeyInput,
   type KeyState,
   type LinkKeyInput,
   type SetMeasureInput,
+  type SetUnknownValueInput,
   type UpdateCubeEntityInput,
   type UpdateMeasureInput,
 } from "../domain/commands";
@@ -89,7 +91,7 @@ async function keyState(store: DataStore, workspaceId: string, model: WorkspaceM
 }
 
 /**
- * A fact's grain, type, factless flag or base, or a dimension's kind, history or snapshot period (saved on the chain with
+ * A fact's grain, type, factless flag or base, or a dimension's kind, history, snapshot period or unknown member flag (saved on the chain with
  * the `cube_entity` row checked; slice 19 reads every row for the base's checks).
  */
 export async function updateCubeEntityAction(workspaceId: string, input: UpdateCubeEntityInput): Promise<ActionResult<{ version: number }>> {
@@ -108,6 +110,17 @@ export async function setMeasureAction(workspaceId: string, input: SetMeasureInp
     const cube = cubes.find((c) => c.deleted_at === null && c.entity_id === attribute?.entity_id) ?? null;
     const measure = measures.find((m) => m.deleted_at === null && m.attribute_id === attribute?.id) ?? null;
     return setMeasure(ctx, access, { attribute, cube, measure }, input);
+  });
+}
+
+/** Slice 22: sets or clears a dimension's attribute's unknown member's value; answers the row's new id and version, or none. */
+export async function setUnknownValueAction(workspaceId: string, input: SetUnknownValueInput): Promise<ActionResult<{ row: { id: string; version: number } | null }>> {
+  return modelCommand(workspaceId, async (ctx, access, { attributes, entities }, store) => {
+    const attribute = attributes.find((a) => a.id === input?.attributeId) ?? null;
+    const [cubes, values] = await Promise.all([store.modules.list(access.workspace.id, "cube_entity"), store.modules.list(access.workspace.id, "cube_attribute")]);
+    const cube = cubes.find((c) => c.deleted_at === null && c.entity_id === attribute?.entity_id) ?? null;
+    const row = values.find((v) => v.deleted_at === null && v.attribute_id === attribute?.id) ?? null;
+    return setUnknownValue(ctx, access, { attribute, cube, row, entityName: entities.find((e) => e.id === attribute?.entity_id)?.name }, input);
   });
 }
 

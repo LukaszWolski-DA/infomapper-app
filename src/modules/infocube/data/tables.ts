@@ -1,7 +1,8 @@
 // InfoCube's tables in the local data file and the rules the database would enforce on them (slice 15a, AD-33),
 // mirroring supabase/migrations/20261104100100_infocube_entities.sql and (slice 15b, `cube_key`)
 // 20261104110100_infocube_keys.sql and (slice 15c, the dimensional mappings) 20261105110000_infocube_mappings.sql and
-// (slice 19, the types) 20261108130000_infocube_types.sql. Registered with the store by `src/compose/`.
+// (slice 19, the types) 20261108130000_infocube_types.sql and (slice 22, the unknown member)
+// 20261109120000_infocube_unknown_member.sql. Registered with the store by `src/compose/`.
 
 import { model, oneOf, type AnyRow, type TableRules } from "@/data/local/schema";
 import {
@@ -14,6 +15,7 @@ import {
   DIM_KINDS,
   FACT_TYPES,
   HISTORIES,
+  type CubeAttribute,
   type CubeEntity,
   type CubeKey,
   type CubeMapping,
@@ -29,25 +31,28 @@ export interface InfoCubeDb {
   cube_key: CubeKey[];
   cube_mapping: CubeMapping[];
   cube_mapping_input: CubeMappingInput[];
+  cube_attribute: CubeAttribute[];
 }
 
 const noneOrOneOf = (values: readonly string[], column: string) => (r: AnyRow) => r[column] === null || values.includes(r[column] as string);
 
 /**
  * A fact has a type and a factless flag and none of a dimension's fields; a dimension a kind and a history and none of a
- * fact's, no grain either (`cube_entity_shape_ck`, slice 19).
+ * fact's, no grain either (`cube_entity_shape_ck`, slice 19); slice 22: a dimension says whether it has an unknown
+ * member, a fact has none.
  */
 const shapeFits = (r: AnyRow) =>
   r.role === "fact"
-    ? r.fact_type != null && r.is_factless != null && r.dim_kind == null && r.history == null && r.snapshot_period == null
-    : r.grain === null && r.fact_type == null && r.is_factless == null && r.base_fact_entity_id == null && r.dim_kind != null && r.history != null;
+    ? r.fact_type != null && r.is_factless != null && r.dim_kind == null && r.history == null && r.snapshot_period == null && r.has_unknown_member == null
+    : r.grain === null && r.fact_type == null && r.is_factless == null && r.base_fact_entity_id == null && r.dim_kind != null && r.history != null && r.has_unknown_member != null;
 
 const OLD_HISTORY: Record<number, string> = { 0: "keep", 1: "overwrite", 2: "history" };
-const NEW_COLUMNS = ["fact_type", "is_factless", "base_fact_entity_id", "dim_kind", "history", "snapshot_period"] as const;
+const NEW_COLUMNS = ["fact_type", "is_factless", "base_fact_entity_id", "dim_kind", "history", "snapshot_period", "has_unknown_member"] as const;
 
 /**
  * A `cube_entity` row written before slice 19 (F1), as it reads now: a fact a transaction, not factless, without a base; a
  * dimension standard, its `scd_type` 0, 1 or 2 as keep, overwrite or history (overwrite when absent); `scd_type` dropped.
+ * A row written before slice 22 (acceptance F4): a dimension has its unknown member on, a fact none.
  * Null for a row in the current shape. The migration does the same in the database.
  */
 export function upgradeCubeEntity(row: AnyRow): AnyRow | null {
@@ -62,6 +67,7 @@ export function upgradeCubeEntity(row: AnyRow): AnyRow | null {
     dim_kind: fact ? null : ((row.dim_kind as string | undefined) ?? DEFAULT_DIM_KIND),
     history: fact ? null : ((row.history as string | undefined) ?? OLD_HISTORY[scd as number] ?? "overwrite"),
     snapshot_period: fact ? null : ((row.snapshot_period as string | undefined) ?? null),
+    has_unknown_member: fact ? null : ((row.has_unknown_member as boolean | undefined) ?? true),
   };
 }
 
@@ -117,5 +123,18 @@ export const INFOCUBE_RULES: Readonly<Record<InfoCubeTable, TableRules>> = {
     key: ["id"],
     foreignKeys: { ...model, mapping_id: "cube_mapping", attribute_id: "attribute" },
     unique: [{ columns: ["mapping_id", "attribute_id"], live: true }],
+  },
+  // slice 22: one live row per attribute; that the attribute is a dimension's is the module's command's check, as
+  // `cube_measure`'s "a fact's attribute"
+  cube_attribute: {
+    key: ["id"],
+    foreignKeys: { ...model, attribute_id: "attribute" },
+    unique: [{ columns: ["attribute_id"], live: true }],
+    checks: [
+      {
+        name: "cube_attribute_unknown_value_ck",
+        test: (r) => r.unknown_value === null || (typeof r.unknown_value === "string" && r.unknown_value !== "" && r.unknown_value === r.unknown_value.trim()),
+      },
+    ],
   },
 };

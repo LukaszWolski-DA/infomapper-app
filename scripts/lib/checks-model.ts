@@ -55,7 +55,7 @@ export interface Prepared {
 /** What a page has before the checks: the model, the module's rows and the requirement index's lookup. */
 export function prepare(db: ChecksDb, ws: Uuid): Prepared {
   const model = modelOf(db, ws);
-  const rows = cubePageRows(of(db.cube_entity, ws), of(db.cube_measure, ws), of(db.cube_key, ws), of(db.cube_mapping, ws), of(db.cube_mapping_input, ws));
+  const rows = cubePageRows(of(db.cube_entity, ws), of(db.cube_measure, ws), of(db.cube_key, ws), of(db.cube_mapping, ws), of(db.cube_mapping_input, ws), of(db.cube_attribute, ws));
   const feeds = cubeRequirementFeeds(mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings: rows.cubeMappings as never, cubeMappingInputs: rows.cubeMappingInputs as never }), model.attributes);
   return { model, lookup: lookupModel(model, feeds), rows, on: !!db.workspace.find((w) => w.id === ws)?.infocube, cube: cubeOf(model, rows) };
 }

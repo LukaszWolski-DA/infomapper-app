@@ -1360,7 +1360,8 @@ AD-35), but the app has no copy or transfer of a workspace yet, so nothing appli
 
 ### What slice 19 leaves for later, and an older undo step (slice 19, D-74)
 
-- **Bridge dimensions, hierarchies, a dimension's unknown member** and other SCD types are later slices (PRD section 9);
+- **Bridge dimensions, hierarchies** and other SCD types are later slices (PRD section 9; a dimension's unknown member
+  came in slice 22);
   a many-to-many relationship between two dimensions is no outrigger until bridges exist.
 - **An aggregate's grain and measures** are not checked against its base; only the dimension hint is.
 - **An undo step recorded before slice 19 on a fact or dimension** (its images hold `scd_type`) is refused as "changed
@@ -1368,6 +1369,23 @@ AD-35), but the app has no copy or transfer of a workspace yet, so nothing appli
   development server that reloads code without restarting can meet it, and the refusal is safe.
 - **A role chip changes with the save's fresh page:** a relationship drawn or deleted between two dimensions, or a type
   chosen in the panel, shows on the card once the page has the answer, as the Σ marks do.
+
+### A dimension's unknown member (slice 22, D-77)
+
+- **Several primary keys:** a fact's Dimensions row shows the value of the dimension's first primary key in its order,
+  as Add key uses the first; every key attribute has its own value in the dimension's panel.
+- **A default is not checked against its type:** a String shorter than "Unknown" (for example `String(3)`) still shows
+  "Unknown" as its default, and no check names it; only typed values are checked (decision 3). Type a value that fits.
+- **A key of a type without a default** (a Date, a Decimal, a Custom type) shows "empty (NULL)" and "no match → NULL"
+  until a value is typed; no check names it (`docs/ideas.md`).
+- **A value is checked by its shape only:** "2026-13-45" fits a Date; an Integer has no range, a Decimal no precision
+  or scale; "1." and "+1" do not fit.
+- **The field's mark follows the stored value:** while a value is typed and the field not yet left, nothing is marked.
+- **The fact's Dimensions and a lookup's placeholder follow a save's fresh page**, as the role chip and the marks do.
+- **An undo step recorded before slice 22 on a dimension** (its images lack the flag) is refused as "changed since", as
+  slice 19's; the history is in the server's memory and empty after the restart the new code needs.
+- **Turning InfoCube off is not possible while facts or dimensions exist** (C-7), so "InfoCube off shows neither check"
+  is tested with a data file written by hand (S22-05) and in a unit test.
 
 ## Model checks (slice 20)
 

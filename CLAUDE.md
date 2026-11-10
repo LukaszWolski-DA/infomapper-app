@@ -56,7 +56,9 @@ the facts' hints and the approved feeds the logical model no longer supports; th
 slanted "!", the status bar counts them and the panels show their own (slice 20, D-75). A logical row dropped onto a source
 column maps them as the opposite drag does; the concept picker makes a new concept with the entity, fact or dimension in
 one undo step; a requirement gap says "column left the source"; the mapping rule keeps its draft; the settings set a
-concept's colour (slice 21, D-76).
+concept's colour (slice 21, D-76). A dimension has an unknown member, on unless turned off, with a value per attribute
+(defaults by type, a value that does not fit its type marked), shown in a fact's Dimensions and as a lookup's placeholder,
+with two model checks (slice 22, D-77).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -424,6 +426,7 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spe
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
 npx tsx scripts/bench-thumbnails.ts                           # slice 12b: the homes' server work and the thumbnails' cost (index, shapes, paths, bytes, 20 requests, keys; not a gate)
+SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts                     # slice 22: the unknown member's section (a value, a value that does not fit, off), Fact Sales' Dimensions; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
 npx tsx scripts/bench-checks.ts                               # slice 20: the model checks (marks and counts, the home with its lines; bar 50 ms in Node), synthetic, Performance test, demo
 npx tsx scripts/bench-checks-browser.ts                       # slice 20: the same in headless Chromium, with the split (the marks: reference 25 ms, not a gate)
@@ -644,6 +647,15 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     `canvasCheckItems`, `checksBox`, `boxItems`).
   React's development mode runs effects twice: a request handled in an effect is marked handled where it is acted on
   (in its animation frame), or the second run finds it done (the status bar's jump, slice 20).
+
+  Slice 22's fixtures reseed with `addFullDemoData`, as slice 20's. Its helpers do the following:
+  - find the section's parts (`unknownFlag`, `unknownSentence`, `unknownItems`, `unknownInput`, `unknownBad` by
+    "{star key}.{attribute}") and type a value (`typeValue`);
+  - read the stored values (`storedValue`, `rawValues` with deleted rows, `unknownOnOf`) and write them as test data
+    through the domain (`setValueAs`, `setUnknownAs`);
+  - write the e2e file as slice 21 left it (`writeBeforeSlice22`) and with InfoCube off beside its facts and dimensions
+    (`writeInfoCubeOff`, which the app never does: C-7).
+  Call `recordToasts` before the page is opened: it is an init script (S22-02).
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,
@@ -963,6 +975,19 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   `moduleView`'s `roles` text and title; a long one is cut in CSS (`infocube.css`; flex shrink factors of at least 1,
   since a factor below 1 hands out only that fraction of the overflow). **A later reader of a dimension's history** uses
   `historyLabel`, never an "SCD n" of its own.
+- **InfoCube's unknown member** (slice 22, D-77): `cube_entity.has_unknown_member` (true for a dimension, null for a
+  fact; older rows through `upgradeCubeEntity`) and the table `cube_attribute` (one live row per attribute while it
+  holds a typed value; parent `attribute`, so it goes with its attribute and undo refuses it on a deleted one). **The
+  rules in one place:** `src/modules/infocube/domain/unknown-member.ts` (`unknownDefault`, `unknownFit` for the eight
+  types, `unknownValueOf`, `lookupPlaceholder`, the texts); the cube index answers `unknownOn` and `unknownOf` when it
+  is built with `cubeAttributes`. The flag is `updateCubeEntity`'s; a value is `setUnknownValue`: it checks the row the
+  page knows, its id and version, or that there is none, and a row gone or replaced is a stale version (so D-66's line
+  shows). The panel (`UnknownMember` in `sections.tsx`) saves a value with its attribute held (`saveRows`) and sends the
+  row of the last answer while the page still shows what it showed then. `TextField` has an optional `invalid`
+  (`aria-invalid`, the warning border, its title). The checks `unkval` and `nounk` read the stored values from the
+  rows (`CubeCheckRows.cubeAttributes`), not from a cube index passed in. A fact's Dimensions show the no-match part on
+  a line of its own under the shared row, in that list only. **A later reader of the unknown member's value** uses
+  `unknownValueOf`, never a default of its own.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a

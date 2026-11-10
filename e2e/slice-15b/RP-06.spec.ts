@@ -21,6 +21,6 @@ test("RP-06: the FK flag cleared on ship_date_key: no key and its hint, the link
   expect((await liveKeys()).some((k) => k.relationship_id === ship && k.attribute_id === attrId("sales.ship_date_key"))).toBe(true);
 
   await undoButton(page).click();
-  await expect(dimensionRow(page, ship)).toHaveText(/^Dim Date as Ship date\s*key ship_date_key$/);
+  await expect(dimensionRow(page, ship)).toHaveText(/^Dim Date as Ship date\s*key ship_date_key\s*no match → -1$/);
   await expect(hintsOk(page)).toBeVisible();
 });

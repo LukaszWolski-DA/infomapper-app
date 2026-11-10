@@ -4,7 +4,8 @@
 // approved source mappings, 1,500 dimensional mappings), on "Performance test" and on the demo. The lookup is the
 // requirement index's and the cube index the page's sections build: both timed apart. One warm-up, then 9 rounds;
 // median, fastest, slowest. Bars (Łukasz, step 2's second round): the project home's whole computation, lines
-// included, 50 ms in Node on the synthetic model; the marks and counts 20 ms in Chromium (`bench-checks-browser.ts`).
+// included, 50 ms in Node on the synthetic model; the marks and counts have no bar in Node; in Chromium (`bench-checks-browser.ts`) a reference of 25 ms, not a gate
+// (slice 20's closing).
 // "Performance test" and the demo are reported without a bar.
 // Run: npx tsx scripts/bench-checks.ts
 

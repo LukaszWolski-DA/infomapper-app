@@ -12,7 +12,7 @@ import type { Uuid } from "@/domain/ids";
 import type { Attribute, Entity, Relationship } from "@/domain/types";
 import { aggregateIndex, type AggregateIndex } from "./aggregates";
 import { outriggers, type Outriggers } from "./outriggers";
-import type { CubeEntity, CubeKey, CubeMeasure } from "./types";
+import type { CubeAttribute, CubeEntity, CubeKey, CubeMeasure } from "./types";
 
 /** The model and InfoCube's rows a read needs (deleted rows are ignored). */
 export interface CubeModel {
@@ -22,6 +22,8 @@ export interface CubeModel {
   cubeEntities: readonly CubeEntity[];
   cubeMeasures: readonly CubeMeasure[];
   cubeKeys: readonly CubeKey[];
+  /** Slice 22: the unknown members' stored values; a caller that reads none of them leaves it out. */
+  cubeAttributes?: readonly CubeAttribute[];
 }
 
 const isLive = <T extends { deleted_at: string | null }>(r: T | undefined | null): r is T => !!r && r.deleted_at === null;
@@ -82,6 +84,10 @@ export interface CubeIndex {
   outriggers(): Outriggers;
   /** Slice 19: the dimensions a fact is related to, each once, in the order of its relationships. */
   dimensionsOf(factId: Uuid): Uuid[];
+  /** Slice 22: whether the entity is a dimension with its unknown member on. */
+  unknownOn(entityId: Uuid): boolean;
+  /** Slice 22: the attribute's live row with its unknown member's stored value (`unknown-member.ts` adds the default). */
+  unknownOf(attributeId: Uuid): CubeAttribute | undefined;
 }
 
 export function cubeIndex(model: CubeModel): CubeIndex {
@@ -110,6 +116,7 @@ export function cubeIndex(model: CubeModel): CubeIndex {
     return ends && key && key.is_foreign_key && key.entity_id === ends.fact ? key : null;
   };
   const pkOf = (entityId: Uuid) => attributesOf.get(entityId)?.find((a) => a.is_primary_key) ?? null;
+  let unknowns: Map<Uuid, CubeAttribute> | undefined;
   let byFact: Map<Uuid, { r: Relationship; dimension: Uuid }[]> | undefined;
   let aggregates: AggregateIndex | undefined;
   let outs: Outriggers | undefined;
@@ -151,6 +158,11 @@ export function cubeIndex(model: CubeModel): CubeIndex {
       byFact ??= groupByFact();
       return [...new Set((byFact.get(factId) ?? []).map((x) => x.dimension))];
     },
+    unknownOn(entityId) {
+      const c = cubes.get(entityId);
+      return c?.role === "dimension" && c.has_unknown_member !== false;
+    },
+    unknownOf: (id) => (unknowns ??= new Map((model.cubeAttributes ?? []).filter(isLive).map((u) => [u.attribute_id, u]))).get(id),
   };
 }
 

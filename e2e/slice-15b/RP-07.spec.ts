@@ -28,6 +28,6 @@ test("RP-07: deleting ship_date_key names its link on the second click; the rela
 
   await undoButton(page).click();
   await expect.poll(() => keyOf(ship)).toBe(attrId("sales.ship_date_key"));
-  await expect(dimensionRow(page, ship)).toHaveText(/^Dim Date as Ship date\s*key ship_date_key$/);
+  await expect(dimensionRow(page, ship)).toHaveText(/^Dim Date as Ship date\s*key ship_date_key\s*no match → -1$/);
   expect((await liveKeys()).length).toBe(6);
 });

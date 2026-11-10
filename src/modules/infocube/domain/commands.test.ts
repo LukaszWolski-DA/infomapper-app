@@ -10,16 +10,16 @@ const state = (entities = [entity(ids.customer)]) => ({ concept: concept(ids.con
 const input = { conceptId: ids.conceptSales };
 
 describe("createCubeEntity", () => {
-  it("creates a dimensional entity and its role in one change group: a fact without a grain, a transaction, not factless; a dimension standard, SCD 1 (slice 19)", () => {
+  it("creates a dimensional entity and its role in one change group: a fact without a grain, a transaction, not factless; a dimension standard, SCD 1 (slice 19), its unknown member on (slice 22)", () => {
     const fact = createCubeEntity(makeCtx(), access("modeler", on), state(), "fact", input);
     if (!fact.ok) throw new Error(fact.error.message);
     expect(fact.writeSet.writes).toMatchObject([
       { kind: "insert", table: "entity", row: { id: fact.value.entityId, model_level: "dimensional", name: "New fact", stereotype: "object" } },
-      { kind: "insert", table: "cube_entity", row: { entity_id: fact.value.entityId, role: "fact", grain: null, fact_type: "transaction", is_factless: false, base_fact_entity_id: null, dim_kind: null, history: null, snapshot_period: null } },
+      { kind: "insert", table: "cube_entity", row: { entity_id: fact.value.entityId, role: "fact", grain: null, fact_type: "transaction", is_factless: false, base_fact_entity_id: null, dim_kind: null, history: null, snapshot_period: null, has_unknown_member: null } },
     ]);
     expect(new Set(fact.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
     const dim = createCubeEntity(makeCtx(), access("modeler", on), state(), "dimension", input);
-    expect(dim.ok && dim.writeSet.writes[1]).toMatchObject({ row: { role: "dimension", grain: null, fact_type: null, is_factless: null, dim_kind: "standard", history: "overwrite", snapshot_period: null } });
+    expect(dim.ok && dim.writeSet.writes[1]).toMatchObject({ row: { role: "dimension", grain: null, fact_type: null, is_factless: null, dim_kind: "standard", history: "overwrite", snapshot_period: null, has_unknown_member: true } });
     expect(dim.ok && dim.writeSet.writes[0]).toMatchObject({ row: { name: "New dimension" } });
   });
 

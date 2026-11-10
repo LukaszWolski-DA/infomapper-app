@@ -45,7 +45,7 @@ describe("the table registry against the migrations (slice 15a)", () => {
     }
     expect(STORE_SCHEMA.undoable).toEqual(UNDO_TABLES.undoable);
     // InfoCube's description rows are undo steps (X-4: one undo brings a deleted fact back with them)
-    expect(UNDO_TABLES.undoable).toEqual(expect.arrayContaining(["cube_entity", "cube_measure", "cube_key", "cube_mapping", "cube_mapping_input"]));
+    expect(UNDO_TABLES.undoable).toEqual(expect.arrayContaining(["cube_entity", "cube_measure", "cube_key", "cube_mapping", "cube_mapping_input", "cube_attribute"]));
     expect(UNDO_TABLES.outside.has("organization_licence")).toBe(true);
   });
 });

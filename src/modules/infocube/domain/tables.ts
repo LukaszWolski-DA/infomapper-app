@@ -57,4 +57,7 @@ export const INFOCUBE_UNDO: Readonly<Record<InfoCubeTable, ModuleTableClass>> = 
     action: (e) => (statusOnlyEvent(e) ? "mapping.set_status" : "model.edit"),
   },
   cube_mapping_input: { parents: [["mapping_id", "cube_mapping"], ["attribute_id", "attribute"]], noun: "dimensional mapping input" },
+  // slice 22: an unknown member's value goes with its attribute, in the same change group; undo refuses a value whose
+  // attribute is deleted (the parents' check)
+  cube_attribute: { parents: [["attribute_id", "attribute"]], noun: "unknown member value" },
 };
