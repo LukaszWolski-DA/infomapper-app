@@ -152,10 +152,10 @@ export interface UpdateEntityState {
   /** The concept named by `conceptId`, when the input moves the entity. */
   concept: Concept | null;
   /**
-   * The workspace's stereotypes (slice 24): a chosen code must be a live one. Without them (a caller that changes no
-   * stereotype) only a built-in code is accepted, which is always live; runCommand's rule checks every write as well.
+   * The workspace's stereotypes (slice 24, F1), required: a chosen code must be a built-in one (always live: every
+   * workspace has the five rows, never deleted) or a live own one of this list. runCommand's rule checks every write too.
    */
-  stereotypes?: readonly Stereotype[];
+  stereotypes: readonly Stereotype[];
 }
 
 /**
@@ -180,9 +180,7 @@ export function updateEntity(
   if (alias !== undefined && alias !== before.alias) patch.alias = alias;
   if (stereotype !== undefined && stereotype !== before.stereotype) {
     if (isDimensional(before)) return fail(domainError("invalid", DIMENSIONAL_STEREOTYPE_MESSAGE));
-    const known = state.stereotypes
-      ? !!stereotypeIndex(state.stereotypes.filter((x) => x.workspace_id === access.workspace.id)).of(stereotype)
-      : isBuiltinStereotypeCode(stereotype);
+    const known = isBuiltinStereotypeCode(stereotype) || !!stereotypeIndex(state.stereotypes.filter((x) => x.workspace_id === access.workspace.id)).of(stereotype);
     if (!known) return fail(domainError("invalid", UNKNOWN_STEREOTYPE));
     patch.stereotype = stereotype;
   }

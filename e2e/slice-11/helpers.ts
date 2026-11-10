@@ -32,7 +32,7 @@ export const FULL = { x: 0, y: 0, zoom: 1 };
 export async function setEntityAlias(name: string, alias: string | null, userId: string = SEED_IDS.userLukasz): Promise<void> {
   const model = await loadModel();
   const entity = model.entities.find((e) => e.name === name)!;
-  await asUser(userId, (ctx, access) => updateEntity(ctx, access, { entity, entities: model.entities, concept: null }, { entityId: entity.id, expectedVersion: entity.version, alias }));
+  await asUser(userId, (ctx, access) => updateEntity(ctx, access, { entity, entities: model.entities, concept: null, stereotypes: model.stereotypes }, { entityId: entity.id, expectedVersion: entity.version, alias }));
 }
 
 /** Test data: an attribute's alias, as Łukasz. */

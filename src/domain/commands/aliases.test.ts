@@ -31,7 +31,7 @@ const roles = ["reviewer", "reader"] as const;
 // ---- the alias (items 1, 6) ----
 
 describe("an entity's alias", () => {
-  const state = (over: Parameters<typeof entity>[1] = {}) => ({ entity: entity(customer, over), entities: [entity(customer, over)], concept: null });
+  const state = (over: Parameters<typeof entity>[1] = {}) => ({ entity: entity(customer, over), entities: [entity(customer, over)], concept: null, stereotypes: [] });
   const ref = { entityId: customer, expectedVersion: 1 };
 
   it("is saved trimmed, in one change group, named “Change entity alias” in the undo history", () => {
@@ -52,7 +52,7 @@ describe("an entity's alias", () => {
 
   it("may repeat another entity's alias or a name, with no warning", () => {
     const other = entity(salesOrder, { alias: "Klient" });
-    const r = ok(updateEntity(makeCtx(), access("modeler"), { entity: entity(customer), entities: [entity(customer), other], concept: null }, { ...ref, alias: "Klient" }));
+    const r = ok(updateEntity(makeCtx(), access("modeler"), { entity: entity(customer), entities: [entity(customer), other], concept: null, stereotypes: [] }, { ...ref, alias: "Klient" }));
     expect(r.value.warning).toBeNull();
     expect(ok(updateEntity(makeCtx(), access("modeler"), state(), { ...ref, alias: "Sales Order" })).value.warning).toBeNull();
   });

@@ -128,18 +128,18 @@ describe("removing an own stereotype (item 6, F16)", () => {
 
 describe("an entity's stereotype (F15)", () => {
   const customer = entity(ids.customer);
-  const state = (stereotypes?: Stereotype[]) => ({ entity: customer, entities: [customer], concept: null, ...(stereotypes ? { stereotypes } : {}) });
+  const state = (stereotypes: Stereotype[]) => ({ entity: customer, entities: [customer], concept: null, stereotypes });
 
   it("takes a live code of the workspace's list, an own one too", () => {
     expect(updateEntity(makeCtx(), modeler, state(list(event())), { entityId: customer.id, expectedVersion: 1, stereotype: "business_event" })).toMatchObject({ ok: true, value: { entity: { stereotype: "business_event" } } });
     expect(updateEntity(makeCtx(), modeler, state(list(event())), { entityId: customer.id, expectedVersion: 1, stereotype: "link" }).ok).toBe(true);
   });
 
-  it("refuses an unknown or removed code, and an own code without the list", () => {
+  it("refuses an unknown or removed code, and an own code a list without it lacks; a built-in code always passes", () => {
     expect(updateEntity(makeCtx(), modeler, state(list()), { entityId: customer.id, expectedVersion: 1, stereotype: "hub" })).toMatchObject({ ok: false, error: { code: "invalid", message: UNKNOWN_STEREOTYPE } });
     expect(updateEntity(makeCtx(), modeler, state(list(event({ deleted_at: NOW }))), { entityId: customer.id, expectedVersion: 1, stereotype: "business_event" })).toMatchObject({ ok: false, error: { message: UNKNOWN_STEREOTYPE } });
-    expect(updateEntity(makeCtx(), modeler, state(), { entityId: customer.id, expectedVersion: 1, stereotype: "business_event" })).toMatchObject({ ok: false, error: { message: UNKNOWN_STEREOTYPE } });
-    expect(updateEntity(makeCtx(), modeler, state(), { entityId: customer.id, expectedVersion: 1, stereotype: "context" }).ok).toBe(true);
+    expect(updateEntity(makeCtx(), modeler, state([]), { entityId: customer.id, expectedVersion: 1, stereotype: "business_event" })).toMatchObject({ ok: false, error: { message: UNKNOWN_STEREOTYPE } });
+    expect(updateEntity(makeCtx(), modeler, state([]), { entityId: customer.id, expectedVersion: 1, stereotype: "context" }).ok).toBe(true);
   });
 
   it("still refuses any stereotype on a fact or a dimension (C-5)", () => {

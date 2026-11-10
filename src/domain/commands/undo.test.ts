@@ -140,7 +140,7 @@ const insertedId = (writeSet: WriteSet): string => {
 
 /** Renames Customer. */
 const rename = (rows: Rows, name: string, expectedVersion: number, who: string = ids.actor) =>
-  ok(updateEntity(makeCtx(who), modeler, { entity: find(rows, "entity", ids.customer) as never, entities: rows.entity, concept: null }, { entityId: ids.customer, expectedVersion, name }));
+  ok(updateEntity(makeCtx(who), modeler, { entity: find(rows, "entity", ids.customer) as never, entities: rows.entity, concept: null, stereotypes: rows.stereotype }, { entityId: ids.customer, expectedVersion, name }));
 
 /** Runs a command on `rows`, then undoes it; returns the states and the groups. */
 function doAndUndo(rows: Rows, run: (rows: Rows) => WriteSet, who: WorkspaceAccess = modeler) {

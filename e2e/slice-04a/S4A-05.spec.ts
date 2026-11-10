@@ -19,7 +19,7 @@ test("S4A-05: entity and attribute definitions open in the editor without “Ins
   const order = entity("Sales Order");
   const long = Array.from({ length: 8 }, (_, i) => `<p>Paragraph ${i + 1} of the order's definition.</p>`).join("");
   await asPerson(SEED_IDS.userAnna, (c, access) =>
-    updateEntity(c, access, { entity: order, entities: [], concept: null }, { entityId: order.id, expectedVersion: order.version, definition: long }),
+    updateEntity(c, access, { entity: order, entities: [], concept: null, stereotypes: [] }, { entityId: order.id, expectedVersion: order.version, definition: long }),
   );
 
   await signInAs(page, "Łukasz");

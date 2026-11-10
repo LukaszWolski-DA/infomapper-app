@@ -114,7 +114,7 @@ test("S1B-12: undo and redo: create, edit, move, reorder and delete are each und
   await expect.poll(() => nameOf(salesOrder.id)).toBe("Order");
   const current = await loadModel();
   await asUser(SEED_IDS.userAnna, (ctx, access) =>
-    updateEntity(ctx, access, { entity: current.entities.find((e) => e.id === salesOrder.id)!, entities: current.entities, concept: null }, {
+    updateEntity(ctx, access, { entity: current.entities.find((e) => e.id === salesOrder.id)!, entities: current.entities, concept: null, stereotypes: current.stereotypes }, {
       entityId: salesOrder.id,
       expectedVersion: current.entities.find((e) => e.id === salesOrder.id)!.version,
       name: "Sales order header",

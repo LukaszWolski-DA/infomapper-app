@@ -482,3 +482,17 @@ edits with the Edit tool so nothing in them is read as a pattern.
   5: 9.1 min, 1,668 MB · 6: 9.7 min, 1,079 MB · 7: 10.2 min, 972 MB · 8: 10.0 min, 1,488 MB.
 - A commit after `c95e9b8` that touches only Markdown in `docs/` and the root keeps this run valid
   (`git diff --stat c95e9b8..HEAD`).
+
+## Step 2: Łukasz's acceptance and the point settled (10 November 2026)
+
+Step 2 accepted, with one point settled before step 3:
+
+- **`updateEntity`'s list is required** (F1: no write skips the check). `UpdateEntityState.stereotypes` is no longer
+  optional: a chosen code passes when it is built in (always live: the five rows exist in every workspace and are never
+  deleted) or a live own one of the list; anything else is "That stereotype is not in the list.". Its only caller in the
+  app, `updateEntityAction`, passes the workspace's list from the model it loads, and `runCommand`'s rule checks every
+  write as before. The callers that only build test data pass a list too (type-level changes, no behaviour):
+  `e2e/slice-01b/S1B-12.spec.ts`, `e2e/slice-04a/S4A-05.spec.ts`, `e2e/slice-11/S11-07.spec.ts`,
+  `e2e/slice-11/helpers.ts` (`setEntityAlias`), `e2e/slice-13/helpers.ts` (`changeEntityAsAnna`), and the unit tests
+  `aliases.test.ts`, `entity.test.ts`, `stereotype.test.ts`, `undo.test.ts`. `npm test`: 2,075 passed.
+- **The repair of `docs/data-model-v2.md`** (`bfa4c58`, "Found on the way" above) is named in the PR's description.
