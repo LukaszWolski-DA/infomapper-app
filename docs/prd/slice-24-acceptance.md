@@ -618,6 +618,22 @@ D-78's last sentences now read: "… The map from physical to logical types, an 
 reset to a language's defaults are later (entity stereotypes came in slice 24, D-79). Accepted by Łukasz on 10 November
 2026."
 
+### The full run (before the merge)
+
+- [Run 42891982944](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42891982944) on `b8377a6`, the
+  workflow "E2E", all eight parts, no retries: **737 passed, 0 failed, 4 skipped, 0 flaky**, no expected failures; S23-02
+  passed. CI (lint, typecheck, unit tests) and the schema check passed on the same commit.
+- Wall-clock 17 min 38 s (20:06:40 to 20:24:18 UTC); the tests 15 min 26 s.
+- Parts (time; heap peak, against the runner's restart threshold of 6,431 MB; no server restart in any part):
+  1: 9.1 min, 1,040 MB · 2: 7.4 min, 1,268 MB · 3: 5.9 min, 1,325 MB · 4: 8.0 min, 1,172 MB · 5: 9.2 min, 1,541 MB ·
+  6: 7.6 min, 1,507 MB · 7: 7.4 min, 1,412 MB · 8: 15.0 min, 1,395 MB.
+- **Part 8 is now the longest by almost 6 minutes** (slice 24's folder joined it; 10.0 min in step 2's run, where part 7
+  was longest). The recut rule reads the median of the last three full runs; this is the first of them with part 8 the
+  longest, so no recut now; if the next full runs confirm it, `PART_STARTS` (`e2e/parts.ts`) needs a recut, a chore of
+  its own.
+- A commit after `b8377a6` that touches only Markdown in `docs/` and the root keeps this run valid
+  (`git diff --stat b8377a6..HEAD`).
+
 ### Manual acceptance
 
 On the demo (`npm run demo`, http://127.0.0.1:3001, `.data/demo-db.json`; it never touches `.data/dev-db.json`), signed in
