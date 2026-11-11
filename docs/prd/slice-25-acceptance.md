@@ -805,3 +805,29 @@ renderer. It is about as large as step 2.
 13. **F27:** the routes `/w/{ws}/d/{id}` (form) and `/w/{ws}/d/{id}/view` (document)?
 14. **Q-P1 (F34):** a bar for building the tree (proposal: 200 ms in Node on "Performance test"), or reference figures
     only?
+
+## Łukasz's answers (11 November 2026)
+
+The answers are in the PRD's version 2, section 7 ("Step 1's findings and Łukasz's answers"): `docs/prd/slice-25-infodocumenter-documents.md`,
+24,701 bytes, SHA-256 `5fd356e63fc3a3fc3486a2e8e136ae85aceb54de12cb717734f4a367f0d01d55`, copied from Łukasz's Downloads
+(`slice-25-infodocumenter-documents.md`; the only other copy there, `slice-25-infodocumenter-documents_old.md`, is
+version 1, `4eb3d8f9…`), checked with `cmp` (equal) and `sha256sum`.
+
+| # | Question | Answer | Changes a proposal? |
+| --- | --- | --- | --- |
+| 1 | F1, `workspaceModelOf` and `snapshot` | yes | no |
+| 2 | F5, `jsonb` and AD-18 | (a) | no |
+| 3 | F8–F10 | the types and the contract in `src/domain/document/` and the home-tab point: yes; **the dictionary's two contributions from InfoCube: no** | **yes:** the data dictionary covers the logical level only (PRD item 3); dimensional entities are in InfoCube's Dimensional model section. F9 is dropped, and F23's "dimensional entities after the logical ones" with it: the dictionary is logical only, whatever the scope's levels. The scope's "Dimensional" level now only turns the Dimensional model section's content on or off (S25-06). The dictionary through InfoCube is later (slice B) |
+| 4 | F14 | (b): `module.own_objects` and the module's own rules | no |
+| 5 | F15, `author_id` | yes | no |
+| 6 | F16 | changed | **yes:** guests print as every member does (PRD item 10); no print CSS line, and its text "Guests cannot print documents in this workspace." is dropped. S25-02 uses Kasia as the guest and an added InfoMate reader, as proposed. F14's rights table loses its "print: not a guest" row: every member who sees a document opens and prints it |
+| 7 | F17 (a), (b) | yes, yes | no |
+| 8 | F22 | yes | no |
+| 9 | Q-L3 (F24) | yes | no |
+| 10 | Q-L4 (F25) | three languages, given by InfoCube with its section | no (F25's proposal: InfoCube's own word table, `DOC_WORDS`) |
+| 11 | D1–D13 | as proposed, except D4 | **yes, D4:** the check box **without a question**: unsharing is at once; its question "Make this document private? Only {author} will see it." is dropped. F17 (c) loses its "the question says so". D1's dictionary preset text becomes "Definitions and personal data of the logical model's entities, for the business." |
+| 12 | F31, F32 (Q-S1) | yes | no |
+| 13 | F27, the routes | yes | no |
+| 14 | Q-P1 (F34) | reference figures only | **yes:** no 200 ms bar; step 3's bench reports figures, Łukasz decides after seeing them |
+
+The German labels, InfoCube's new words included, stay marked for Łukasz's review.
