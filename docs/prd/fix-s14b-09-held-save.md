@@ -52,4 +52,19 @@ one chunk of its answer and cancels the rest, so the load ends `POST … net::ER
 - `e2e/slice-14b` (local, the branch's helpers): its 11 spec files, 19 tests passed (the run's one failure was the
   probe, then still in the folder).
 - `npm run lint`, `npm run typecheck`, `npm test` (165 files, 2,089 tests) pass.
-- The full run on GitHub: below.
+- **The full run** (workflow "E2E", `2a8391f`, all eight parts, no retries;
+  [42976006163](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42976006163), wall-clock 15 min 47 s):
+  **739 passed, 0 failed, 4 skipped, 0 flaky, 0 expected failures.** No server restarted (one server process per part).
+
+  | Part | Time | Heap peak (limit 8,039 MB) |
+  | --- | --- | --- |
+  | 1 | 7.0 min | 1,032 MB |
+  | 2 | 8.4 min | 1,347 MB |
+  | 3 | 9.8 min | 1,081 MB |
+  | 4 | 8.1 min | 1,121 MB |
+  | 5 | 8.9 min | 1,691 MB |
+  | 6 | 7.9 min | 1,620 MB |
+  | 7 | 9.3 min | 1,299 MB |
+  | 8 | 14.7 min | 1,217 MB |
+
+  Part times are the jobs' times on the runner (server start included).
