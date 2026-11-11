@@ -831,3 +831,169 @@ version 1, `4eb3d8f9…`), checked with `cmp` (equal) and `sha256sum`.
 | 14 | Q-P1 (F34) | reference figures only | **yes:** no 200 ms bar; step 3's bench reports figures, Łukasz decides after seeing them |
 
 The German labels, InfoCube's new words included, stay marked for Łukasz's review.
+
+## Step 2: module, data and domain (11 November 2026)
+
+Draft PR: [LukaszWolski-DA/infomapper-app#57](https://github.com/LukaszWolski-DA/infomapper-app/pull/57), opened at the
+start of the step. Before the format's upgrade was written, and again before its commit, no `node` process ran on the
+laptop, so no dev server of Łukasz's served this checkout. `.data/dev-db.json` and the KB backups were not read or
+written.
+
+### What changed
+
+**One model rule and one snapshot (F1).**
+- `src/domain/model/workspace-model.ts` (pure):
+  - `workspaceModelOf` holds the live filter, the orders and the lost originals that `store.model.load` computed in the
+    adapter;
+  - `liveRequirementLinksOf`, `liveProjectCanvasesOf`, `byTabOrder` and `workspacePeopleOf` are the store's other rules,
+    moved here unchanged;
+  - `workspaceSnapshotOf` and `WorkspaceSnapshot` build the snapshot.
+- The local store calls them for `model.load`, `requirements.listLinks`, the canvas links and `users.listForWorkspace`,
+  so they behave as before (`src/data/local/store.ts`).
+- The new port method `DataStore.snapshot(workspaceId, tables)` (`src/data/ports.ts`) reads the file once. It returns
+  null for a workspace that is not live, and throws on a table the store does not know, as `modules.list` does.
+
+**The switch, the licence, the table and format 17 (F2, F4–F6, F12).**
+- Columns and values:
+  - `Workspace.infodoc` (`src/domain/types.ts`);
+  - `LICENSED_MODULES = ["infocube", "infodoc"]`;
+  - the local file's format 17 sets `infodoc` false in every workspace (`src/data/local/file.ts`, `schema.ts`);
+  - the seed, `seed:large` and the domain's fixture have `infodoc: false`.
+- `updateWorkspaceSettings` takes `infodoc`. It is turned on only with the licence ("{organization} has no InfoDocumenter
+  licence.", `licenceMissingMessage`, `src/domain/model/module-switches.ts`) and off at any time, by owners and admins,
+  on the workspace's version, outside undo.
+  - **A deviation from F12's proposal:** InfoCube's fourth argument stays as it is, and InfoDocumenter's licence state is
+    a fifth (`ModuleLicenceState`), read by the action only when the input changes the switch
+    (`src/app/_actions/workspace.ts`). Generalising the arguments into one record would have changed every InfoCube call
+    and test for no behaviour.
+- `scripts/licence.ts` grants `infodoc` (its usage line lists the modules).
+- The migration `supabase/migrations/20261111120000_infodocumenter.sql` has:
+  - `workspace.infodoc`;
+  - the licence CHECK with `infodoc`;
+  - `document_definition`: FKs to `workspace`, `app_user` (author and audit) and `baseline`; CHECKs on the name, the
+    preset, the source (`live` without a baseline, `baseline` with one), and the recipe's JSON kinds; two indexes; RLS.
+- The local adapter's rules (`src/modules/infodocumenter/data/tables.ts`) mirror it. `baseline_id` has no key while
+  `baseline` is not in the domain (F6), and the source check accepts `live` only in this slice.
+- The table is registered `"outside undo"` (`src/modules/infodocumenter/domain/tables.ts`): the first module table
+  there.
+
+**Rights (F14 b, F15, F17; PRD item 10 as changed).**
+- The core action `module.own_objects` (every role, never in an archived workspace) is in `src/domain/permissions.ts`.
+- InfoDocumenter's pure rules are `src/modules/infodocumenter/domain/rights.ts`:
+  - `canSee`;
+  - the refusals `createRefusal`, `editRefusal`, `shareRefusal`, `deleteRefusal` and `openRefusal`;
+  - `documentRights`, what the page will offer.
+- Another's private document is "not found". A shared document's author whose role was lowered still deletes it.
+  Unsharing is refused while the author is no longer a member.
+- Every member who sees a document opens and prints it, also in an archived workspace. While InfoDocumenter is off,
+  every write and every opening is refused ("InfoDocumenter is off in this workspace.").
+
+**The commands** (`src/modules/infodocumenter/domain/commands.ts`):
+- `createDocument` makes a private document from a preset (`presets.ts`, D1 as answered). A module's kind that names the
+  preset ends it while it is available, so the source-to-target preset ends with InfoCube's Dimensional model only while
+  InfoCube is on.
+- `updateDocument` saves the named fields only: name, audience, title page fields, scope parts, one section's switch or
+  options. Options are merged into the stored ones and checked against the section kind's schema; the columns are kept
+  in their fixed order. A section of a type no module knows keeps its options. The row's version is checked, and
+  "Nothing to change." is refused.
+- `setDocumentShared` shares or unshares at once (D4 as answered).
+- `duplicateDocument` makes "{name} (copy)", the person's private copy.
+- `deleteDocument` soft-deletes with the version.
+- Each command is one change event and no undo step.
+
+**The extension points (F8, F10).**
+- `src/domain/document/content.ts`: the content tree's node types (`DocNode`: heading, paragraph, meta, table with
+  full-width rows under a row, note, page break).
+- `src/domain/document/sections.ts`: the section contract.
+  - It has two halves. `DocumentSectionKind` is the recipe's: type, availability, the presets it ends, defaults, the
+    options' schema. `DocumentSectionType` adds the label per language, the tables and the pure `build` from a snapshot,
+    which step 3 fills.
+  - `sectionKinds` throws on a name registered twice or not in the stored shape.
+- InfoDocumenter's own kinds are `text`, `dict` and `s2t` (`src/modules/infodocumenter/domain/sections.ts`), and
+  InfoCube's is `cube.dim` (`src/modules/infocube/domain/document-section.ts`). `src/compose/documents.ts` joins them
+  (`DOCUMENT_SECTION_KINDS`).
+- The home's module tab:
+  - `src/ui/home-tabs.ts`: `ModuleHomeTab`, `homeTabOrder`, `chosenHomeTab`;
+  - `src/compose/home.tsx`: `HOME_TABS`, `homeTabs`, with the composed store;
+  - `src/app/w/[workspaceId]/page.tsx` draws the modules' tabs after Overview and their body while chosen.
+  - `HOME_TABS` is empty until step 4 (the Documentation tab is the interface's), so the home looks as before.
+- `eslint.config.mjs` has `modules = ["infocube", "infodocumenter"]`.
+
+**Docs.**
+- `docs/data-model-v2.md`:
+  - `workspace.infodoc`;
+  - the licence's values;
+  - the JSON paragraph with AD-18's fourth place as proposed;
+  - a section "InfoDocumenter: `document_definition`".
+- CLAUDE.md's list of extension points: document sections, the home's module tab, one snapshot, a module's own objects
+  outside the model and a module table outside undo, plus the licence script's line.
+
+**Not in this step, by the plan:**
+- the server actions, the Documentation tab, the form, the document page and Settings' box (step 4);
+- the demo's licence, switch and documents (step 4, F31, F32);
+- the section builders, the labels and InfoCube's words (step 3).
+
+### Tests
+
+New unit tests:
+- `src/modules/infodocumenter/domain/documents.test.ts` (22): the rights matrix (every role on shared, own, another's
+  private, a lowered author, archived, off), each preset for every role, the Dimensional model only with InfoCube on,
+  saves (named fields, version, stale, empty name, nothing to change, options merged and checked, an unknown type),
+  share and unshare (the author gone), duplicate and delete.
+- `tests/infodocumenter-store.test.ts` (8), through the composed store:
+  - a reader's document is stored with its change event and is not an undo step, and `loadForUndo` leaves it out;
+  - the adapter refuses a stale save, a baseline source, a broken recipe, a padded name and an unknown author;
+  - the switch: refused without the licence or without its state, for a modeler; documents kept while off;
+  - the snapshot equals `model.load`, `workspaceModelOf`, the requirements, links, projects, canvas links, cards,
+    members and people as the other reads give them; it leaves out deleted rows and other workspaces' rows; null for a
+    missing workspace; it throws on a table the store does not know;
+  - the registered kinds and their defaults against their schemas, a name twice, a bad name, and the s2t preset with
+    InfoCube on.
+- `src/data/local/upgrade-17.test.ts` (2): format 16 to 17 turns InfoDocumenter off everywhere and changes nothing else,
+  with no change event and no log line; a current file is read as it is.
+- `src/ui/home-tabs.test.ts` (2): the order, and `?tab=` falling back to Overview.
+- `src/domain/commands/workspace.test.ts`: a new describe (3) for InfoDocumenter's switch.
+
+**Earlier tests changed, each with its reason:**
+- `src/domain/permissions.test.ts`: the role matrix gets `module.own_objects` for every role (the new core action, AD-05's
+  addition).
+- `tests/schema/compare-schema.test.ts`: the list of stored tables gets `document_definition`, and four column kinds are
+  checked (`scope` and `sections` `jsonb`, `baseline_id` nullable `uuid`, `workspace.infodoc` boolean).
+- `tests/table-registry.test.ts`: `document_definition` is outside undo and not among the store's undoable tables.
+- `tests/layer-rules.test.ts`: a new describe "two modules": InfoDocumenter refused in InfoMapper's layers, each module
+  refused in every part of the other, both domains read the contract, the composition root reads both,
+  InfoDocumenter's domain stays pure.
+
+No earlier e2e spec changed. `src/data/local/upgrade-16.test.ts`'s test "is not repeated: a file at format 16 is read as
+it is" reads the current file (now format 17) and passes unchanged; its wording is older than the file and was left.
+
+Locally, on `87a3cdb`:
+- `npm run lint`: no problems;
+- `npm run typecheck`: passes;
+- `npm test`: 170 files, 2,137 tests passed.
+
+### The full run
+
+The run is local (`npm run e2e`, CLAUDE.md's fallback), because GitHub Actions had a major outage during the step: the
+workflow "E2E" started by hand on `87a3cdb` ended in `startup_failure` (run 43098258021), and CI and Schema on
+`6d4d196` and `87a3cdb` were still queued after two hours.
+
+- Commit: `87a3cdb`, on the laptop, Europe/Warsaw, from scratch with no dev server running.
+- Wall-clock: 113 min 6 s.
+- Result: **739 passed, 0 failed, 4 skipped, 0 flaky, no expected failures.**
+- Parts:
+
+| Part | Folders | Time |
+| --- | --- | --- |
+| 1 | fixes to slice-01b | 12 min 51 s |
+| 2 | slice-02a to slice-03a | 13 min 24 s |
+| 3 | slice-03b to slice-04b2 | 11 min 23 s |
+| 4 | slice-04p to slice-07a | 12 min 35 s |
+| 5 | slice-07b to slice-09 | 15 min 22 s |
+| 6 | slice-10a to slice-12b | 14 min 35 s |
+| 7 | slice-13 to slice-15c | 13 min 45 s |
+| 8 | slice-15d to slice-24 | 19 min 6 s |
+
+- Heap peaks: not recorded (the run was without `E2E_MEMORY_LOG=1`).
+- GitHub's own full run, CI and the Postgres schema check (`schema.yml`, the new migration) are still to run once Actions
+  is back.
