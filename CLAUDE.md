@@ -352,7 +352,7 @@ npm run seed             # demo data into .data/dev-db.json (only if it does not
 npm run reset-dev-data   # replace .data/dev-db.json with fresh demo data
 npm run demo             # the demo data with the Sales star in .data/demo-db.json (seeded if missing; -- --reset), on http://127.0.0.1:3001 beside npm run dev; never touches .data/dev-db.json
 npx tsx scripts/licence.ts grant "<organization name>" infocube [--file <db>]   # slice 15a: a module's licence in a local file (development only)
-npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards, labels and notes; slice 4b-2: a second canvas with 12 requirement cards) to .data/dev-db.json
+npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards, labels and notes; slice 4b-2: a second canvas with 12 requirement cards) to .data/dev-db.json; works on a file with module rows (the seed's star); on Łukasz's test model only on his command, after a backup (INFOMAPPER_DEV_DB points it elsewhere)
 npm run dev              # local app on http://localhost:3000; sign in at /sign-in by picking a test user
 npm run build            # production build (npm start serves it; no dev sign-in, no local data)
 npm run measure:build    # measurement-only production build in .next-measure (AD-31)
