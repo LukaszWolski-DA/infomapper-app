@@ -241,6 +241,26 @@ list up to date in each sub-slice):
   passed in. A canvas page's index lives in `ModulesProvider` (with the page's one requirement index,
   `RequirementIndexCtx`, `ChecksCtx`, `src/canvas/checks.ts`). **A later rule** is a group of `CheckItem`s, its texts in
   `text()`; **a later caller of the requirement index** on a canvas page uses the page's (`usePageRequirementIndex`).
+- **Document sections** (slice 25, InfoDocumenter): the content tree's node types (`src/domain/document/content.ts`,
+  `DocNode`) and the section contract (`src/domain/document/sections.ts`) are InfoMapper's domain, since modules never
+  import each other. A section kind (`DocumentSectionKind`: its stored `type`, a module's with its prefix, `cube.dim`;
+  `available(workspace)`; the `presets` it ends; `defaults`; its options' Zod schema) is what the recipe stores and the
+  commands check; `DocumentSectionType` adds its `label` per documentation language, the module `tables` it reads and
+  its pure `build` from a `WorkspaceSnapshot` (step 3). `DOCUMENT_SECTION_KINDS` (`src/compose/documents.ts`) joins
+  InfoDocumenter's own (`text`, `dict`, `s2t`) and InfoCube's (`CUBE_SECTION_KIND`); `sectionKinds` throws on a name
+  registered twice. A section whose type no module knows is kept and skipped.
+- **The workspace home's module tab** (slice 25): `HOME_TABS` (`src/compose/home.tsx`, `HomeTabSource`: `shown(access)`
+  and its `ModuleHomeTab`, `src/ui/home-tabs.ts`) after Overview; `chosenHomeTab` opens Overview for a `?tab=` that is
+  not shown. InfoDocumenter's Documentation tab is the first (slice 25, step 4).
+- **One snapshot of a workspace** (slice 25, F1): `store.snapshot(workspaceId, tables)` reads the model, requirements,
+  projects, cards, people, the organization and the named module tables from one state of the data
+  (`workspaceSnapshotOf`, `src/domain/model/workspace-model.ts`); `store.model.load` reads the model by the same pure rule
+  (`workspaceModelOf`: the live filter, the orders, the lost originals). **A later reader that needs the model and a
+  module's rows together** uses the snapshot, not several reads.
+- **A module's own objects outside the model** (slice 25, AD-05's addition as proposed): the core action
+  `module.own_objects` (every role, never in an archived workspace); the module adds its own rules on top
+  (InfoDocumenter's `rights.ts`). A module table outside undo registers as `"outside undo"` (`ModuleTableClass`): its
+  writes keep their change events and are never an undo step.
 - **A new module** adds its folder, its name to `modules` in `eslint.config.mjs`, its tables to the registry's three
   records and a migration, and its pieces to `src/compose/`; InfoMapper's code does not change.
 
@@ -351,7 +371,7 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 npm run seed             # demo data into .data/dev-db.json (only if it does not exist yet)
 npm run reset-dev-data   # replace .data/dev-db.json with fresh demo data
 npm run demo             # the demo data with the Sales star in .data/demo-db.json (seeded if missing; -- --reset), on http://127.0.0.1:3001 beside npm run dev; never touches .data/dev-db.json
-npx tsx scripts/licence.ts grant "<organization name>" infocube [--file <db>]   # slice 15a: a module's licence in a local file (development only)
+npx tsx scripts/licence.ts grant "<organization name>" infocube|infodoc [--file <db>]   # slice 15a (infodoc: slice 25): a module's licence in a local file (development only)
 npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards, labels and notes; slice 4b-2: a second canvas with 12 requirement cards) to .data/dev-db.json; works on a file with module rows (the seed's star); on Łukasz's test model only on his command, after a backup (INFOMAPPER_DEV_DB points it elsewhere)
 npm run dev              # local app on http://localhost:3000; sign in at /sign-in by picking a test user
 npm run build            # production build (npm start serves it; no dev sign-in, no local data)
