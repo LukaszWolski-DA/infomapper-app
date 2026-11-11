@@ -1,7 +1,7 @@
 // Slice 14b's e2e helpers (the canvas's row on the save chain): the canvas tabs' rename, the tab menu, and a canvas's
 // stored row. The earlier slices' helpers come through slice 14a's.
 
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type Request } from "@playwright/test";
 import { renameCanvas, setCanvasLook } from "../../src/domain/commands/canvas";
 import type { CanvasBackground, CanvasGrid } from "../../src/domain/types";
 import { canvasTab } from "../slice-02a/helpers";
@@ -71,15 +71,31 @@ export async function leaveAsksNothing(page: Page): Promise<void> {
   expect(asked).toEqual([]);
 }
 
+const isAction = (r: Request) => r.method() === "POST" && !!r.headers()["next-action"];
+
 /**
- * Resolves once the page has the answer of its next server action: the response read to its end, and the entity's card
- * showing `name` from the fresh page it brings. The data file is written before the answer reaches the page, so a
- * stored row alone does not mean the save is no longer on its way.
+ * Resolves once the page has the answer of its next server action: the request over with its response, and the
+ * entity's card showing `name` from the fresh page it brings. The data file is written before the answer reaches the
+ * page, so a stored row alone does not mean the save is no longer on its way.
+ *
+ * "Over" is `requestfinished` or `requestfailed` after a response. Now and then (about one action in six on the dev
+ * server) the page's reader stops before the response's end once it has the answer, and Chromium reports the rest of
+ * the load as `net::ERR_ABORTED`; Playwright's `response.finished()` never resolves then (the S14B-09 flake).
  */
 export function answerOf(page: Page, name: string): () => Promise<void> {
-  const response = page.waitForResponse((r) => r.request().method() === "POST" && !!r.request().headers()["next-action"]);
+  const over = new Promise<Request>((resolve) => {
+    const on = (r: Request) => {
+      if (!isAction(r)) return;
+      page.off("requestfinished", on);
+      page.off("requestfailed", on);
+      resolve(r);
+    };
+    page.on("requestfinished", on);
+    page.on("requestfailed", on);
+  });
   return async () => {
-    await (await response).finished();
+    const request = await over;
+    if (request.failure() && !(await request.response())) throw new Error(`The server action failed without an answer: ${request.failure()!.errorText}`);
     await expect(page.getByTestId("card-entity").filter({ hasText: name }).first()).toBeVisible();
   };
 }

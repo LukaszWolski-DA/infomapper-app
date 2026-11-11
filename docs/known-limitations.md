@@ -1008,24 +1008,6 @@ load. That was after `05d0a04`, slice 7b's fix for the race on REQ-101's card. I
 unknown, because the run's error text was lost (the output was filtered, and the reruns replaced `test-results/`). In
 the next full run, keep the failing test's error output before rerunning it.
 
-### S14B-09 times out waiting for a save's answer now and then (a known flake)
-
-S14B-09 (`e2e/slice-14b/S14B-09.spec.ts`) failed three times by its test timeout in `answerOf`
-(`e2e/slice-14b/helpers.ts`), which waits for the page's next server action's response:
-- slice 21's first closing full run, on `main`'s code ("a focused field with typed text asks; once it is saved,
-  nothing"; `docs/prd/slice-21-acceptance.md`);
-- the local run of the affected specs on fix/field-draft-after-undo (the same test; its traces were lost to the rerun);
-- PR 54's first full run ([42919400613](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42919400613),
-  "a save held on its way asks; after its answer, nothing").
-
-Each time its single-file check or the next full run passed. **The cause is in the test's helpers**, shown by the third
-failure's trace: the browser aborted the page's save request (`net::ERR_ABORTED`) during the leave check
-(`leaveAsks`: `page.close({ runBeforeUnload: true })` with the dialog dismissed); `holdUntil` then fulfilled a request
-the page no longer waited for, so no `response` event came and `answerOf` waited until the timeout. The application
-sends and cancels nothing there. **To fix on its own `fix/…` branch** (shared test infrastructure, the slice cycle, 4):
-`answerOf` waits for what the page shows instead of a `response` event, or the leave check runs where no save is on its
-way.
-
 ### S10C-13 failed once in slice 10c's first closing run
 
 In the first closing full run of slice 10c (30 October 2026), S10C-13 (`e2e/slice-10c/S10C-13.spec.ts`) failed once:
