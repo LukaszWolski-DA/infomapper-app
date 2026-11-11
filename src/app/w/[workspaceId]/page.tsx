@@ -21,19 +21,14 @@ import { AddPersonBox, OrganizationAccessBox, RemovePersonButton, RoleSelect } f
 import { SettingsForm } from "./_components/settings-form";
 import { Conventions } from "./_components/conventions";
 import { settingsBoxes } from "@/compose/settings";
+import { homeTabs } from "@/compose/home";
+import { chosenHomeTab } from "@/ui/home-tabs";
 import { moduleFeeds } from "@/compose";
 import { workspacePeople } from "@/app/_lib/people";
-
-// slice 23: "Metadata conventions" between People and Settings, for every member (item 1)
-const TABS = ["overview", "people", "conventions", "settings"] as const;
-type Tab = (typeof TABS)[number];
 
 export default async function WorkspaceHomePage({ params, searchParams }: PageProps<"/w/[workspaceId]">) {
   const { workspaceId } = await params;
   const query = await searchParams;
-  const tabParam = query.tab;
-  const tab: Tab = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "overview";
-
   const shell = await loadShell({ workspaceId });
   const store = getDataStore();
   const workspace = (await store.workspaces.get(workspaceId))!;
@@ -53,6 +48,10 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const orgName = (id: string) => organizations.find((o) => o?.id === id)?.name ?? "";
 
   const access = { workspace, member: members.find((m) => m.user_id === shell.user.id) ?? null };
+  // slice 25 (F10): a module's tabs after Overview, while it shows them; `?tab=` naming another is Overview
+  const moduleTabs = await homeTabs(access);
+  const tab = chosenHomeTab(query.tab, moduleTabs);
+  const moduleTab = moduleTabs.find((t) => t.id === tab);
   const archived = shell.workspace.archived;
   const isOwner = shell.role === "owner";
   const isAdmin = isOwner || shell.role === "admin";
@@ -140,6 +139,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
             {(
               [
                 ["overview", "Overview"],
+                ...moduleTabs.map((t) => [t.id, t.label] as const),
                 ["people", `People (${members.length})`],
                 ["conventions", "Metadata conventions"],
                 ["settings", "Settings"],
@@ -331,6 +331,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               stereotypeUses={stereotypeUses(model.entities)}
             />
           )}
+
+          {moduleTab ? await moduleTab.body() : null}
 
           {tab === "settings" && (
             <SettingsForm

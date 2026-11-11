@@ -65,3 +65,34 @@ describe("module boundary (slice 15a, S15-01)", () => {
     expect(await lintFile("src/modules/infocube/app/__probe__.ts", 'import "@/app/_lib/run-command";\n')).toEqual([]);
   });
 }, 120_000);
+
+describe("two modules (slice 25, step 1's F8)", () => {
+  const DOC_IMPORT = 'import { DOCUMENT_PRESETS } from "@/modules/infodocumenter/domain/types";\nexport const x = DOCUMENT_PRESETS;\n';
+  const CUBE_IMPORT = 'import { CUBE_ROLES } from "@/modules/infocube/domain/types";\nexport const y = CUBE_ROLES;\n';
+  const CONTRACT = 'import { sectionKinds } from "@/domain/document/sections";\nexport const x = sectionKinds;\n';
+
+  it("refuses InfoDocumenter in each of InfoMapper's layers", async () => {
+    for (const layer of ["domain", "data", "ui", "canvas", "app"]) {
+      expect(await lintFile(`src/${layer}/__module_probe__.ts`, DOC_IMPORT), layer).toContain("boundaries/dependencies");
+    }
+  });
+
+  it("refuses an import of one module in every part of the other", async () => {
+    for (const part of ["domain", "data", "ui", "canvas", "app"]) {
+      expect(await lintFile(`src/modules/infocube/${part}/__probe__.ts`, DOC_IMPORT), `infocube ${part}`).toContain("boundaries/dependencies");
+      expect(await lintFile(`src/modules/infodocumenter/${part}/__probe__.ts`, CUBE_IMPORT), `infodocumenter ${part}`).toContain("boundaries/dependencies");
+    }
+  });
+
+  it("lets both modules' domain parts read the section contract, and the composition root both modules", async () => {
+    expect(await lintFile("src/modules/infocube/domain/__probe__.ts", CONTRACT)).toEqual([]);
+    expect(await lintFile("src/modules/infodocumenter/domain/__probe__.ts", CONTRACT)).toEqual([]);
+    expect(await lintFile("src/compose/__probe__.ts", DOC_IMPORT + CUBE_IMPORT)).toEqual([]);
+  });
+
+  it("keeps InfoDocumenter's domain part pure", async () => {
+    const at = "src/modules/infodocumenter/domain/__probe__.ts";
+    expect(await lintFile(at, 'import "react";\n')).toContain("no-restricted-imports");
+    expect(await lintFile(at, 'import "../data/tables";\n')).toEqual(expect.arrayContaining(["no-restricted-imports", "boundaries/dependencies"]));
+  });
+}, 120_000);

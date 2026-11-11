@@ -13,7 +13,7 @@ const layers = ["domain", "data", "app", "ui", "canvas"];
 // same directions inside itself and towards InfoMapper's layers. InfoMapper's layers never import a module (the default
 // "disallow" below: no InfoMapper policy names a module part). src/compose/ is the composition root, the only code that
 // imports a module; only src/app imports it.
-const modules = ["infocube"];
+const modules = ["infocube", "infodocumenter"];
 const part = (module, layer) => `${module}-${layer}`;
 const moduleElements = modules.flatMap((m) =>
   layers.map((layer) => ({ type: part(m, layer), pattern: `src/modules/${m}/${layer}/**`, partialMatch: false })),
