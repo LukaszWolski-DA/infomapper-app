@@ -18,17 +18,18 @@ const expected: Record<WorkspaceRole, WorkspaceAction[]> = {
   admin: [
     "workspace.view", "workspace.edit_settings", "project.create", "project.edit", "project.delete", "canvas.create", "canvas.rename", "canvas.edit_projects",
     "canvas.edit_items", "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
-    "requirement.edit", "requirement.set_status", "people.edit",
+    "requirement.edit", "requirement.set_status", "people.edit", "module.own_objects",
   ],
   modeler: [
     "workspace.view", "project.create", "project.edit", "project.delete", "canvas.create", "canvas.rename", "canvas.edit_projects", "canvas.edit_items",
     "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
-    "requirement.edit", "requirement.set_status",
+    "requirement.edit", "requirement.set_status", "module.own_objects",
   ],
   // Slice 3a: reviewers work on notes as modelers do (Łukasz's step 0 answer 1); labels are for editors (answer 2).
   // Slice 4a: reviewers change a requirement's status only (AD-05).
-  reviewer: ["workspace.view", "mapping.set_status", "note.edit", "requirement.set_status"],
-  reader: ["workspace.view"],
+  // Slice 25 (AD-05's addition): every role makes its own objects of a module outside the model (private documents).
+  reviewer: ["workspace.view", "mapping.set_status", "note.edit", "requirement.set_status", "module.own_objects"],
+  reader: ["workspace.view", "module.own_objects"],
 };
 
 describe("role permissions (AD-05)", () => {

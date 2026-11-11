@@ -287,3 +287,34 @@ describe("updateWorkspaceSettings: InfoCube on and off (slice 15a, C-7)", () => 
     expect(same.ok && same.value.workspace).toMatchObject({ infocube: false, name: "Retail DWH" });
   });
 });
+
+describe("updateWorkspaceSettings: InfoDocumenter on and off (slice 25, AD-35's addition)", () => {
+  const licensed = { licensed: true, organizationName: "Retail Co" };
+  const turn = (infodoc: boolean) => ({ workspaceId: ids.ws, expectedVersion: 3, infodoc });
+
+  it("lets an owner or an admin turn it on with the licence, and off at any time, even without the licence", () => {
+    for (const role of ["owner", "admin"] as const) {
+      const r = updateWorkspaceSettings(makeCtx(), access(role), turn(true), undefined, licensed);
+      expect(r.ok && r.value.workspace).toMatchObject({ infodoc: true, infocube: false, version: 4 });
+      const off = updateWorkspaceSettings(makeCtx(), access(role, { infodoc: true }), turn(false), undefined, { ...licensed, licensed: false });
+      expect(off.ok && off.value.workspace.infodoc).toBe(false);
+    }
+  });
+
+  it("refuses to turn it on without the licence, a modeler, a reviewer, a reader, an archived workspace and no state", () => {
+    expect(updateWorkspaceSettings(makeCtx(), access("owner"), turn(true), undefined, { ...licensed, licensed: false })).toMatchObject({
+      ok: false,
+      error: { code: "forbidden", message: "Retail Co has no InfoDocumenter licence." },
+    });
+    for (const role of ["modeler", "reviewer", "reader"] as const) {
+      expect(updateWorkspaceSettings(makeCtx(), access(role), turn(true), undefined, licensed)).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    }
+    expect(updateWorkspaceSettings(makeCtx(), access("owner", archived), turn(true), undefined, licensed)).toMatchObject({ ok: false, error: { code: "archived" } });
+    expect(updateWorkspaceSettings(makeCtx(), access("owner"), turn(true))).toMatchObject({ ok: false, error: { code: "invalid" } });
+  });
+
+  it("is outside undo: one change event of the workspace row", () => {
+    const r = updateWorkspaceSettings(makeCtx(), access("owner"), turn(true), undefined, licensed);
+    expect(r.ok && r.writeSet.events).toEqual([expect.objectContaining({ object_type: "workspace", operation: "update" })]);
+  });
+});

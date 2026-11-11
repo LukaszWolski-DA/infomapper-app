@@ -83,6 +83,7 @@ export function addLargeWorkspace(db: DevDb, at: string, schema: LocalSchema = C
     dv2_mode: false,
     four_eyes: false,
     infocube: false,
+    infodoc: false,
     naming_conventions: null,
     archived_at: null,
     archived_by: null,

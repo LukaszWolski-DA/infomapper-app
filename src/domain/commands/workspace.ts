@@ -8,6 +8,7 @@ import { builtinClassificationRows } from "../model/classifications";
 import { builtinStereotypeRows } from "../model/stereotypes";
 import { domainError } from "../errors";
 import { noLicenceMessage, turnOffRefusedMessage } from "../model/levels";
+import { licenceMissingMessage, type ModuleLicenceState } from "../model/module-switches";
 import { checkCreateWorkspace, checkPermission, type WorkspaceAccess } from "../permissions";
 import {
   DEFAULT_CANVAS_LOOK,
@@ -85,6 +86,7 @@ export function newWorkspaceRows(
     dv2_mode: false,
     four_eyes: false,
     infocube: false,
+    infodoc: false,
     archived_at: null,
     archived_by: null,
     requirement_key_next: 101,
@@ -152,6 +154,8 @@ const updateSettingsInput = z
     fourEyes: z.boolean().optional(),
     /** InfoCube on or off (slice 15a, C-7): with the organization's licence, and off only without facts or dimensions. */
     infocube: z.boolean().optional(),
+    /** InfoDocumenter on or off (slice 25, AD-35): on with the organization's licence, off at any time. */
+    infodoc: z.boolean().optional(),
   })
   .strict();
 export type UpdateWorkspaceSettingsInput = z.input<typeof updateSettingsInput>;
@@ -167,15 +171,17 @@ export interface InfoCubeSwitchState {
 }
 
 /**
- * Changes any of name, client, description, documentation language, Data Vault 2.0 mode, four-eyes and InfoCube.
- * InfoCube (slice 15a, C-7): owners and admins (the settings' right), on only with the organization's licence, off only
- * while the workspace has no facts or dimensions. Without `infoCube` state a change of it is refused.
+ * Changes any of name, client, description, documentation language, Data Vault 2.0 mode, four-eyes, InfoCube and
+ * InfoDocumenter. InfoCube (slice 15a, C-7): owners and admins (the settings' right), on only with the organization's
+ * licence, off only while the workspace has no facts or dimensions. InfoDocumenter (slice 25, AD-35's addition): on only
+ * with the licence, off at any time, its documents kept. Without a module's state a change of its switch is refused.
  */
 export function updateWorkspaceSettings(
   ctx: CommandContext,
   access: WorkspaceAccess,
   input: unknown,
   infoCube?: InfoCubeSwitchState,
+  infoDoc?: ModuleLicenceState,
 ): CommandResult<{ workspace: Workspace }> {
   const denied = checkPermission(access, "workspace.edit_settings");
   if (denied) return fail(denied);
@@ -199,6 +205,12 @@ export function updateWorkspaceSettings(
     if (p.infocube && !infoCube.licensed) return fail(domainError("forbidden", noLicenceMessage(infoCube.organizationName)));
     if (!p.infocube && infoCube.dimensionalEntities > 0) return fail(domainError("invalid", turnOffRefusedMessage(infoCube.dimensionalEntities)));
     patch.infocube = p.infocube;
+  }
+  if (p.infodoc !== undefined && p.infodoc !== workspace.infodoc) {
+    if (!infoDoc) return fail(domainError("invalid", "InfoDocumenter can be turned on or off only from the workspace settings."));
+    // turning it off deletes nothing (its documents are outside the model), so it is always allowed
+    if (p.infodoc && !infoDoc.licensed) return fail(domainError("forbidden", licenceMissingMessage("infodoc", infoDoc.organizationName)));
+    patch.infodoc = p.infodoc;
   }
 
   const row = nextVersion(ctx, workspace, patch);
