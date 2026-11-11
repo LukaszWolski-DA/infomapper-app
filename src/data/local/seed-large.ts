@@ -14,7 +14,7 @@ import { parseColumnLines } from "@/domain/model/column-lines";
 import { DEFAULT_CANVAS_LOOK, type LogicalType, type MappingStatus } from "@/domain/types";
 import type { BuiltinStereotypeCode } from "@/domain/model/stereotypes";
 import { ATTR_TYPES, ENT_COLORS, FRAME_NAMES, generate, STEREOS } from "./large-generator";
-import { findViolation, type DevDb } from "./schema";
+import { CORE_SCHEMA, findViolation, type DevDb, type LocalSchema } from "./schema";
 import { addLargeRequirementCards } from "./seed-large-requirement-cards";
 import { addLargeRequirements } from "./seed-large-requirements";
 import { addLargeWorkingLayer } from "./seed-large-working-layer";
@@ -60,7 +60,12 @@ const STEREOTYPE: Record<(typeof STEREOS)[number], BuiltinStereotypeCode> = {
 const STATUSES: MappingStatus[] = ["approved", "review", "draft"];
 
 /** Adds the performance workspace to the file's data. Returns false when it is there already. */
-export function addLargeWorkspace(db: DevDb, at: string): boolean {
+/**
+ * `schema`: the rules the whole file is checked with afterwards. InfoMapper's tables by default (the e2e files and the
+ * benches hold no module rows); `npm run seed:large` passes the composed schema, since a seeded file holds the modules'
+ * demo rows (fix/seed-large-module-tables).
+ */
+export function addLargeWorkspace(db: DevDb, at: string, schema: LocalSchema = CORE_SCHEMA): boolean {
   if (db.workspace.some((w) => w.id === LARGE_IDS.workspace)) return false;
   const ws = LARGE_IDS.workspace;
   const by = SEED_IDS.userLukasz;
@@ -264,7 +269,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
   // the same layout with 12 requirement cards on a canvas of its own (slice 4b-2, PRD item 26, E): the third tab
   addLargeRequirementCards({ db, data, workspaceId: ws, projectId: LARGE_IDS.project, canvasId: LARGE_IDS.canvasRequirements, fromCanvasId: LARGE_IDS.canvas, by, at, id });
 
-  const violation = findViolation(db);
+  const violation = findViolation(db, undefined, schema);
   if (violation) throw new Error(`Generated data breaks a rule: ${violation.table}: ${violation.detail}`);
   return true;
 }
