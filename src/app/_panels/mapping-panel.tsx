@@ -131,7 +131,8 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   async function write(action: (expectedVersion: number) => Promise<ActionResult<{ notice: string | null }>>) {
     const result = await saveRow(m, action);
     if (result.ok && result.value.notice) toast(result.value.notice);
-    return result.ok;
+    // for a field: stored, with the row's version (fix/field-draft-after-undo), or refused (its code left out, as before)
+    return result.ok ? result : false;
   }
 
   const focusRule = () => setTimeout(() => rule.current?.focus(), 0);
@@ -150,7 +151,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   }
 
   /** Leaving the rule saves it (or the transformation with it); null when nothing is sent. */
-  function onRuleBlur(text: string): Promise<boolean> | null {
+  function onRuleBlur(text: string): ReturnType<typeof write> | null {
     if (pending) return null; // saved with the input
     const value = text.trim();
     if (wantsRule) {
@@ -167,6 +168,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   const { bind: ruleBind, defaultValue: ruleInitial, commit: ruleCommit, keyDown: ruleKeyDown, mark: ruleMark, takeStored: ruleTake, keepMine: ruleKeep } = useDraft<HTMLTextAreaElement>(m.rule_expression ?? "", onRuleBlur, {
     elementRef: rule,
     readOnly: !p.editable,
+    version: m.version,
     keep: { key: fieldKey(m.id, "rule"), field: "Transformation rule", object: `the mapping to ${attribute?.name ?? "?"}` },
   });
 
@@ -376,6 +378,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
       <Field label="Note" htmlFor="f-note">
         <TextArea
           key={fieldKey(m.id, "note")}
+          version={m.version}
           id="f-note"
           value={m.note_text ?? ""}
           readOnly={!p.editable}

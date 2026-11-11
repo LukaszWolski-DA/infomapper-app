@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choiceLanded, choiceShown, FieldDraft, storedBy } from "./field-draft";
+import { choiceLanded, choiceShown, FieldDraft, storedBy, versionBy } from "./field-draft";
 
 describe("FieldDraft (slice 13, D-66)", () => {
   it("takes a fresh stored value only without the focus and without a draft", () => {
@@ -77,6 +77,101 @@ describe("FieldDraft (slice 13, D-66)", () => {
     expect(storedBy(false)).toBe(false);
     expect(storedBy(undefined)).toBeUndefined();
     expect(storedBy(null)).toBeUndefined();
+  });
+});
+
+describe("FieldDraft: a stored save by the row's version (fix/field-draft-after-undo)", () => {
+  /** A field shown at version 3 with "old", its text "new" saved and stored at version 4. */
+  const savedAt4 = (text = "new") => {
+    const d = new FieldDraft("old");
+    d.answered(d.send(text), true, 4);
+    return d;
+  };
+
+  it("a newer version, the same value again: the field takes it (an Undo drawn in one commit with the save's page, S23-02)", () => {
+    const d = savedAt4();
+    expect(d.receive("old", "new", false, 5)).toBe("take");
+    expect(d.taken).toBe("old");
+    expect(d.hasDraft("old")).toBe(false);
+    expect(d.shouldSave("old", "old")).toBe(false);
+  });
+
+  it("the same version: the save's own page ends the draft", () => {
+    const d = savedAt4();
+    expect(d.receive("new", "new", false, 4)).toBe("end");
+    expect(d.hasDraft("new")).toBe(false);
+    // later stored values show as before
+    expect(d.receive("old", "new", false, 5)).toBe("take");
+  });
+
+  it("an older version (the page before the save's): nothing yet, the rule waits for the save's version", () => {
+    const d = savedAt4();
+    expect(d.receive("old", "new", false, 3)).toBe("keep");
+    expect(d.receive("old", "new", false, 5)).toBe("take");
+  });
+
+  it("no version (the field's or the answer's): today's rules only", () => {
+    const d = savedAt4();
+    expect(d.receive("old", "new", false)).toBe("keep");
+    expect(d.receive("old", "new", false, null)).toBe("keep");
+    const noAnswerVersion = new FieldDraft("old");
+    noAnswerVersion.answered(noAnswerVersion.send("new"), true, null);
+    expect(noAnswerVersion.receive("old", "new", false, 5)).toBe("keep");
+    expect(noAnswerVersion.settle("old", 5, "new", false)).toBe(false);
+  });
+
+  it("the focus held: the element keeps its text until the field is left; leaving it then takes the stored value", () => {
+    const d = savedAt4();
+    expect(d.receive("old", "new", true, 5)).toBe("keep");
+    // leaving the field with the same text saves nothing and shows the stored value
+    expect(d.settle("old", 5, "new", false)).toBe(true);
+    expect(d.taken).toBe("old");
+  });
+
+  it("a trimmed value: the stored form of the text replaces it, with no render of the text itself", () => {
+    const d = new FieldDraft("old");
+    d.answered(d.send("  new  "), true, 4);
+    expect(d.receive("new", "  new  ", false, 4)).toBe("take");
+    expect(d.taken).toBe("new");
+    expect(d.receive("old", "new", false, 5)).toBe("take"); // an undo afterwards
+  });
+
+  it("a value changed by someone else after the save: the field takes it", () => {
+    const d = savedAt4();
+    expect(d.receive("theirs", "new", false, 6)).toBe("take");
+    expect(d.taken).toBe("theirs");
+  });
+
+  it("text typed since the save: a draft as any, never overwritten", () => {
+    const d = savedAt4();
+    expect(d.receive("old", "newer", false, 5)).toBe("keep");
+    expect(d.settle("old", 5, "new", false)).toBe(false); // the rule is over for that save
+  });
+
+  it("the answer after the page: settled when the answer comes, against the version already shown", () => {
+    const d = new FieldDraft("old");
+    const n = d.send("  new  ");
+    expect(d.receive("new", "  new  ", false, 4)).toBe("keep"); // the page first
+    d.answered(n, true, 4);
+    expect(d.settle("new", 4, "  new  ", false)).toBe(true);
+  });
+
+  it("only the newest save's answer counts; a refusal sets nothing", () => {
+    const d = new FieldDraft("old");
+    const first = d.send("a");
+    const second = d.send("ab");
+    d.answered(first, true, 4);
+    expect(d.settle("a", 4, "ab", false)).toBe(false);
+    d.answered(second, false);
+    expect(d.settle("a", 5, "ab", false)).toBe(false);
+  });
+
+  it("versionBy reads a panel save's value.version or a canvas save's version", () => {
+    expect(versionBy({ ok: true, value: { version: 7 } })).toBe(7);
+    expect(versionBy({ ok: true, version: 3 })).toBe(3);
+    expect(versionBy({ ok: false, code: "stale_version" })).toBeNull();
+    expect(versionBy(true)).toBeNull();
+    expect(versionBy(undefined)).toBeNull();
   });
 });
 

@@ -1004,7 +1004,7 @@ export function useFrames(o: Options) {
           versions.current.set(frameId, r.version);
           patchFrames(new Map([[frameId, { name: r.name, kind: r.kind, conceptId: r.concept_id, sourceSystemId: r.source_system_id, color: r.color, version: r.version }]]));
           undo()?.noteSaved();
-          resolve({ ok: true });
+          resolve({ ok: true, version: r.version });
         });
       }),
     [editable, enqueueGroup, writes, ver, toast, versions, patchFrames, undo, cuts, fresh],

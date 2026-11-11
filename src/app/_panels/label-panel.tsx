@@ -110,7 +110,7 @@ export function LabelPanel({ label }: { label: Label }) {
     <div data-testid="panel-label">
       <Kind>Working label</Kind>
       <Field label="Name" htmlFor="f-ln">
-        <TextField key={fieldKey(label.id, "name")} id="f-ln" value={label.name} required readOnly={!p.editable} onSave={rename} testId="input-label-name" keep={{ key: fieldKey(label.id, "name"), field: "Name", object: label.name }} />
+        <TextField key={fieldKey(label.id, "name")} version={label.version} id="f-ln" value={label.name} required readOnly={!p.editable} onSave={rename} testId="input-label-name" keep={{ key: fieldKey(label.id, "name"), field: "Name", object: label.name }} />
       </Field>
       <p className="mt-3 text-im-ink-2" data-testid="text-label-marks">
         {parts.length ? `Marks ${parts.join(", ")}.` : "Not used anywhere yet."} Labels belong to your working context, not to the model.

@@ -3,7 +3,8 @@
 // what the person typed, from the moment a save of it starts until it is stored or dropped:
 // - a save starts: the draft's text is the value sent; its base is the stored text it started from (after a conflict,
 //   the newest stored text: only "Keep mine" saves then);
-// - a save is stored: the draft ends when its text is the stored one; text typed after it stays, on the new base;
+// - a save is stored: the draft ends when its text is the stored one, or the text that save sent (nothing typed since:
+//   the stored form wins, e.g. trimmed; fix/field-draft-after-undo); text typed after it stays, on the new base;
 // - a refusal keeps the draft with its kind: `mark` (a stale version or a save cut behind a refusal: the conflict line
 //   or "Not saved", by its base), `locked` ("Not saved", editable), `copy` (a permission or the archive: read-only); an
 //   invalid input keeps it for correcting, unmarked; a note not found takes it with it.
@@ -79,12 +80,15 @@ export class NoteDrafts {
     this.set(id, { text, base: !e || inConflict(e, stored) ? stored : e.base, sent: text, refusal: null });
   }
 
-  /** A save was stored: the note's text is now `stored`. */
-  stored(id: string, stored: string): void {
+  /**
+   * A save was stored: the note's text is now `stored`; `sent` is the text that save sent. The draft ends when the
+   * person's text is either (the server may store another form of it, such as trimmed); other text stays, on the new base.
+   */
+  stored(id: string, stored: string, sent?: string): void {
     const e = this.get(id);
     if (!e) return;
-    if (e.text === stored) this.set(id, null);
-    else this.set(id, { ...e, base: stored, sent: e.sent === stored ? null : e.sent });
+    if (e.text === stored || (sent !== undefined && e.text === sent)) this.set(id, null);
+    else this.set(id, { ...e, base: stored, sent: e.sent === stored || (sent !== undefined && e.sent === sent) ? null : e.sent });
   }
 
   /** A save was refused (or cut) with `code`. */

@@ -93,10 +93,10 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
       {/* slice 20 (PRD item 6): its own model checks and its attributes' */}
       <ChecksBox of={{ t: "entity", id: e.id }} />
       <Field label="Name" htmlFor="f-en">
-        <TextField key={fieldKey(e.id, "name")} id="f-en" value={e.name} required readOnly={!p.editable} onSave={(name) => save({ name })} testId="input-entity-name" inputRef={nameRef} keep={{ key: fieldKey(e.id, "name"), field: "Name", object: e.name }} />
+        <TextField key={fieldKey(e.id, "name")} version={e.version} id="f-en" value={e.name} required readOnly={!p.editable} onSave={(name) => save({ name })} testId="input-entity-name" inputRef={nameRef} keep={{ key: fieldKey(e.id, "name"), field: "Name", object: e.name }} />
       </Field>
       <Field label="Alias" htmlFor="f-ealias">
-        <TextField key={fieldKey(e.id, "alias")} id="f-ealias" value={e.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => save({ alias })} testId="input-entity-alias" keep={{ key: fieldKey(e.id, "alias"), field: "Alias", object: e.name }} />
+        <TextField key={fieldKey(e.id, "alias")} version={e.version} id="f-ealias" value={e.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => save({ alias })} testId="input-entity-alias" keep={{ key: fieldKey(e.id, "alias"), field: "Alias", object: e.name }} />
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
         {role ? (

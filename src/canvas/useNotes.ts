@@ -172,16 +172,16 @@ export function useNotes(o: Options) {
   /**
    * Saves one change of a note after its earlier ones; a refusal puts `back` and shows the domain's message. A cutting
    * refusal before it cuts it: `back`, no toast, not sent (slice 14a, F2). Answers `{ ok, code }`; a refusal that brings
-   * the fresh page, once its notes are merged (F3). A text save (`text`) is not shown in the note's data but as its draft
+   * the fresh page, once its notes are merged (F3). A text save (`text`: the text it sends) is not shown in the note's data but as its draft
    * (`drafts`): a refusal or a cut keeps the draft with its kind instead of putting anything back (D-66).
    */
   const save = useCallback(
-    (id: Uuid, run: (version: number) => NoteResult, back: Partial<NoteData>, text?: boolean): Promise<CanvasSave> =>
+    (id: Uuid, run: (version: number) => NoteResult, back: Partial<NoteData>, text?: string): Promise<CanvasSave> =>
       new Promise((resolve) => {
         const mark = cuts.mark(id);
         enqueue(id, async () => {
           if (cuts.cutSince(id, mark)) {
-            if (text) drafts.refused(id, "cut");
+            if (text !== undefined) drafts.refused(id, "cut");
             else patch(id, back);
             resolve(CUT_SAVE);
             return;
@@ -196,11 +196,11 @@ export function useNotes(o: Options) {
           if (!result.ok) {
             const code = result.code ?? "unexpected";
             cuts.refuse(id, code);
-            if (!text) patch(id, back);
+            if (text === undefined) patch(id, back);
             toast(result.message, "refusal");
             const answer = () => {
               // the draft's kind once the fresh page is in, so its mark compares with the newest stored text
-              if (text) drafts.refused(id, code);
+              if (text !== undefined) drafts.refused(id, code);
               resolve({ ok: false, code });
             };
             if (PAGE_REFUSALS.has(code)) fresh.wait(pages, answer);
@@ -213,7 +213,7 @@ export function useNotes(o: Options) {
           // ahead of its save (it is the draft), so the stored one is always taken
           if ((pending.current.get(id) ?? 0) <= 1) setNotes((ns) => ns.map((n) => (n.id === id ? stored : n)));
           else setNotes((ns) => ns.map((n) => (n.id === id ? { ...n, text: stored.text } : n)));
-          if (text) drafts.stored(id, stored.text);
+          if (text !== undefined) drafts.stored(id, stored.text, text);
           undo()?.noteSaved();
           resolve({ ok: true });
         });
@@ -225,7 +225,7 @@ export function useNotes(o: Options) {
   const saveText = useCallback(
     (id: Uuid, text: string): Promise<CanvasSave> => {
       drafts.start(id, text, noteOf(id)?.text ?? "");
-      return save(id, (v) => writes.updateNote({ noteId: id, expectedVersion: v, text }), {}, true);
+      return save(id, (v) => writes.updateNote({ noteId: id, expectedVersion: v, text }), {}, text);
     },
     [drafts, noteOf, save, writes],
   );

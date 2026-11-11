@@ -98,6 +98,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       <Field label="Name" htmlFor="f-fn">
         <TextField
           key={fieldKey(f.id, "name")}
+          version={f.version}
           id="f-fn"
           value={f.name}
           required

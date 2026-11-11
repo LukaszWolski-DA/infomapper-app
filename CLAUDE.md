@@ -1089,7 +1089,12 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     rules in `src/ui/field-draft.ts`, `FieldDraft`). A stored value is written into the element in an effect only
     while the field has neither the focus nor a draft. Leaving it compares with the value on its way, else with the
     stored one (no "Nothing to change."). Every field's `onSave` returns its save's answer (`FieldSave`). **A new text
-    field that saves a row uses `TextField`, `TextArea` or `useDraft` and returns the save.** Choice fields use
+    field that saves a row uses `TextField`, `TextArea` or `useDraft`, returns the save and passes the shown version of
+    the row it saves (`version`, required on `TextField` and `TextArea`; `null` only where the row has none).** Since
+    fix/field-draft-after-undo the draft also ends by its save's answer: once the field shows the version that save
+    wrote or a newer one, still holds the text it sent and has no focus, it takes the stored value (`FieldDraft.settle`),
+    so an Undo drawn in one commit with the save's page, or a command's trimmed form, shows; a save's answer must give
+    that row's version (`Saved`'s `value.version`, a canvas save's `version`). Choice fields use
     `useChoice`: no draft, the newest stored value after a refusal.
   - **A refusal that cuts brings the fresh page:** `runCommand` revalidates after `stale_version`, `forbidden`,
     `archived` and `not_found`, and `useAction`'s `saveRow` and `saveRows` answer such a refusal only once the transition

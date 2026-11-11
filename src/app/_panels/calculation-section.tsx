@@ -173,6 +173,7 @@ export function CalculationSection({ attribute: a }: { attribute: Attribute }) {
         <Field label="Rule" htmlFor={RULE_ID}>
           <TextArea
             key={fieldKey(a.id, "calc_rule")}
+            version={a.version}
             id={RULE_ID}
             code
             value={a.calc_rule ?? ""}

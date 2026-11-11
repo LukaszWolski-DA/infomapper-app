@@ -110,7 +110,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       <Kind>Requirement</Kind>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="ID" htmlFor="f-rqk">
-          <TextField key={fieldKey(rid, "key")} id="f-rqk" value={r.key} mono readOnly={!p.editable} onSave={(key) => save("key", key)} testId="input-req-key" keep={{ key: fieldKey(rid, "key"), field: "ID", object: r.key }} />
+          <TextField key={fieldKey(rid, "key")} version={r.version} id="f-rqk" value={r.key} mono readOnly={!p.editable} onSave={(key) => save("key", key)} testId="input-req-key" keep={{ key: fieldKey(rid, "key"), field: "ID", object: r.key }} />
         </Field>
         <Field label="Kind" htmlFor="f-rqkind">
           <select key={fieldKey(rid, "kind")} id="f-rqkind" className={inputClass} value={kind.value} disabled={!p.editable} onChange={(e) => kind.choose(e.target.value as Requirement["kind"])} data-testid="select-req-kind">
@@ -123,7 +123,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
         </Field>
       </div>
       <Field label="Name" htmlFor="f-rqn">
-        <TextField key={fieldKey(rid, "name")} id="f-rqn" inputRef={nameRef} value={r.name} readOnly={!p.editable} onSave={(name) => save("name", name)} required onEmpty={() => toast(NAME_REQUIRED, "refusal")} testId="input-req-name" keep={{ key: fieldKey(rid, "name"), field: "Name", object: r.key }} />
+        <TextField key={fieldKey(rid, "name")} version={r.version} id="f-rqn" inputRef={nameRef} value={r.name} readOnly={!p.editable} onSave={(name) => save("name", name)} required onEmpty={() => toast(NAME_REQUIRED, "refusal")} testId="input-req-name" keep={{ key: fieldKey(rid, "name"), field: "Name", object: r.key }} />
       </Field>
       <RichTextField
         key={fieldKey(rid, "description")}
@@ -142,6 +142,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
         <Field label={r.kind === "dq_rule" ? "Check" : "Rule"} htmlFor="f-rqe">
           <TextArea
             key={fieldKey(rid, "expression")}
+            version={r.version}
             id="f-rqe"
             code
             value={r.expression ?? ""}
@@ -172,10 +173,10 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Owner" htmlFor="f-rqo">
-          <TextField key={fieldKey(rid, "owner")} id="f-rqo" value={r.owner_name ?? ""} readOnly={!p.editable} onSave={(owner) => save("owner_name", owner || null)} testId="input-req-owner" keep={{ key: fieldKey(rid, "owner"), field: "Owner", object: r.key }} />
+          <TextField key={fieldKey(rid, "owner")} version={r.version} id="f-rqo" value={r.owner_name ?? ""} readOnly={!p.editable} onSave={(owner) => save("owner_name", owner || null)} testId="input-req-owner" keep={{ key: fieldKey(rid, "owner"), field: "Owner", object: r.key }} />
         </Field>
         <Field label="External reference" htmlFor="f-rqr">
-          <TextField key={fieldKey(rid, "ref")} id="f-rqr" value={r.external_ref ?? ""} readOnly={!p.editable} placeholder="e.g. JIRA-481" onSave={(ref) => save("external_ref", ref || null)} testId="input-req-ref" />
+          <TextField key={fieldKey(rid, "ref")} version={r.version} id="f-rqr" value={r.external_ref ?? ""} readOnly={!p.editable} placeholder="e.g. JIRA-481" onSave={(ref) => save("external_ref", ref || null)} testId="input-req-ref" />
         </Field>
       </div>
       <Field label="Part of" htmlFor="f-rqp">

@@ -106,6 +106,7 @@ export function Conventions(p: ConventionsProps) {
         <p className={hintClass}>{NAMING_HINT}</p>
         <TextArea
           key={fieldKey(p.workspaceId, "naming_conventions")}
+          version={p.workspaceVersion}
           value={p.namingConventions ?? ""}
           rows={7}
           readOnly={!p.editable}
@@ -209,7 +210,7 @@ function Row({ c, onRemove, ...p }: ConventionsProps & { c: Classification; onRe
     setError(r.ok || r.code === "cut" ? null : r.message);
     return r;
   };
-  const { bind, defaultValue, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(c.name, rename, { prepare: (t) => t.trim(), required: true, onEmpty: () => setError(null) });
+  const { bind, defaultValue, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(c.name, rename, { prepare: (t) => t.trim(), required: true, onEmpty: () => setError(null), version: c.version });
   return (
     <tr className={`align-top ${dv && !p.dataVault ? DIMMED : ""}`} data-testid="classification-row" data-code={c.code ?? ""} data-dimmed={dv && !p.dataVault ? "true" : undefined}>
       <td className="border-b border-im-line py-1.5 pr-2">
@@ -263,6 +264,7 @@ function Row({ c, onRemove, ...p }: ConventionsProps & { c: Classification; onRe
       <td className="w-[48%] min-w-[220px] border-b border-im-line py-1.5 pr-2">
         <TextArea
           key={fieldKey(c.id, "definition")}
+          version={c.version}
           value={c.definition ?? ""}
           rows={2}
           readOnly={!p.editable}

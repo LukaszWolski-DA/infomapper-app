@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
 import { useToast } from "@/ui/components/toast";
-import { choiceLanded, choiceShown, FieldDraft, storedBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
+import { choiceLanded, choiceShown, FieldDraft, storedBy, versionBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
 import { dropDraft, isGone, keepDraft, markGone, takeDraft, unmarkGone, updateDraft } from "@/ui/field-drafts";
 import { guard, release } from "@/ui/leave-guard";
 
@@ -105,6 +105,12 @@ export const notSavedAway = (field: string, object: string): string => `Not save
  * field saves nothing, F6), or it does not ("Not saved": leaving the field saves it again). Escape puts the stored value
  * back (while a conflict shows, it is "Use this"). With `keep`, a draft whose field unmounts stays for the page
  * (`src/ui/field-drafts.ts`) and comes back when the field mounts again.
+ *
+ * `version` (fix/field-draft-after-undo): the version of the row the field saves, as shown. With it, a save stored with
+ * the row's version its answer gives ends the draft once the field shows that version or a newer one (`FieldDraft.settle`):
+ * the stored value is written into the element even when it never equalled the text (a command's trim) or the save's page
+ * was drawn together with a later one (an Undo right after the save). `null`: the field's row has no version to show
+ * (today's rules only).
  */
 export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
   stored: string,
@@ -117,6 +123,7 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     elementRef?: Ref<E>;
     keep?: DraftKeep;
     outside?: OutsideDraft;
+    version?: number | null;
   } = {},
 ) {
   const toast = useToast();
@@ -131,6 +138,9 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
   const lastText = useRef<string | null>(null);
   const keepNow = useRef<DraftKeep | undefined>(undefined);
   const toastNow = useRef(toast);
+  /** The stored value and the row's version the field was last drawn with, for a save's answer that comes after them. */
+  const storedNow = useRef(stored);
+  const versionNow = useRef(o.version);
   /**
    * The leave guard (slice 14b): held while the field has a refused draft (any mark but a deleted object's) or the focus
    * with typed text not yet sent; a sent text is a save on its way, which the save chain holds.
@@ -154,17 +164,20 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     keepNow.current = o.keep;
     toastNow.current = toast;
   });
+  const version = o.version;
   useEffect(() => {
+    storedNow.current = stored;
+    versionNow.current = version;
     const el = element.current;
     // a DOM write after the commit, never a layout read (CLAUDE.md, slice 6a)
-    const take = el ? draft.receive(stored, el.value, document.activeElement === el) : "keep";
+    const take = el ? draft.receive(stored, el.value, document.activeElement === el, version) : "keep";
     if (el && take === "take") el.value = stored;
     if (take === "end" && refusalNow.current && refusalNow.current.kind !== "copy") {
       setRefusalNow(null);
       // the stored value came to equal the draft: its mark goes
       setRefusal(null);
     }
-  }, [stored, draft, setRefusalNow]);
+  }, [stored, version, draft, setRefusalNow]);
   // a draft kept outside the field (slice 14a): taken while the field has neither the focus nor a text of its own
   const outside = o.outside?.draft;
   const hasOutside = !!o.outside;
@@ -250,7 +263,7 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     const n = draft.send(value);
     const answered = (answer: SaveAnswer) => {
       const ok = storedBy(answer);
-      draft.answered(n, ok);
+      draft.answered(n, ok, versionBy(answer));
       const keep = keepNow.current;
       const code = codeOf(answer);
       // a deleted object (answer 8): its drafts go, and a save cut behind its refusal says nothing more
@@ -265,6 +278,9 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
       }
       const r = ok === false ? refusalOf(code, draft.taken) : null;
       if (r) refuse(r);
+      // the page with the save's version may be drawn already (it came first): the stored value shows now
+      const el = element.current;
+      if (ok === true && el && draft.settle(storedNow.current, versionNow.current, el.value, document.activeElement === el)) el.value = storedNow.current;
     };
     Promise.resolve(save!(value)).then(answered, () => answered(false));
   };
@@ -286,6 +302,12 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
       return;
     }
     if (value !== raw) el.value = value;
+    // the text is the stored save's, left untouched since: the field takes the stored value, saving nothing (an undo
+    // while the field had the focus is not undone by leaving it)
+    if (draft.settle(stored, version, value, false)) {
+      el.value = stored;
+      return;
+    }
     if (!draft.shouldSave(value, stored)) return;
     send(value);
   };
@@ -432,6 +454,7 @@ export function TextField({
   placeholder,
   keep,
   invalid,
+  version,
 }: {
   id?: string;
   value: string;
@@ -448,8 +471,11 @@ export function TextField({
   keep?: DraftKeep;
   /** Why the stored value is not valid (slice 22): the field is marked (`aria-invalid`, the warning border), this its title. */
   invalid?: string | null;
+  /** The shown version of the row it saves, or null when there is none (`useDraft`'s `version`). Required, so no field goes without one by mistake. */
+  version: number | null;
 }) {
   const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(value, onSave, {
+    version,
     prepare: (t) => t.trim(),
     required,
     onEmpty,
@@ -490,9 +516,19 @@ export function TextArea({
   onSave,
   code,
   ...rest
-}: { value: string; onSave: FieldSave<string>; code?: boolean; keep?: DraftKeep; outside?: OutsideDraft; prepare?: (text: string) => string | null } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
-  const { keep, outside, prepare, ...props } = rest;
+}: {
+  value: string;
+  onSave: FieldSave<string>;
+  code?: boolean;
+  keep?: DraftKeep;
+  outside?: OutsideDraft;
+  prepare?: (text: string) => string | null;
+  /** The shown version of the row it saves, or null when there is none (`useDraft`'s `version`). Required, so no field goes without one by mistake. */
+  version: number | null;
+} & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
+  const { keep, outside, prepare, version, ...props } = rest;
   const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLTextAreaElement>(value, onSave, {
+    version,
     readOnly: !!props.readOnly || !!props.disabled,
     keep,
     outside,

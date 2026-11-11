@@ -1008,6 +1008,24 @@ load. That was after `05d0a04`, slice 7b's fix for the race on REQ-101's card. I
 unknown, because the run's error text was lost (the output was filtered, and the reruns replaced `test-results/`). In
 the next full run, keep the failing test's error output before rerunning it.
 
+### S14B-09 times out waiting for a save's answer now and then (a known flake)
+
+S14B-09 (`e2e/slice-14b/S14B-09.spec.ts`) failed three times by its test timeout in `answerOf`
+(`e2e/slice-14b/helpers.ts`), which waits for the page's next server action's response:
+- slice 21's first closing full run, on `main`'s code ("a focused field with typed text asks; once it is saved,
+  nothing"; `docs/prd/slice-21-acceptance.md`);
+- the local run of the affected specs on fix/field-draft-after-undo (the same test; its traces were lost to the rerun);
+- PR 54's first full run ([42919400613](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42919400613),
+  "a save held on its way asks; after its answer, nothing").
+
+Each time its single-file check or the next full run passed. **The cause is in the test's helpers**, shown by the third
+failure's trace: the browser aborted the page's save request (`net::ERR_ABORTED`) during the leave check
+(`leaveAsks`: `page.close({ runBeforeUnload: true })` with the dialog dismissed); `holdUntil` then fulfilled a request
+the page no longer waited for, so no `response` event came and `answerOf` waited until the timeout. The application
+sends and cancels nothing there. **To fix on its own `fix/…` branch** (shared test infrastructure, the slice cycle, 4):
+`answerOf` waits for what the page shows instead of a `response` event, or the leave check runs where no save is on its
+way.
+
 ### S10C-13 failed once in slice 10c's first closing run
 
 In the first closing full run of slice 10c (30 October 2026), S10C-13 (`e2e/slice-10c/S10C-13.spec.ts`) failed once:
@@ -1147,30 +1165,6 @@ a removed own classification is never restored, and its code is never given agai
 As for classifications: an own stereotype's code is unique among every row of the workspace, deleted ones included, so
 undoing "Add stereotype" keeps the row and its code stays taken ("That code is taken"); a removed own stereotype's code
 is never given again either, and it also blocks a name (F4, F5, accepted by Łukasz on 10 November 2026).
-
-### A text area whose command trims may keep an untrimmed draft (found in slice 23, not checked elsewhere)
-
-A plain-text area saves what was typed and its command stores it trimmed. Without `prepare` the field keeps the typed
-text as a draft (it differs from the stored text by its spaces), so a later stored value (an undo, another person's
-change) does not show in it until the field is left or Escape is pressed. Slice 23 found it on a definition (S23-02) and
-gave `TextArea` an optional `prepare`, which the Metadata conventions tab's two text areas use (a trim, as
-`TextField`'s). The other text areas (a source's note, a mapping's note and rule, a note's text, a requirement's
-fields, a calculation's rule) were not changed or checked; whether they show it, and the fix (`prepare` where the
-command trims), is a `fix/…` branch of its own (The slice cycle, 4), with the next note's fix after slice 24's merge.
-
-### Undo right after a definition's save can leave the typed text in the field (found in slice 24, S23-02)
-
-In S23-02 a classification's definition is typed and left, its toast and its stored value come, and the top bar's Undo
-is pressed about 0.4 s after the save was sent: the toast "Undone: …" shows and the stored value is back, but in 3 of 9
-local runs (on 10 November 2026; also with slice 24's interface taken out) the text area kept the typed, trimmed text
-for the whole 15 s. On GitHub it passed 3 of 3 on `main` and on slice 24's branch, and in slice 24's full runs. The
-trace and the run's log are in `.data/traces/s23-02-20261110/` (git-ignored): every server action answered 200, the
-undo's answer carrying the fresh page. The draft rules (`useDraft`, `src/ui/field-draft.ts`) and the save chain's
-answer after the page (`afterPage`, `rowSaves`) are shared infrastructure, so the slice did not change them or the test.
-
-- **To fix on a `fix/…` branch from `main` after slice 24's merge** (The slice cycle, 4), together with the note above
-  (a text area whose command trims): reproduce it on `main`, find the interleaving from the trace, fix it with its own
-  full run.
 
 ## Organizations and sign-in (slice 8)
 
@@ -1439,6 +1433,13 @@ AD-35), but the app has no copy or transfer of a workspace yet, so nothing appli
   slice 19's; the history is in the server's memory and empty after the restart the new code needs.
 - **Turning InfoCube off is not possible while facts or dimensions exist** (C-7), so "InfoCube off shows neither check"
   is tested with a data file written by hand (S22-05) and in a unit test.
+- **The value's field has no version to follow** (fix/field-draft-after-undo): its row (`cube_attribute`) is made with the
+  first value and deleted when the value is cleared, and `setUnknownValueAction` answers that row, not a version, so the
+  field passes `version={null}` and keeps slice 13's draft rules only. `setUnknownValue` trims the value, but the field
+  is a `TextField`, which trims the text on leaving before it is sent: after a save it shows the trimmed, stored text,
+  never the untrimmed one. What it lacks is the fix's other half: an Undo pressed before the save's page is drawn (both
+  pages in one commit) can leave the saved value in the field while the stored one went back, until the field is left
+  or Escape is pressed, as every field did before the fix.
 
 ## Model checks (slice 20)
 

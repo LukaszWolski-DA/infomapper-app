@@ -14,6 +14,20 @@ describe("NoteDrafts (slice 14a, D-66)", () => {
     expect(d.get("n")).toBeNull();
   });
 
+  it("a save stored in another form (trimmed) ends the draft when nothing was typed since (fix/field-draft-after-undo)", () => {
+    const d = new NoteDrafts();
+    d.start("n", "  one  ", "old");
+    d.stored("n", "one", "  one  ");
+    expect(d.get("n")).toBeNull();
+    // an older save's answer while newer text is on its way keeps the newer draft
+    d.start("n", " a", "one");
+    d.start("n", " ab", "one");
+    d.stored("n", "a", " a");
+    expect(d.get("n")).toEqual({ text: " ab", base: "a", sent: " ab", refusal: null });
+    d.stored("n", "ab", " ab");
+    expect(d.get("n")).toBeNull();
+  });
+
   it("a refusal keeps the draft with its kind; not found takes it with the note", () => {
     const cases: [string, string | null][] = [
       ["stale_version", "mark"],

@@ -79,6 +79,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
       <Field label="Verb phrase" htmlFor="f-rl">
         <TextField
           key={fieldKey(r.id, "label")}
+          version={r.version}
           id="f-rl"
           value={r.label ?? ""}
           readOnly={!p.editable}
@@ -91,6 +92,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
       <Field label={roleLabel(self, "from", from)} htmlFor="f-rfr">
         <TextField
           key={fieldKey(r.id, "fromRole")}
+          version={r.version}
           id="f-rfr"
           value={r.from_role ?? ""}
           readOnly={!p.editable}
@@ -103,6 +105,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
       <Field label={roleLabel(self, "to", to)} htmlFor="f-rtr">
         <TextField
           key={fieldKey(r.id, "toRole")}
+          version={r.version}
           id="f-rtr"
           value={r.to_role ?? ""}
           readOnly={!p.editable}

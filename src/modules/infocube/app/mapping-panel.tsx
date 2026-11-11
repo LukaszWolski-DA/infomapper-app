@@ -243,6 +243,7 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
         <Field label="Transformation rule" htmlFor={RULE_ID}>
           <TextArea
             key={fieldKey(m.id, "rule")}
+            version={m.version}
             id={RULE_ID}
             code
             value={m.rule_expression ?? ""}
@@ -262,6 +263,7 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
       <Field label="Note" htmlFor="f-cnote">
         <TextArea
           key={fieldKey(m.id, "note")}
+          version={m.version}
           id="f-cnote"
           value={m.note ?? ""}
           readOnly={!p.editable}
@@ -358,6 +360,7 @@ function LookupFields({
       <Field label="When no match" htmlFor={NO_MATCH_ID}>
         <TextField
           key={fieldKey(m.id, "lookup_default")}
+          version={m.version}
           id={NO_MATCH_ID}
           value={m.lookup_default ?? ""}
           readOnly={!p.editable}
