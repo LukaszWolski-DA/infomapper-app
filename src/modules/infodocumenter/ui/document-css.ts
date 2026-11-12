@@ -56,8 +56,8 @@ table.dt thead{display:table-header-group}
 .dst.draft{background:#FCEADD;color:#9A3412}.dst.review{background:#E7EAFB;color:#3346C4}.dst.approved{background:#DCF1EB;color:#0B6B59}
 .dcover{display:flex;flex-direction:column;justify-content:flex-end;min-height:248mm;padding-bottom:20mm}
 .dcover .dorg{font-size:10pt;color:var(--dink3);margin-bottom:auto;padding-bottom:20mm;border-bottom:2px solid var(--dacc);width:100%}
-.dcover h1{font-family:var(--font-plex-serif),Georgia,serif;font-size:26pt;line-height:1.15;font-weight:500;margin:0 0 3mm;max-width:150mm}
-.dsub{font-family:var(--font-plex-serif),Georgia,serif;font-style:italic;font-size:13pt;color:var(--dink2);margin-bottom:12mm}
+.dcover h1{font-size:26pt;line-height:1.15;font-weight:600;margin:0 0 3mm;max-width:150mm;letter-spacing:-.01em}
+.dsub{font-size:13pt;color:var(--dink2);margin-bottom:12mm}
 .dcovt{border-collapse:collapse;font-size:9.5pt;width:auto}
 .dcovt th{text-align:left;font-weight:500;color:var(--dink3);padding:1mm 8mm 1mm 0}
 .dcovt td{padding:1mm 0}

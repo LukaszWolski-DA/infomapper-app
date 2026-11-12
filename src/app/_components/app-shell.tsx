@@ -5,7 +5,7 @@ import { LookFrame } from "@/canvas/look";
 import { CanvasTabs } from "@/app/w/[workspaceId]/p/[projectId]/_components/canvas-tabs";
 import type { ProjectView } from "../_lib/project-view";
 import type { ShellData } from "../_lib/shell";
-import { Breadcrumbs } from "./breadcrumbs";
+import { Breadcrumbs, type Trail } from "./breadcrumbs";
 import { SidePanelsGrid, SidePanelsProvider } from "./side-panels";
 import { TopBar } from "./top-bar";
 
@@ -35,19 +35,22 @@ export async function AppShell({
   shell,
   project,
   tools,
+  trail,
   children,
 }: {
   shell: ShellData;
   project?: ProjectFrame;
   /** The top bar's tools on workspace pages: Undo and Redo on the workspace home (slice 12a). */
   tools?: ReactNode;
+  /** A workspace page's breadcrumbs after the workspace (slice 25's document pages); else "Workspace home". */
+  trail?: Trail;
   children: ReactNode;
 }) {
   if (!project) {
     return (
       <div className="flex h-dvh min-h-0 flex-col bg-im-panel text-im-ink">
         <TopBar shell={shell} tools={tools} />
-        <Breadcrumbs shell={shell} />
+        <Breadcrumbs shell={shell} trail={trail} />
         <main className="min-h-0 flex-1 overflow-auto">{children}</main>
       </div>
     );

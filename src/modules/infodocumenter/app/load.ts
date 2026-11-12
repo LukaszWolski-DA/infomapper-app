@@ -10,6 +10,9 @@ import type { AppUser } from "@/domain/types";
 import { canSee, documentRights, openRefusal } from "../domain/rights";
 import type { DocumentDefinition } from "../domain/types";
 
+/** The `?gone=` the workspace home answers with its toast (`HOME_GONE` in `src/compose/home.tsx`, step 4b). */
+export const GONE_DOCUMENT = "document";
+
 export interface DocumentListRow {
   id: Uuid;
   name: string;

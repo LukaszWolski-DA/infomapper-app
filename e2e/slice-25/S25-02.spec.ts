@@ -2,9 +2,11 @@
 // it, cannot delete another's shared one, deletes their own; a reader (an InfoMate reader added for this) makes, changes
 // and deletes a private one and opens and prints the shared one, read only; a guest (Kasia) makes a private one and
 // prints; nobody sees another's private document; a shared document whose author left cannot be made private; an
-// archived workspace's documents open and print, read only.
+// archived workspace's documents open and print, read only. Step 4b: only its author makes a shared document private
+// (others see the check box disabled with the reason); a document the person can no longer open returns to the
+// Documentation tab with a toast, never a 404.
 
-import { deleteDocument } from "../../src/modules/infodocumenter/domain/commands";
+import { deleteDocument, setDocumentShared } from "../../src/modules/infodocumenter/domain/commands";
 import { RIGHTS_TEXTS } from "../../src/modules/infodocumenter/domain/rights";
 import { refusalAs } from "../slice-15a/helpers";
 import { expect, test, type Page } from "./fixtures";
@@ -129,12 +131,47 @@ test("S25-02: a guest makes a private document and prints it; nobody sees anothe
   await expect(docRow(a, DEMO_DOCUMENT_NAMES.s2t)).toHaveCount(0);
   await expect(a.getByTestId("row-document")).toHaveCount(2);
   const lukaszPrivate = (await storedDocument(DEMO_DOCUMENT_NAMES.s2t))!;
-  // another's private document is "not found", never "forbidden"
+  // another's private document is never told to exist: its pages return to the tab with the toast (step 4b)
   for (const url of [formUrl(lukaszPrivate.id), viewUrl(lukaszPrivate.id), formUrl(id)]) {
-    const response = await a.goto(url);
-    expect(response?.status(), url).toBe(404);
+    await a.goto(url);
+    await expect(a.getByTestId("tab-docs"), url).toHaveAttribute("aria-selected", "true");
+    await expectToast(a, "This document is no longer available to you.");
+    expect(new URL(a.url()).searchParams.get("gone"), url).toBeNull();
   }
   await anna.close();
+});
+
+test("S25-02: only its author makes a shared document private; whoever else had it open returns to the tab", async ({ page, browser }) => {
+  await shareDocumentAs(SEED_IDS.userAnna, DEMO_DOCUMENT_NAMES.anna, true);
+  const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.anna))!;
+  await signInAs(page, "Łukasz");
+  await page.goto(formUrl(doc.id));
+  await expect(page.getByTestId("check-shared")).toBeChecked();
+  await expect(page.getByTestId("check-shared")).toBeDisabled();
+  await expect(page.getByTestId("text-shared-locked")).toHaveText("Only Anna Nowak can make it private.");
+  // the domain refuses it too, whatever the page shows
+  expect(
+    await refusalAs(SEED_IDS.userLukasz, (ctx, access) =>
+      setDocumentShared(ctx, access, doc, { workspaceId: doc.workspace_id, documentId: doc.id, expectedVersion: doc.version, shared: false }, { member: true, name: "Anna Nowak" }),
+    ),
+  ).toBe("Only Anna Nowak can make it private.");
+
+  const anna = await browser.newContext();
+  const a = await anna.newPage();
+  await signInAs(a, "Anna Nowak");
+  await a.goto(formUrl(doc.id));
+  await expect(a.getByTestId("text-shared-locked")).toHaveCount(0);
+  await a.getByTestId("check-shared").uncheck();
+  await expect.poll(async () => (await storedDocument(DEMO_DOCUMENT_NAMES.anna))!.shared).toBe(false);
+  await anna.close();
+
+  // Łukasz can no longer open it: the form and the page return to the tab with the toast
+  for (const url of [formUrl(doc.id), viewUrl(doc.id)]) {
+    await page.goto(url);
+    await expect(page.getByTestId("tab-docs"), url).toHaveAttribute("aria-selected", "true");
+    await expectToast(page, "This document is no longer available to you.");
+  }
+  await expect(docRow(page, DEMO_DOCUMENT_NAMES.anna)).toHaveCount(0);
 });
 
 test("S25-02: a shared document whose author left cannot be made private", async ({ page }) => {
@@ -143,9 +180,13 @@ test("S25-02: a shared document whose author left cannot be made private", async
   await signInAs(page, "Łukasz");
   const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.anna))!;
   await page.goto(formUrl(doc.id));
-  await page.getByTestId("check-shared").uncheck();
-  await expect(page.getByTestId("text-shared-refusal")).toHaveText("Anna Nowak is no longer a member of this workspace, so the document stays shared.");
-  await expect(page.getByTestId("check-shared")).toBeChecked();
+  await expect(page.getByTestId("check-shared")).toBeDisabled();
+  await expect(page.getByTestId("text-shared-locked")).toHaveText("Anna Nowak is no longer a member of this workspace, so the document stays shared.");
+  expect(
+    await refusalAs(SEED_IDS.userLukasz, (ctx, access) =>
+      setDocumentShared(ctx, access, doc, { workspaceId: doc.workspace_id, documentId: doc.id, expectedVersion: doc.version, shared: false }, { member: false, name: "Anna Nowak" }),
+    ),
+  ).toBe("Anna Nowak is no longer a member of this workspace, so the document stays shared.");
   expect((await storedDocument(DEMO_DOCUMENT_NAMES.anna))!.shared).toBe(true);
 });
 

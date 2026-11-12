@@ -14,6 +14,7 @@ import { useAction } from "@/app/_components/use-action";
 import { Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
 import { useToast } from "@/ui/components/toast";
 import { DOCUMENT_TEXTS, NAME_REQUIRED, type UpdateDocumentInput } from "../domain/commands";
+import { RIGHTS_TEXTS } from "../domain/rights";
 import { DICTIONARY_COLUMNS, DICTIONARY_ENTITY_FIELDS, S2T_COLUMNS, type DictionaryColumn, type DictionaryEntityField, type S2TColumn } from "../domain/sections";
 import type { DocumentCover, DocumentScope, MappingFilter } from "../domain/types";
 import { duplicateDocumentAction, setDocumentSharedAction, updateDocumentAction } from "./actions";
@@ -86,9 +87,11 @@ interface Props {
   workspaceId: string;
   document: { id: string; version: number; name: string; audience: string | null; shared: boolean; scope: DocumentScope; cover: DocumentCover };
   sections: FormSection[];
-  rights: { edit: boolean; share: boolean; delete: boolean; duplicate: boolean };
+  rights: { edit: boolean; share: boolean; unshare: boolean; delete: boolean; duplicate: boolean };
   archived: boolean;
   author: string;
+  /** Whether the author is still a member (F17 a: otherwise the document stays shared). */
+  authorMember: boolean;
   viewHref: string;
   projects: { id: string; name: string }[];
   concepts: { id: string; name: string }[];
@@ -96,7 +99,7 @@ interface Props {
 
 type Patch = Omit<UpdateDocumentInput, "workspaceId" | "documentId" | "expectedVersion">;
 
-export function DocumentForm({ workspaceId, document: doc, sections, rights, archived, author, viewHref, projects, concepts }: Props) {
+export function DocumentForm({ workspaceId, document: doc, sections, rights, archived, author, authorMember, viewHref, projects, concepts }: Props) {
   const { saveRow, run, pending } = useAction();
   const toast = useToast();
   const router = useRouter();
@@ -147,7 +150,15 @@ export function DocumentForm({ workspaceId, document: doc, sections, rights, arc
         <Field label="Audience (for your own orientation)">
           {text("audience", doc.audience, (v) => ({ audience: v }), { testId: "input-document-audience", placeholder: "e.g. Business, ETL developers, Client" })}
         </Field>
-        {rights.share && <SharedBox workspaceId={workspaceId} row={row} shared={doc.shared} />}
+        {rights.share && (
+          <SharedBox
+            workspaceId={workspaceId}
+            row={row}
+            shared={doc.shared}
+            // a shared document is made private by its author only (step 4b); while the author is gone it stays shared (F17 a)
+            lockedBecause={doc.shared && !rights.unshare ? (authorMember ? RIGHTS_TEXTS.onlyAuthor(author) : RIGHTS_TEXTS.authorGone(author)) : null}
+          />
+        )}
         <Field label="Model state">
           <div data-testid="text-model-state" className="text-im-ink-2">
             {FORM_TEXTS.modelState}
@@ -202,8 +213,11 @@ export function DocumentForm({ workspaceId, document: doc, sections, rights, arc
   );
 }
 
-/** "Shared with the workspace": at once, both ways (D4); the refusal of F17 stays under it. */
-function SharedBox({ workspaceId, row, shared }: { workspaceId: string; row: { id: string; version: number }; shared: boolean }) {
+/**
+ * "Shared with the workspace": at once, both ways (D4). Disabled on a shared document for everyone but its author, with
+ * the reason under it (step 4b); a refusal stays under it too.
+ */
+function SharedBox({ workspaceId, row, shared, lockedBecause }: { workspaceId: string; row: { id: string; version: number }; shared: boolean; lockedBecause: string | null }) {
   const { saveRow } = useAction();
   const [refusal, setRefusal] = useState<string | null>(null);
   const choice = useChoice(shared, async (next: boolean) => {
@@ -215,8 +229,14 @@ function SharedBox({ workspaceId, row, shared }: { workspaceId: string; row: { i
   return (
     <div className="mt-3">
       <label className="flex items-center gap-2">
-        <input type="checkbox" data-testid="check-shared" checked={choice.value} onChange={(e) => choice.choose(e.currentTarget.checked)} /> Shared with the workspace
+        <input type="checkbox" data-testid="check-shared" checked={choice.value} disabled={!!lockedBecause} onChange={(e) => choice.choose(e.currentTarget.checked)} /> Shared
+        with the workspace
       </label>
+      {lockedBecause && (
+        <p className="m-0 mt-1.5 text-[12px] text-im-ink-3" data-testid="text-shared-locked">
+          {lockedBecause}
+        </p>
+      )}
       {refusal && (
         <p className="m-0 mt-1.5 text-[12px] text-im-warn" role="alert" data-testid="text-shared-refusal">
           {refusal}

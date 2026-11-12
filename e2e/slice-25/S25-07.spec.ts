@@ -13,6 +13,9 @@ test("S25-07: title page, contents with matching page numbers, header and footer
   await page.goto(viewUrl(doc.id));
   const n = await laidOut(page);
   expect(n).toBeGreaterThanOrEqual(4);
+  // step 4b: the breadcrumbs, Documentation's link back to the tab
+  await expect(page.getByTestId("breadcrumb")).toHaveText(["InfoMate", "Retail Co – DWH", "Documentation", DEMO_DOCUMENT_NAMES.shared]);
+  await expect(page.getByTestId("breadcrumb").nth(2)).toHaveAttribute("href", /\?tab=docs$/);
   await expect(page.getByTestId("text-pages")).toHaveText(`${n} pages`);
   await expect(pagesOf(page)).toHaveCount(n);
 

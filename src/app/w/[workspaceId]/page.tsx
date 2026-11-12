@@ -21,7 +21,7 @@ import { AddPersonBox, OrganizationAccessBox, RemovePersonButton, RoleSelect } f
 import { SettingsForm } from "./_components/settings-form";
 import { Conventions } from "./_components/conventions";
 import { settingsBoxes } from "@/compose/settings";
-import { homeTabs } from "@/compose/home";
+import { HOME_GONE, homeTabs } from "@/compose/home";
 import { chosenHomeTab } from "@/ui/home-tabs";
 import { moduleFeeds } from "@/compose";
 import { workspacePeople } from "@/app/_lib/people";
@@ -105,6 +105,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     <UndoProvider workspaceId={workspaceId} state={{ canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 }}>
     <AppShell shell={shell} tools={<UndoButtons />}>
       {query.gone === "project" && <GoneNotice message="That project no longer exists." />}
+      {/* slice 25 (step 4b): a module's page the person can no longer open sent them back here */}
+      {typeof query.gone === "string" && HOME_GONE[query.gone] && <GoneNotice message={HOME_GONE[query.gone]!} />}
       <div data-testid="page-workspace-home" className="min-h-full bg-im-canvas px-[clamp(16px,4vw,48px)] pb-12 pt-6">
         <div className="mx-auto max-w-[1180px]">
           <div className="mb-1 text-xs text-im-ink-3">{shell.organization.name} · workspace</div>

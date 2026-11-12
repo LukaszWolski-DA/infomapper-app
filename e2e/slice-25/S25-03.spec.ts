@@ -42,6 +42,8 @@ test("S25-03: a change is saved with a version and a change event; a stale save 
   await signInAs(page, "Łukasz");
   const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.shared))!;
   await page.goto(formUrl(doc.id));
+  // step 4b: the breadcrumbs name the document under Documentation
+  await expect(page.getByTestId("breadcrumb")).toHaveText(["InfoMate", "Retail Co – DWH", "Documentation", DEMO_DOCUMENT_NAMES.shared]);
   const before = (await documentEvents(doc.id)).length;
   await page.getByTestId("input-cover-status").fill("Agreed");
   await page.getByTestId("input-cover-status").press("Enter");

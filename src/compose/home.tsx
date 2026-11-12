@@ -4,9 +4,9 @@
 import { getDataStore, type DataStore } from "@/data";
 import { checkPermission, type WorkspaceAccess } from "@/domain/permissions";
 import type { ModuleHomeTab } from "@/ui/home-tabs";
-import { visibleDocuments } from "@/modules/infodocumenter/app/load";
 import { DocumentationTab, TAB_TEXTS } from "@/modules/infodocumenter/app/tab";
-import { createRefusal } from "@/modules/infodocumenter/domain/rights";
+import { GONE_DOCUMENT, visibleDocuments } from "@/modules/infodocumenter/app/load";
+import { createRefusal, RIGHTS_TEXTS } from "@/modules/infodocumenter/domain/rights";
 import { STORE_SCHEMA } from "./tables";
 
 /** A module's home tab: whether it is shown in the workspace, and the tab when it is. */
@@ -37,6 +37,11 @@ const DOCUMENTATION: HomeTabSource = {
     };
   },
 };
+
+/**
+ * What the home says when a module's page sent the person back (`?gone=`, step 4b): a document they can no longer open.
+ */
+export const HOME_GONE: Readonly<Record<string, string>> = { [GONE_DOCUMENT]: RIGHTS_TEXTS.gone };
 
 /** Every module's home tab, in order. */
 export const HOME_TABS: readonly HomeTabSource[] = [DOCUMENTATION];

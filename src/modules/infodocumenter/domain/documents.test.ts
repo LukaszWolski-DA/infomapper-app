@@ -58,24 +58,24 @@ describe("the rights (PRD item 10, F14 b)", () => {
     const shared = doc({ shared: true, author_id: OTHER });
     const rights = Object.fromEntries(WORKSPACE_ROLES.map((r) => [r, documentRights(as(r), shared)]));
     expect(rights).toEqual({
-      owner: { edit: true, share: true, delete: true, duplicate: true },
-      admin: { edit: true, share: true, delete: true, duplicate: true },
-      modeler: { edit: true, share: true, delete: false, duplicate: true },
-      reviewer: { edit: false, share: false, delete: false, duplicate: true },
-      reader: { edit: false, share: false, delete: false, duplicate: true },
+      owner: { edit: true, share: true, unshare: false, delete: true, duplicate: true },
+      admin: { edit: true, share: true, unshare: false, delete: true, duplicate: true },
+      modeler: { edit: true, share: true, unshare: false, delete: false, duplicate: true },
+      reviewer: { edit: false, share: false, unshare: false, delete: false, duplicate: true },
+      reader: { edit: false, share: false, unshare: false, delete: false, duplicate: true },
     });
   });
 
   it("gives every role full rights on their own private document, sharing to owners, admins and modelers only", () => {
     for (const role of WORKSPACE_ROLES) {
       const share = role === "owner" || role === "admin" || role === "modeler";
-      expect(documentRights(as(role), doc({ author_id: ME })), role).toEqual({ edit: true, share, delete: true, duplicate: true });
+      expect(documentRights(as(role), doc({ author_id: ME })), role).toEqual({ edit: true, share, unshare: share, delete: true, duplicate: true });
     }
   });
 
   it("lets an author whose role was lowered delete their shared document, not change it (F17 b)", () => {
     const shared = doc({ shared: true, author_id: ME });
-    expect(documentRights(as("reader"), shared)).toEqual({ edit: false, share: false, delete: true, duplicate: true });
+    expect(documentRights(as("reader"), shared)).toEqual({ edit: false, share: false, unshare: false, delete: true, duplicate: true });
     expect(editRefusal(as("reader"), shared)?.message).toBe(RIGHTS_TEXTS.sharedEdit);
   });
 
@@ -94,7 +94,7 @@ describe("the rights (PRD item 10, F14 b)", () => {
 
   it("reads an archived workspace's documents only", () => {
     const mine = doc({ author_id: ME });
-    expect(documentRights(as("owner", archived), mine)).toEqual({ edit: false, share: false, delete: false, duplicate: false });
+    expect(documentRights(as("owner", archived), mine)).toEqual({ edit: false, share: false, unshare: false, delete: false, duplicate: false });
     expect(editRefusal(as("owner", archived), mine)).toEqual({ code: "archived", message: ARCHIVED_MESSAGE });
   });
 
@@ -189,16 +189,24 @@ describe("saving (D-59, F19)", () => {
   });
 });
 
-describe("sharing and unsharing (D4, F17 a)", () => {
+describe("sharing and unsharing (D4, F17 a, step 4b)", () => {
   const member = { member: true, name: "Łukasz" };
   const input = (d: DocumentDefinition, shared: boolean) => ({ workspaceId: ids.ws, documentId: d.id, expectedVersion: d.version, shared });
 
-  it("shares and unshares at once, for owners, admins and modelers", () => {
+  it("shares and unshares at once, for owners, admins and modelers; only its author makes it private again", () => {
     const d = made("blank", {}, "modeler");
     const shared = ok(setDocumentShared(makeCtx(ME), as("modeler"), d, input(d, true), member)).document;
     expect(shared).toMatchObject({ shared: true, author_id: ME, version: d.version + 1 });
+    expect(ok(setDocumentShared(makeCtx(ME), as("modeler"), shared, input(shared, false), member)).document).toMatchObject({ shared: false, author_id: ME });
     const theirs = { ...shared, author_id: OTHER };
-    expect(ok(setDocumentShared(makeCtx(ME), as("admin"), theirs, input(theirs, false), member)).document).toMatchObject({ shared: false, author_id: OTHER });
+    for (const role of ["owner", "admin", "modeler"] as const) {
+      expect(setDocumentShared(makeCtx(ME), as(role), theirs, input(theirs, false), { member: true, name: "Anna Nowak" }), role).toMatchObject({
+        ok: false,
+        error: { code: "forbidden", message: "Only Anna Nowak can make it private." },
+      });
+      expect(documentRights(as(role), theirs)).toMatchObject({ share: true, unshare: false });
+    }
+    expect(documentRights(as("modeler"), shared)).toMatchObject({ share: true, unshare: true });
   });
 
   it("refuses readers and reviewers, also their own document", () => {

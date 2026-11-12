@@ -15,6 +15,10 @@ export const RIGHTS_TEXTS = {
   sharedDelete: "A shared document is deleted by owners, admins or its author.",
   share: "Only modelers, admins and owners share documents.",
   authorGone: (author: string) => `${author} is no longer a member of this workspace, so the document stays shared.`,
+  /** Step 4b: only the author makes a shared document private again. */
+  onlyAuthor: (author: string) => `Only ${author} can make it private.`,
+  /** Step 4b: a document the person can no longer open (gone, made private by its author, InfoDocumenter off). */
+  gone: "This document is no longer available to you.",
 } as const;
 
 type Doc = Pick<DocumentDefinition, "author_id" | "shared" | "deleted_at" | "workspace_id">;
@@ -52,13 +56,17 @@ export function editRefusal(access: WorkspaceAccess, doc: Doc | null | undefined
 
 /**
  * Sharing or unsharing: owners, admins and modelers, on a document they see (a private one is its author's). Unsharing
- * makes it its author's private document again, refused while the author is no longer a member (F17 a).
+ * makes it its author's private document again: only its author does it (step 4b), refused while the author is no
+ * longer a member (F17 a).
  */
 export function shareRefusal(access: WorkspaceAccess, doc: Doc | null | undefined, shared: boolean, author: { member: boolean; name: string }): DomainError | null {
   const first = own(access) ?? offRefusal(access) ?? unseen(access, doc);
   if (first) return first;
   if (checkPermission(access, "model.edit")) return domainError("forbidden", RIGHTS_TEXTS.share);
-  if (!shared && doc!.shared && !author.member) return domainError("invalid", RIGHTS_TEXTS.authorGone(author.name));
+  if (!shared && doc!.shared) {
+    if (!author.member) return domainError("invalid", RIGHTS_TEXTS.authorGone(author.name));
+    if (!isAuthor(access, doc!)) return domainError("forbidden", RIGHTS_TEXTS.onlyAuthor(author.name));
+  }
   return null;
 }
 
@@ -78,10 +86,13 @@ export function openRefusal(access: WorkspaceAccess, doc: Doc | null | undefined
 }
 
 /** What the page offers on a document the person sees (the tab's buttons and the form, step 4). */
-export function documentRights(access: WorkspaceAccess, doc: Doc): { edit: boolean; share: boolean; delete: boolean; duplicate: boolean } {
+export function documentRights(access: WorkspaceAccess, doc: Doc): { edit: boolean; share: boolean; unshare: boolean; delete: boolean; duplicate: boolean } {
+  const share = own(access) === null && checkPermission(access, "model.edit") === null && canSee(access, doc);
   return {
     edit: editRefusal(access, doc) === null,
-    share: own(access) === null && checkPermission(access, "model.edit") === null && canSee(access, doc),
+    share,
+    // a shared document is made private by its author only (step 4b)
+    unshare: share && isAuthor(access, doc),
     delete: deleteRefusal(access, doc) === null,
     duplicate: createRefusal(access) === null && canSee(access, doc),
   };
