@@ -245,10 +245,16 @@ list up to date in each sub-slice):
   `DocNode`) and the section contract (`src/domain/document/sections.ts`) are InfoMapper's domain, since modules never
   import each other. A section kind (`DocumentSectionKind`: its stored `type`, a module's with its prefix, `cube.dim`;
   `available(workspace)`; the `presets` it ends; `defaults`; its options' Zod schema) is what the recipe stores and the
-  commands check; `DocumentSectionType` adds its `label` per documentation language, the module `tables` it reads and
-  its pure `build` from a `WorkspaceSnapshot` (step 3). `DOCUMENT_SECTION_KINDS` (`src/compose/documents.ts`) joins
-  InfoDocumenter's own (`text`, `dict`, `s2t`) and InfoCube's (`CUBE_SECTION_KIND`); `sectionKinds` throws on a name
-  registered twice. A section whose type no module knows is kept and skipped.
+  commands check; `DocumentSectionType` adds its `module` (the name in a skipped section's note), its `label` per
+  documentation language, an optional `heading` from its options, the module `tables` it reads and its pure `build`.
+  `build` reads the document's model state only (`DocumentState`, `src/domain/document/state.ts`: one snapshot and the
+  app's indexes over it, `documentStateOf`; never a store); shared pieces are `src/domain/document/blocks.ts` (runs, the
+  mapping filter's rule, `relationshipsBlock`). `DOCUMENT_SECTION_TYPES` (`src/compose/documents.ts`, also as
+  `DOCUMENT_SECTION_KINDS`) joins InfoDocumenter's own (`text`, `dict`, `s2t`, `builders.ts`) and InfoCube's
+  (`CUBE_SECTION`, its words in `document-words.ts`); `DOCUMENT_TABLES` is what a document's snapshot reads (the types'
+  `tables` and the feeds'), and `documentStateFor` builds the state with InfoCube's requirement feeds, so InfoDocumenter
+  never names a module or its tables. `buildDocument` (`src/modules/infodocumenter/domain/document.ts`) makes the whole
+  tree; a section whose type no module knows, or whose module is off, is kept, skipped and named in a note.
 - **The workspace home's module tab** (slice 25): `HOME_TABS` (`src/compose/home.tsx`, `HomeTabSource`: `shown(access)`
   and its `ModuleHomeTab`, `src/ui/home-tabs.ts`) after Overview; `chosenHomeTab` opens Overview for a `?tab=` that is
   not shown. InfoDocumenter's Documentation tab is the first (slice 25, step 4).
@@ -457,6 +463,7 @@ SCREENS=<folder> npx playwright test e2e/slice-24/S24-screens.spec.ts           
 SCREENS=<folder> npx playwright test e2e/slice-23/S23-screens.spec.ts                     # slice 23: the Metadata conventions tab, the remove dialog, Settings' Model conventions, the new workspace's language; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts                     # slice 22: the unknown member's section (a value, a value that does not fit, off), Fact Sales' Dimensions; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
+npx tsx scripts/bench-documents.ts                            # slice 25: a whole document's content tree (snapshot, state, tree) on Performance test and the demo (reference figure, no bar)
 npx tsx scripts/bench-checks.ts                               # slice 20: the model checks (marks and counts, the home with its lines; bar 50 ms in Node), synthetic, Performance test, demo
 npx tsx scripts/bench-checks-browser.ts                       # slice 20: the same in headless Chromium, with the split (the marks: reference 25 ms, not a gate)
 npx tsx scripts/count-checks.ts <copy of a backup>             # slice 20: a read-only count of the check lines per workspace and project (counts only, never .data/dev-db.json)

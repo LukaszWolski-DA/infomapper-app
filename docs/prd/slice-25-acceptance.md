@@ -997,3 +997,180 @@ workflow "E2E" started by hand on `87a3cdb` ended in `startup_failure` (run 4309
 - Heap peaks: not recorded (the run was without `E2E_MEMORY_LOG=1`).
 - GitHub's own full run, CI and the Postgres schema check (`schema.yml`, the new migration) are still to run once Actions
   is back.
+
+## Step 3: the content tree (12 November 2026)
+
+Before the step: CI and the Schema check passed on `fdfcd82` (runs 43115169075 and 43115168888, after GitHub Actions came
+back), so the migration is checked against Postgres. The local full run on `87a3cdb` stays the step's full run
+(`fdfcd82` is docs only). This step changes no shared infrastructure, so it has no full run.
+
+### What changed
+
+**The model state (InfoMapper's domain).**
+- `src/domain/document/state.ts`: `DocumentState`, the document's model built once from one snapshot by
+  `documentStateOf(snapshot, feeds)`. It holds:
+  - the requirement index with the feeds (`buildRequirementIndex`) and its own lookup (`lookupModel`);
+  - `derivationIndex`, `stereotypeIndex`;
+  - the maps of entities, concepts, tables and systems;
+  - `mapped`, the app's coverage rule (`countsAsMapped` over "any live mapping", as `stats.ts` counts it).
+- `src/domain/document/blocks.ts`: the runs (name, type, status), the mapping filter's rule (`statusShown`,
+  `marksStatus`, the prototype's `mapOk` and `markSt`) and `relationshipsBlock` (the prototype's `relBlock`), which the
+  dictionary and InfoCube's section both print, each with its own words.
+- The contract (`sections.ts`):
+  - `SectionBuildInput` carries `state` instead of the bare snapshot;
+  - `DocumentSectionType` gets `module` (the name for the skipped note) and an optional `heading` (Text's);
+  - `build` is a method, so a module's type with its own tables registers in the common map.
+- `content.ts`: a run may start a new line (`lineBreak`): a second mapping of one attribute, a line of a Text body.
+
+**InfoDocumenter's sections** (`src/modules/infodocumenter/domain/`):
+- `labels.ts`: the prototype's `LBL`, only the keys this slice prints, in English, Polish and German (`label(language,
+  key, values)`).
+- `scope.ts`: `sectionScopeOf`. A project means the entities on its canvases (`projectScope`, the project home's rule),
+  then the chosen concepts. Ids no longer live are ignored (F7): a choice whose every id is gone reads as no choice.
+- `builders.ts`:
+  - **Text:** paragraphs at blank lines, line breaks kept, nothing read as Markdown (D8).
+  - **Data dictionary**, logical only:
+    - entities grouped by concept in the concepts' order, by name within one;
+    - above the table, one line of the stereotype's workspace name (`stereotypeIndex.name`), the coverage line and the
+      entity's requirements, then its definition;
+    - the chosen columns in their fixed order, the definition under the row, the relationships after.
+    - "Mapped from" lists the shown mappings' columns, one line each. It marks a column that left the source, and a
+      status other than Approved while drafts or reviews are shown. Without a shown mapping, a calculated attribute
+      names its inputs ("= a, b").
+    - **The coverage line counts by the app's rule whatever the filter (Q-L3).**
+  - **Source-to-target mapping**, logical targets only:
+    - every shown mapping, with Rule and Note under the row (D9), labelled when both are chosen;
+    - the type check from `checkMappingTypes` ("✓" or its message), and types from `formatColumnType` and
+      `formatAttributeType`;
+    - grouped by target entity, with the attributes that have no mapping when chosen; or by source system, the systems
+      by name (a mapping that reads two systems is listed under both).
+  - The requirements of an element are its own links (`RequirementIndex.of(...).direct`, the prototype's `reqKeys`).
+- `document.ts`: `buildDocument` makes the whole tree:
+  - the title page: organization, title, subtitle, client, workspace, "Live model on {d}", version, status, prepared by
+    (the author's name when empty, D11);
+  - the contents;
+  - the frame's texts: header "{organization} · {title}", footer "{workspace} · {model state}", the watermark, "Page"
+    and "of" (D2, D3);
+  - every section that is on.
+  - A section of a type no module knows, or of a module that is off, is left out of the contents and named in `skipped`:
+    - "Skipped while {module} is off: {section}.";
+    - "Skipped: this section's module is not installed ({type})."
+
+**InfoCube's section** (`src/modules/infocube/domain/document-section.ts`, `CUBE_SECTION`):
+- The Dimensional model, built from InfoCube's own indexes over the snapshot's rows: `cubeIndex`, `mappingIndex`,
+  `unknownValueOf`, `unknownFit`, `historyLabel` and `cubeTitle`.
+- It prints the facts, then the dimensions, of the scope's dimensional entities.
+  - Each: the role's long text, then the definition.
+  - A fact: its type (and "factless") and grain; its dimensions with role, key and "No match →" (the unknown member's
+    key value), their definitions under the row; its measures with additivity and note.
+  - A dimension: its history, its unknown member's values (NULL muted, a value that does not fit marked), or "This
+    dimension has no unknown member.", and its relationships.
+  - Each entity's attributes with their feed and rule (direct, lookup, the transformation's rule; a calculation's rule
+    when it has no feed).
+- With the dimensional level out of scope it prints "There are no facts or dimensions in this model state." (S25-06).
+- `cubeDocumentFeeds`: the requirement feeds from the snapshot's rows (`cubeRequirementFeeds`), for the document's
+  requirement index.
+- `document-words.ts` (`CUBE_DOC_WORDS`): InfoCube's words in three languages (Q-L4), including the fact types,
+  additivity, histories, kinds and the role's long text.
+- **A change to two InfoCube rules, defaults unchanged:**
+  - `historyLabel(c, snapshot = "Snapshot")` takes the word for "Snapshot";
+  - `cubeTitle(c, x, words = ENGLISH_TITLE_WORDS)` takes the long text's words.
+
+  So the document reads the same rule, never an "SCD n" or a title of its own (CLAUDE.md, slice 19). The card, the panel
+  and the bus matrix pass nothing and are as before.
+
+**How the snapshot's tables come from the registry.** `src/compose/documents.ts`:
+- `DOCUMENT_SECTION_TYPES` joins `INFODOC_SECTION_TYPES` and `CUBE_SECTION`, and is also `DOCUMENT_SECTION_KINDS`
+  for the commands.
+- `DOCUMENT_TABLES` is the union of every registered type's `tables` and InfoCube's feed tables (`CUBE_FEED_TABLES`).
+  Step 4's page reads `store.snapshot(workspaceId, DOCUMENT_TABLES)`.
+- `documentStateFor(snapshot)` builds the state with `cubeDocumentFeeds`.
+
+InfoDocumenter's builders receive the types map and the state. They never name InfoCube or a `cube_` table, and a test
+checks their sources for it.
+
+**Not in this step** (by the brief):
+- No UI, no server actions, no demo data.
+- **The HTML renderer** moves to step 4, with the page and Paged.js. Step 1's plan had it in step 3; the step's brief
+  lists the tree only, and the renderer's classes belong with the page's CSS.
+
+### German for Łukasz's review
+
+The prototype's German `LBL` values are used as they are. These words are new:
+- InfoDocumenter: "Übersprungen, solange {module} ausgeschaltet ist: {section}.", "Übersprungen: Das Modul dieses
+  Abschnitts ist nicht installiert ({type}).";
+- InfoCube:
+  - fact types: "Transaktion", "Periodischer Snapshot", "Akkumulierender Snapshot";
+  - additivity: "Additiv", "Semi-additiv", "Nicht additiv";
+  - history: "Snapshot";
+  - beside a value that does not fit its type: "passt nicht zum Typ";
+  - the role's long text: "Transaktionsfakt", "Fakt (periodischer Snapshot)", "Fakt (akkumulierender Snapshot)", "ohne
+    Kennzahlen", "Aggregat von {n}", "Dimension", "Junk-Dimension", "Snapshot ({period})", "Outrigger von {n}".
+
+The Polish ones that are new: "Pominięto, bo {module} jest wyłączony: {section}.", "Pominięto: moduł tej sekcji nie
+jest zainstalowany ({type}).", "Transakcyjny", "Migawka okresowa", "Migawka narastająca", "Addytywna", "Częściowo
+addytywna", "Nieaddytywna", "Migawka", "nie pasuje do typu", "Fakt transakcyjny", "Fakt – migawka okresowa", "Fakt –
+migawka narastająca", "agregat faktu {n}", "Wymiar typu junk", "migawka ({period})", "outrigger wymiaru {n}".
+
+### Tests
+
+`tests/document-tree.test.ts` (23, S25-09) builds every document from a snapshot made of the demo's plain rows
+(`buildSeed` and `addFullDemoData`, `workspaceSnapshotOf`), with no file and no store:
+- **the document:**
+  - the title page, the contents and the frame;
+  - "Prepared by" falls back to the author;
+  - a section skipped while InfoCube is off, and one of an unknown type, each with its note;
+- **Text:** paragraphs and line breaks, no Markdown;
+- **the dictionary:**
+  - logical only, by concept and name;
+  - the meta line, the columns, two mappings on two lines with the draft marked, a definition under its row (written as
+    test data: the demo's attributes have none);
+  - the relationships;
+  - the coverage line the same under "Approved only" (Q-L3), with drafts and reviews hidden in the rows;
+  - a calculation's rule and inputs;
+  - a renamed stereotype;
+  - scope by project and by concept, a deleted project id ignored, "outside this document";
+  - logical out of scope;
+- **source-to-target:**
+  - columns, Rule and Note under the row, the attributes with no mapping;
+  - one long text unlabelled, a transformation's rule;
+  - grouped by system;
+  - the three filters;
+- **the Dimensional model:**
+  - its tables are the registered ones;
+  - facts and dimensions with role, key, "No match →", measures, feeds, history, a snapshot, an aggregate, a junk
+    dimension, an outrigger;
+  - no unknown member;
+  - dimensional out of scope;
+  - options off;
+  - a project without dimensional entities;
+- **the languages:**
+  - Polish and German headings, labels and InfoCube's words, with names and definitions unchanged;
+  - every key in every language;
+- **no store:** the builders' sources import nothing of the data layer, and InfoDocumenter's never name InfoCube or its
+  tables.
+
+Earlier tests: none changed. InfoCube's tests of `cubeTitle`, `historyLabel` and the bus matrix pass unchanged (the new
+parameters default to the old words).
+
+Locally:
+- `npm run lint`: no problems;
+- `npm run typecheck`: passes;
+- `npm test`: 171 files, 2,160 tests passed.
+
+### The reference figure (Q-P1, no bar)
+
+`npx tsx scripts/bench-documents.ts`, in Node 22.20.0 on the laptop (Intel Core i7-8550U at 1.80 GHz, 7.9 GB RAM,
+Windows 11), with no other program measured. One warm-up, then 9 rounds; median (fastest – slowest).
+
+The document is a full one: Text; the dictionary with every field and column; source-to-target with every column and
+the attributes that have no mapping; the Dimensional model with every option.
+
+| Model | Snapshot from the rows | State (indexes) | Tree | All three |
+| --- | --- | --- | --- | --- |
+| "Performance test" (41 entities, 779 attributes, 300 mappings; InfoCube off, so its section is skipped): dictionary 859 table rows, source-to-target 839 | 1.0 ms (0.9–1.4) | 1.7 ms (1.4–3.5) | 12.0 ms (9.5–13.5) | **12.8 ms** (11.0–14.5) |
+| Demo (Retail Co – DWH with the star: 13 entities, 72 attributes; all four sections) | 0.1 ms | 0.7 ms | 1.1 ms | **1.6 ms** (1.4–2.6) |
+
+The tree of "Performance test" is 367 KB as JSON. The snapshot's figure starts after the file is read and parsed:
+`store.snapshot` adds one read of the file, which the cache skips while the file's stamp is the same. Step 4 adds the
+HTML and Paged.js's layout in the browser, measured there.
