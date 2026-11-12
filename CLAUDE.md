@@ -255,6 +255,17 @@ list up to date in each sub-slice):
   `tables` and the feeds'), and `documentStateFor` builds the state with InfoCube's requirement feeds, so InfoDocumenter
   never names a module or its tables. `buildDocument` (`src/modules/infodocumenter/domain/document.ts`) makes the whole
   tree; a section whose type no module knows, or whose module is off, is kept, skipped and named in a note.
+  Since step 4 a type may give `optionChecks` (its boolean options as the form's check boxes, plain data), so the form
+  draws a module's options without knowing the module.
+- **A module's own pages** (slice 25, step 4): the routes stay in `src/app` (`/w/{ws}/d/{id}` and `/view`) and render a
+  module's page bodies through `src/compose/documents-pages.tsx`; `loadShell`'s `rest` keeps such a path for the locked
+  organization's return (F27). A module's app part reads the composed sections and store through
+  `src/app/_lib/documents.ts` (`composedStore`), as it reads `model-command.ts`. **The document page** renders the content
+  tree with React (`document-html.tsx`, every model text escaped; never HTML built from strings) into a hidden source,
+  and `PagedView` (`paged-view.tsx`) hands a copy and the document's CSS (`document-css.ts`) to Paged.js 0.4.3 (pinned,
+  `next.config.ts` aliases `pagedjs` to its bundled ES module: its source breaks under Turbopack), which lays out A4
+  pages in `document-host`; print shows those pages alone. IBM Plex Serif (`src/app/fonts/plex-serif.ts`) is loaded on
+  that page only.
 - **The workspace home's module tab** (slice 25): `HOME_TABS` (`src/compose/home.tsx`, `HomeTabSource`: `shown(access)`
   and its `ModuleHomeTab`, `src/ui/home-tabs.ts`) after Overview; `chosenHomeTab` opens Overview for a `?tab=` that is
   not shown. InfoDocumenter's Documentation tab is the first (slice 25, step 4).
@@ -374,7 +385,7 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 ## Commands
 
 ```
-npm run seed             # demo data into .data/dev-db.json (only if it does not exist yet)
+npm run seed             # demo data into .data/dev-db.json (only if it does not exist yet); since slice 25 with InfoDocumenter's documents (`addSeedDemoData`)
 npm run reset-dev-data   # replace .data/dev-db.json with fresh demo data
 npm run demo             # the demo data with the Sales star in .data/demo-db.json (seeded if missing; -- --reset), on http://127.0.0.1:3001 beside npm run dev; never touches .data/dev-db.json
 npx tsx scripts/licence.ts grant "<organization name>" infocube|infodoc [--file <db>]   # slice 15a (infodoc: slice 25): a module's licence in a local file (development only)
@@ -459,6 +470,7 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spe
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
 npx tsx scripts/bench-thumbnails.ts                           # slice 12b: the homes' server work and the thumbnails' cost (index, shapes, paths, bytes, 20 requests, keys; not a gate)
+MEASURE=1 npx playwright test e2e/slice-25/S25-layout.spec.ts                             # slice 25: a full data dictionary of Performance test laid out by Paged.js, headless (reference figure)
 SCREENS=<folder> npx playwright test e2e/slice-24/S24-screens.spec.ts                     # slice 24: the Entity stereotypes box, its remove dialog, the entity panel's select with the definition; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-23/S23-screens.spec.ts                     # slice 23: the Metadata conventions tab, the remove dialog, Settings' Model conventions, the new workspace's language; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts                     # slice 22: the unknown member's section (a value, a value that does not fit, off), Fact Sales' Dimensions; light and dark
@@ -707,6 +719,19 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - read the e2e data file's stereotypes and entities (`storedStereotypes`, `storedStereotype`, `storedEntity`,
     `expectStoredName`) and set an entity's stereotype as Łukasz through the domain (`setStereotypeAs`).
   A row the Add row writes is in the data file before the page shows it: wait for the page's list (S24-04).
+
+  Slice 25's fixtures reseed with an option `seed`: "docs" (the default: the plain seed and `addDocumentsDemoData`, InfoMate's
+  InfoDocumenter licence, the switch on in "Retail Co – DWH", three documents, no star), "plain" (slice 0's seed) or "full"
+  (`addSeedDemoData`, the star and the documents). Its helpers do the following:
+  - open the tab, the form and the document page (`docsUrl`, `formUrl`, `viewUrl`, `settingsUrl`) and a tab's row
+    (`docRow`); sign in by any name, an added person too (`signInByName`);
+  - read the e2e data file's documents and their change events (`storedDocuments`, `storedDocument`, `documentEvents`);
+  - write test data through the domain: a document from a preset, a save, a share (`createDocumentAs`, `updateDocumentAs`,
+    `shareDocumentAs`), the licence (`grantDocLicence`), a workspace's switch or language (`setWorkspace`), an InfoMate
+    reader (`addReader`, `READER`) and a person gone (`removeMember`);
+  - wait until Paged.js has laid out the pages (`laidOut`, the page count) and read them (`pagesOf`, `sectionText`, and
+    `marginContent`: a margin box's computed `content`, which Paged.js draws in `::after`).
+  Paged.js lays out a copy of the hidden source in `document-host`; read the laid-out pages there, not the source.
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,

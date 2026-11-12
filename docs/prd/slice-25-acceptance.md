@@ -1174,3 +1174,197 @@ the attributes that have no mapping; the Dimensional model with every option.
 The tree of "Performance test" is 367 KB as JSON. The snapshot's figure starts after the file is read and parsed:
 `store.snapshot` adds one read of the file, which the cache skips while the file's stamp is the same. Step 4 adds the
 HTML and Paged.js's layout in the browser, measured there.
+
+## Step 4: the interface (12 November 2026)
+
+CI and the Schema check passed on step 3's `879e99b`. `.data/dev-db.json` and the KB backups were not read or written: the
+pages were tried on a scratch demo file (`.data/preview-25.json`) and the specs on the e2e file.
+
+### What changed
+
+**The HTML renderer (step 3's deviation).**
+- `src/modules/infodocumenter/ui/document-html.tsx` renders the content tree as React elements with the prototype's
+  classes: the title page, the contents, each section. Every text from the model, a definition or the recipe is a text
+  node that React escapes; no HTML is built from strings and nothing uses `dangerouslySetInnerHTML`.
+- **How a test proves it:**
+  - `tests/document-html.test.ts` renders a document whose title, subtitle, Text heading and body, entity definition
+    and attribute definition hold `<img src=x onerror=…><script>…</script><b>bold</b>`, and an attribute named
+    `<i>email</i>`. The output has no `<img`, `<script`, `<b>bold` or `<i>email`, and holds the escaped text six times.
+  - `e2e/slice-25/S25-04.spec.ts` (first test) does the same in the browser. It writes such a definition into the
+    data, opens the laid-out dictionary and checks that the row below shows the markup as text, that the pages hold no
+    `<img>` and no `<b>`, and that the `onerror` code did not run.
+- The frame's texts (the organization, the title, the workspace) go into CSS strings, escaped by `cssString` (unit
+  test).
+
+**The Documentation tab** (through the home's module tab point, `HOME_TABS` in `src/compose/home.tsx`):
+- "Documentation ({n})" after Overview while InfoDocumenter is on; n is the documents the person sees.
+- The introduction and New document. Its dialog offers the three presets with their texts; a click creates the
+  document and opens its form (D13).
+- "Shared documents" and "Your private documents", each row with:
+  - the name;
+  - the meta line "{audience} · live model · {n} sections · {language} · A4 · by {author}", with "by …" only for shared
+    ones;
+  - Edit or Open, Duplicate, and Delete with its dialog "Delete {name}? It cannot be brought back."
+- The toasts as step 1 listed them. No Undo: documents are outside undo.
+- Another's private document never reaches the page: the list is filtered on the server (`visibleDocuments`).
+
+**The form** (`/w/{ws}/d/{id}`), one page as D5:
+- Name, Audience, "Shared with the workspace" (owners, admins and modelers; at once, no question, D4), Model state;
+- the title page's five fields;
+- the scope: projects, concepts, levels, the mappings segment;
+- the sections in their order with their switch and options;
+- Open document and Print.
+- Each field saves its own part on the row's chain (`saveRow`):
+  - text fields keep their draft and show the conflict line after a stale refusal (D-66);
+  - choices use `useChoice`.
+- Read only, with the banner and "Duplicate as my document", in an archived workspace and for a shared document the
+  person may not change.
+- F17's refusal stays under the check box: "{author} is no longer a member of this workspace, so the document stays
+  shared."
+- A module's section draws its options from its registration (`optionChecks`, InfoCube's four check boxes), so the form
+  does not name InfoCube's options. A section whose module is off shows the tag "off", titled "{module} is off in this
+  workspace".
+
+**The document page** (`/w/{ws}/d/{id}/view`):
+- It makes one snapshot of the workspace (`store.snapshot(ws, DOCUMENT_TABLES)`) and builds the tree on the server. The
+  rendered HTML waits in a hidden source.
+- `PagedView` hands a copy of that source and the document's CSS to Paged.js 0.4.3, which lays out the pages in
+  `document-host`.
+- What the pages show:
+  - A4 portrait;
+  - the title page as a named page with nothing in its margins;
+  - the contents with page numbers (`target-counter`);
+  - top left "{organization} · {title}", top centre the watermark "DRAFT · live model", bottom left "{workspace} · Live
+    model on {date}", bottom right "Page n of m" (D2, D3);
+  - each section on a new page (D6);
+  - the skipped sections' notes under the contents.
+- "Laying out pages…" meanwhile, "{n} pages" after, and Print. `?print=1` (the form's Print) opens the print dialog once
+  the pages are ready.
+- In print, everything but the pages is hidden and their ancestors are unclipped.
+- **Paged.js** is pinned at exactly 0.4.3 (`package.json`, no CDN). `next.config.ts` points `pagedjs` at its own
+  bundled ES module (`dist/paged.esm.js`): its source build failed under Turbopack ("contains.call is not a function",
+  `es5-ext` through `event-emitter`). The alias affects nothing else.
+- **IBM Plex Serif:** Regular, Medium and Italic, IBM's unmodified files from `@ibm/plex-serif` 2.0.0, with their
+  SHA-256 in `src/app/fonts/ibm-plex/README.md` (the licence is the same OFL text).
+  - It is loaded by `next/font/local` on the document page only; the canvas page's head has the same five font
+    preloads as before.
+  - **Used for the title page's title and subtitle.** The prototype's default template prints in Sans and uses Serif in
+    its "formal" template; since this slice has no templates and the brief asks for Serif hosted, I used it where the
+    formal template does. Say if you want the title in Sans.
+- `loadShell` takes the path after `/w/{ws}` (`rest`), so a locked organization's sign-in returns to the document page
+  (F27).
+
+**Settings:**
+- InfoDocumenter's box sits below InfoCube's, with the text, the switch for owners and admins and the licence line.
+- Toasts:
+  - "InfoDocumenter is on: see the Documentation tab.";
+  - "InfoDocumenter is off. Its {n} document(s) is/are kept for when it is on again.";
+  - "InfoDocumenter is off." with none.
+- `settingsBoxes` reads the documents through the composed store.
+
+**The server actions** (`src/modules/infodocumenter/app/actions.ts`): create, save, share or unshare, duplicate and
+delete, over step 2's commands through `runCommand`.
+- The rights are the domain's: guests make and print private documents; an archived workspace's documents are read only.
+- Saves answer the row's version for the chain. The registry reaches the module through `src/app/_lib/documents.ts`,
+  since a module never imports `src/compose/`.
+
+**The demo** (F31, F32): `addDocumentsDemoData` (`src/compose/seed.ts`, the module's `data/demo.ts`):
+- InfoMate's licence and InfoDocumenter on in "Retail Co – DWH";
+- "Retail Co – data dictionary" (shared, Łukasz's; subtitle "For the business", version 1.0, "Draft for review");
+- "Order management – S2T for the ETL team" (Łukasz's private, scope Order management; it ends with the Dimensional model
+  where InfoCube is on);
+- "Anna's working dictionary" (Anna's private, all mappings).
+
+`npm run seed`, `reset-dev-data` and `demo` write it after `addFullDemoData` (`addSeedDemoData`); `addFullDemoData` is
+unchanged, so earlier fixtures and the benches read the demo as before. The seed's attributes are unchanged.
+
+**What the routes leave as they are:** the breadcrumbs on the document pages say "Workspace home" (the shell's
+workspace page). A shared document unshared by someone who is not its author leaves that person on a page they may no
+longer see: its fresh page answers 404 (D4 as answered, no question).
+
+### If about ten demo attributes got definitions
+
+The demo's attributes have no definitions today, so the dictionary prints none under its rows. Definitions written in
+`src/data/local/seed-model.ts` (the plain seed, which every e2e reseed uses) would change these:
+- **`e2e/slice-04a/S4A-05.spec.ts`**: it expects Customer.email's panel to show the empty definition's placeholder
+  ("What this attribute means for the business. Click to write it."). It changes only if Customer.email is one of the
+  ten; choosing others leaves it as it is.
+- **`tests/document-tree.test.ts`** (this slice): one test expects only the definition it writes itself under Customer's
+  rows. It would read the seeded ones.
+- **`e2e/slice-25/S25-04.spec.ts`**: its first test finds the row under Customer.email by its text, so it stays as it
+  is. It also expects only that row to be under one.
+- **`scripts/bench-documents.ts`**: a slightly larger tree; its figures would move a little.
+- Nothing else reads an attribute's definition from the seed:
+  - the canvas never draws definitions;
+  - the model checks have no definition rule;
+  - S10C-01 compares a copy's definition with its original's, so it holds either way;
+  - the element guard counts canvas elements only.
+
+Written only in the documents' demo (`addDocumentsDemoData`), they would change no earlier spec or fixture, only
+`npm run seed`, `reset-dev-data` and `demo`, and this slice's specs that use the "docs" or "full" seed.
+
+### Tests
+
+**New specs** (`e2e/slice-25/`, one file per criterion, fresh seed each; the fixture's `seed` option: "docs", "plain",
+"full"):
+
+| Spec | Tests | What |
+| --- | --- | --- |
+| S25-01 | 3 | the box without and with the licence, a modeler's disabled switch, off with documents and on again |
+| S25-02 | 5 | owner shares; modeler changes, cannot delete another's (also the domain's refusal), deletes her own; an InfoMate reader (added) makes, changes, deletes, opens and prints the shared one read only; Kasia (guest) makes and prints; nobody sees another's private document (the list, and 404 on its pages); the author gone; archived |
+| S25-03 | 3 | each preset's sections; a save with its version and change event; a stale save with the conflict line; Duplicate; the home's Undo stays off |
+| S25-04 | 3 | concepts and entities in order, the columns, the definition under the row, a renamed stereotype, markup as text; the coverage line equal under "Approved only" and "All" (Q-L3); scope by project and by concept |
+| S25-05 | 2 | the columns, the rule under the row, the attributes with no mapping; Approved only; by source system |
+| S25-06 | 4 | facts, dimensions, role, key, no-match value, measures, unknown member, feeds; Polish words; InfoCube off: skipped with its note and the form's tag; dimensional out of scope |
+| S25-07 | 2 | the title page and its empty margins; header, watermark, footer and "Page n of m" on every other page; the contents' numbers equal the pages their sections start on, each section first on its page; print media: A4 (Paged.js's last page size rule), every page 793.7 × 1122.5 px, the top bar and the buttons hidden, no watermark on page 1 |
+| S25-08 | 2 | a Polish workspace ("Sales analytics", Łukasz a guest there) and a German one: contents, section titles, title page labels, column heads, watermark, "Strona … z …"; names and definitions unchanged |
+
+Also new:
+- `S25-layout.spec.ts`, the figure below, which runs only with `MEASURE=1`;
+- `S25-screens.spec.ts`, which runs only with `SCREENS=<folder>`;
+- `tests/document-html.test.ts` (3 unit tests).
+
+**Runs, locally:**
+- `e2e/slice-25`: 24 tests. The first run had 22 passed and 2 failed, both in S25-07 on the test's own reading: the
+  contents' counter is on the link's `::after`, and Paged.js writes its default `letter` before the document's `a4`.
+  With those two reads corrected, S25-07 passed 2 of 2. After the last CSS change (the paper's variables on the pages)
+  the folder ran again: **24 passed, 1 skipped** (S25-layout, `MEASURE=1` only), 4.1 min.
+- Earlier specs the home, Settings and `loadShell` touch: step 1's list (`S15-03` of 15a and 15b, `S23-01`, `S23-06`,
+  `S24-02`) and the whole folders `slice-00`, `slice-08`, `slice-12a`, `slice-23` and `slice-24`, 83 tests: 82 passed.
+  - **S0-10** (it restarts the dev server) failed once: its first sign-in after the cold restart did not show the top
+    bar within 15 s.
+  - Alone three times it passed twice and failed once, the same way. Its passing rounds took 1.1 and 1.2 min, as in
+    step 2's full run (1.2 min), so the cold compile did not grow.
+  - It is the flake slice 13's acceptance doc describes (and slices 8 and 10c), with the same symptom. I report it and
+    changed nothing.
+- **The element guard**, against slice 8's counts on the measurement build: the viewport's counts are equal (4,508,
+  19,305, 1,465, 4,907).
+  - The page totals are 6,136, 20,933, 3,003 and 6,445, **one more than slice 24's** (6,135 …).
+  - `S13-head-elements` shows `<head>` with 29 children: one more JavaScript chunk than before. The font preloads are
+    still the five Sans and Mono files, so Serif is not loaded there. Nothing drawn changed.
+- `npm run lint` no problems, `npm run typecheck` passes, `npm test` 172 files, 2,163 tests passed.
+
+**Earlier tests changed:** none. `tests/document-tree.test.ts` (step 3) gets the pill's `status` field.
+
+### The reference figure (Q-P1, no bar)
+
+The method:
+- `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-25/S25-layout.spec.ts`, on the measurement build in
+  headless Chromium 153;
+- the laptop as in step 3 (i7-8550U, 7.9 GB, Windows 11);
+- "Performance test" added to the e2e file, with a full data dictionary there: every field and column, all mappings;
+- one warm-up load, then 5 loads.
+
+**42 pages.** From the navigation's start to "{n} pages": median **5.8 s** (5.7–6.8). Paged.js's part alone (from its
+start to the last page): median **4.3 s** (4.1–5.3). The rest is the page's load and the server's snapshot, tree and
+HTML (step 3's tree: about 13 ms).
+
+### Screenshots
+
+`docs/prd/slice-25-screens/step-4/`:
+- `1-documentation-tab.png`;
+- `2-form.png`;
+- `3-title-page.png`;
+- `4-dictionary-page.png` (page 4, the dictionary's first).
+
+The pages are taken in print media at 900 × 1200, so each is whole.
