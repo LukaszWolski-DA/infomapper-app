@@ -1480,4 +1480,25 @@ backup "Łukasz's test model" requires; then a dictionary of Kanton Basel.
 
 ### The full run
 
-See the report: the workflow "E2E" on the final commit.
+The workflow "E2E" on GitHub, [run 43270760839](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/43270760839),
+on `9c9d09a` (the final code commit is `94f9ef1`; `9c9d09a` adds docs only). Wall-clock 18 min 50 s (17:33:50 to
+17:52:40 UTC).
+
+**764 passed, 0 failed, 5 skipped, 0 flaky, no expected failures.** The fifth skip is S25-layout (`MEASURE=1` only). CI
+and the Schema check passed on the same commit.
+
+| Part | Folders | Time | Heap peak | Lowest available memory | Restarts |
+| --- | --- | --- | --- | --- | --- |
+| 1 | fixes to slice-01b | 7 min 15 s | 1,105 MB | 9,539 MB | 0 |
+| 2 | slice-02a to slice-03a | 9 min 31 s | 1,131 MB | 11,043 MB | 0 |
+| 3 | slice-03b to slice-04b2 | 8 min 27 s | 1,022 MB | 11,459 MB | 0 |
+| 4 | slice-04p to slice-07a | 10 min 29 s | 1,042 MB | 11,555 MB | 0 |
+| 5 | slice-07b to slice-09 | 11 min 52 s | 1,215 MB | 10,574 MB | 0 |
+| 6 | slice-10a to slice-12b | 10 min 59 s | 991 MB | 10,811 MB | 0 |
+| 7 | slice-13 to slice-15c | 7 min 27 s | 1,520 MB | 10,766 MB | 0 |
+| 8 | slice-15d to slice-25 | 16 min 31 s | 1,374 MB | 10,839 MB | 0 |
+
+The heap peaks are far below the runner's restart threshold (6,431 MB). **Part 8 is the longest by 4.6 min** (slice 25
+joined it, as the recut rule says). The recut rule asks for the median of the last three full runs; if it confirms, the
+recut of `PART_STARTS` belongs on its own `chore/` branch (shared infrastructure, The slice cycle, 4), not in this
+slice.
