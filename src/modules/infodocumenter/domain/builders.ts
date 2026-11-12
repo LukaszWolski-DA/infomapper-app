@@ -48,7 +48,7 @@ function columnRuns(state: DocumentState, c: SourceColumn, t: L): DocRuns {
   return runs;
 }
 
-const statusRun = (status: Mapping["status"], t: L): DocRun => ({ text: t(status), pill: true });
+const statusRun = (status: Mapping["status"], t: L): DocRun => ({ text: t(status), pill: true, status });
 
 /** The logical entities of the scope, in the Model tab's order: by concept (the concepts' order), then by name. */
 function logicalEntities(state: DocumentState, scope: SectionScope): Map<Uuid, Entity[]> {

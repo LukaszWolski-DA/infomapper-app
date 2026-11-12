@@ -77,7 +77,7 @@ export function cubeDocumentFeeds(snapshot: WorkspaceSnapshot<FeedTable>): Attri
   return cubeRequirementFeeds(mappingsOf(snapshot), snapshot.model.attributes);
 }
 
-const statusRun = (status: CubeMappingStatus, w: CubeDocWords): DocRun => ({ text: w.status[status], pill: true });
+const statusRun = (status: CubeMappingStatus, w: CubeDocWords): DocRun => ({ text: w.status[status], pill: true, status });
 
 /** Runs on separate lines. */
 const lines = (parts: readonly DocRuns[]): DocRuns => parts.flatMap((runs, i) => (i && runs.length ? [{ ...runs[0]!, lineBreak: true }, ...runs.slice(1)] : runs));
@@ -204,6 +204,13 @@ export const CUBE_SECTION: DocumentSectionType<CubeSectionTable> = {
   ...CUBE_SECTION_KIND,
   module: "InfoCube",
   label: (language) => CUBE_DOC_WORDS[language].title,
+  // the form's check boxes (step 1's list of texts); the dimensions' definitions and the measures keep their defaults
+  optionChecks: [
+    { key: "facts", label: "Facts: type, grain, dimensions, measures" },
+    { key: "dimensions", label: "Dimensions: history and attributes" },
+    { key: "relationships", label: "Relationships of each dimension" },
+    { key: "feeds", label: "Attributes with their feed from the logical model" },
+  ],
   tables: CUBE_SECTION_TABLES,
   build: buildCubeSection,
 };

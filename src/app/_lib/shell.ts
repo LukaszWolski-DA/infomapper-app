@@ -39,6 +39,8 @@ interface Where {
   workspaceId: string;
   projectId?: string;
   canvasId?: string;
+  /** A workspace page's path after `/w/{id}` that is neither a project nor a canvas (slice 25: `/d/{document}[/view]`). */
+  rest?: string;
 }
 
 /**
@@ -75,7 +77,7 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
   if (access === "missing") notFound();
   if ("locked" in access) {
     const workspace = access.locked;
-    const path = `/w/${workspace.id}${where.projectId ? `/p/${where.projectId}` : ""}${where.canvasId ? `/c/${where.canvasId}` : ""}`;
+    const path = `/w/${workspace.id}${where.projectId ? `/p/${where.projectId}` : ""}${where.canvasId ? `/c/${where.canvasId}` : ""}${where.rest ?? ""}`;
     redirect(`/sign-in?org=${workspace.organization_id}&next=${encodeURIComponent(path)}`);
   }
   const { workspace, member } = access;

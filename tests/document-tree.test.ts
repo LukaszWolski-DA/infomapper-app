@@ -169,7 +169,7 @@ describe("the data dictionary", () => {
     expect(email.cells.map(words)).toEqual(["email", "string(120)", "", "Yes", "PII", "customers.email_addrweb_users.email Draft", "", "REQ-102, REQ-103, REQ-105"]);
     // two mappings, the second on its own line, its status marked while the document shows drafts
     expect(email.cells[5]![1]).toEqual({ text: "web_users.email", mono: true, lineBreak: true });
-    expect(email.cells[5]![3]).toEqual({ text: "Draft", pill: true });
+    expect(email.cells[5]![3]).toEqual({ text: "Draft", pill: true, status: "draft" });
     expect(words(rowNamed(attributes!.rows, "customer_id").cells[2]!)).toBe("PK");
     expect(words(rowNamed(attributes!.rows, "customer_id").cells[3]!)).toBe("No");
     expect(rowNamed(attributes!.rows, "segment_code").cells[5]).toEqual([{ text: "Not mapped", muted: true }]);

@@ -57,6 +57,11 @@ export interface DocumentSectionType<T extends ModuleTable = ModuleTable> extend
   readonly label: (language: DocLanguage) => string;
   /** A heading its options set instead (Text's), or null for the default. */
   readonly heading?: (options: Record<string, unknown>) => string | null;
+  /**
+   * A module's options as the form draws them (slice 25, step 4): check boxes of its boolean options, each with its label
+   * in the app's language; the form changes these keys only. InfoDocumenter's own sections draw their own fields.
+   */
+  readonly optionChecks?: readonly { readonly key: string; readonly label: string }[];
   /** The module tables its builder reads from the snapshot. */
   readonly tables: readonly T[];
   /** Pure: the section's nodes after its heading, from the model state alone (never a store). */

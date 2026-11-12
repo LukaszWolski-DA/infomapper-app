@@ -14,6 +14,8 @@ export interface DocRun {
   readonly strong?: boolean;
   /** Drawn as a pill (a mapping's status in a document that shows drafts). */
   readonly pill?: boolean;
+  /** A mapping's status drawn as a pill: its tone (the prototype's `.dst.draft`, `.review`, `.approved`). */
+  readonly status?: "draft" | "review" | "approved";
   /** Starts a new line within its cell or paragraph (a second mapping of one attribute, a line of a Text body). */
   readonly lineBreak?: boolean;
 }
