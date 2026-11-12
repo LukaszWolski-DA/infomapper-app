@@ -97,11 +97,12 @@ import {
  * `attribute_input`; no change events, no log line), 15 = slice 23 (`definition` on classifications, the built-in ones' in
  * their workspace's documentation language, and `naming_conventions` on workspaces, null; no change events, no log line), 16 = slice 24
  * (`stereotype`: every workspace's five built-in rows, English names, definitions in its documentation language, and an
- * own row for any other code an entity has, with one log line; no change events). It is written back at once; an older file no upgrade reaches is refused with a hint to
+ * own row for any other code an entity has, with one log line; no change events), 17 = slice 25 (`infodoc` on
+ * workspaces, false; no change events, no log line). It is written back at once; an older file no upgrade reaches is refused with a hint to
  * run "npm run reset-dev-data", a newer one (a newer branch wrote it) with the advice to switch back to that branch or
  * restore a backup, never a reset (`newerFormatMessage`, slice 15a). A module's tables are not part of the format (AD-33): a file without one has none of its rows yet.
  */
-export const DEV_DB_FORMAT = 16;
+export const DEV_DB_FORMAT = 17;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;

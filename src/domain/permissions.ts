@@ -26,6 +26,7 @@ export const WORKSPACE_ACTIONS = [
   "requirement.edit",
   "requirement.set_status",
   "people.edit",
+  "module.own_objects",
 ] as const;
 export type WorkspaceAction = (typeof WORKSPACE_ACTIONS)[number];
 
@@ -61,6 +62,10 @@ export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]>
   "requirement.set_status": ["owner", "admin", "modeler", "reviewer"],
   // adding people, changing their role and removing them (slice 8, P6); who may touch an owner is the people commands'
   "people.edit": ["owner", "admin"],
+  // a member's own objects of a module, outside the model, that only they see (slice 25, AD-05's addition: an
+  // InfoDocumenter private document); every role, never in an archived workspace. What else a module allows on its
+  // objects is the module's own rule (InfoDocumenter's rights).
+  "module.own_objects": ALL_ROLES,
 };
 
 /** Actions that remain possible while the workspace is archived (AD-09). */
@@ -87,6 +92,7 @@ const ACTION_TEXT: Record<WorkspaceAction, string> = {
   "requirement.edit": "change requirements",
   "requirement.set_status": "change requirements",
   "people.edit": "change who has access",
+  "module.own_objects": "make your own documents",
 };
 
 /** Refusals worded for the role rather than the action (slice 4a, PRD item 12). */

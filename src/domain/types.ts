@@ -57,8 +57,8 @@ export interface OrganizationMember {
   created_at: Timestamp;
 }
 
-/** The modules an organization may hold a licence for (slice 15a, C-7, AD-35). */
-export const LICENSED_MODULES = ["infocube"] as const;
+/** The modules an organization may hold a licence for (slice 15a, C-7, AD-35; InfoDocumenter since slice 25). */
+export const LICENSED_MODULES = ["infocube", "infodoc"] as const;
 export type LicensedModule = (typeof LICENSED_MODULES)[number];
 
 /**
@@ -95,6 +95,11 @@ export interface Workspace extends VersionedColumns {
   four_eyes: boolean;
   /** InfoCube turned on here by an owner or admin (slice 15a, C-7); it works only while the organization holds the licence. */
   infocube: boolean;
+  /**
+   * InfoDocumenter turned on here by an owner or admin (slice 25, AD-35): on only with the organization's licence, off at
+   * any time; its documents are kept while it is off.
+   */
+  infodoc: boolean;
   archived_at: Timestamp | null;
   archived_by: Uuid | null;
   requirement_key_next: number;

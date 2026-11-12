@@ -99,6 +99,8 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
         "cube_mapping", "cube_mapping_input",
         // slice 22: a dimensional attribute's settings (the unknown member's value)
         "cube_attribute",
+        // slice 25: InfoDocumenter's document definitions
+        "document_definition",
       ].sort(),
     );
     for (const t of NOT_IN_DOMAIN_YET) expect(tables.map((x) => x.table)).not.toContain(t);
@@ -119,5 +121,10 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
     expect(column("change_event", "before_image")).toEqual({ name: "before_image", kind: "jsonb", nullable: true });
     expect(column("relationship", "from_min")).toEqual({ name: "from_min", kind: "number", nullable: false });
     expect(column("attribute", "type_scale")).toEqual({ name: "type_scale", kind: "number", nullable: true });
+    // slice 25 (F5 a): a document's recipe is JSON, read and written whole; the list of sections too
+    expect(column("document_definition", "scope")).toEqual({ name: "scope", kind: "jsonb", nullable: false });
+    expect(column("document_definition", "sections")).toEqual({ name: "sections", kind: "jsonb", nullable: false });
+    expect(column("document_definition", "baseline_id")).toEqual({ name: "baseline_id", kind: "uuid", nullable: true });
+    expect(column("workspace", "infodoc")).toEqual({ name: "infodoc", kind: "boolean", nullable: false });
   });
 });

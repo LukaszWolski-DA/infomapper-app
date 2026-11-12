@@ -8,6 +8,7 @@ import type { DataStore } from "@/data";
 import { createProject, deleteProject, updateProject } from "@/domain/commands/project";
 import { archiveWorkspace, createWorkspace, setNamingConventions, unarchiveWorkspace, updateWorkspaceSettings, type InfoCubeSwitchState } from "@/domain/commands/workspace";
 import { dimensionalCount } from "@/domain/model/levels";
+import type { ModuleLicenceState } from "@/domain/model/module-switches";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { rememberGoneProject } from "../_lib/gone-project";
@@ -38,6 +39,13 @@ async function infoCubeSwitch(store: DataStore, access: WorkspaceAccess): Promis
   };
 }
 
+/** What turning InfoDocumenter on needs (slice 25): the licence and the organization's name. */
+async function infoDocSwitch(store: DataStore, access: WorkspaceAccess): Promise<ModuleLicenceState> {
+  const { organization_id: organizationId } = access.workspace;
+  const [organization, licences] = await Promise.all([store.organizations.get(organizationId), store.organizations.listLicences(organizationId)]);
+  return { licensed: licences.some((l) => l.module === "infodoc"), organizationName: organization?.name ?? "This organization" };
+}
+
 function done<T>(result: ActionResult<T>): ActionResult<T> {
   if (result.ok) revalidatePath("/", "layout");
   return result;
@@ -65,12 +73,19 @@ export async function updateWorkspaceSettingsAction(input: {
   dv2Mode?: boolean;
   fourEyes?: boolean;
   infocube?: boolean;
+  infodoc?: boolean;
 }) {
   return done(
     await runCommand(async (ctx, store, user) => {
       const access = await loadAccess(store, input?.workspaceId, user.id);
       if (!access) return NOT_FOUND;
-      const result = updateWorkspaceSettings(ctx, access, input, input?.infocube === undefined ? undefined : await infoCubeSwitch(store, access));
+      const result = updateWorkspaceSettings(
+        ctx,
+        access,
+        input,
+        input?.infocube === undefined ? undefined : await infoCubeSwitch(store, access),
+        input?.infodoc === undefined ? undefined : await infoDocSwitch(store, access),
+      );
       return result.ok ? { ...result, value: { version: result.value.workspace.version } } : result;
     }),
   );

@@ -63,7 +63,12 @@ conventions" tab: the classification list (slice 7c's dialog moved there) with d
 matches, the concepts' colours and the naming conventions; a new workspace's built-in classifications are named and
 defined in the documentation language chosen when it is created (slice 23, D-78). Entity stereotypes are the workspace's
 list in that tab: the five built-in ones renamed and defined, own ones with a code; entities keep codes, cards, the Model
-tab and the entity panel show the names (slice 24, D-79).
+tab and the entity panel show the names (slice 24, D-79). InfoDocumenter is the second module (slice 25, D-80): its
+licence and switch, the workspace home's Documentation tab, documents as recipes made from presets (private, or shared
+with the workspace; only the author makes a shared one private), a form on one page, and the document page built from
+one snapshot of the live model and laid out in A4 pages by Paged.js (title page, contents with page numbers, header,
+footer, watermark), printed by the browser; sections Text, Data dictionary, Source-to-target and InfoCube's Dimensional
+model, in the workspace's documentation language.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -241,6 +246,45 @@ list up to date in each sub-slice):
   passed in. A canvas page's index lives in `ModulesProvider` (with the page's one requirement index,
   `RequirementIndexCtx`, `ChecksCtx`, `src/canvas/checks.ts`). **A later rule** is a group of `CheckItem`s, its texts in
   `text()`; **a later caller of the requirement index** on a canvas page uses the page's (`usePageRequirementIndex`).
+- **Document sections** (slice 25, InfoDocumenter): the content tree's node types (`src/domain/document/content.ts`,
+  `DocNode`) and the section contract (`src/domain/document/sections.ts`) are InfoMapper's domain, since modules never
+  import each other. A section kind (`DocumentSectionKind`: its stored `type`, a module's with its prefix, `cube.dim`;
+  `available(workspace)`; the `presets` it ends; `defaults`; its options' Zod schema) is what the recipe stores and the
+  commands check; `DocumentSectionType` adds its `module` (the name in a skipped section's note), its `label` per
+  documentation language, an optional `heading` from its options, the module `tables` it reads and its pure `build`.
+  `build` reads the document's model state only (`DocumentState`, `src/domain/document/state.ts`: one snapshot and the
+  app's indexes over it, `documentStateOf`; never a store); shared pieces are `src/domain/document/blocks.ts` (runs, the
+  mapping filter's rule, `relationshipsBlock`). `DOCUMENT_SECTION_TYPES` (`src/compose/documents.ts`, also as
+  `DOCUMENT_SECTION_KINDS`) joins InfoDocumenter's own (`text`, `dict`, `s2t`, `builders.ts`) and InfoCube's
+  (`CUBE_SECTION`, its words in `document-words.ts`); `DOCUMENT_TABLES` is what a document's snapshot reads (the types'
+  `tables` and the feeds'), and `documentStateFor` builds the state with InfoCube's requirement feeds, so InfoDocumenter
+  never names a module or its tables. `buildDocument` (`src/modules/infodocumenter/domain/document.ts`) makes the whole
+  tree; a section whose type no module knows, or whose module is off, is kept, skipped and named in a note.
+  Since step 4 a type may give `optionChecks` (its boolean options as the form's check boxes, plain data), so the form
+  draws a module's options without knowing the module.
+- **A module's own pages** (slice 25, step 4): the routes stay in `src/app` (`/w/{ws}/d/{id}` and `/view`), load the
+  shell and render a module's pages through `src/compose/documents-pages.tsx`; `loadShell`'s `rest` keeps such a path for
+  the locked organization's return (F27). The pages render `AppShell` with a `trail` (the breadcrumbs after the
+  workspace: Documentation › the document, step 4b), and a document the person can no longer open redirects to the
+  tab with `?gone=document`, whose toast the home shows from `HOME_GONE` (`src/compose/home.tsx`), never a 404. A module's app part reads the composed sections and store through
+  `src/app/_lib/documents.ts` (`composedStore`), as it reads `model-command.ts`. **The document page** renders the content
+  tree with React (`document-html.tsx`, every model text escaped; never HTML built from strings) into a hidden source,
+  and `PagedView` (`paged-view.tsx`) hands a copy and the document's CSS (`document-css.ts`) to Paged.js 0.4.3 (pinned,
+  `next.config.ts` aliases `pagedjs` to its bundled ES module: its source breaks under Turbopack), which lays out A4
+  pages in `document-host`; print shows those pages alone. The document is set in IBM Plex Sans (Serif comes with
+  slice B's templates).
+- **The workspace home's module tab** (slice 25): `HOME_TABS` (`src/compose/home.tsx`, `HomeTabSource`: `shown(access)`
+  and its `ModuleHomeTab`, `src/ui/home-tabs.ts`) after Overview; `chosenHomeTab` opens Overview for a `?tab=` that is
+  not shown. InfoDocumenter's Documentation tab is the first (slice 25, step 4).
+- **One snapshot of a workspace** (slice 25, F1): `store.snapshot(workspaceId, tables)` reads the model, requirements,
+  projects, cards, people, the organization and the named module tables from one state of the data
+  (`workspaceSnapshotOf`, `src/domain/model/workspace-model.ts`); `store.model.load` reads the model by the same pure rule
+  (`workspaceModelOf`: the live filter, the orders, the lost originals). **A later reader that needs the model and a
+  module's rows together** uses the snapshot, not several reads.
+- **A module's own objects outside the model** (slice 25, AD-05's addition as proposed): the core action
+  `module.own_objects` (every role, never in an archived workspace); the module adds its own rules on top
+  (InfoDocumenter's `rights.ts`). A module table outside undo registers as `"outside undo"` (`ModuleTableClass`): its
+  writes keep their change events and are never an undo step.
 - **A new module** adds its folder, its name to `modules` in `eslint.config.mjs`, its tables to the registry's three
   records and a migration, and its pieces to `src/compose/`; InfoMapper's code does not change.
 
@@ -348,10 +392,10 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 ## Commands
 
 ```
-npm run seed             # demo data into .data/dev-db.json (only if it does not exist yet)
+npm run seed             # demo data into .data/dev-db.json (only if it does not exist yet); since slice 25 with InfoDocumenter's documents (`addSeedDemoData`)
 npm run reset-dev-data   # replace .data/dev-db.json with fresh demo data
 npm run demo             # the demo data with the Sales star in .data/demo-db.json (seeded if missing; -- --reset), on http://127.0.0.1:3001 beside npm run dev; never touches .data/dev-db.json
-npx tsx scripts/licence.ts grant "<organization name>" infocube [--file <db>]   # slice 15a: a module's licence in a local file (development only)
+npx tsx scripts/licence.ts grant "<organization name>" infocube|infodoc [--file <db>]   # slice 15a (infodoc: slice 25): a module's licence in a local file (development only)
 npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards, labels and notes; slice 4b-2: a second canvas with 12 requirement cards) to .data/dev-db.json; works on a file with module rows (the seed's star); on Łukasz's test model only on his command, after a backup (INFOMAPPER_DEV_DB points it elsewhere)
 npm run dev              # local app on http://localhost:3000; sign in at /sign-in by picking a test user
 npm run build            # production build (npm start serves it; no dev sign-in, no local data)
@@ -433,10 +477,12 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spe
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
 npx tsx scripts/bench-thumbnails.ts                           # slice 12b: the homes' server work and the thumbnails' cost (index, shapes, paths, bytes, 20 requests, keys; not a gate)
+MEASURE=1 npx playwright test e2e/slice-25/S25-layout.spec.ts                             # slice 25: a full data dictionary of Performance test laid out by Paged.js, headless (reference figure)
 SCREENS=<folder> npx playwright test e2e/slice-24/S24-screens.spec.ts                     # slice 24: the Entity stereotypes box, its remove dialog, the entity panel's select with the definition; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-23/S23-screens.spec.ts                     # slice 23: the Metadata conventions tab, the remove dialog, Settings' Model conventions, the new workspace's language; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts                     # slice 22: the unknown member's section (a value, a value that does not fit, off), Fact Sales' Dimensions; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
+npx tsx scripts/bench-documents.ts                            # slice 25: a whole document's content tree (snapshot, state, tree) on Performance test and the demo (reference figure, no bar)
 npx tsx scripts/bench-checks.ts                               # slice 20: the model checks (marks and counts, the home with its lines; bar 50 ms in Node), synthetic, Performance test, demo
 npx tsx scripts/bench-checks-browser.ts                       # slice 20: the same in headless Chromium, with the split (the marks: reference 25 ms, not a gate)
 npx tsx scripts/count-checks.ts <copy of a backup>             # slice 20: a read-only count of the check lines per workspace and project (counts only, never .data/dev-db.json)
@@ -680,6 +726,19 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - read the e2e data file's stereotypes and entities (`storedStereotypes`, `storedStereotype`, `storedEntity`,
     `expectStoredName`) and set an entity's stereotype as Łukasz through the domain (`setStereotypeAs`).
   A row the Add row writes is in the data file before the page shows it: wait for the page's list (S24-04).
+
+  Slice 25's fixtures reseed with an option `seed`: "docs" (the default: the plain seed and `addDocumentsDemoData`, InfoMate's
+  InfoDocumenter licence, the switch on in "Retail Co – DWH", three documents, no star), "plain" (slice 0's seed) or "full"
+  (`addSeedDemoData`, the star and the documents). Its helpers do the following:
+  - open the tab, the form and the document page (`docsUrl`, `formUrl`, `viewUrl`, `settingsUrl`) and a tab's row
+    (`docRow`); sign in by any name, an added person too (`signInByName`);
+  - read the e2e data file's documents and their change events (`storedDocuments`, `storedDocument`, `documentEvents`);
+  - write test data through the domain: a document from a preset, a save, a share (`createDocumentAs`, `updateDocumentAs`,
+    `shareDocumentAs`), the licence (`grantDocLicence`), a workspace's switch or language (`setWorkspace`), an InfoMate
+    reader (`addReader`, `READER`) and a person gone (`removeMember`);
+  - wait until Paged.js has laid out the pages (`laidOut`, the page count) and read them (`pagesOf`, `sectionText`, and
+    `marginContent`: a margin box's computed `content`, which Paged.js draws in `::after`).
+  Paged.js lays out a copy of the hidden source in `document-host`; read the laid-out pages there, not the source.
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,

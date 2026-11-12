@@ -1,5 +1,5 @@
 // Grants an organization a module's licence in a local data file (slice 15a, C-7, Q6 as changed on 4 November 2026):
-//   npx tsx scripts/licence.ts grant "<organization name>" infocube [--file <db>]
+//   npx tsx scripts/licence.ts grant "<organization name>" infocube|infodoc [--file <db>]   (infodoc: slice 25)
 // Development only (the local adapter, AD-29); the database slice replaces it with whatever sells the licence. It only
 // grants: ending a licence has no command yet (docs/known-limitations.md). It writes no change event, as the seed's
 // rows have none, and changes nothing else in the file; a workspace is turned on in its settings by an owner or admin.
@@ -13,7 +13,7 @@ async function main(argv: string[]): Promise<string> {
   const fileAt = argv.indexOf("--file");
   const file = fileAt >= 0 ? argv[fileAt + 1] : devDbPath();
   const [verb, name, module] = argv.filter((_, i) => fileAt < 0 || (i !== fileAt && i !== fileAt + 1));
-  if (verb !== "grant" || !name || !module || !file) throw new Error('Use: npx tsx scripts/licence.ts grant "<organization name>" infocube [--file <db>]');
+  if (verb !== "grant" || !name || !module || !file) throw new Error(`Use: npx tsx scripts/licence.ts grant "<organization name>" ${LICENSED_MODULES.join("|")} [--file <db>]`);
   if (!(LICENSED_MODULES as readonly string[]).includes(module)) throw new Error(`Unknown module "${module}". Known: ${LICENSED_MODULES.join(", ")}.`);
   const db = await readDb(file);
   const found = db.organization.filter((o) => o.deleted_at === null && o.name === name);

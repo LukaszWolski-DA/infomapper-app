@@ -95,7 +95,8 @@ export async function readDb(file: string): Promise<DevDb> {
  * `is_calculated` false and `calc_rule` null, and the file an empty `attribute_input` (slice 18, Q2; no change events, no
  * log line). From 14, every built-in classification without a definition gets its definition in its workspace's
  * documentation language, own ones and every other row `definition` null, and every workspace `naming_conventions`
- * null; names are kept (slice 23, F2, F15; no change events, no log line).
+ * null; names are kept (slice 23, F2, F15; no change events, no log line). From 15, the stereotypes (slice 24,
+ * `upgrade-16.ts`). From 16, every workspace gets `infodoc` false (slice 25, F4; no change events, no log line).
  */
 export function upgradeDb(db: DevDb, now: string, newId: () => string): { report: Upgrade8Report | null; passwordsGiven: number; ownStereotypes: number } {
   let report: Upgrade8Report | null = null;
@@ -202,6 +203,11 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): { report
   let ownStereotypes = 0;
   if ((db.format as number) === 15) {
     ownStereotypes = upgradeTo16(db, now, newId);
+    Object.assign(db, { format: 16 });
+  }
+  // slice 25 (F4): every workspace's InfoDocumenter off (no change events, no log line)
+  if ((db.format as number) === 16) {
+    for (const w of db.workspace) w.infodoc ??= false;
     Object.assign(db, { format: DEV_DB_FORMAT });
   }
   return { report, passwordsGiven, ownStereotypes };

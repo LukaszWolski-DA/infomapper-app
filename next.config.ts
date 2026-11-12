@@ -7,6 +7,9 @@ const e2eServer = !!process.env.NEXT_DIST_DIR;
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  // Slice 25 (F28): Paged.js 0.4.3's own bundled ES module, not its source, whose CommonJS dependencies (es5-ext through
+  // event-emitter) break under Turbopack ("contains.call is not a function"). The document page loads it in the browser.
+  turbopack: { resolveAlias: { pagedjs: "./node_modules/pagedjs/dist/paged.esm.js" } },
   experimental: {
     turbopackFileSystemCacheForDev: !e2eServer,
     // The proxy (src/proxy.ts) buffers request bodies up to this size; an import's upload may be up to 25 MB (slice 7a,

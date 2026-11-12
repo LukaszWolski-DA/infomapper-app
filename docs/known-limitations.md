@@ -1443,3 +1443,50 @@ page. A change made by someone else shows with the next fresh page, as the rest 
 
 As model consistency, the home computes its model checks when it loads. "Show all" reads its group again from the model
 as it stands, so a change made meanwhile may show there before the rest of the section.
+
+## InfoDocumenter (slice 25)
+
+### Module switches and licences are positional arguments
+
+`updateWorkspaceSettings` takes InfoCube's switch state as its fourth argument and InfoDocumenter's licence state as its
+fifth (`src/domain/commands/workspace.ts`, step 2's deviation from F12). With two modules that reads well enough; when a
+third module with a switch comes, the states become one record keyed by the module.
+
+### Paged.js is aliased to its bundled ES module
+
+`next.config.ts` points `pagedjs` at `node_modules/pagedjs/dist/paged.esm.js` (`turbopack.resolveAlias`). Paged.js
+0.4.3's source build fails under Turbopack ("contains.call is not a function": `es5-ext`, a CommonJS dependency of
+`event-emitter`). The alias affects nothing else; it goes when Paged.js is replaced or its source works under the
+bundler. Paged.js loads only on the document page (its chunk is reached only from the document pages' manifests).
+
+### Laying out a large document takes seconds
+
+A full data dictionary of "Performance test" (41 entities, 779 attributes, every field and column) is 42 pages; from the
+navigation to "42 pages" takes 5.8 s (median of 5, measurement build, headless Chromium 153 on the laptop), of which
+Paged.js's layout is 4.3 s (step 4's reference figure, no bar; `e2e/slice-25/S25-layout.spec.ts`). The page is built
+once when it is opened. A live preview while the recipe is edited (slice B) needs another approach than laying out
+every page again on each change.
+
+### German document labels and InfoCube's German words await review
+
+The German labels of documents (the prototype's `LBL`, `src/modules/infodocumenter/domain/labels.ts`) and InfoCube's
+German words for documents (fact types, additivity, histories, kinds and the role's long text,
+`src/modules/infocube/domain/document-words.ts`) are a first draft; Łukasz reviews them. Polish and English are the
+prototype's, with the new words listed in the acceptance doc (step 3).
+
+### The demo's plain seed has almost no attribute definitions
+
+The seed's model (`src/data/local/seed-model.ts`) defines entities but no attributes, so a dictionary of the plain seed
+prints no definitions under its rows. The documents' demo (`addDocumentsDemoData`, step 4b) adds twelve, which
+`npm run seed`, `reset-dev-data` and `demo` write; every earlier fixture reads the seed without them.
+
+### A removed author's private documents
+
+A person removed from a workspace keeps their documents: their private ones are seen by nobody until they are a member
+again, and their shared ones stay shared (nobody but the author makes a document private, F17 a). No page lists or
+deletes another person's private documents.
+
+### Change events hold the whole recipe
+
+Every save of a document writes its whole row, recipe included, before and after (AD-13), private documents too. No page
+lists change events today; a later history or export filters private documents by their author (step 1, F18).

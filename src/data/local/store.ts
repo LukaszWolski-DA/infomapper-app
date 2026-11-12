@@ -11,15 +11,13 @@ import type { WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
 import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-history";
-import type { LostOriginal, ProjectCanvas } from "@/domain/types";
+import { byTabOrder, liveProjectCanvasesOf, liveRequirementLinksOf, workspaceModelOf, workspacePeopleOf, workspaceSnapshotOf } from "@/domain/model/workspace-model";
+import type { ModuleTable, WritableRows } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
 import { assertNotProduction, readDbCached, writeDb } from "./file";
 import { CORE_SCHEMA, findViolation, keyOf, readRows, rowsOf, upgradeRows, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
 
 const live = <R extends { deleted_at: string | null }>(rows: R[]): R[] => rows.filter((r) => r.deleted_at === null);
-
-const byTabOrder = (a: ProjectCanvas, b: ProjectCanvas) =>
-  a.sort_order - b.sort_order || a.added_at.localeCompare(b.added_at);
 
 // Writes are serialised per file within this process.
 const queues = new Map<string, Promise<unknown>>();
@@ -45,33 +43,7 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
   const load = async () => upgradeRows(await readDbCached(file), schema);
 
   /** Links whose project and canvas both still exist. */
-  const liveLinks = (db: DevDb, workspaceId: Uuid) => {
-    const projects = new Set(live(db.project).filter((p) => p.workspace_id === workspaceId).map((p) => p.id));
-    const canvases = new Set(live(db.canvas).filter((c) => c.workspace_id === workspaceId).map((c) => c.id));
-    return db.project_canvas.filter(
-      (l) => l.workspace_id === workspaceId && projects.has(l.project_id) && canvases.has(l.canvas_id),
-    );
-  };
-
-  /**
-   * The deleted originals that live copies point to, with their entity's name, deleted too or not (slice 10c, F6):
-   * what a copy's panel names. One pass over the workspace's attributes.
-   */
-  const lostOriginals = (db: Readonly<DevDb>, workspaceId: Uuid): LostOriginal[] => {
-    const attributes = db.attribute.filter((a) => a.workspace_id === workspaceId);
-    const byId = new Map(attributes.map((a) => [a.id, a]));
-    const wanted = new Set<Uuid>();
-    for (const a of attributes) {
-      if (a.deleted_at !== null || a.copied_from_attribute_id === null) continue;
-      if (byId.get(a.copied_from_attribute_id)?.deleted_at !== null) wanted.add(a.copied_from_attribute_id);
-    }
-    if (!wanted.size) return [];
-    const entityName = new Map(db.entity.filter((e) => e.workspace_id === workspaceId).map((e) => [e.id, e.name]));
-    return [...wanted].flatMap((id) => {
-      const a = byId.get(id);
-      return a ? [{ id, name: a.name, entityName: entityName.get(a.entity_id) ?? "?" }] : [];
-    });
-  };
+  const liveLinks = (db: DevDb, workspaceId: Uuid) => liveProjectCanvasesOf(db, workspaceId);
 
   /** Live label links whose label and item are live too (the domain deletes links with their items; this is a guard). */
   const liveLabelLinks = (db: Readonly<DevDb>, workspaceId: Uuid) => {
@@ -87,17 +59,7 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
   };
 
   /** Live requirement links whose requirement and element are live too (the domain deletes links with their elements). */
-  const liveRequirementLinks = (db: Readonly<DevDb>, workspaceId: Uuid) => {
-    const ids = (rows: readonly { id: Uuid; workspace_id: Uuid; deleted_at: string | null }[]) =>
-      new Set(rows.filter((r) => r.deleted_at === null && r.workspace_id === workspaceId).map((r) => r.id));
-    const requirements = ids(db.requirement);
-    const targets = [ids(db.entity), ids(db.attribute), ids(db.mapping), ids(db.source_table), ids(db.source_column)];
-    return live(db.requirement_link).filter((k) => {
-      if (k.workspace_id !== workspaceId || !requirements.has(k.requirement_id)) return false;
-      const target = [k.entity_id, k.attribute_id, k.mapping_id, k.source_table_id, k.source_column_id];
-      return target.some((id, i) => id !== null && targets[i]!.has(id));
-    });
-  };
+  const liveRequirementLinks = (db: Readonly<DevDb>, workspaceId: Uuid) => liveRequirementLinksOf(db, workspaceId);
 
   /** The change groups in the workspace's log: a history step outside it belongs to data that was replaced. */
   const groupsOf = async (workspaceId: Uuid) =>
@@ -113,12 +75,7 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
       list: async () => (await load()).app_user,
       get: async (userId) => (await load()).app_user.find((u) => u.id === userId) ?? null,
       getByEmail: async (email) => (await load()).app_user.find((u) => u.email === email) ?? null,
-      listForWorkspace: async (workspaceId) => {
-        const db = await load();
-        const ids = new Set(db.workspace_member.filter((m) => m.workspace_id === workspaceId).map((m) => m.user_id));
-        for (const e of db.change_event) if (e.workspace_id === workspaceId) ids.add(e.user_id);
-        return db.app_user.filter((u) => ids.has(u.id));
-      },
+      listForWorkspace: async (workspaceId) => workspacePeopleOf(await load(), workspaceId),
     },
 
     organizations: {
@@ -182,33 +139,8 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
     },
 
     model: {
-      load: async (workspaceId) => {
-        const db = await load();
-        const of = <R extends { workspace_id: Uuid; deleted_at: string | null }>(rows: R[]) =>
-          live(rows).filter((r) => r.workspace_id === workspaceId);
-        return {
-          concepts: of(db.concept).sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
-          entities: of(db.entity).sort((a, b) => a.name.localeCompare(b.name)),
-          attributes: of(db.attribute).sort((a, b) => a.entity_id.localeCompare(b.entity_id) || a.sort_order - b.sort_order),
-          relationships: of(db.relationship),
-          sourceSystems: of(db.source_system).sort((a, b) => a.name.localeCompare(b.name)),
-          sourceTables: of(db.source_table).sort((a, b) => a.name.localeCompare(b.name)),
-          sourceColumns: of(db.source_column).sort((a, b) => a.source_table_id.localeCompare(b.source_table_id) || a.ordinal - b.ordinal),
-          mappings: of(db.mapping),
-          mappingInputs: of(db.mapping_input).sort((a, b) => a.mapping_id.localeCompare(b.mapping_id) || a.sort_order - b.sort_order),
-          attributeInputs: of(db.attribute_input).sort((a, b) => a.attribute_id.localeCompare(b.attribute_id) || a.sort_order - b.sort_order),
-          sourceRelationships: of(db.source_relationship),
-          sourceRelationshipColumns: of(db.source_relationship_column).sort(
-            (a, b) => a.source_relationship_id.localeCompare(b.source_relationship_id) || a.sort_order - b.sort_order,
-          ),
-          // slice 7c: the list with its removed rows (a removed built-in one can be restored), live links only
-          classifications: db.classification.filter((c) => c.workspace_id === workspaceId),
-          classificationLinks: of(db.classification_link),
-          // slice 24: the list with its removed rows (their codes stay taken)
-          stereotypes: db.stereotype.filter((x) => x.workspace_id === workspaceId),
-          lostOriginals: lostOriginals(db, workspaceId),
-        };
-      },
+      // slice 25 (F1): the live filter, the orders and the lost originals are the domain's one rule
+      load: async (workspaceId) => workspaceModelOf(await load(), workspaceId),
       listImports: async (workspaceId, sourceSystemId) =>
         live((await load()).source_import)
           .filter((i) => i.workspace_id === workspaceId && (sourceSystemId === undefined || i.source_system_id === sourceSystemId))
@@ -301,6 +233,17 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
         histories.set(key, next);
         return next;
       },
+    },
+
+    // slice 25 (F1): one read of the file, so a write cannot fall between the model and the modules' rows
+    snapshot: async (workspaceId, tables) => {
+      const db = await load();
+      const modules: Partial<Record<ModuleTable, unknown[]>> = {};
+      for (const table of tables) {
+        if (!schema.rules[table]) throw new Error(`The store does not know the table ${table}.`);
+        modules[table] = readRows(db, table as StoreTable, schema);
+      }
+      return workspaceSnapshotOf(db, workspaceId, modules as { [K in (typeof tables)[number]]: WritableRows[K][] });
     },
 
     apply: (writeSet) => serialise(file, () => applyToFile(file, writeSet, schema)),

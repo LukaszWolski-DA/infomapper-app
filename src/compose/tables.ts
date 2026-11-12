@@ -9,14 +9,16 @@ import { undoTables, type ModuleTableClass } from "@/domain/commands/undo";
 import type { ModuleTable } from "@/domain/types";
 import { INFOCUBE_RULES, type InfoCubeDb } from "@/modules/infocube/data/tables";
 import { INFOCUBE_UNDO } from "@/modules/infocube/domain/tables";
+import { INFODOC_RULES, type InfoDocDb } from "@/modules/infodocumenter/data/tables";
+import { INFODOC_UNDO } from "@/modules/infodocumenter/domain/tables";
 
 /** Every module's table, in or outside the undo history. */
-const MODULE_UNDO: Readonly<Record<ModuleTable, ModuleTableClass>> = { ...INFOCUBE_UNDO };
+const MODULE_UNDO: Readonly<Record<ModuleTable, ModuleTableClass>> = { ...INFOCUBE_UNDO, ...INFODOC_UNDO };
 /** Every module's table, with the rules the local adapter enforces. */
-const MODULE_RULES: Readonly<Record<ModuleTable, TableRules>> = { ...INFOCUBE_RULES };
+const MODULE_RULES: Readonly<Record<ModuleTable, TableRules>> = { ...INFOCUBE_RULES, ...INFODOC_RULES };
 
 /** The whole data file: InfoMapper's tables and the modules' (the AD-31 schema check reads this interface). */
-export interface ComposedDb extends DevDb, InfoCubeDb {}
+export interface ComposedDb extends DevDb, InfoCubeDb, InfoDocDb {}
 type MissingInFile = Exclude<ModuleTable, keyof ComposedDb>;
 export const MODULE_TABLES_IN_FILE: [MissingInFile] extends [never] ? true : MissingInFile = true;
 

@@ -8,6 +8,7 @@ import type { DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
 import type { UndoHistory } from "@/domain/model/undo-history";
 import type { MappingLog } from "@/domain/model/mapping-rules";
+import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type {
   AppUser,
   Canvas,
@@ -198,6 +199,12 @@ export interface DataStore {
   changeEvents: ChangeEventRepository;
   undoHistory: UndoHistoryRepository;
   modules: ModuleRowRepository;
+  /**
+   * One consistent read of a live workspace (slice 25, F1): its model, requirements, projects and cards, people and the
+   * named module tables' live rows, all from one state of the data. Null when the workspace is not live. A table the
+   * store does not know throws.
+   */
+  snapshot<T extends ModuleTable>(workspaceId: Uuid, tables: readonly T[]): Promise<WorkspaceSnapshot<T> | null>;
   /**
    * Applies the rows and change events of one command together or not at all (AD-13). Refuses a stale version,
    * unknown ids, duplicate keys and broken rules with the same error a database would cause.

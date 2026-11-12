@@ -8,7 +8,10 @@ import type { ShellData } from "../_lib/shell";
 import { HistoryNav } from "./history-nav";
 import { canvasHref, projectHref, workspaceHref } from "../_lib/paths";
 
-export function Breadcrumbs({ shell, children }: { shell: ShellData; children?: ReactNode }) {
+/** A workspace page's own parts after the workspace (slice 25: Documentation › the document), instead of "Workspace home". */
+export type Trail = readonly { label: string; href: string }[];
+
+export function Breadcrumbs({ shell, trail, children }: { shell: ShellData; trail?: Trail; children?: ReactNode }) {
   const { workspace, project, canvas, page } = shell;
   const firstInOrg = shell.organizations.find((o) => o.id === shell.organization.id)?.firstWorkspaceId ?? workspace.id;
 
@@ -16,7 +19,7 @@ export function Breadcrumbs({ shell, children }: { shell: ShellData; children?: 
     { label: shell.organization.name, href: workspaceHref(firstInOrg) },
     { label: workspace.name, href: workspaceHref(workspace.id) },
   ];
-  if (page === "workspace") parts.push({ label: "Workspace home", href: workspaceHref(workspace.id) });
+  if (page === "workspace") parts.push(...(trail ?? [{ label: "Workspace home", href: workspaceHref(workspace.id) }]));
   if (page !== "workspace" && project) {
     parts.push({ label: project.name, href: projectHref(workspace.id, project.id) });
     if (page === "project") parts.push({ label: "Home", href: projectHref(workspace.id, project.id) });
