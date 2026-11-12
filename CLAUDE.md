@@ -63,7 +63,12 @@ conventions" tab: the classification list (slice 7c's dialog moved there) with d
 matches, the concepts' colours and the naming conventions; a new workspace's built-in classifications are named and
 defined in the documentation language chosen when it is created (slice 23, D-78). Entity stereotypes are the workspace's
 list in that tab: the five built-in ones renamed and defined, own ones with a code; entities keep codes, cards, the Model
-tab and the entity panel show the names (slice 24, D-79).
+tab and the entity panel show the names (slice 24, D-79). InfoDocumenter is the second module (slice 25, D-80): its
+licence and switch, the workspace home's Documentation tab, documents as recipes made from presets (private, or shared
+with the workspace; only the author makes a shared one private), a form on one page, and the document page built from
+one snapshot of the live model and laid out in A4 pages by Paged.js (title page, contents with page numbers, header,
+footer, watermark), printed by the browser; sections Text, Data dictionary, Source-to-target and InfoCube's Dimensional
+model, in the workspace's documentation language.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -257,15 +262,17 @@ list up to date in each sub-slice):
   tree; a section whose type no module knows, or whose module is off, is kept, skipped and named in a note.
   Since step 4 a type may give `optionChecks` (its boolean options as the form's check boxes, plain data), so the form
   draws a module's options without knowing the module.
-- **A module's own pages** (slice 25, step 4): the routes stay in `src/app` (`/w/{ws}/d/{id}` and `/view`) and render a
-  module's page bodies through `src/compose/documents-pages.tsx`; `loadShell`'s `rest` keeps such a path for the locked
-  organization's return (F27). A module's app part reads the composed sections and store through
+- **A module's own pages** (slice 25, step 4): the routes stay in `src/app` (`/w/{ws}/d/{id}` and `/view`), load the
+  shell and render a module's pages through `src/compose/documents-pages.tsx`; `loadShell`'s `rest` keeps such a path for
+  the locked organization's return (F27). The pages render `AppShell` with a `trail` (the breadcrumbs after the
+  workspace: Documentation › the document, step 4b), and a document the person can no longer open redirects to the
+  tab with `?gone=document`, whose toast the home shows from `HOME_GONE` (`src/compose/home.tsx`), never a 404. A module's app part reads the composed sections and store through
   `src/app/_lib/documents.ts` (`composedStore`), as it reads `model-command.ts`. **The document page** renders the content
   tree with React (`document-html.tsx`, every model text escaped; never HTML built from strings) into a hidden source,
   and `PagedView` (`paged-view.tsx`) hands a copy and the document's CSS (`document-css.ts`) to Paged.js 0.4.3 (pinned,
   `next.config.ts` aliases `pagedjs` to its bundled ES module: its source breaks under Turbopack), which lays out A4
-  pages in `document-host`; print shows those pages alone. IBM Plex Serif (`src/app/fonts/plex-serif.ts`) is loaded on
-  that page only.
+  pages in `document-host`; print shows those pages alone. The document is set in IBM Plex Sans (Serif comes with
+  slice B's templates).
 - **The workspace home's module tab** (slice 25): `HOME_TABS` (`src/compose/home.tsx`, `HomeTabSource`: `shown(access)`
   and its `ModuleHomeTab`, `src/ui/home-tabs.ts`) after Overview; `chosenHomeTab` opens Overview for a `?tab=` that is
   not shown. InfoDocumenter's Documentation tab is the first (slice 25, step 4).

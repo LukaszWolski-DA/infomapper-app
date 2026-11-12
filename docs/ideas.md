@@ -935,3 +935,50 @@ their relationships' other ends. Measure first with `scripts/bench-checks-browse
 - **A "Show checks" view** that fades everything else, as the Changes view; next and previous line on the canvas.
 - **Marks on relationship and mapping lines**; a switch to hide the marks; marks on collapsed frames' blocks.
 - **Source-side and Data Vault checks**; a dimension's unknown member (slice 19, decision 5b; done in slice 22, D-77).
+
+## InfoDocumenter: done in slice 25, and what comes later (PRD section 9)
+
+**Done in slice 25** (D-80): InfoDocumenter as a module with its licence and switch; documents as stored recipes from
+three presets, private and shared with their rights; the form on one page; the document page laid out in A4 by Paged.js
+with a title page, contents with page numbers, the running header and footer and the watermark; sections Text, Data
+dictionary (logical level), Source-to-target mapping and InfoCube's Dimensional model; the labels in English, Polish and
+German; the two extension points (document sections, the workspace home's module tab); the demo's three documents.
+
+**Later:**
+- **Slice B:** the dictionary's dimensional entities through InfoCube's contributions (if needed); the editor with a
+  live preview, section order, adding and removing sections; the style (paper, orientation, theme, templates with IBM
+  Plex Serif, header and footer fields, logos); the sections overview, conventions and notation, readiness, sources,
+  classification register, requirements, traceability, data quality; the dictionary's other layouts and long
+  definitions moved to the end.
+- **Baselines** (their own slice, before the first that reads one): the snapshot as agreed (the entry below); then
+  documents from a baseline and "changes since a baseline".
+- **Slice C:** figures (canvases, frames, the star diagram drawn from the model), the canvas's page outline.
+- **Slice D:** versions (the generated file stored), links for people outside the workspace (a new AD for access
+  without a session), guests' restriction on versions and links (the export setting), where PDF files are made (browser
+  or server).
+- **Slice E:** Markdown export (metadata instead of images; one file or several).
+- Live label canvases in documents from a baseline (option a of 11 November 2026); a workspace transfer with baselines
+  holding InfoCube rows.
+- For a workspace's copy or transfer (step 1, F30): a document's author kept when they are a member of the target, else
+  the person copying; others' private documents never copied; the scope's project and concept ids remapped; the
+  licence checked as AD-35 says, also while the switch is off.
+- A module's switch states as one record when a third module comes (`docs/known-limitations.md`).
+
+## Baselines: the design agreed for their slice (11 November 2026)
+
+Baselines: the design agreed for their slice (11 November 2026). A baseline's snapshot holds the live rows (for link
+tables, both ends live) of the core, sources, classifications and their links, stereotypes, mappings, requirements and
+their links, every module's tables, projects and canvases with their items and frames, plus the deleted originals that
+live copies point to (id, name, entity name), and the settings dv2_mode, four_eyes, naming_conventions and infocube. It
+leaves out labels, label links, project pinned labels, notes, change events, source changes, source imports, people and
+access. A per-table snapshot flag in the table registry decides it, so every new table is classified. The snapshot has
+its own snapshot_schema with a short pure upgrade chain that reuses the modules' row upgrades; it runs on read,
+deterministically (no new ids or times), and never writes back; a slice that changes a stored shape of a snapshot table
+adds its step and a fixture test. One store method makes it from one read. Locally each snapshot is its own file in a
+folder per data file, written before its row, and KB's backup includes that folder; in SQL it stays jsonb, kept out of
+change event images. The first baseline slice builds create (name, note), list, rename and delete: new actions
+baseline.create and rename for owners, admins and modelers, baseline.delete for owners and admins; outside undo,
+logged; content immutable; soft delete; read only in an archived workspace. Live label canvases are in the snapshot but
+not drawn from a baseline; later, freezing the labels and label links that drive them (option a). A document from a
+baseline after that slice; a workspace transfer with baselines holding InfoCube rows is a question for the transfer
+slice.

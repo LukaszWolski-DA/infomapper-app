@@ -1368,3 +1368,116 @@ HTML (step 3's tree: about 13 ms).
 - `4-dictionary-page.png` (page 4, the dictionary's first).
 
 The pages are taken in print media at 900 × 1200, so each is whole.
+
+## Step 4b: small fixes (12 November 2026)
+
+Łukasz's answers to step 4, built in `94f9ef1`:
+
+1. **The title page in IBM Plex Sans,** as the prototype's default template. The Serif files, their loader and their
+   README rows are removed; templates and Serif come with slice B.
+2. **Breadcrumbs** on the form and the document page: "{organization} › {workspace} › Documentation › {document}".
+   - `AppShell` takes a `trail` after the workspace; it was "Workspace home" before.
+   - The organization stays first, as on every page.
+   - "Documentation" links to the tab.
+3. **Only its author makes a shared document private.**
+   - `shareRefusal` refuses anyone else with "Only {author} can make it private." (`forbidden`). F17's refusal stays,
+     first, while the author is no longer a member.
+   - The form shows the check box disabled for everyone but the author, with the reason under it (the F17 text while the
+     author is gone).
+   - A document the person can no longer open (form or page; gone, made private by its author, another's private one,
+     InfoDocumenter off) redirects to the Documentation tab with `?gone=document`. The home shows "This document is no
+     longer available to you." (`HOME_GONE`), never a 404.
+   - Tests: the domain's matrix gets `unshare`, and the unsharing tests cover the author and every other role.
+     S25-02's tests now check the author-only rule and the return to the tab, the author-left case, and the redirect
+     where step 4 expected a 404.
+4. **Twelve attribute definitions,** written by the documents' demo layer only (`DEMO_ATTRIBUTE_DEFINITIONS` in
+   `src/modules/infodocumenter/data/demo.ts`; `seed-model.ts` unchanged), and only where an attribute has none. They
+   are:
+   - Customer: `customer_id`, `birth_date`, `segment_code`;
+   - Customer Address: `postal_code`;
+   - Sales Order: `order_number`, `order_date`, `total_amount`, `status_code`;
+   - Order Line: `quantity`, `discount_pct`;
+   - Product: `sku`, `list_price`.
+
+   **No earlier spec changed:** every earlier fixture reads `addFullDemoData`, which writes none of them
+   (`tests/documents-demo.test.ts` checks both).
+5. **Paged.js and the extra chunk, from the build's output** (the measurement build):
+   - **Paged.js** is the chunk `2ug013kwm7s6u.js` (498,070 bytes, "Paged.js v0.4.3"). Only `1b-r-kf2ofutg.js`
+     references it (the dynamic import's loader), and only the two document pages' client manifests
+     (`/w/[workspaceId]/d/[documentId]` and `…/view`) reference that loader. No chunk in the canvas page's `<head>`
+     contains `pagedjs`.
+   - **The extra element:** I built `main` (`e987f82`) in the same checkout and read the canvas page's `<head>` on both
+     builds: 28 children on `main`, 29 on the branch.
+     - Main's chunk `10890hq23d_1a.js` (520,219 bytes) is on the branch two chunks, `1nmbhsl8bzt1u.js` (329,395) and
+       `3o9yk2iz-4a4w.js` (196,216), 5.4 KB more in all.
+     - The rest of `<head>`'s scripts have the same names; the first stylesheet's name changed (new classes); the font
+       preloads are the same five.
+     - The only InfoDocumenter text in a canvas chunk is the workspace settings schema's `infodoc` switch (step 2).
+     - So the extra element is one chunk split in two by the bundler, not Paged.js.
+
+**Runs:**
+- `npm run lint` no problems, `npm run typecheck` passes, `npm test` 173 files, 2,165 tests passed;
+- `e2e/slice-25`: **25 passed, 1 skipped** (S25-layout);
+- the element guard on the measurement build: viewports equal slice 8's (4,508, 19,305, 1,465, 4,907), page totals
+  6,136, 20,933, 3,003, 6,445, as in step 4;
+- no earlier spec changed.
+- The screenshots in `docs/prd/slice-25-screens/step-4/` are retaken with the Sans title page.
+
+## Closing (12 November 2026)
+
+### Docs
+
+- `docs/decisions.md`: **D-80** (a new section "InfoDocumenter"), marked as proposed and awaiting Łukasz's approval, and
+  notes "(slice 25)" on **AD-05**, **AD-18**, **AD-33** and **AD-35**; quoted in the report.
+- `docs/data-model-v2.md`: written in step 2 (`workspace.infodoc`, the licence's values, AD-18's fourth place,
+  `document_definition`); nothing changed since.
+- `docs/inventory-prototype-vs-app.md`: a summary row and a section "InfoDocumenter" (what the prototype has beyond the
+  slice, what is present, the deliberate differences).
+- `README.md` and `CLAUDE.md`: the status; CLAUDE.md's extension points (document sections, `optionChecks`, a module's
+  own pages, the home's module tab, one snapshot, a module's objects outside the model), slice 25's helpers and the
+  commands.
+- `docs/known-limitations.md`: a section "InfoDocumenter (slice 25)":
+  - module switches and licences as positional arguments;
+  - the `pagedjs` alias;
+  - the layout's reference figure, with a live preview needing another approach;
+  - the German labels and InfoCube's German words awaiting review;
+  - the plain seed's attribute definitions;
+  - a removed author's private documents;
+  - change events holding the whole recipe.
+- `docs/ideas.md`: "InfoDocumenter: done in slice 25, and what comes later" (PRD section 9, and F30's copy and transfer
+  points), and "Baselines: the design agreed for their slice (11 November 2026)" as Łukasz gave it.
+- `docs/ideas_infodocumenter.md`: two sentences at its top; its text unchanged.
+
+### Manual acceptance (PRD section 6)
+
+On the demo (`npm run demo -- --reset`, http://127.0.0.1:3001; never `.data/dev-db.json`):
+1. Sign in as Łukasz; Retail Co – DWH; the Documentation tab shows "Retail Co – data dictionary" (shared) and "Order
+   management – S2T for the ETL team" (private).
+2. **New document → Data dictionary for the business:** the form opens. Give it a name and a title; under Scope tick
+   the project "Customer 360"; Open document. "Laying out pages…", then "{n} pages":
+   - a title page without header or footer;
+   - contents whose page numbers match;
+   - the header, the footer, "Page n of m" and "DRAFT · live model" from page 2;
+   - only Customer, Order Line and Sales Order in the dictionary;
+   - the definitions under their rows (Customer.customer_id, Sales Order.order_date…).
+3. **New document → Source-to-target specification for ETL:** it ends with the Dimensional model (InfoCube is on).
+   Open it: the mappings by entity with "Rule" under each row, then Facts and Dimensions with grain, roles, keys, "No
+   match →", measures and feeds.
+4. **Print** (the page's button, or the form's Print): the browser's dialog shows A4 portrait pages without the app
+   around them. Save as PDF and look at it.
+5. Sign in as **Kasia (reader, guest)** in another browser: she sees the shared document only, opens it read only, and
+   makes and prints a private one.
+6. As **Anna**, open the shared dictionary: "Shared with the workspace" is disabled, "Only Łukasz can make it private."
+   As Łukasz, untick it. Anna's open page, reloaded, returns to the tab with "This document is no longer available to
+   you."
+7. **Settings → InfoDocumenter:** turn it off. The toast names the documents kept, and the tab goes. Turn it on: they
+   are back.
+8. Settings → Documentation language **Deutsch** (or Polski): open a document; the headings, labels and InfoCube's words
+   are in that language. **Review the German words** (step 3's list).
+
+KB: the local file's format changed in step 2 (17). Upgrading Łukasz's file happens only on his command, after the
+backup "Łukasz's test model" requires; then a dictionary of Kanton Basel.
+
+### The full run
+
+See the report: the workflow "E2E" on the final commit.

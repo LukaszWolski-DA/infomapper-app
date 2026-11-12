@@ -1,5 +1,7 @@
 # InfoDocumenter: ideas
 
+These notes are historical. The decisions in force are D-80 (`docs/decisions.md`) and `docs/prd/slice-25-infodocumenter-documents.md`.
+
 Notes from a discussion with Łukasz on 7 November 2026 (slice 16a thread, extensive tests). Nothing here is decided
 beyond the first section; it is a starting point for a later PRD.
 
