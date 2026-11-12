@@ -9,10 +9,10 @@
 
 import type { z } from "zod";
 import type { Uuid } from "../ids";
-import type { WorkspaceSnapshot } from "../model/workspace-model";
 import { domainError, type DomainError } from "../errors";
 import type { DocLanguage, ModuleTable, Workspace } from "../types";
 import type { DocNode } from "./content";
+import type { DocumentState } from "./state";
 
 /** A section type's stored name: lower case, digits, `_` and one optional `.` after a module's prefix (`cube.dim`). */
 export const SECTION_TYPE_RE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/;
@@ -30,7 +30,10 @@ export interface DocumentSectionKind {
   readonly options: z.ZodType<Record<string, unknown>>;
 }
 
-/** What a section is drawn for: the entities the scope covers, its levels and the mappings shown. */
+/**
+ * What a section is drawn for: the entities the scope covers (both levels; a section takes its own level), whether
+ * each level is in scope, and the mappings shown.
+ */
 export interface SectionScope {
   /** The entities in scope (the projects' cards and the concepts chosen); every live entity when nothing narrows it. */
   readonly entityIds: ReadonlySet<Uuid>;
@@ -40,19 +43,24 @@ export interface SectionScope {
 }
 
 export interface SectionBuildInput<T extends ModuleTable = ModuleTable> {
-  readonly snapshot: WorkspaceSnapshot<T>;
+  /** The snapshot and the app's indexes over it, built once per document (`state.ts`). */
+  readonly state: DocumentState<T>;
   readonly scope: SectionScope;
   readonly options: Record<string, unknown>;
   readonly language: DocLanguage;
 }
 
 export interface DocumentSectionType<T extends ModuleTable = ModuleTable> extends DocumentSectionKind {
+  /** The module's name as people know it ("InfoCube"), for the note on a section skipped while it is off; null: InfoDocumenter's own. */
+  readonly module: string | null;
   /** Its default heading in each documentation language. */
   readonly label: (language: DocLanguage) => string;
+  /** A heading its options set instead (Text's), or null for the default. */
+  readonly heading?: (options: Record<string, unknown>) => string | null;
   /** The module tables its builder reads from the snapshot. */
   readonly tables: readonly T[];
-  /** Pure: the section's nodes after its heading, from the snapshot alone. */
-  readonly build: (input: SectionBuildInput<T>) => readonly DocNode[];
+  /** Pure: the section's nodes after its heading, from the model state alone (never a store). */
+  build(input: SectionBuildInput<T>): readonly DocNode[];
 }
 
 /** The registered kinds by type; a name registered twice or not in the stored shape throws (a mistake in the wiring). */

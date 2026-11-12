@@ -14,6 +14,8 @@ export interface DocRun {
   readonly strong?: boolean;
   /** Drawn as a pill (a mapping's status in a document that shows drafts). */
   readonly pill?: boolean;
+  /** Starts a new line within its cell or paragraph (a second mapping of one attribute, a line of a Text body). */
+  readonly lineBreak?: boolean;
 }
 
 /** A cell, a paragraph or a meta part: its runs in order. */

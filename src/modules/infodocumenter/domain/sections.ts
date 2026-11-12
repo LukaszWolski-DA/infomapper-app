@@ -27,7 +27,7 @@ const subsetOf = <const T extends readonly [string, ...string[]]>(values: T) =>
   z
     .array(z.enum(values))
     .refine((list) => new Set(list).size === list.length, "Each column is chosen once.")
-    .transform((list) => values.filter((v) => list.includes(v)));
+    .transform((list) => values.filter((v): v is T[number] => (list as readonly string[]).includes(v)));
 
 const headingSchema = z
   .string()

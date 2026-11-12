@@ -28,9 +28,12 @@ export function rolesOf(cubeEntities: readonly CubeEntity[]): Map<Uuid, CubeEnti
   return new Map(live(cubeEntities).map((c) => [c.entity_id, c]));
 }
 
-/** A dimension's history as shown (prototype `scdLabel`): "SCD 0", "SCD 1", "SCD 2", "Snapshot · {period}" or "Snapshot". */
-export function historyLabel(c: Pick<CubeEntity, "history" | "snapshot_period"> | undefined): string {
-  if (c?.history === "snapshot") return c.snapshot_period?.trim() ? `Snapshot · ${c.snapshot_period.trim()}` : "Snapshot";
+/**
+ * A dimension's history as shown (prototype `scdLabel`): "SCD 0", "SCD 1", "SCD 2", "Snapshot · {period}" or "Snapshot".
+ * Slice 25: a document in another language passes its word for "Snapshot" ("SCD n" stays as it is).
+ */
+export function historyLabel(c: Pick<CubeEntity, "history" | "snapshot_period"> | undefined, snapshot = "Snapshot"): string {
+  if (c?.history === "snapshot") return c.snapshot_period?.trim() ? `${snapshot} · ${c.snapshot_period.trim()}` : snapshot;
   return `SCD ${SCD_NUMBER[c?.history ?? "overwrite"]}`;
 }
 
@@ -69,16 +72,42 @@ export function tabMeta(c: CubeEntity, x?: TypeContext): string {
 }
 
 /**
+ * The words of `cubeTitle`'s long text (slice 25): English on the card and the panel; a document passes its language's
+ * (InfoCube's document words, Q-L4). The parts that apply are the same rule in every language.
+ */
+export interface CubeTitleWords {
+  /** "Transaction fact", "Periodic snapshot fact". */
+  fact(type: FactType): string;
+  factless: string;
+  aggregateOf(name: string): string;
+  dimension: string;
+  junkDimension: string;
+  /** "snapshot (Month-end)", or "snapshot" without a period. */
+  snapshot(period: string | null): string;
+  outriggerOf(names: string): string;
+}
+
+export const ENGLISH_TITLE_WORDS: CubeTitleWords = {
+  fact: (type) => `${FACT_TYPE_NAMES[type]} fact`,
+  factless: "factless",
+  aggregateOf: (name) => `aggregate of ${name}`,
+  dimension: "Dimension",
+  junkDimension: "Junk dimension",
+  snapshot: (period) => `snapshot${period ? ` (${period})` : ""}`,
+  outriggerOf: (names) => `outrigger of ${names}`,
+};
+
+/**
  * The card's and the panel's role (prototype `cubeTitle`): the short text ("Fact · Snapshot · Aggregate", "Dimension ·
  * Junk") and the long one for the title ("Periodic snapshot fact, factless, aggregate of Fact Sales").
  */
-export function cubeTitle(c: CubeEntity, x: TypeContext): { short: string; long: string } {
+export function cubeTitle(c: CubeEntity, x: TypeContext, words: CubeTitleWords = ENGLISH_TITLE_WORDS): { short: string; long: string } {
   if (c.role === "fact") {
     const base = x.aggregates.baseOf(c.entity_id);
     const type = c.fact_type ?? "transaction";
     return {
       short: [ROLE_NAMES.fact, FACT_TYPE_CHIP[type], c.is_factless ? "Factless" : "", base ? "Aggregate" : ""].filter(Boolean).join(" · "),
-      long: [`${FACT_TYPE_NAMES[type]} fact`, c.is_factless ? "factless" : "", base ? `aggregate of ${x.nameOf(base)}` : ""].filter(Boolean).join(", "),
+      long: [words.fact(type), c.is_factless ? words.factless : "", base ? words.aggregateOf(x.nameOf(base)) : ""].filter(Boolean).join(", "),
     };
   }
   const outOf = x.outriggers.outOf(c.entity_id);
@@ -87,9 +116,9 @@ export function cubeTitle(c: CubeEntity, x: TypeContext): { short: string; long:
   return {
     short: [ROLE_NAMES.dimension, c.dim_kind === "junk" ? "Junk" : "", snapshot ? "Snapshot" : "", outOf.length ? "Outrigger" : ""].filter(Boolean).join(" · "),
     long: [
-      c.dim_kind === "junk" ? "Junk dimension" : "Dimension",
-      snapshot ? `snapshot${period ? ` (${period})` : ""}` : "",
-      outOf.length ? `outrigger of ${outOf.map((d) => x.nameOf(d)).join(", ")}` : "",
+      c.dim_kind === "junk" ? words.junkDimension : words.dimension,
+      snapshot ? words.snapshot(period || null) : "",
+      outOf.length ? words.outriggerOf(outOf.map((d) => x.nameOf(d)).join(", ")) : "",
     ].filter(Boolean).join(", "),
   };
 }
