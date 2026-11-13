@@ -1444,7 +1444,7 @@ page. A change made by someone else shows with the next fresh page, as the rest 
 As model consistency, the home computes its model checks when it loads. "Show all" reads its group again from the model
 as it stands, so a change made meanwhile may show there before the rest of the section.
 
-## InfoDocumenter (slice 25)
+## InfoDocumenter (slices 25 and 26)
 
 ### Module switches and licences are positional arguments
 
@@ -1457,22 +1457,59 @@ third module with a switch comes, the states become one record keyed by the modu
 `next.config.ts` points `pagedjs` at `node_modules/pagedjs/dist/paged.esm.js` (`turbopack.resolveAlias`). Paged.js
 0.4.3's source build fails under Turbopack ("contains.call is not a function": `es5-ext`, a CommonJS dependency of
 `event-emitter`). The alias affects nothing else; it goes when Paged.js is replaced or its source works under the
-bundler. Paged.js loads only on the document page (its chunk is reached only from the document pages' manifests).
+bundler. Paged.js loads only on the document pages (its chunk is reached only from the document pages' manifests).
+**Check at every Paged.js or Next.js upgrade**, with the two uses of Paged.js's internals below.
 
 ### Laying out a large document takes seconds
 
-A full data dictionary of "Performance test" (41 entities, 779 attributes, every field and column) is 42 pages; from the
-navigation to "42 pages" takes 5.8 s (median of 5, measurement build, headless Chromium 153 on the laptop), of which
-Paged.js's layout is 4.3 s (step 4's reference figure, no bar; `e2e/slice-25/S25-layout.spec.ts`). The page is built
-once when it is opened. A live preview while the recipe is edited (slice B) needs another approach than laying out
-every page again on each change.
+Paged.js lays out the whole document on every call, on the main thread, one page per animation frame (slice 26, step 1).
+Reference figures (no bar; measurement build, headless Chromium 153 on the laptop, medians of 5):
+- a full data dictionary of "Performance test" (41 entities, 779 attributes, every field and column): 42 pages, layout
+  4.3 s (slice 25's `e2e/slice-25/S25-layout.spec.ts`);
+- the Source-to-target specification for ETL preset on "Performance test": **117 pages in 6.4 s**; the dictionary
+  preset: 37 pages in 1.2 s (slice 26, step 3).
+
+A layout of such a document holds up typing: a key waits up to about 0.4 s while a page is laid out (slice 26, step 1).
+The editor therefore shows the quick sheet in Auto once a layout took 1,000 ms or more, lays out again only about 500 ms
+after the last keystroke, and stops a running layout when a newer change comes (D-81). Exact pages on such a document
+still meets one page's task when a key falls into a layout that already started.
+
+### The editor reads the model once
+
+The editor reads the workspace's snapshot once when it opens (slice 26, D7): the preview builds the document from it.
+Changes others make to the model meanwhile reach the preview after a reload; the document page (`/view`) always reads
+the model as it is. The snapshot holds people as id and name only (no e-mail address, no roles).
+
+### Two uses of Paged.js's internals
+
+- **Stopping a layout:** Paged.js 0.4.3's `chunker.stop()` makes its flow start again from the break. The editor makes
+  the stopped layout's next page fail instead (it replaces the chunker's `renderAsync` on that instance), which ends the
+  flow, and destroys the layout once the flow has ended (`src/modules/infodocumenter/app/preview.tsx`).
+- **Resize watchers:** Paged.js keeps a `ResizeObserver` on each page after a layout, which checks the page for
+  underflow again; on pages moved into view or zoomed it walks an ended flow and throws. The editor disconnects them
+  when a layout is done (`removeListeners` on each page).
+
+Both rely on Paged.js's internals: check them with the alias at every Paged.js upgrade (S26-02 and S26-03 cover them).
+
+### The model checks are printed in English
+
+Model readiness prints the model checks' groups and lines (D-75, the core's `CHECK_TEXTS` and its rules' texts, and
+InfoCube's) in English in Polish and German documents; the section's own words are translated (slice 26, D3). Their
+three languages are a follow-up in `docs/ideas.md`.
+
+### Part 8 of the full run is past 2 GB
+
+Slice 26's specs joined part 8 (the recut rule). Its heap peaked at 2,088 MB in slice 26's step 2 run (CLAUDE.md:
+"when a part's heap comes near 2 GB, move the cuts or add a part"). The recut goes on a `chore/` branch after slice
+26's merge.
 
 ### German document labels and InfoCube's German words await review
 
 The German labels of documents (the prototype's `LBL`, `src/modules/infodocumenter/domain/labels.ts`) and InfoCube's
-German words for documents (fact types, additivity, histories, kinds and the role's long text,
-`src/modules/infocube/domain/document-words.ts`) are a first draft; Łukasz reviews them. Polish and English are the
-prototype's, with the new words listed in the acceptance doc (step 3).
+German words for documents (fact types, additivity, histories, kinds, the role's long text, the Bus matrix,
+`src/modules/infocube/domain/document-words.ts`) are a first draft; Łukasz reviews them. Slice 26's new German words are
+listed in `docs/prd/slice-26-acceptance.md` (step 3). Polish and English are the prototype's, with the new words (the
+requirements' kinds, statuses and priorities, the readiness note) listed there too.
 
 ### The demo's plain seed has almost no attribute definitions
 

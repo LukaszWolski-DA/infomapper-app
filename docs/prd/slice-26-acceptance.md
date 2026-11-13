@@ -1311,3 +1311,120 @@ New: `e2e/slice-26/S26-08.spec.ts`, `S26-09.spec.ts`, S26-screens' step 4 part, 
 
 Screenshots: `docs/prd/slice-26-screens/step-4/` (a Formal A3 landscape title page and dictionary page; a Compact page
 in black and white, and its title page).
+
+## Łukasz's answers to step 4 (13 November 2026)
+
+Accepted as built:
+- the draft mark is black in black and white;
+- a document's language does not return to the workspace's once chosen (noted in `docs/ideas.md`, "Later, noted");
+- the title page's height comes from the page size;
+- sections are numbered by default; slice 25's documents get numbers after the upgrade.
+
+## Step 5: the closing (13 November 2026)
+
+### The decisions, for Łukasz's approval
+
+- **D-81** (new) in `docs/decisions.md`, after D-80. It says which parts of D-80 it amends; D-80 ends with "(Changed by
+  D-81.)". D-81 reads "Proposed at slice 26's closing, awaiting Łukasz's approval." until he accepts it.
+- **AD-18's slice 25 note** is amended: the recipe holds `style` too.
+
+### The docs
+
+- **`docs/data-model-v2.md`:** `document_definition.style`, the section entries' `heading` and `newPage`, the new types,
+  the second migration and the row upgrade.
+- **`docs/inventory-prototype-vs-app.md`:** InfoDocumenter's section against slice 26's prototype: what is still
+  missing (logos, figures, versions and links, baselines, light markup, Markdown), what is present, the deliberate
+  differences.
+- **`docs/known-limitations.md`, "InfoDocumenter":**
+  - the layout reference figures (117 pages in 6.4 s);
+  - the editor's snapshot read once;
+  - the two uses of Paged.js's internals, checked with the alias at each upgrade;
+  - the model checks in English;
+  - part 8's heap at 2,088 MB (the recut on a `chore/` branch after the merge);
+  - the German words awaiting review.
+- **`docs/ideas.md`:**
+  - InfoDocumenter's section holds slices 25 and 26 as done, and the roadmap moved in (the order of slices C, baselines,
+    D, E; "Later, noted" with steps 2 to 4's notes; the follow-ups outside the slices).
+  - `docs/prd/slice-26-roadmap.md` is now one sentence pointing there.
+- **README and CLAUDE.md:**
+  - the status;
+  - the document sections' new kinds and contributions;
+  - the editor's files;
+  - `onType`;
+  - slice 26's helpers and its two on-demand commands.
+
+### The measuring scripts
+
+- **Kept:** `e2e/slice-26/S26-10-figures.spec.ts`, from step 2's D7 script, as an on-demand measurement (skipped unless
+  `MEASURE=1`, as slice 25's layout spec). It measures the editor's snapshot (its bytes and that it holds no e-mail
+  address), the state, the tree and the first layout on "Performance test" and the demo, and is listed in CLAUDE.md's
+  commands.
+- **Deleted:** `scripts/s26-measure/S26-measure.spec.ts` (step 1's measurement on slice 25's document page; the layout
+  is now measured in the editor, and `/view` keeps `S25-layout`) and its config.
+- Nothing stays uncommitted.
+
+### The full run
+
+See below: the run on the final commit.
+
+### Manual acceptance (PRD section 6), on the demo
+
+Start the demo on its own file, never `.data/dev-db.json`:
+
+```bash
+npm run demo -- --reset
+```
+
+Then work at http://127.0.0.1:3001, signed in as Łukasz from the test users' list.
+
+1. **A document from the dictionary preset.**
+   - Open "Retail Co – DWH" › Documentation › New document › "Data dictionary for the business". The editor opens with
+     seven sections: Text, Model overview, Conventions and notation, Data dictionary, Requirements and coverage, Data
+     quality rules, Classification register.
+   - The preview shows real pages and the top bar says "{n} pages".
+2. **Add and reorder sections.**
+   - "+ Add section": the list shows every type. "Dimensional model" and "Bus matrix" carry "InfoCube" and are enabled
+     (InfoCube is on in the demo).
+   - Add "Model readiness"; it comes last, selected.
+   - Move it up three times with the arrows, rename it in "Heading", turn one section off with its box, remove another.
+   - The preview follows each change. The Documentation tab's Undo stays off: documents are outside undo.
+3. **Auto while typing.** Type in the Text section's text or the cover's subtitle. The pages follow about half a second
+   after you stop, before you leave the field; the field saves when you leave it.
+4. **The quick sheet with "Update pages" on a large document.**
+   - In a terminal, with the demo server stopped, add the workspace "Performance test" to the demo file:
+
+     ```bash
+     INFOMAPPER_DEV_DB=.data/demo-db.json npm run seed:large
+     ```
+
+   - Restart the demo without `--reset`, turn InfoDocumenter on in Performance test's Settings, and make a document from
+     the source-to-target preset.
+   - The first layout takes several seconds (117 pages for every mapping). A change then shows the quick sheet at once
+     with "Pages out of date: this document took {s} s to lay out…".
+   - "Update pages" lays out the pages; the quick sheet stays until they are in.
+   - "Quick preview" and "Exact pages" in the mode select behave as named; "Fit width", "75 %" and "100 %" zoom.
+5. **The sync.**
+   - Click a section on the left: the preview scrolls to it and outlines it.
+   - Click a section in the preview: its options open on the right.
+   - Double-click a section: its Heading takes the focus.
+6. **A Formal template in landscape A3.**
+   - In Document › Style choose Formal, A3, Landscape, an accent, "Black and white" off.
+   - Set the header's right part to `{date}` and the footer's right part to `{page}/{pages}`.
+   - The pages are A3 landscape with serif body text, sans headings, a ruled title page, numbered sections and your
+     header and footer.
+   - Choose Compact: the sections run on and each section's "Start on a new page" is disabled with the reason.
+7. **The sections' content.**
+   - In the demo document check Model readiness (the model checks in English, the definition checks), Conventions (the
+     workspace's stereotypes and classifications), Source tables (turn on Data Vault 2.0 mode in Settings for the
+     reading) and the classification register.
+   - In the Data dictionary with "Dimensional (InfoCube)" ticked, check the facts and dimensions with their role and
+     feeds; try the three layouts and "Long definitions".
+8. **The language.**
+   - Choose "Deutsch" in "Language of the document": headings and labels in German, names and definitions as written.
+   - A document of the seed (made before your choice) shows the workspace's language in the select.
+9. **A PDF.** "Print / PDF" opens the browser's print dialog on the pages alone, in the style's paper and orientation;
+   save as PDF.
+10. **The document page.** Open the document from the Documentation tab ("Open" or `/view`): the same pages and style.
+
+KB is not part of this acceptance: the local file's format did not change (it stays 17), and no step needs KB's
+file.
