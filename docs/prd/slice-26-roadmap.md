@@ -58,10 +58,14 @@ Agreed 12 November 2026 (option 2):
 - Module switches and licences as one record when a third module comes.
 - Step 2 of figures: a requirement's path from source to dimensional model, a canvas with a requirement's lens,
   cross-references instead of duplicates.
+- Light markup in Text ("- " lists, **bold**, _italic_, as the prototype; slice 26 keeps D-80's plain text, D11).
 
 ## Follow-ups outside the slices
 
 - **German words** (document labels, InfoCube's words): Łukasz's review, then a small `fix/` branch.
+- **The model checks' texts in Polish and German** (about 40 texts in the core, `CHECK_TEXTS` and the rules' `text()`,
+  and InfoCube's checks), with the German words' review; until then a Polish or German document prints them in English
+  (slice 26, D3).
 - **Part 8 of the full run:** the longest in the last two GitHub runs (13:53, 16:31); at the next full run, check the
   median of three; if confirmed, recut `PART_STARTS` on a `chore/` branch.
 - **KB to format 17:** only on Łukasz's command, after the backup; then a dictionary of Kanton Basel.

@@ -699,3 +699,30 @@ contents words, the checks' labels, the conventions' texts, the Data Vault lines
 11. **Q3:** Auto's threshold at 1,000 ms; stop a running layout when a newer change arrives?
 12. **Q8:** a new document stores the workspace's language; older and seeded ones follow the workspace (null)?
 13. **F8:** a full run in step 2?
+
+## Łukasz's answers (12 November 2026)
+
+All thirteen questions as proposed, with these additions:
+
+1. **D1:** yes. The dictionary's three layouts as the prototype ("Definition under each row", "Definition as a column"
+   with its width, "One block per attribute"); "Under each row / After the table, numbered / As a column" for long texts
+   in the five other sections.
+2. **D2:** yes, the presets as the prototype's **without Diagrams, Figure and Changes since a baseline**, with the two
+   reworded descriptions.
+3. **D3:** yes. The Data Vault reading in the document's language; model checks in English for now. **Also noted in
+   `slice-26-roadmap.md`, "Follow-ups outside the slices":** the model checks' texts in Polish and German (about 40 texts
+   in the core), with the German words' review.
+4. **D4, D5:** yes. Overview as the prototype (no "what is on no canvas"); weak definitions as InfoDocumenter's own rule.
+5. **D6:** yes. `{page}`, `{pages}` and `{pagelabel}` are dropped from the header's left part, with the prototype's hint.
+6. **D7:** yes, the tree built in the browser from a snapshot the editor's page sends once (the editor only; `/view`
+   unchanged). **Also:** confirm that the snapshot holds nothing about people beyond what the app's pages already show
+   (no e-mail addresses unless a page shows them to this member), and measure its size and the time to build the tree in
+   the browser on "Performance test" and the demo (reference figures, no bar). Step 2's report gives both.
+7. **D8:** yes, the quick sheet's footer from the footer fields.
+8. **D9:** yes, double-click focuses "Heading" (no inline rename).
+9. **D10:** yes, at most 50 sections.
+10. **D11:** yes, Text stays plain text (D-80). **Also noted in `slice-26-roadmap.md`, "Later, noted":** light markup in
+    Text.
+11. **Q3:** yes, Auto's threshold 1,000 ms; a running layout is stopped when a newer change arrives.
+12. **Q8:** yes, a new document stores the workspace's language; older and seeded ones follow the workspace (null).
+13. **F8:** yes, a full run in step 2.
