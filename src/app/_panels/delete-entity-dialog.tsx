@@ -48,7 +48,7 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
     // on the entity's save chain (slice 10a): after its panel's saves, with the newest version
     const result = await saveRow(e, (v) => deleteEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v }), `Deleted ${e.name} from the model.`, { undoable: true, deletes: true });
     if (result.ok) {
-      ui.select(null);
+      ui.deselectDeleted(result.deleted);
       onClose();
     }
   }

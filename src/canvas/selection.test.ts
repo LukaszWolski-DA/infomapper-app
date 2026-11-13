@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { afterLasso, allKeys, cardKey, fromKeys, lassoHits, rectBetween, selectedCardIds, selectedKeys, selectionBounds, toggleCard, toggleItem, unitsOf, type ItemBox } from "./selection";
+import { access, attribute, canvasItem, entity, ids, makeCtx, mapping, mappingInput, relationship } from "@/domain/__fixtures__/domain";
+import { deletedIds } from "@/domain/changes";
+import { deleteAttribute } from "@/domain/commands/attribute";
+import { deleteEntity } from "@/domain/commands/entity";
+import { deleteMapping } from "@/domain/commands/mapping";
+import { afterLasso, allKeys, cardKey, fromKeys, lassoHits, rectBetween, selectedCardIds, selectedKeys, selectionBounds, selectionDeleted, toggleCard, toggleItem, unitsOf, type ItemBox } from "./selection";
 
 const cards: ItemBox[] = [
   { id: "c1", key: "entity:customer", rect: { x: 0, y: 0, w: 256, h: 200 } },
@@ -189,5 +194,79 @@ describe("requirement cards in the selection (slice 4b-2, L)", () => {
     expect(allKeys(all)).toContain("req:r1");
     expect(unitsOf(["frame:f1", "req:r1"], all)).toMatchObject({ frames: ["f1"], cards: [], reqs: ["rc1"] });
     expect(selectedCardIds(["entity:customer", "req:r1"], all)).toEqual(["c1"]);
+  });
+});
+
+describe("the selection after a delete's answer (fix/selection-after-delete)", () => {
+  // Customer (on two canvases) with two attributes, one mapped; Sales Order with one mapped attribute; a relationship
+  // Customer – Sales Order and one Sales Order – Project A that does not touch Customer
+  const { customer, salesOrder, itemCustomer, itemCrmCustomer } = ids;
+  const itemCustomer2 = "01900000-0000-7000-8000-00000000c003";
+  const itemOrder = "01900000-0000-7000-8000-00000000c004";
+  const [email, phone] = [attribute(ids.email, { entity_id: customer, sort_order: 0 }), attribute("01900000-0000-7000-8000-000000005199", { entity_id: customer, sort_order: 1 })];
+  const orderId = attribute(ids.orderId, { entity_id: salesOrder });
+  const mapEmail = mapping({ id: "01900000-0000-7000-8000-00000000a101", attribute_id: email.id });
+  const mapOrder = mapping({ id: "01900000-0000-7000-8000-00000000a104", attribute_id: orderId.id });
+  const inputs = [mappingInput("01900000-0000-7000-8000-00000000b101", { mapping_id: mapEmail.id }), mappingInput("01900000-0000-7000-8000-00000000b104", { mapping_id: mapOrder.id })];
+  const relCustomer = relationship();
+  const relOther = relationship({ id: "01900000-0000-7000-8000-000000006003", from_entity_id: salesOrder, to_entity_id: ids.projectA });
+  const items = [canvasItem(itemCustomer), canvasItem(itemCustomer2, { entity_id: customer }), canvasItem(itemCrmCustomer), canvasItem(itemOrder, { entity_id: salesOrder })];
+  const links = { labelLinks: [], requirementLinks: [] };
+
+  const gone = (r: { ok: true; writeSet: { writes: Parameters<typeof deletedIds>[0] } } | { ok: false }) => {
+    if (!r.ok) throw new Error("refused");
+    return new Set(deletedIds(r.writeSet.writes));
+  };
+
+  it("an entity's delete clears a selection of the entity, its cards, its attributes' rows, its mappings and its relationships", () => {
+    const deleted = gone(
+      deleteEntity(
+        makeCtx(),
+        access("modeler"),
+        { entity: entity(customer), attributes: [email, phone, orderId], mappings: [mapEmail, mapOrder], mappingInputs: inputs, attributeInputs: [], relationships: [relCustomer, relOther], canvasItems: items, notes: [], ...links },
+        { entityId: customer, expectedVersion: 1 },
+      ),
+    );
+    expect(selectionDeleted({ t: "card", id: itemCustomer }, deleted)).toBe(true);
+    expect(selectionDeleted({ t: "card", id: itemCustomer2 }, deleted)).toBe(true);
+    expect(selectionDeleted({ t: "element", kind: "entity", id: customer }, deleted)).toBe(true);
+    expect(selectionDeleted({ t: "row", cardId: itemCustomer, id: phone.id }, deleted)).toBe(true);
+    expect(selectionDeleted({ t: "element", kind: "attribute", id: email.id }, deleted)).toBe(true);
+    expect(selectionDeleted({ t: "map", id: mapEmail.id }, deleted)).toBe(true);
+    expect(selectionDeleted({ t: "rel", id: relCustomer.id }, deleted)).toBe(true);
+    expect(selectionDeleted({ t: "multi", keys: [`entity:${salesOrder}`, `entity:${customer}`] }, deleted)).toBe(true);
+    // what the person selected meanwhile, which the delete did not take along, stays
+    expect(selectionDeleted({ t: "card", id: itemCrmCustomer }, deleted)).toBe(false);
+    expect(selectionDeleted({ t: "card", id: itemOrder }, deleted)).toBe(false);
+    expect(selectionDeleted({ t: "row", cardId: itemOrder, id: orderId.id }, deleted)).toBe(false);
+    expect(selectionDeleted({ t: "map", id: mapOrder.id }, deleted)).toBe(false);
+    expect(selectionDeleted({ t: "rel", id: relOther.id }, deleted)).toBe(false);
+    expect(selectionDeleted({ t: "multi", keys: [`entity:${salesOrder}`, `source:${ids.crmCustomer}`] }, deleted)).toBe(false);
+    expect(selectionDeleted({ t: "bundle", id: `${itemCustomer}|${itemOrder}` }, deleted)).toBe(false);
+    expect(selectionDeleted(null, deleted)).toBe(false);
+  });
+
+  it("an attribute's delete clears its row and its mappings; its card, its entity and the other rows stay", () => {
+    const deleted = gone(
+      deleteAttribute(makeCtx(), access("modeler"), { attribute: email, mappings: [mapEmail, mapOrder], mappingInputs: inputs, attributeInputs: [], ...links }, { attributeId: email.id, expectedVersion: 1 }),
+    );
+    expect(selectionDeleted({ t: "row", cardId: itemCustomer, id: email.id }, deleted)).toBe(true);
+    expect(selectionDeleted({ t: "map", id: mapEmail.id }, deleted)).toBe(true);
+    expect(selectionDeleted({ t: "card", id: itemCustomer }, deleted)).toBe(false);
+    expect(selectionDeleted({ t: "element", kind: "entity", id: customer }, deleted)).toBe(false);
+    expect(selectionDeleted({ t: "row", cardId: itemCustomer, id: phone.id }, deleted)).toBe(false);
+    expect(selectionDeleted({ t: "map", id: mapOrder.id }, deleted)).toBe(false);
+  });
+
+  it("a mapping's delete clears only the mapping; a module's line is compared by its id as well", () => {
+    const deleted = gone(deleteMapping(makeCtx(), access("modeler"), { mapping: mapEmail, inputs: [inputs[0]!], ...links }, { mappingId: mapEmail.id, expectedVersion: 1 }));
+    expect(selectionDeleted({ t: "map", id: mapEmail.id }, deleted)).toBe(true);
+    expect(selectionDeleted({ t: "row", cardId: itemCustomer, id: email.id }, deleted)).toBe(false);
+    expect(selectionDeleted({ t: "ext", kind: "cube_mapping", id: "m-cube" }, new Set(["m-cube"]))).toBe(true);
+    expect(selectionDeleted({ t: "ext", kind: "cube_mapping", id: "m-cube" }, deleted)).toBe(false);
+  });
+
+  it("nothing deleted clears nothing", () => {
+    expect(selectionDeleted({ t: "card", id: itemCustomer }, new Set())).toBe(false);
   });
 });

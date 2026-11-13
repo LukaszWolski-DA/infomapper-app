@@ -280,9 +280,7 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
             className={dangerClass}
             data-testid="button-delete-cube-mapping"
             onClick={() =>
-              void remove(m.id).then((ok) => {
-                if (ok) ui.select(null);
-              })
+              void remove(m.id).then((deleted) => ui.deselectDeleted(deleted))
             }
           >
             Delete mapping

@@ -367,7 +367,7 @@ export function useCanvasHost({
         const m = ix.mapping.get(line.id);
         if (!m) return;
         const r = await saveRow(m, (v) => deleteMappingAction(workspaceId, { mappingId: m.id, expectedVersion: v }), "Mapping deleted", { undoable: true, deletes: true });
-        if (r.ok) ui.select(null);
+        if (r.ok) ui.deselectDeleted(r.deleted);
       } else {
         const rel = ix.model.relationships.find((x) => x.id === line.id);
         if (!rel) return;
@@ -375,7 +375,7 @@ export function useCanvasHost({
           undoable: true,
           deletes: true,
         });
-        if (r.ok) ui.select(null);
+        if (r.ok) ui.deselectDeleted(r.deleted);
       }
     },
     [editable, ix, saveRow, workspaceId, ui, modules, toast],
@@ -775,7 +775,7 @@ export function useCanvasHost({
                 attributeDeleted(n, copies.length, modules.attributeDeletes[a.id]?.toast),
                 { undoable: true, deletes: true },
               ).then((r) => {
-                if (r.ok) ui.select(null);
+                if (r.ok) ui.deselectDeleted(r.deleted);
               }),
           });
         }

@@ -60,7 +60,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
     void saveRow(r, (v) => setRequirementStatusAction(p.workspaceId, { requirementId: r.id, expectedVersion: v, status }));
   async function remove() {
     const result = await saveRow(r, (v) => deleteRequirementAction(p.workspaceId, { requirementId: r.id, expectedVersion: v }), (x) => x.message, { undoable: true, deletes: true });
-    if (result.ok) ui.select(null);
+    if (result.ok) ui.deselectDeleted(result.deleted);
   }
   const unlink = (k: RequirementLink) =>
     void run(() => unlinkRequirementAction(p.workspaceId, { requirementLinkId: k.id, expectedVersion: k.version }), "Unlinked.", { undoable: true });

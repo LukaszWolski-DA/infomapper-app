@@ -94,7 +94,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
     );
     if (result.ok) {
       setDeleting(false);
-      ui.select(null);
+      ui.deselectDeleted(result.deleted);
     }
   }
 

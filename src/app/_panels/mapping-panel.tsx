@@ -207,7 +207,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
 
   async function remove() {
     const result = await saveRow(m, (v) => deleteMappingAction(p.workspaceId, ref(v)), "Mapping deleted", { undoable: true, deletes: true });
-    if (result.ok) ui.select(null);
+    if (result.ok) ui.deselectDeleted(result.deleted);
   }
 
   const first = inputs[0] ? ix.column.get(inputs[0].source_column_id) : undefined;

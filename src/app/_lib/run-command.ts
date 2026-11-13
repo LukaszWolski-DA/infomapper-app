@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { STORE_SCHEMA, UNDO_TABLES } from "@/compose";
 import { getDataStore, type DataStore } from "@/data";
-import { buildWriteSet, writtenVersions, type CommandContext, type CommandResult, type WriteSet } from "@/domain/changes";
+import { buildWriteSet, deletedIds, writtenVersions, type CommandContext, type CommandResult, type WriteSet } from "@/domain/changes";
 import { completeLiveWrites, touchesLiveCanvases, type LiveOutcome } from "@/domain/commands/live";
 import { CONTEXT_LABEL_GONE, contextTargets } from "@/domain/model/live";
 import { cascadingModuleTables, moduleCascade } from "@/domain/commands/module-cascade";
@@ -29,9 +29,11 @@ import { lockedRefusal, organizationOfWrite } from "./unlock";
 export type ActionResult<T = undefined> =
   /**
    * `versions`: the new version of every row the write wrote, for the writes that opt in (`runCommand`'s `versions`,
-   * slice 10a, F2); the browser's next saves of those rows send them (`rowSaves`).
+   * slice 10a, F2); the browser's next saves of those rows send them (`rowSaves`). `deleted`: the ids of the rows the
+   * write soft-deleted, its cascades included (`deletedIds`), present only when it deleted any; after a delete's answer
+   * the canvas clears the selection only if it points at one of them (`ui.deselectDeleted`, fix/selection-after-delete).
    */
-  | { ok: true; value: T; live?: LiveOutcome; versions?: Record<string, number> }
+  | { ok: true; value: T; live?: LiveOutcome; versions?: Record<string, number>; deleted?: string[] }
   /** `fields`: the domain's field messages, when it gave some (slice 7a: P8's refusal says `review: "stale"`). */
   | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected" | "cut" | "locked"; message: string; fields?: Record<string, string> };
 
@@ -101,11 +103,13 @@ export async function runCommand<T>(
     if (!applied.ok) return { ok: false, code: applied.error.code, message: applied.error.message };
     await remember(store, user.id, completed.writeSet);
     if (completed.value.canvases.length) recordLiveNotices(user.id, completed.value);
+    const deleted = deletedIds(completed.writeSet.writes);
     return {
       ok: true,
       value: result.value,
       ...(completed.value.canvases.length || completed.value.labeled ? { live: completed.value } : {}),
       ...(options.versions ? { versions: writtenVersions(completed.writeSet.writes) } : {}),
+      ...(deleted.length ? { deleted } : {}),
     };
   };
   try {

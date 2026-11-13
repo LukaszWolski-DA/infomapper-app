@@ -53,15 +53,18 @@ export const traceOf = (index: MappingIndex, id: Uuid): string => {
   return m ? `${index.inputsOf(id).map((i) => index.label(i.attribute_id)).join(" + ")} → ${index.label(m.attribute_id)}` : "";
 };
 
-/** "Delete mapping", the Delete key: on the save chain with the mapping's row checked; true once deleted. */
+/**
+ * "Delete mapping", the Delete key: on the save chain with the mapping's row checked; once deleted, the ids the delete
+ * removed (the answer's `deleted`, for `ui.deselectDeleted`), else undefined.
+ */
 export function useCubeMappingDelete(workspaceId: string, index: MappingIndex) {
   const { saveRow } = useAction();
   return useCallback(
     async (id: Uuid) => {
       const m = index.mapping(id);
-      if (!m) return false;
+      if (!m) return undefined;
       const r = await saveRow(m, (v) => deleteCubeMappingAction(workspaceId, { mappingId: m.id, expectedVersion: v }), "Mapping deleted", { undoable: true, deletes: true });
-      return r.ok;
+      return r.ok ? r.deleted : undefined;
     },
     [saveRow, index, workspaceId],
   );
@@ -89,9 +92,7 @@ export function useCubeCanvas(context: CanvasExtContext): CanvasExtHandlers {
 
     const remove = (id: Uuid) => {
       if (!editable) return;
-      void deleteMapping(id).then((ok) => {
-        if (ok) ui.select(null);
-      });
+      void deleteMapping(id).then((deleted) => ui.deselectDeleted(deleted));
     };
 
     const menu = (id: Uuid): ExtMenuItem[] => {
