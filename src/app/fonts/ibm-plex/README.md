@@ -14,6 +14,12 @@ fonts (every script the font covers):
 | `IBMPlexSans-SemiBold.woff2` | `@ibm/plex-sans` 1.1.0 | `f78048030eab62e860efa39a0df79e2e5581bf122eb95b9bc42c0b8a4988d205` |
 | `IBMPlexMono-Regular.woff2` | `@ibm/plex-mono` 2.5.0, `fonts/complete/woff2/` | `ba204497f16b6d334cee9d1e963a831b73e3a56e1d6300a8489d18df7214b350` |
 | `IBMPlexMono-Medium.woff2` | `@ibm/plex-mono` 2.5.0 | `33faf307fa6031fb4062276d7320a6d632de890cbb347576fd80cfa01077bc25` |
+| `IBMPlexSerif-Regular.woff2` | `@ibm/plex-serif` 2.0.0, `fonts/complete/woff2/` | `024ebce13cec984b46e350dd85fa7c01105c777e116bfe95f097ad7fa93f39f2` |
+| `IBMPlexSerif-Medium.woff2` | `@ibm/plex-serif` 2.0.0 | `f66376aeb33a5b32116558e0de53b76b48531f6388e352aeeb35ad82ea05cfaa` |
+| `IBMPlexSerif-Italic.woff2` | `@ibm/plex-serif` 2.0.0 | `ba5feed9ebae36e3b6ae3486052c90f4f42a294fa67a7c9415985175d19c4c82` |
+
+The three Serif files (slice 26, step 4: the Formal template of InfoDocumenter's documents) are loaded by
+`src/app/fonts/plex-serif.ts` on the document editor and the document page only, never by the root layout.
 
 **Licence:** SIL Open Font License 1.1, in `LICENSE.txt` (the packages' `LICENSE.txt`, the same text as Google Fonts'
 `OFL.txt` for both families). "Plex" is a Reserved Font Name: a modified version (a subset, for example) may not be
