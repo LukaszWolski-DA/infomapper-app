@@ -48,6 +48,9 @@ export interface CubeDocWords {
   readonly snapshot: string;
   /** The role's long text above an entity (`cubeTitle`). */
   readonly titles: CubeTitleWords;
+  /** Slice 26: the Bus matrix's heading and its first column (the prototype's `t_bus`, `fact`). */
+  readonly busTitle: string;
+  readonly fact: string;
 }
 
 const EN: CubeDocWords = {
@@ -88,6 +91,8 @@ const EN: CubeDocWords = {
   additivities: { additive: "Additive", semi: "Semi-additive", non: "Non-additive" },
   snapshot: "Snapshot",
   titles: ENGLISH_TITLE_WORDS,
+  busTitle: "Bus matrix",
+  fact: "Fact",
 };
 
 const PL: CubeDocWords = {
@@ -136,6 +141,8 @@ const PL: CubeDocWords = {
     snapshot: (period) => `migawka${period ? ` (${period})` : ""}`,
     outriggerOf: (names) => `outrigger wymiaru ${names}`,
   },
+  busTitle: "Macierz bus matrix",
+  fact: "Fakt",
 };
 
 /** German: for Łukasz's review (PRD section 7). */
@@ -185,6 +192,8 @@ const DE: CubeDocWords = {
     snapshot: (period) => `Snapshot${period ? ` (${period})` : ""}`,
     outriggerOf: (names) => `Outrigger von ${names}`,
   },
+  busTitle: "Bus-Matrix",
+  fact: "Fakt",
 };
 
 export const CUBE_DOC_WORDS: Readonly<Record<DocLanguage, CubeDocWords>> = { en: EN, pl: PL, de: DE };

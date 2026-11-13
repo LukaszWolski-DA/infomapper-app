@@ -37,6 +37,12 @@ export interface DocumentSectionKind {
 export interface SectionScope {
   /** The entities in scope (the projects' cards and the concepts chosen); every live entity when nothing narrows it. */
   readonly entityIds: ReadonlySet<Uuid>;
+  /**
+   * Slice 26 (F13): the source tables in scope, the prototype's rule: those with a column a shown mapping reads into an
+   * entity in scope; with no concept chosen, also those on the scope's canvases (the projects', or every canvas); with
+   * neither a project nor a concept chosen, every live table.
+   */
+  readonly tableIds: ReadonlySet<Uuid>;
   readonly logical: boolean;
   readonly dimensional: boolean;
   readonly mappings: "all" | "notdraft" | "approved";
@@ -57,6 +63,8 @@ export interface DocumentSectionType<T extends ModuleTable = ModuleTable> extend
   readonly label: (language: DocLanguage) => string;
   /** Its line in the editor's "+ Add section" list and under its options' title (slice 26), in the app's language. */
   readonly description?: string;
+  /** Slice 26: a line in place of options, for a type with none to set (the Bus matrix's). */
+  readonly optionNote?: string;
   /**
    * A module's options as the form draws them (slice 25, step 4): check boxes of its boolean options, each with its label
    * in the app's language; the form changes these keys only. InfoDocumenter's own sections draw their own fields.

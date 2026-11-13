@@ -3,4 +3,4 @@
 // joins. Pure code only (no store, no server module), so a module's client part may import it, as it imports
 // `model-command.ts`'s helpers on the server.
 
-export { DOCUMENT_SECTION_TYPES, documentStateFor } from "@/compose/documents";
+export { DOCUMENT_SECTION_TYPES, dimensionalLevelOn, documentStateFor } from "@/compose/documents";
