@@ -3,9 +3,12 @@
 // selects its section, a double-click goes to its heading.
 
 import { expect, test } from "./fixtures";
-import { buildTimes, builds, DEMO_DOCUMENT_NAMES, expectLayouts, formUrl, layouts, openEditor, probeBuilds, rowOfType, signInAs, storedDocument } from "./helpers";
+import { buildTimes, keepOnly, builds, DEMO_DOCUMENT_NAMES, expectLayouts, formUrl, layouts, openEditor, probeBuilds, rowOfType, signInAs, storedDocument } from "./helpers";
 
 const SHARED = DEMO_DOCUMENT_NAMES.shared;
+
+// the preview's mechanics on a short document: the shared one's Text and dictionary (its other sections off)
+test.beforeEach(() => keepOnly(SHARED, ["text", "dict"]));
 
 test("S26-03: typing in a field refreshes the preview once, about 500 ms after the last keystroke", async ({ page }) => {
   await probeBuilds(page);

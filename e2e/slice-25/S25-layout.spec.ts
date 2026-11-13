@@ -31,7 +31,7 @@ test("S25-layout: a full data dictionary of Performance test laid out in pages (
     {
       scope: { mappings: "all" },
       section: {
-        id: document.sections[1]!.id,
+        id: document.sections.find((s) => s.type === "dict")!.id,
         options: {
           entity: ["stereotype", "definition", "coverage", "requirements", "relationships"],
           columns: ["attribute", "type", "keys", "nullable", "pii", "definition", "mappedFrom", "calculation", "requirements"],

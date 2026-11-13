@@ -2,7 +2,12 @@
 // what it shows), and a probe of what the preview shows while a layout runs.
 
 import { expect, type Locator, type Page } from "@playwright/test";
-import { laidOut } from "../slice-25/helpers";
+import { DOCUMENT_SECTION_KINDS } from "../../src/compose/documents";
+import { readDb, writeDb } from "../../src/data/local/file";
+import { uuidv7 } from "../../src/domain/ids";
+import type { DocumentDefinition } from "../../src/modules/infodocumenter/domain/types";
+import { E2E_DB } from "../config";
+import { laidOut, sectionText } from "../slice-25/helpers";
 
 export * from "../slice-25/helpers";
 
@@ -66,3 +71,24 @@ export const probeBuilds = (page: Page) =>
     );
   });
 export const buildTimes = (page: Page) => page.evaluate(() => (window as unknown as { __imBuilds: number[] }).__imBuilds.slice());
+
+/**
+ * Test data: a stored document's sections replaced by these, each on, with its kind's defaults and the given options over
+ * them (the e2e data file, as slice 25's `keepOnly`).
+ */
+export async function setSections(name: string, sections: readonly { type: string; options?: Record<string, unknown>; heading?: string }[]) {
+  const db = await readDb(E2E_DB);
+  const doc = (db as unknown as { document_definition: DocumentDefinition[] }).document_definition.find((d) => d.name === name && d.deleted_at === null)!;
+  doc.sections = sections.map((x) => ({ id: uuidv7(), type: x.type, on: true, heading: x.heading ?? null, newPage: true, options: { ...DOCUMENT_SECTION_KINDS.get(x.type)!.defaults(), ...x.options } }));
+  await writeDb(E2E_DB, db);
+}
+
+/** Test data: a change of the e2e data file. */
+export async function changeDb(change: (db: Awaited<ReturnType<typeof readDb>>) => void) {
+  const db = await readDb(E2E_DB);
+  change(db);
+  await writeDb(E2E_DB, db);
+}
+
+/** The laid-out text of each section by its heading. */
+export const sectionsText = async (page: Page, headings: readonly string[]) => Object.fromEntries(await Promise.all(headings.map(async (h) => [h, await sectionText(page, h)] as const)));

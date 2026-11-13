@@ -119,10 +119,7 @@ describe("documents in the local adapter", () => {
     const fresh = createLocalDataStore(file, STORE_SCHEMA);
     const [read] = await fresh.modules.list(WS, "document_definition");
     expect(read!.style).toEqual({ ...d.style, language: null });
-    expect(read!.sections.map((s) => [s.type, s.heading, s.newPage, "heading" in s.options])).toEqual([
-      ["text", "Scope", true, false],
-      ["dict", null, true, false],
-    ]);
+    expect(read!.sections.map((s) => [s.type, s.heading, s.newPage, "heading" in s.options])).toEqual(d.sections.map((s) => [s.type, s.type === "text" ? "Scope" : null, true, false]));
     // a read writes nothing: the file keeps its format and the old row until the next write
     const after = await readDb(file);
     expect((after as unknown as { format: number }).format).toBe(17);
@@ -189,8 +186,8 @@ describe("one snapshot of a workspace (F1)", () => {
 });
 
 describe("the registered section kinds (F8)", () => {
-  it("joins InfoDocumenter's three and InfoCube's Dimensional model, once each", () => {
-    expect([...DOCUMENT_SECTION_KINDS.keys()]).toEqual(["text", "dict", "s2t", CUBE_SECTION_TYPE]);
+  it("joins InfoDocumenter's sections and InfoCube's two, once each (slice 26: every section without figures)", () => {
+    expect([...DOCUMENT_SECTION_KINDS.keys()]).toEqual(["text", "overview", "dict", "s2t", "sources", "classreg", "reqs", "ready", "conv", "trace", "dq", CUBE_SECTION_TYPE, "cube.bus"]);
     const cube = DOCUMENT_SECTION_KINDS.get(CUBE_SECTION_TYPE)!;
     expect(cube.presets).toEqual(["s2t"]);
     expect(cube.options.safeParse(cube.defaults()).success).toBe(true);
@@ -208,6 +205,7 @@ describe("the registered section kinds (F8)", () => {
     for (const w of db.workspace) if (w.id === WS) w.infocube = true;
     await writeDb(file, db);
     await turnOn();
-    expect((await created(SEED_IDS.userLukasz, "s2t")).sections.map((s) => s.type)).toEqual(["s2t", CUBE_SECTION_TYPE]);
+    // slice 26 (D2): the prototype's preset, the module's section in its place
+    expect((await created(SEED_IDS.userLukasz, "s2t")).sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", CUBE_SECTION_TYPE, "dq"]);
   });
 });

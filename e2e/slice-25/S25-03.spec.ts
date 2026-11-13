@@ -3,7 +3,7 @@
 // Duplicate makes a private copy; Undo does not touch documents.
 
 import { expect, test, type Page } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, docRow, docsUrl, documentEvents, expectToast, formUrl, SEED_IDS, signInAs, storedDocument, storedDocuments, updateDocumentAs } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, docRow, docsUrl, documentEvents, expectToast, formUrl, sectionOf, SEED_IDS, signInAs, storedDocument, storedDocuments, updateDocumentAs } from "./helpers";
 
 async function fromPreset(page: Page, preset: "dictionary" | "s2t" | "blank") {
   await page.goto(docsUrl());
@@ -20,19 +20,25 @@ test("S25-03: each preset makes a private document with its sections, and opens 
   const dictionary = await fromPreset(page, "dictionary");
   expect(dictionary).toMatchObject({ name: "Data dictionary for the business", shared: false, author_id: SEED_IDS.userLukasz, audience: "Business", preset: "dictionary", source_kind: "live" });
   expect(dictionary.scope.mappings).toBe("approved");
+  // slice 26 (D2): the prototype's preset without Diagrams
   expect(dictionary.sections.map((s) => [s.type, s.on])).toEqual([
     ["text", true],
+    ["overview", true],
+    ["conv", true],
     ["dict", true],
+    ["reqs", true],
+    ["dq", true],
+    ["classreg", true],
   ]);
-  await expect(page.getByTestId("editor-section")).toHaveCount(2);
+  await expect(page.getByTestId("editor-section")).toHaveCount(7);
   await expect(page.getByTestId("text-model-state")).toHaveText("Live model (changes as people work)");
 
   const s2t = await fromPreset(page, "s2t");
   // InfoCube is off in this seed: no Dimensional model (D1)
   expect(s2t).toMatchObject({ name: "Source-to-target specification for ETL", audience: "ETL developers" });
   expect(s2t.scope.mappings).toBe("notdraft");
-  expect(s2t.sections.map((s) => s.type)).toEqual(["s2t"]);
-  expect(s2t.sections[0]!.options).toMatchObject({ unmapped: true, group: "entity" });
+  expect(s2t.sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", "dq"]);
+  expect(sectionOf(s2t, "s2t").options).toMatchObject({ unmapped: true, group: "entity" });
 
   const blank = await fromPreset(page, "blank");
   expect(blank).toMatchObject({ name: "Blank document", audience: null });
@@ -56,7 +62,7 @@ test("S25-03: a change is saved with a version and a change event; a stale save 
   // a section's switch and its options too (slice 26: in the editor's right panel once the section is selected)
   await page.locator('[data-testid="editor-section"][data-section="dict"]').click();
   await page.locator('[data-testid="panel-section"][data-section="dict"]').getByTestId("checks-dict-columns-keys").check();
-  await expect.poll(async () => (await storedDocument(DEMO_DOCUMENT_NAMES.shared))?.sections[1]?.options.columns).toEqual(["attribute", "type", "keys", "pii", "definition"]);
+  await expect.poll(async () => sectionOf((await storedDocument(DEMO_DOCUMENT_NAMES.shared))!, "dict").options.columns).toEqual(["attribute", "type", "keys", "pii", "definition"]);
 
   await page.getByTestId("row-editor-document").click();
   // Anna changes the subtitle meanwhile; Łukasz's save of the same field is refused as stale and keeps his text

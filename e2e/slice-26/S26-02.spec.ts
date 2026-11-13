@@ -3,9 +3,12 @@
 // always lays them out; Quick never does; the old pages stay until the new ones are in.
 
 import { expect, test, type Page } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, expectLayouts, formUrl, layouts, openEditor, preview, probeWhileLaying, rowOfType, setThreshold, shown, signInAs, storedDocument, whileLaying } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, keepOnly, expectLayouts, formUrl, layouts, openEditor, preview, probeWhileLaying, rowOfType, setThreshold, shown, signInAs, storedDocument, whileLaying } from "./helpers";
 
 const SHARED = DEMO_DOCUMENT_NAMES.shared;
+
+// the preview's mechanics on a short document: the shared one's Text and dictionary (its other sections off)
+test.beforeEach(() => keepOnly(SHARED, ["text", "dict"]));
 
 /** A change of the document: the dictionary's switch, stored. */
 async function toggleDictionary(page: Page) {

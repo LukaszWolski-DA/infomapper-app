@@ -34,6 +34,20 @@ export const storedDocuments = async (): Promise<DocumentDefinition[]> => ((awai
 export const storedDocument = async (name: string) => (await storedDocuments()).find((d) => d.name === name && d.deleted_at === null);
 export const documentEvents = async (id: string) => (await readDb(E2E_DB)).change_event.filter((e) => e.object_id === id);
 
+/** A stored document's section by its type (slice 26: the presets have more sections, D2). */
+export const sectionOf = (doc: DocumentDefinition, type: string) => doc.sections.find((s) => s.type === type)!;
+
+/**
+ * Test data (slice 26): only the given types of a stored document stay on, the others off, so a spec of one section reads
+ * that section alone in the laid-out document (the demo's documents have the prototype's presets since slice 26, D2).
+ */
+export async function keepOnly(name: string, types: readonly string[]) {
+  const db = await readDb(E2E_DB);
+  const doc = (db as unknown as { document_definition: DocumentDefinition[] }).document_definition.find((d) => d.name === name && d.deleted_at === null)!;
+  doc.sections = doc.sections.map((s) => ({ ...s, on: types.includes(s.type) }));
+  await writeDb(E2E_DB, db);
+}
+
 /** A row of the Documentation tab by the document's name. */
 export const docRow = (page: Page, name: string): Locator => page.locator(`[data-testid="row-document"][data-name="${name}"]`);
 

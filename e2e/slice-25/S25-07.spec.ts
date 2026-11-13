@@ -52,7 +52,8 @@ test("S25-07: title page, contents with matching page numbers, header and footer
       };
     });
   });
-  expect(toc.map((t) => t.text)).toEqual(["Introduction", "Data dictionary"]);
+  // slice 26 (D2): the dictionary preset's sections
+  expect(toc.map((t) => t.text)).toEqual(["Introduction", "Model overview", "Conventions and notation", "Data dictionary", "Requirements and coverage", "Data quality rules", "Classification register"]);
   for (const t of toc) {
     expect(t.number, t.text!).toBe(t.page);
     expect(t.first, t.text!).toBe(true);

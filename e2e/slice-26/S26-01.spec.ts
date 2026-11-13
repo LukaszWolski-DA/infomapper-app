@@ -33,14 +33,16 @@ test("S26-01: the three panels; a section added, renamed, moved, turned off and 
   await expect(page.getByTestId("document-pages")).toBeVisible();
   await expect(page.getByTestId("editor-right")).toBeVisible();
   await expect(page.getByTestId("row-editor-document")).toContainText("Model state, scope, style, cover");
-  await expect(page.getByTestId("editor-section")).toHaveCount(2);
+  const count = doc.sections.length;
+  await expect(page.getByTestId("editor-section")).toHaveCount(count);
   let at = await now(doc.id);
+  const before = doc.sections.map((s) => s.type);
 
   // added at the end, with its kind's defaults, and selected
   await addSection(page, "s2t");
   at = await savedOnce(at, doc.id);
-  expect(await typesOf()).toEqual(["text", "dict", "s2t"]);
-  const added = (await storedDocument(SHARED))!.sections[2]!;
+  expect(await typesOf()).toEqual([...before, "s2t"]);
+  const added = (await storedDocument(SHARED))!.sections.at(-1)!;
   expect(added).toMatchObject({ on: true, heading: null, newPage: true });
   await expect(sectionRow(page, added.id)).toHaveAttribute("aria-current", "true");
   await expect(page.locator('[data-testid="panel-section"][data-section="s2t"]')).toBeVisible();
@@ -49,25 +51,25 @@ test("S26-01: the three panels; a section added, renamed, moved, turned off and 
   await page.getByTestId("input-section-heading").fill("Mappings for review");
   await page.getByTestId("input-section-heading").press("Enter");
   at = await savedOnce(at, doc.id);
-  expect((await storedDocument(SHARED))!.sections[2]!.heading).toBe("Mappings for review");
+  expect((await storedDocument(SHARED))!.sections.at(-1)!.heading).toBe("Mappings for review");
   await expect(sectionRow(page, added.id).getByTestId("text-section-name")).toHaveText("Mappings for review");
 
   // moved up
   await sectionRow(page, added.id).getByTestId("button-section-up").click();
   at = await savedOnce(at, doc.id);
-  expect(await typesOf()).toEqual(["text", "s2t", "dict"]);
-  await expect(page.getByTestId("editor-section").nth(1)).toHaveAttribute("data-section-id", added.id);
+  expect(await typesOf()).toEqual([...before.slice(0, -1), "s2t", before.at(-1)]);
+  await expect(page.getByTestId("editor-section").nth(count - 1)).toHaveAttribute("data-section-id", added.id);
 
   // turned off
   await sectionRow(page, added.id).getByTestId("check-section-on").uncheck();
   at = await savedOnce(at, doc.id);
-  expect((await storedDocument(SHARED))!.sections[1]!.on).toBe(false);
+  expect((await storedDocument(SHARED))!.sections[count - 1]!.on).toBe(false);
 
   // removed, without a question
   await sectionRow(page, added.id).getByTestId("button-section-remove").click();
   await savedOnce(at, doc.id);
-  expect(await typesOf()).toEqual(["text", "dict"]);
-  await expect(page.getByTestId("editor-section")).toHaveCount(2);
+  expect(await typesOf()).toEqual(before);
+  await expect(page.getByTestId("editor-section")).toHaveCount(count);
   // the selection goes back to Document
   await expect(page.getByTestId("panel-document")).toBeVisible();
 
@@ -99,7 +101,7 @@ test.describe("with InfoCube on", () => {
     await expect(cube).toBeEnabled();
     await expect(cube).toContainText("Facts with grain and type, dimensions and measures; dimensions with history; every dimensional attribute's feed.");
     await cube.click();
-    await expect.poll(typesOf).toEqual(["text", "dict", "cube.dim"]);
+    await expect.poll(async () => (await typesOf()).at(-1)).toBe("cube.dim");
     await expect(rowOfType(page, "cube.dim")).toContainText("InfoCube");
   });
 });

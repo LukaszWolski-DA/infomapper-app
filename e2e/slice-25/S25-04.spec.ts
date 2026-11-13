@@ -6,7 +6,7 @@
 import { readDb, writeDb } from "../../src/data/local/file";
 import { E2E_DB } from "../config";
 import { expect, test, type Page } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, laidOut, RETAIL, SEED_IDS, signInAs, storedDocument, updateDocumentAs, viewUrl } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, keepOnly, laidOut, RETAIL, sectionOf, SEED_IDS, signInAs, storedDocument, updateDocumentAs, viewUrl } from "./helpers";
 
 const MARKUP = `<img src=x onerror="window.__imXss=1"><b>bold</b> where we write to the customer`;
 
@@ -30,6 +30,8 @@ const metaOf = (page: Page, entity: string) =>
   }, entity);
 
 async function openDictionary(page: Page) {
+  // slice 26 (D2): the preset has more sections; this spec reads the dictionary alone
+  await keepOnly(DEMO_DOCUMENT_NAMES.shared, ["dict"]);
   const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.shared))!;
   await page.goto(viewUrl(doc.id));
   await laidOut(page);
@@ -50,7 +52,7 @@ test("S25-04: logical entities by concept, the chosen columns, the definition un
   db.attribute.find((a) => a.entity_id === customer.id && a.name === "email")!.definition_text = MARKUP;
   db.stereotype.find((s) => s.workspace_id === RETAIL && s.code === "object")!.name = "Business object";
   await writeDb(E2E_DB, db);
-  await updateDocumentAs(SEED_IDS.userLukasz, DEMO_DOCUMENT_NAMES.shared, { section: { id: (await storedDocument(DEMO_DOCUMENT_NAMES.shared))!.sections[1]!.id, options: { entity: ["stereotype", "definition", "coverage"] } } });
+  await updateDocumentAs(SEED_IDS.userLukasz, DEMO_DOCUMENT_NAMES.shared, { section: { id: sectionOf((await storedDocument(DEMO_DOCUMENT_NAMES.shared))!, "dict").id, options: { entity: ["stereotype", "definition", "coverage"] } } });
 
   await signInAs(page, "Łukasz");
   await openDictionary(page);
@@ -73,7 +75,7 @@ test("S25-04: logical entities by concept, the chosen columns, the definition un
 
 test("S25-04: the coverage line counts by the app's rule whatever the mapping filter (Q-L3)", async ({ page }) => {
   const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.shared))!;
-  await updateDocumentAs(SEED_IDS.userLukasz, DEMO_DOCUMENT_NAMES.shared, { section: { id: doc.sections[1]!.id, options: { entity: ["coverage"], columns: ["attribute", "mappedFrom"] } } });
+  await updateDocumentAs(SEED_IDS.userLukasz, DEMO_DOCUMENT_NAMES.shared, { section: { id: sectionOf(doc, "dict").id, options: { entity: ["coverage"], columns: ["attribute", "mappedFrom"] } } });
   await signInAs(page, "Łukasz");
   const expected = await customerCoverage();
   // Approved only: drafts and reviews are hidden in the rows, the line counts them
