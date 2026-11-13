@@ -1363,9 +1363,35 @@ Accepted as built:
   is now measured in the editor, and `/view` keeps `S25-layout`) and its config.
 - Nothing stays uncommitted.
 
-### The full run
+### The full run on the final commit (`77cd668`)
 
-See below: the run on the final commit.
+- **The first run failed once:** https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/43481776730, 784 passed,
+  1 failed, 12 skipped. The failure was `e2e/slice-15b/RP-07` (a test timeout), outside InfoDocumenter.
+  - The single-file check passed 3 of 3: https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/43484703157.
+  - **The cause is a race in the test.** After the delete it waits for the data file, then clicks the card's name while
+    the canvas is still redrawing from the delete's fresh page. The click is lost: the details panel still shows the
+    canvas's overview, and the test waits for the entity panel until its timeout. The fix is to wait for what the
+    page shows (the deleted row gone from the card) before the click (CLAUDE.md, "A race in a test"). It is an earlier
+    slice's test, so it goes on its own `fix/` branch, not into this slice.
+- **The second run passed:** https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/43485073406 on `77cd668`.
+  - **785 passed, 0 failed, 0 flaky, 12 skipped, 0 expected failures.**
+  - Wall-clock 16 min 44 s (18:41:30 to 18:58:14 UTC).
+
+  | Part | Time | Heap peak |
+  | --- | ---: | ---: |
+  | 1 | 7 min 21 s | 1,038 MB |
+  | 2 | 8 min 11 s | 1,246 MB |
+  | 3 | 8 min 33 s | 1,007 MB |
+  | 4 | 8 min 7 s | 1,196 MB |
+  | 5 | 11 min 42 s | 1,169 MB |
+  | 6 | 7 min 32 s | 1,660 MB |
+  | 7 | 10 min 12 s | 1,112 MB |
+  | 8 | 15 min 13 s | 1,814 MB |
+
+  - No part restarted.
+  - Part 8 is again the longest, 3 min 31 s ahead of part 5, so the recut rule applies (`docs/ideas.md`, the
+    follow-ups).
+  - This commit, which adds this record, changes only Markdown in `docs/`.
 
 ### Manual acceptance (PRD section 6), on the demo
 
