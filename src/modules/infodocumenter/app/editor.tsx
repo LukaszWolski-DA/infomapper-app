@@ -26,7 +26,6 @@ import { useToast } from "@/ui/components/toast";
 import { DOCUMENT_TEXTS, NAME_REQUIRED, type UpdateDocumentInput } from "../domain/commands";
 import { buildDocument, type DocumentTree } from "../domain/document";
 import { RIGHTS_TEXTS } from "../domain/rights";
-import { DICTIONARY_COLUMNS, DICTIONARY_ENTITY_FIELDS, S2T_COLUMNS, type DictionaryColumn, type DictionaryEntityField, type S2TColumn } from "../domain/sections";
 import type { DocumentDefinition, MappingFilter } from "../domain/types";
 import {
   addDocumentSectionAction,
@@ -38,6 +37,7 @@ import {
   updateDocumentAction,
 } from "./actions";
 import { nextDraft, withDrafts, type TextDraft } from "../ui/drafts";
+import { hasSpec, SectionOptions, type OptionContext } from "./section-options";
 import { DocumentPreview, LAYOUT_THRESHOLD_MS, PREVIEW_TEXTS, type PreviewHandle, type PreviewMode, type PreviewZoom } from "./preview";
 
 /** A registered section type as the editor lists it (the server computes it for the workspace). */
@@ -53,6 +53,8 @@ export interface EditorSectionType {
   /** The default heading in the document's language (the Heading field's placeholder). */
   heading: string;
   checks: readonly { key: string; label: string }[] | null;
+  /** A line in place of options (a module's type with none to set). */
+  note: string | null;
 }
 
 export const EDITOR_TEXTS = {
@@ -80,36 +82,6 @@ export const EDITOR_TEXTS = {
 const OWN_NAMES: Record<string, string> = { text: "Text", dict: "Data dictionary", s2t: "Source-to-target mapping" };
 export const sectionName = (type: string, label: string): string => OWN_NAMES[type] ?? label;
 
-const ENTITY_LABELS: Record<DictionaryEntityField, string> = {
-  stereotype: "Stereotype",
-  definition: "Definition",
-  coverage: "Mapping coverage",
-  requirements: "Requirements",
-  relationships: "Relationships (after the attributes)",
-};
-const DICT_LABELS: Record<DictionaryColumn, string> = {
-  attribute: "Attribute",
-  type: "Type",
-  keys: "Keys",
-  nullable: "Nullable",
-  pii: "Personal data",
-  definition: "Definition",
-  mappedFrom: "Mapped from",
-  calculation: "Calculation",
-  requirements: "Requirements",
-};
-const S2T_LABELS: Record<S2TColumn, string> = {
-  target: "Target",
-  targetType: "Target type",
-  system: "System",
-  sourceColumn: "Source column",
-  sourceType: "Source type",
-  rule: "Rule",
-  status: "Status",
-  typeCheck: "Type check",
-  note: "Note",
-  requirements: "Requirements",
-};
 const MAPPINGS: readonly (readonly [MappingFilter, string])[] = [
   ["all", "All, drafts marked"],
   ["notdraft", "Approved and in review"],
@@ -131,6 +103,10 @@ export interface EditorProps {
   date: string;
   /** The test hook for Auto's threshold (`window.__imDocLayoutMs`), only where the test hooks are on. */
   testHooks: boolean;
+  /** Whether the dimensional level is drawn (its module on): "Model levels" shows only then (the prototype's). */
+  dimensional: boolean;
+  /** What the sections' options need from the workspace. */
+  optionContext: OptionContext;
 }
 
 type Patch = Omit<UpdateDocumentInput, "workspaceId" | "documentId" | "expectedVersion">;
@@ -152,7 +128,7 @@ const readMode = (): PreviewMode => {
 export const TYPING_PAUSE_MS = 500;
 
 export function DocumentEditor(props: EditorProps) {
-  const { workspaceId, document: doc, types, rights, archived, author, authorMember, projects, concepts, date, testHooks } = props;
+  const { workspaceId, document: doc, types, rights, archived, author, authorMember, projects, concepts, date, testHooks, dimensional, optionContext } = props;
   const { saveRow, run, pending } = useAction();
   const toast = useToast();
   const router = useRouter();
@@ -469,6 +445,7 @@ export function DocumentEditor(props: EditorProps) {
                 headingRef.current = el;
               }}
               typed={typed}
+              context={optionContext}
               save={(patch) => save({ section: { id: selectedSection.id, ...patch } })}
             />
           ) : (
@@ -485,12 +462,15 @@ export function DocumentEditor(props: EditorProps) {
               <Field label="Concepts" hint="None ticked: every concept.">
                 <IdChecks testId="checks-concepts" items={concepts} chosen={doc.scope.concepts} disabled={ro} onSave={(ids) => save({ scope: { concepts: ids } })} />
               </Field>
-              <Field label="Model levels">
-                <div className="flex flex-wrap gap-4">
-                  <Check testId="check-level-logical" label="Logical" stored={doc.scope.logical} disabled={ro} onSave={(on) => save({ scope: { logical: on } })} />
-                  <Check testId="check-level-dimensional" label="Dimensional (InfoCube)" stored={doc.scope.dimensional} disabled={ro} onSave={(on) => save({ scope: { dimensional: on } })} />
-                </div>
-              </Field>
+              {/* only while the dimensional level is drawn (the prototype's; Łukasz's answer to step 2) */}
+              {dimensional && (
+                <Field label="Model levels">
+                  <div className="flex flex-wrap gap-4">
+                    <Check testId="check-level-logical" label="Logical" stored={doc.scope.logical} disabled={ro} onSave={(on) => save({ scope: { logical: on } })} />
+                    <Check testId="check-level-dimensional" label="Dimensional (InfoCube)" stored={doc.scope.dimensional} disabled={ro} onSave={(on) => save({ scope: { dimensional: on } })} />
+                  </div>
+                </Field>
+              )}
               <Field label="Mappings included">
                 <Choice stored={doc.scope.mappings} save={(m) => save({ scope: { mappings: m } })}>
                   {(value, pick) => <Seg testId="seg-mappings" value={value} options={MAPPINGS} disabled={ro} onChange={pick} />}
@@ -618,11 +598,13 @@ function SectionPanel({
   headingRef,
   typed,
   save,
+  context,
 }: {
   section: Recipe["sections"][number];
   type: EditorSectionType | null;
   readOnly: boolean;
   version: number;
+  context: OptionContext;
   headingRef: (el: HTMLInputElement | null) => void;
   typed: (key: string) => (text: string) => void;
   save: (patch: { on?: boolean; heading?: string | null; newPage?: boolean; options?: Record<string, unknown> }) => Answer;
@@ -646,44 +628,8 @@ function SectionPanel({
         />
       </Field>
     );
-  else if (s.type === "dict")
-    body = (
-      <>
-        <Field label="Attribute properties" hint="Order follows this list. Headers are written in the document's language.">
-          <ListChecks testId="checks-dict-columns" all={DICTIONARY_COLUMNS} labels={DICT_LABELS} stored={o.columns as DictionaryColumn[]} disabled={readOnly} onSave={(v) => opt({ columns: v })} />
-        </Field>
-        <Field label="Above each entity's table">
-          <ListChecks testId="checks-dict-entity" all={DICTIONARY_ENTITY_FIELDS} labels={ENTITY_LABELS} stored={o.entity as DictionaryEntityField[]} disabled={readOnly} onSave={(v) => opt({ entity: v })} />
-        </Field>
-      </>
-    );
-  else if (s.type === "s2t")
-    body = (
-      <>
-        <Field label="Columns" hint="Order follows this list. Headers are written in the document's language.">
-          <ListChecks testId="checks-s2t-columns" all={S2T_COLUMNS} labels={S2T_LABELS} stored={o.columns as S2TColumn[]} disabled={readOnly} onSave={(v) => opt({ columns: v })} />
-        </Field>
-        <Field label="Grouping">
-          <Choice stored={o.group as "entity" | "system"} save={(g) => opt({ group: g })}>
-            {(value, pick) => (
-              <Seg
-                testId="seg-s2t-group"
-                value={value}
-                options={[
-                  ["entity", "By target entity"],
-                  ["system", "By source system"],
-                ]}
-                disabled={readOnly}
-                onChange={pick}
-              />
-            )}
-          </Choice>
-        </Field>
-        <div className="mt-3">
-          <Check testId="check-s2t-unmapped" label="List attributes that have no mapping" stored={!!o.unmapped} disabled={readOnly} onSave={(v) => opt({ unmapped: v })} />
-        </div>
-      </>
-    );
+  else if (hasSpec(s.type))
+    body = <SectionOptions sectionId={s.id} type={s.type} options={o} readOnly={readOnly} version={version} context={context} typed={typed} save={opt} />;
   else if (type.checks)
     body = (
       <div className="mt-3 grid gap-1">
@@ -692,6 +638,7 @@ function SectionPanel({
         ))}
       </div>
     );
+  else if (type.note) body = <p className="m-0 mt-3 text-[11.5px] text-im-ink-3">{type.note}</p>;
   const name = type ? sectionName(type.type, type.name) : s.type;
   return (
     <div data-testid="panel-section" data-section={s.type}>
@@ -789,37 +736,13 @@ function Check({ label, stored, onSave, disabled, testId }: { label: string; sto
   );
 }
 
-/** A subset of a fixed list, kept in the list's order. */
-function ListChecks<K extends string>({ all, labels, stored, onSave, disabled, testId }: { all: readonly K[]; labels: Record<K, string>; stored: readonly K[]; onSave: (v: K[]) => Answer; disabled?: boolean; testId: string }) {
-  const choice = useChoice<readonly K[]>(stored, (v) => onSave([...v]));
-  return (
-    <div className="grid grid-cols-2 gap-1" data-testid={testId}>
-      {all.map((k) => (
-        <label key={k} className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            data-testid={`${testId}-${k}`}
-            checked={choice.value.includes(k)}
-            disabled={disabled}
-            onChange={(e) => {
-              const on = e.currentTarget.checked;
-              choice.choose(all.filter((x) => (x === k ? on : choice.value.includes(x))));
-            }}
-          />
-          {labels[k]}
-        </label>
-      ))}
-    </div>
-  );
-}
-
 function IdChecks({ items, chosen, onSave, disabled, testId }: { items: { id: string; name: string }[]; chosen: string[]; onSave: (v: string[]) => Answer; disabled?: boolean; testId: string }) {
   const live = new Set(items.map((i) => i.id));
-  // ids deleted since stay in the recipe and are ignored (F7): the boxes show the live ones
-  const choice = useChoice<readonly string[]>(
-    chosen.filter((id) => live.has(id)),
-    (v) => onSave([...v]),
-  );
+  // ids deleted since stay in the recipe and are ignored (F7): the boxes show the live ones, as one object while they
+  // stay the same (`useChoice` shows a choice made on that object)
+  const shownKey = JSON.stringify(chosen.filter((id) => live.has(id)));
+  const shown = useMemo(() => JSON.parse(shownKey) as string[], [shownKey]);
+  const choice = useChoice<readonly string[]>(shown, (v) => onSave([...v]));
   return (
     <div className="flex flex-col gap-1" data-testid={testId}>
       {items.map((i) => (

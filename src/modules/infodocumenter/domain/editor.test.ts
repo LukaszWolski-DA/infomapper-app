@@ -91,27 +91,28 @@ describe("a section's heading and page break; add, remove, move (F12, D10)", () 
     const d = made();
     const r = ok(addDocumentSection(makeCtx(ME), as("reader"), d, { ...at(d), type: "s2t" }, KINDS));
     expect(r.document.version).toBe(d.version + 1);
-    expect(r.document.sections.map((s) => s.type)).toEqual(["text", "dict", "s2t"]);
-    expect(r.document.sections[2]).toMatchObject({ id: r.sectionId, on: true, heading: null, newPage: true, options: { group: "entity", unmapped: false } });
+    expect(r.document.sections.map((s) => s.type)).toEqual([...d.sections.map((s) => s.type), "s2t"]);
+    expect(r.document.sections.at(-1)).toMatchObject({ id: r.sectionId, on: true, heading: null, newPage: true, options: { group: "entity", unmapped: false, longTexts: "row" } });
   });
 
   it("refuses a type no module knows, a module's while it is off, and the 51st section", () => {
     const d = made();
     expect(refusal(addDocumentSection(makeCtx(ME), as("reader"), d, { ...at(d), type: "acme.figures" }, KINDS))).toBe(SECTION_TEXTS.notInstalled);
     expect(refusal(addDocumentSection(makeCtx(ME), as("reader"), d, { ...at(d), type: "cube.dim" }, KINDS))).toBe("InfoCube is off in this workspace.");
-    expect(ok(addDocumentSection(makeCtx(ME), as("reader", { infocube: true }), d, { ...at(d), type: "cube.dim" }, KINDS)).document.sections).toHaveLength(3);
+    expect(ok(addDocumentSection(makeCtx(ME), as("reader", { infocube: true }), d, { ...at(d), type: "cube.dim" }, KINDS)).document.sections).toHaveLength(d.sections.length + 1);
     const full = { ...d, sections: Array.from({ length: SECTIONS_MAX }, (_, i) => ({ ...d.sections[0]!, id: `0190000${i}-0000-7000-8000-000000000000`.slice(0, 36) })) };
     expect(refusal(addDocumentSection(makeCtx(ME), as("reader"), full, { ...at(full), type: "text" }, KINDS))).toBe("A document holds at most 50 sections.");
   });
 
   it("removes and moves a section; the first one up changes nothing; a gone section is not found", () => {
     const d = made();
-    const [text, dict] = d.sections;
-    const moved = ok(moveDocumentSection(makeCtx(ME), as("reader"), d, { ...at(d), sectionId: dict!.id, direction: "up" })).document;
-    expect(moved.sections.map((s) => s.id)).toEqual([dict!.id, text!.id]);
-    expect(refusal(moveDocumentSection(makeCtx(ME), as("reader"), moved, { ...at(moved), sectionId: dict!.id, direction: "up" }))).toBe("Nothing to change.");
+    const [text, second, ...rest] = d.sections;
+    const moved = ok(moveDocumentSection(makeCtx(ME), as("reader"), d, { ...at(d), sectionId: second!.id, direction: "up" })).document;
+    expect(moved.sections.map((s) => s.id)).toEqual([second!.id, text!.id, ...rest.map((s) => s.id)]);
+    expect(refusal(moveDocumentSection(makeCtx(ME), as("reader"), moved, { ...at(moved), sectionId: second!.id, direction: "up" }))).toBe("Nothing to change.");
     const removed = ok(removeDocumentSection(makeCtx(ME), as("reader"), moved, { ...at(moved), sectionId: text!.id })).document;
-    expect(removed.sections.map((s) => s.id)).toEqual([dict!.id]);
+    expect(removed.sections.map((s) => s.id)).toEqual([second!.id, ...rest.map((s) => s.id)]);
+    const dict = second;
     expect(removeDocumentSection(makeCtx(ME), as("reader"), removed, { ...at(removed), sectionId: text!.id })).toMatchObject({ ok: false, error: { code: "not_found" } });
     // the row's version is checked (D-59)
     expect(removeDocumentSection(makeCtx(ME), as("reader"), removed, { ...at(removed), expectedVersion: d.version, sectionId: dict!.id })).toMatchObject({ ok: false, error: { code: "stale_version" } });
@@ -139,7 +140,7 @@ describe("the page frame's fields (F9, D6, D8)", () => {
 
   it("drops the page tokens from the header's left part, empties the header without a running header, and the mark when off", async () => {
     const { buildDocument } = await import("./document");
-    const state = { snapshot: { workspace: { name: "W", client_name: null, doc_language: "en" }, organization: { name: "Org" }, people: [], model: { concepts: [], entities: [] }, projects: [], projectCanvases: [], canvasItems: [] } };
+    const state = { snapshot: { workspace: { name: "W", client_name: null, doc_language: "en" }, organization: { name: "Org" }, people: [], model: { concepts: [], entities: [], attributes: [], sourceTables: [], sourceColumns: [], mappings: [], mappingInputs: [] }, projects: [], projectCanvases: [], canvasItems: [] } };
     const tree = (style = defaultStyle()) =>
       buildDocument({
         definition: { name: "Doc", author_id: ME, scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings: "all" }, cover: { title: null, subtitle: null, version: null, status: null, preparedBy: null }, style, sections: [] },

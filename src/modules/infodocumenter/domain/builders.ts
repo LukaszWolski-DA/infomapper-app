@@ -1,17 +1,22 @@
-// InfoDocumenter's own sections as content trees (slice 25, step 3; PRD section 2): Text, the Data dictionary (the
-// logical level only, PRD item 3 as answered) and the Source-to-target mapping. Pure: each reads the document's model
-// state (`src/domain/document/state.ts`: one snapshot and the app's indexes over it) and nothing else, and draws what
-// the prototype's `DOC` draws for this slice's options (step 1's D6, D8, D9): one layout, long texts under the row.
+// InfoDocumenter's own sections as content trees (slice 25, step 3; PRD section 2): Text, the Data dictionary and the
+// Source-to-target mapping; since slice 26 the dictionary's three layouts, its long definitions at the end and the
+// dimensional entities with their role and feeds (PRD item 8), and the long-texts choice of the source-to-target. Pure:
+// each reads the document's model state (`src/domain/document/state.ts`: one snapshot and the app's indexes over it)
+// and nothing else, and draws what the prototype's `DOC` draws. The other sections are in `sections-*.ts`.
 
-import { EMPTY, marksStatus, mono, muted, relationshipsBlock, statusShown, strong, text, typeRuns, warn } from "@/domain/document/blocks";
-import type { DocColumn, DocNode, DocRow, DocRun, DocRuns } from "@/domain/document/content";
+import { EMPTY, lines, longTextTable, marksStatus, mono, muted, relationshipsBlock, statusShown, strong, text, typeRuns, warn } from "@/domain/document/blocks";
+import type { DocColumn, DocNode, DocRun, DocRuns } from "@/domain/document/content";
 import type { DocumentSectionType, SectionBuildInput, SectionScope } from "@/domain/document/sections";
 import type { DocumentState } from "@/domain/document/state";
 import type { Uuid } from "@/domain/ids";
-import type { LabelTargetKind } from "@/domain/model/labels";
 import { checkMappingTypes, formatColumnType } from "@/domain/model/type-check";
 import type { Attribute, DocLanguage, Entity, Mapping, SourceColumn } from "@/domain/types";
 import { label, type LabelKey } from "./labels";
+import { buildReadiness } from "./readiness";
+import { buildConventions, buildOverview } from "./sections-model";
+import { buildQuality, buildRequirements, buildTrace } from "./sections-requirements";
+import { buildRegister, buildSources } from "./sections-sources";
+import { attributeLabel, attributesOf, byConcept, columnRuns, feedStatus, fedRule, logicalEntities, NONE, requirementKeys, scopeEntities, statusRun, wordsIn, wordsOf, type L } from "./parts";
 import {
   dictionaryOptions,
   INFODOC_SECTION_KINDS,
@@ -22,47 +27,6 @@ import {
   type S2TColumn,
   type S2TOptions,
 } from "./sections";
-
-type L = (key: LabelKey, values?: Readonly<Record<string, string | number>>) => string;
-const wordsOf = (language: DocLanguage): L => (key, values) => label(language, key, values);
-const NONE = (t: L): DocNode => ({ kind: "paragraph", runs: [muted(t("none"))] });
-
-/** Runs on separate lines: the first as it is, every later one starting a new line. */
-function lines(parts: readonly DocRuns[]): DocRuns {
-  return parts.flatMap((runs, i) => (i && runs.length ? [{ ...runs[0]!, lineBreak: true }, ...runs.slice(1)] : runs));
-}
-
-/** The keys of an element's own requirements, joined (the prototype's `reqKeys`: its direct links). */
-function requirementKeys(state: DocumentState, kind: LabelTargetKind, id: Uuid): DocRuns {
-  const keys = state.requirements.of({ kind, id }).direct.map((r) => r.key);
-  return keys.length ? [mono(keys.join(", "))] : EMPTY;
-}
-
-/** "Order.order_id": a source column with its table (the prototype's `colLabel`), marked when it left the source. */
-function columnRuns(state: DocumentState, c: SourceColumn, t: L): DocRuns {
-  const table = state.table.get(c.source_table_id);
-  const runs: DocRun[] = [mono(`${table?.name ?? "?"}.${c.name}`)];
-  if (c.missing_since !== null) runs.push(warn(` ${t("colMissing")}`));
-  else if (c.retired_since !== null) runs.push(muted(` ${t("colRetired")}`));
-  return runs;
-}
-
-const statusRun = (status: Mapping["status"], t: L): DocRun => ({ text: t(status), pill: true, status });
-
-/** The logical entities of the scope, in the Model tab's order: by concept (the concepts' order), then by name. */
-function logicalEntities(state: DocumentState, scope: SectionScope): Map<Uuid, Entity[]> {
-  const out = new Map<Uuid, Entity[]>();
-  if (!scope.logical) return out;
-  for (const c of state.snapshot.model.concepts) out.set(c.id, []);
-  for (const e of state.snapshot.model.entities) {
-    if (e.model_level !== "logical" || !scope.entityIds.has(e.id)) continue;
-    out.get(e.concept_id)?.push(e);
-  }
-  for (const [id, list] of out) if (!list.length) out.delete(id);
-  return out;
-}
-
-const attributesOf = (state: DocumentState, entityId: Uuid): readonly Attribute[] => state.lookup.attributesOf.get(entityId) ?? [];
 
 // ---- Text (D8) ----
 
@@ -91,17 +55,37 @@ const DICTIONARY_LABEL: Record<DictionaryColumn, LabelKey> = {
 };
 
 function mappedFromRuns(state: DocumentState, a: Attribute, scope: SectionScope, t: L): DocRuns {
+  if (state.lookup.isDimensional(a.id)) return fedFromRuns(state, a, scope, t);
   const shown = (state.lookup.mappingsOfAttribute.get(a.id) ?? []).filter((m) => statusShown(scope.mappings, m.status));
-  if (!shown.length) {
-    const inputs = state.derivations.inputsOf(a.id);
-    if (state.derivations.isCalculated(a.id) && inputs.length) return [muted(`= ${inputs.map((id) => state.lookup.attribute.get(id)?.name ?? "?").join(", ")}`)];
-    return [muted(t("notMapped"))];
-  }
+  if (!shown.length) return calculatedOrNot(state, a, t);
   return lines(
     shown.map((m) => {
       const cols = state.lookup.inputsOf.get(m.id) ?? [];
       const runs: DocRun[] = cols.flatMap((c, i) => (i ? [text(" + "), ...columnRuns(state, c, t)] : [...columnRuns(state, c, t)]));
       if (marksStatus(scope.mappings) && m.status !== "approved") runs.push(text(" "), statusRun(m.status, t));
+      return runs;
+    }),
+  );
+}
+
+/** A calculated attribute without a shown mapping: "= a, b" (its inputs); otherwise "Not mapped". */
+function calculatedOrNot(state: DocumentState, a: Attribute, t: L): DocRuns {
+  const inputs = state.derivations.inputsOf(a.id);
+  if (state.derivations.isCalculated(a.id) && inputs.length) return [muted(`= ${inputs.map((id) => state.lookup.attribute.get(id)?.name ?? "?").join(", ")}`)];
+  return [muted(t("notMapped"))];
+}
+
+/**
+ * A dimensional attribute's "Mapped from" (PRD item 8, the prototype's `attrCell` "src"): each shown feed as the logical
+ * attributes it reads, "Entity.attr + Entity.attr", with its status pill while drafts are marked.
+ */
+function fedFromRuns(state: DocumentState, a: Attribute, scope: SectionScope, t: L): DocRuns {
+  const feeds = state.lookup.feedsOf(a.id).filter((f) => statusShown(scope.mappings, feedStatus(f)));
+  if (!feeds.length) return calculatedOrNot(state, a, t);
+  return lines(
+    feeds.map((f) => {
+      const runs: DocRun[] = [mono(f.inputs.map((id) => attributeLabel(state, id)).join(" + "))];
+      if (marksStatus(scope.mappings) && feedStatus(f) !== "approved") runs.push(text(" "), statusRun(feedStatus(f), t));
       return runs;
     }),
   );
@@ -132,45 +116,106 @@ function dictionaryCell(state: DocumentState, a: Attribute, column: DictionaryCo
   }
 }
 
+/** The prototype's `COLW`: the columns' shares of what the definition column leaves, in the "as a column" layout. */
+const COLUMN_WEIGHTS: Record<DictionaryColumn, number> = { attribute: 2, type: 1.2, keys: 0.7, nullable: 0.9, pii: 0.8, definition: 0, mappedFrom: 2.3, calculation: 1.6, requirements: 1 };
+/** The cards' one line of properties (the prototype's `cardsH`), and their labelled lines. */
+const CARD_PROPS: readonly DictionaryColumn[] = ["type", "keys", "nullable", "pii"];
+const CARD_LINES: readonly DictionaryColumn[] = ["mappedFrom", "calculation", "requirements"];
+
 /**
- * Entities grouped by concept; above each entity's table the chosen fields (stereotype, coverage, requirements on one
- * line, then the definition); the chosen columns, the definition under each row; the relationships after them. The
- * coverage line counts by the app's rule whatever the mapping filter (Q-L3): any mapping, any status, or through a
- * calculation.
+ * The entities of the scope, by concept when chosen (a concept on a new page when chosen), each a block: above its table
+ * the chosen fields (the stereotype, or a dimensional entity's role in its module's words, PRD item 8; the coverage; the
+ * requirements; then the definition), its attributes in the chosen layout (D1: the definition under each row, as a
+ * column with its width, or one block per attribute), its relationships after them. With long definitions moved, a
+ * longer definition leaves "→ note {n}" and comes in full at the section's end. The coverage line counts by the app's
+ * rule whatever the mapping filter (Q-L3): any mapping or feed, any status, or through a calculation.
  */
 export function buildDictionary({ state, scope, options, language }: SectionBuildInput): DocNode[] {
   const o: DictionaryOptions = dictionaryOptions.parse(options);
   const t = wordsOf(language);
-  const columns = o.columns.filter((c) => c !== "definition");
+  const fed = fedRule(state);
   const definitions = o.columns.includes("definition");
-  const head: DocColumn[] = columns.map((c) => ({ key: c, label: t(DICTIONARY_LABEL[c]) }));
+  const columns = o.layout === "column" ? o.columns : o.columns.filter((c) => c !== "definition");
+  const rest = columns.filter((c) => c !== "definition").reduce((n, c) => n + COLUMN_WEIGHTS[c], 0);
+  const width = (c: DictionaryColumn) => (c === "definition" ? o.definitionWidth : Math.round(((100 - (definitions ? o.definitionWidth : 0)) * COLUMN_WEIGHTS[c] * 10) / rest) / 10);
+  const head: DocColumn[] = columns.map((c) => ({ key: c, label: t(DICTIONARY_LABEL[c]), ...(o.layout === "column" ? { width: width(c) } : {}) }));
   const words = { heading: t("rels"), related: t("related"), name: t("relname"), cardinality: t("cardin"), outsideScope: t("outScope") };
-  const out: DocNode[] = [];
-  for (const [conceptId, entities] of logicalEntities(state, scope)) {
-    out.push({ kind: "heading", level: 2, text: state.concept.get(conceptId)?.name ?? "?" });
-    for (const e of entities) {
-      const attributes = attributesOf(state, e.id);
-      out.push({ kind: "heading", level: 3, text: e.name });
-      const meta: DocRuns[] = [];
-      if (o.entity.includes("stereotype")) meta.push([text(state.stereotypes.name(e.stereotype))]);
-      if (o.entity.includes("coverage")) meta.push([text(t("mappedCnt", { a: attributes.filter((a) => state.mapped(a.id)).length, b: attributes.length }))]);
-      if (o.entity.includes("requirements")) {
-        const keys = requirementKeys(state, "entity", e.id);
-        if (keys.length) meta.push(keys);
-      }
-      if (meta.length) out.push({ kind: "meta", parts: meta });
-      if (o.entity.includes("definition") && e.definition_text) out.push({ kind: "paragraph", runs: [text(e.definition_text)] });
-      if (!attributes.length) out.push(NONE(t));
-      else {
-        const rows: DocRow[] = attributes.map((a) => {
-          const below = definitions && a.definition_text ? [[text(a.definition_text)]] : undefined;
-          return { cells: columns.map((c) => dictionaryCell(state, a, c, scope, t)), ...(below ? { below } : {}) };
-        });
-        out.push({ kind: "table", columns: head, rows });
-      }
-      if (o.entity.includes("relationships")) out.push(...relationshipsBlock(state, e.id, scope, words));
+  const moved: Attribute[] = [];
+  /** A definition in place, or its reference when it goes to the end (counted in plain words, the prototype's). */
+  const definitionRuns = (a: Attribute): DocRuns => {
+    if (!a.definition_text) return EMPTY;
+    if (o.longDefinitions && wordsIn(a.definition_text).join(" ").length > o.longDefinitions) {
+      moved.push(a);
+      return [{ text: `→ ${t("defNote")} ${moved.length}`, ref: true }];
     }
-  }
+    return [text(a.definition_text)];
+  };
+  const cell = (a: Attribute, c: DictionaryColumn) => (c === "definition" ? definitionRuns(a) : dictionaryCell(state, a, c, scope, t));
+
+  const attributesNode = (attributes: readonly Attribute[]): DocNode => {
+    if (o.layout === "cards")
+      return {
+        kind: "cards",
+        variant: "attribute",
+        cards: attributes.map((a) => ({
+          title: [mono(a.name)],
+          props: CARD_PROPS.filter((c) => o.columns.includes(c))
+            .map((c) => (c === "nullable" ? (a.is_nullable && !a.is_primary_key ? [text(t("nullable").toLowerCase())] : EMPTY) : dictionaryCell(state, a, c, scope, t)))
+            .filter((runs) => runs.length),
+          ...(definitions && a.definition_text ? { text: definitionRuns(a) } : {}),
+          lines: CARD_LINES.filter((c) => o.columns.includes(c))
+            .map((c) => ({ label: t(DICTIONARY_LABEL[c]), runs: dictionaryCell(state, a, c, scope, t) }))
+            .filter((x) => x.runs.length),
+        })),
+      };
+    if (o.layout === "column") return { kind: "table", style: "fixed", columns: head, rows: attributes.map((a) => ({ cells: columns.map((c) => cell(a, c)) })) };
+    return {
+      kind: "table",
+      columns: head,
+      rows: attributes.map((a) => {
+        const below = definitions ? definitionRuns(a) : EMPTY;
+        return { cells: columns.map((c) => dictionaryCell(state, a, c, scope, t)), ...(below.length ? { below: [below] } : {}) };
+      }),
+    };
+  };
+
+  const entityNodes = (e: Entity): DocNode[] => {
+    const attributes = attributesOf(state, e.id);
+    const meta: DocRuns[] = [];
+    if (o.entity.includes("stereotype")) {
+      const role = e.model_level === "dimensional" ? state.modules.entityRole(e.id, language) : null;
+      meta.push([text(role ?? state.stereotypes.name(e.stereotype))]);
+    }
+    if (o.entity.includes("coverage")) meta.push([text(t("mappedCnt", { a: attributes.filter((a) => fed(a.id)).length, b: attributes.length }))]);
+    if (o.entity.includes("requirements")) {
+      const keys = requirementKeys(state, "entity", e.id);
+      if (keys.length) meta.push(keys);
+    }
+    const nodes: DocNode[] = [{ kind: "heading", level: 3, text: e.name }];
+    if (meta.length) nodes.push({ kind: "meta", parts: meta });
+    if (o.entity.includes("definition") && e.definition_text) nodes.push({ kind: "paragraph", runs: [text(e.definition_text)] });
+    nodes.push(attributes.length ? attributesNode(attributes) : NONE(t));
+    if (o.entity.includes("relationships")) nodes.push(...relationshipsBlock(state, e.id, scope, words));
+    return [{ kind: "group", nodes, mark: state.concept.get(e.concept_id)?.color }];
+  };
+
+  // the dimensional entities with a role from their module (PRD item 8); with it off or out of scope, none
+  const entities = scopeEntities(state, scope).filter((e) => e.model_level === "logical" || state.modules.entityRole(e.id, language) !== null);
+  const out: DocNode[] = [];
+  if (o.byConcept) {
+    let first = true;
+    for (const [conceptId, list] of byConcept(state, entities)) {
+      if (o.conceptPage && !first) out.push({ kind: "pageBreak" });
+      first = false;
+      const c = state.concept.get(conceptId);
+      out.push({ kind: "heading", level: 2, text: c?.name ?? "?", ...(c ? { swatch: c.color } : {}) }, ...list.flatMap(entityNodes));
+    }
+  } else out.push(...entities.flatMap(entityNodes));
+  if (moved.length)
+    out.push(
+      { kind: "heading", level: 2, text: t("t_longdefs") },
+      { kind: "list", ordered: true, items: moved.map((a) => ({ label: [strong(attributeLabel(state, a.id)), text(" ")], runs: [text(a.definition_text ?? "")] })) },
+    );
   return out.length ? out : [NONE(t)];
 }
 
@@ -231,15 +276,11 @@ function s2tCell(state: DocumentState, m: Mapping, column: S2TColumn, t: L): Doc
 export function buildS2T({ state, scope, options, language }: SectionBuildInput): DocNode[] {
   const o: S2TOptions = s2tOptions.parse(options);
   const t = wordsOf(language);
-  const columns = o.columns.filter((c) => !S2T_BELOW.has(c));
-  const below = o.columns.filter((c) => S2T_BELOW.has(c));
-  const head: DocColumn[] = columns.map((c) => ({ key: c, label: t(S2T_LABEL[c]) }));
-  const rowOf = (m: Mapping): DocRow => {
-    const parts = below.map((c) => ({ c, runs: s2tCell(state, m, c, t) })).filter((x) => x.runs.length);
-    // with both chosen, each long text is labelled (the prototype's `ltable`)
-    const long = parts.map((x) => (below.length > 1 ? [strong(`${t(S2T_LABEL[x.c])}: `), ...x.runs] : x.runs));
-    return { cells: columns.map((c) => s2tCell(state, m, c, t)), ...(long.length ? { below: long } : {}) };
-  };
+  // the rule and the note are the long texts (D1): under the row, after the table numbered, or a column
+  const head = o.columns.map((c) => ({ key: c, label: t(S2T_LABEL[c]), long: S2T_BELOW.has(c) }));
+  const rowOf = (m: Mapping): DocRuns[] => o.columns.map((c) => s2tCell(state, m, c, t));
+  const table = (rows: readonly DocRuns[][]): DocNode[] => longTextTable(head, rows, o.longTexts, t("none"));
+  const firstShort = o.columns.findIndex((c) => !S2T_BELOW.has(c) && c !== "target");
   const entities = [...logicalEntities(state, scope).values()].flat();
   const shownOf = (a: Attribute) => (state.lookup.mappingsOfAttribute.get(a.id) ?? []).filter((m) => statusShown(scope.mappings, m.status));
   const out: DocNode[] = [];
@@ -254,19 +295,19 @@ export function buildS2T({ state, scope, options, language }: SectionBuildInput)
     for (const s of state.snapshot.model.sourceSystems) {
       const ms = bySystem.get(s.id);
       if (!ms) continue;
-      out.push({ kind: "heading", level: 2, text: s.name }, { kind: "table", columns: head, rows: ms.map(rowOf) });
+      out.push({ kind: "heading", level: 2, text: s.name }, ...table(ms.map(rowOf)));
     }
   } else {
     for (const e of entities) {
-      const rows: DocRow[] = [];
+      const rows: DocRuns[][] = [];
       for (const a of attributesOf(state, e.id)) {
         const ms = shownOf(a);
         rows.push(...ms.map(rowOf));
         if (!ms.length && o.unmapped) {
-          rows.push({ cells: columns.map((c, i) => (c === "target" ? [mono(a.name)] : i === (columns[0] === "target" ? 1 : 0) ? [warn(t("notMapped"))] : EMPTY)) });
+          rows.push(o.columns.map((c, i) => (c === "target" ? [mono(a.name)] : i === firstShort ? [warn(t("notMapped"))] : EMPTY)));
         }
       }
-      if (rows.length) out.push({ kind: "heading", level: 2, text: e.name }, { kind: "table", columns: head, rows });
+      if (rows.length) out.push({ kind: "heading", level: 2, text: e.name }, ...table(rows));
     }
   }
   return out.length ? out : [NONE(t)];
@@ -274,27 +315,51 @@ export function buildS2T({ state, scope, options, language }: SectionBuildInput)
 
 // ---- the registrations ----
 
-const kind = (type: string) => INFODOC_SECTION_KINDS.find((k) => k.type === type)!;
 const titled = (key: LabelKey) => (language: DocLanguage) => label(language, key);
 
-/** InfoDocumenter's three section types: their kinds (`sections.ts`) with their headings and builders. */
-export const INFODOC_SECTION_TYPES: readonly DocumentSectionType[] = [
-  // the descriptions are the prototype's "+ Add section" lines (slice 26)
-  {
-    ...kind("text"),
-    module: null,
-    label: titled("t_text"),
-    description: "Your own words: introduction, scope, assumptions, open points. Not stored in the model.",
-    tables: [],
-    build: buildText,
+type Registration = Pick<DocumentSectionType, "label" | "description" | "build">;
+
+/** InfoDocumenter's section types: their kinds (`sections.ts`) with their headings, the prototype's "+ Add section" lines and builders. */
+const OWN: Record<string, Registration> = {
+  text: { label: titled("t_text"), description: "Your own words: introduction, scope, assumptions, open points. Not stored in the model.", build: buildText },
+  overview: { label: titled("t_overview"), description: "The workspace's description, what the model holds, and its concepts.", build: buildOverview },
+  dict: { label: titled("t_dict"), description: "Entities by concept with the attribute properties you choose.", build: buildDictionary },
+  s2t: { label: titled("t_s2t"), description: "Every mapping from source columns to logical attributes, with rules, types and status.", build: buildS2T },
+  sources: {
+    label: titled("t_sources"),
+    description: "The source tables in scope: their classifications and notes, their columns with classifications, notes and use, and a Data Vault reading.",
+    build: buildSources,
   },
-  { ...kind("dict"), module: null, label: titled("t_dict"), description: "Entities by concept with the attribute properties you choose.", tables: [], build: buildDictionary },
-  {
-    ...kind("s2t"),
-    module: null,
-    label: titled("t_s2t"),
-    description: "Every mapping from source columns to logical attributes, with rules, types and status.",
-    tables: [],
-    build: buildS2T,
+  classreg: {
+    label: titled("t_classreg"),
+    description: "Every column and table with the classifications you choose, e.g. all personal data in the sources and the attributes that carry it.",
+    build: buildRegister,
   },
-];
+  reqs: {
+    label: titled("t_reqs"),
+    description: "Requirements that touch the scope: their description, kind, status, owner and coverage by approved mappings.",
+    build: buildRequirements,
+  },
+  ready: {
+    label: titled("t_ready"),
+    description: "What is still open: missing or weak definitions, unmapped attributes, type problems, unapproved mappings, uncovered requirements.",
+    build: buildReadiness,
+  },
+  conv: {
+    label: titled("t_conv"),
+    description: "How to read the document: relationship notation, mapping statuses, marks, stereotypes, type conversions, naming.",
+    build: buildConventions,
+  },
+  trace: {
+    label: titled("t_trace"),
+    description: "From each requirement to the attributes that meet it, their source columns and the facts or dimensions they feed.",
+    build: buildTrace,
+  },
+  dq: {
+    label: titled("t_dq"),
+    description: "Requirements of the kind data-quality rule: the rule, what happens when it fails, its owner and what it applies to.",
+    build: buildQuality,
+  },
+};
+
+export const INFODOC_SECTION_TYPES: readonly DocumentSectionType[] = INFODOC_SECTION_KINDS.map((k) => ({ ...k, module: null, tables: [], ...OWN[k.type]! }));

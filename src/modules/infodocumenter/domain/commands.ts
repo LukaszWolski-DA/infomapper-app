@@ -98,8 +98,8 @@ export function createDocument(ctx: CommandContext, access: WorkspaceAccess, inp
     baseline_id: null,
     scope,
     cover: { ...EMPTY_COVER },
-    // a new document takes the workspace's documentation language (Q8); the ETL preset has no draft mark (the prototype's)
-    style: defaultStyle({ language: access.workspace.doc_language, watermark: preset.code !== "s2t" }),
+    // a new document takes the workspace's documentation language (Q8) and its preset's draft mark
+    style: defaultStyle({ language: access.workspace.doc_language, watermark: preset.watermark }),
     sections: presetSections(preset, kinds.values(), access.workspace, ctx.newId),
   };
   return { ok: true, value: { document: row }, writeSet: buildWriteSet(ctx, access.workspace.id, [{ kind: "insert", table: "document_definition", row }]) };

@@ -96,7 +96,7 @@ export function addDocumentsDemo(db: DevDb & { document_definition?: DocumentDef
       scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings: p.mappings, ...row.scope },
       cover: { ...EMPTY_COVER, ...row.cover },
       // the workspace's language (Q8: a seeded document follows it), the preset's draft mark
-      style: defaultStyle({ watermark: preset !== "s2t" }),
+      style: defaultStyle({ watermark: p.watermark }),
       sections: presetSections(p, list, workspace, () => id(`document:${key}:section:${n++}`)),
     };
   };

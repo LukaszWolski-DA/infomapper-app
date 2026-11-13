@@ -10,7 +10,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/app/_components/app-shell";
-import { composedStore, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES, documentStateFor } from "@/app/_lib/documents";
+import { composedStore, dimensionalLevelOn, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES, documentStateFor } from "@/app/_lib/documents";
+import { classificationIndex, isBuiltin, isDataVault } from "@/domain/model/classifications";
+import { registerKey } from "../domain/sections-sources";
 import { loadAccess } from "@/app/_lib/model-command";
 import { DOCUMENTATION_TAB, documentHref, workspaceHref } from "@/app/_lib/paths";
 import type { ShellData } from "@/app/_lib/shell";
@@ -71,7 +73,13 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
     available: t.available(access.workspace),
     heading: t.label(language),
     checks: t.optionChecks ?? null,
+    note: t.optionNote ?? null,
   }));
+  // the register's choices: the workspace's live classifications in list order, a built-in one by its code (Data Vault
+  // ones only in Data Vault 2.0 mode)
+  const classifications = classificationIndex(model.classifications, model.classificationLinks)
+    .list.filter((c) => !isDataVault(c) || access.workspace.dv2_mode)
+    .map((c) => ({ key: registerKey(c), name: c.name, scope: c.scope, own: !isBuiltin(c) }));
   return (
     <AppShell shell={shell} trail={trail(workspaceId, doc, false)}>
       <DocumentEditor
@@ -97,6 +105,8 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
         concepts={model.concepts.map((c) => ({ id: c.id, name: c.name }))}
         date={today()}
         testHooks={areTestHooksOn()}
+        dimensional={dimensionalLevelOn(access.workspace)}
+        optionContext={{ dataVault: access.workspace.dv2_mode, hasNaming: !!access.workspace.naming_conventions?.trim(), classifications }}
       />
     </AppShell>
   );
