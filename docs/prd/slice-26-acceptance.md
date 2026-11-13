@@ -1203,3 +1203,111 @@ New: `e2e/slice-26/S26-04` to `S26-07`; S26-screens' step 3 part; `tests/documen
 | `pr_could` | Could | Könnte |
 | `pr_wont` | Won't | Nicht jetzt |
 | (InfoCube) `busTitle`, `fact` | Bus matrix, Fact | Bus-Matrix, Fakt |
+
+## Step 4: the style (13 November 2026)
+
+### Step 3's checkbox fix: where it lives
+
+- **The fix is in InfoDocumenter's own two components, not in shared code:**
+  - `ListChecks` in `src/modules/infodocumenter/app/section-options.tsx`: every section's lists of check boxes, the
+    dictionary's columns and fields among them;
+  - `IdChecks` in `src/modules/infodocumenter/app/editor.tsx`: the scope's projects and concepts.
+
+  Nothing else in the app uses either: they are module-private functions. `useChoice` itself
+  (`src/app/_panels/fields.tsx`) was not changed.
+- **No other part of the app has the bug:** no other `useChoice` call passes a list built anew on each render (searched:
+  `useChoice<readonly …[]>` appears only in these two). No earlier spec outside slices 25 and 26 covers these
+  components.
+
+### What was built
+
+- **The Style panel** in the editor's Document options, after Sharing (`app/style-panel.tsx`, the prototype's labels and
+  hints):
+  - the document's language, showing the language in effect (Q8: a document stored without one follows the
+    workspace's);
+  - the template (Standard, Formal, Compact, with the hint of each);
+  - the accent colour (four swatches; "Black and white overrides the accent.");
+  - paper (A4, A3), orientation, colours (colour, black and white), the relationship notation (crow's foot, UML);
+  - "Keep a table on one page up to" (never, 10, 15, 25, 40 rows);
+  - the six switches.
+- **Header and footer:** the four fields with their grey examples and the hint. Each keeps its draft (D-66) and feeds the
+  preview while it is typed (`style.header.left` and the others in `ui/drafts.ts`).
+- **The style in the document** (`ui/document-css.ts`, `domain/document.ts`, `ui/document-html.tsx`):
+  - **Paper and orientation:**
+    - Paged.js's named `@page{size:A3 landscape}`, one size per document;
+    - the title page's height from the page's (A4 portrait 248 mm, the slice 25 value; A3 portrait 371 mm; landscape
+      161 mm; A3 landscape 248 mm);
+    - the quick sheet's width and page height, and the preview's "Fit width", follow them too.
+  - **The templates** (`styleCss`, the prototype's `tpl-*` rules). They are written without a root class, since
+    Paged.js lays out the source's content and not its root element.
+    - Formal: IBM Plex Serif for the body text, sans headings, tables and meta lines; a ruled cover; the subtitle in
+      italic.
+    - Compact: smaller type and tighter tables; its sections run on (`newPage` ignored, and the section's "Start on a
+      new page" is disabled with "The Compact template runs sections on.").
+  - **Accent, and black and white:** the accent from the prototype's four colours. Black and white sets the accent to
+    black and greys the chips, pills, bars, swatches and the concepts' marks; the draft mark prints black too.
+  - **Numbered sections and subsections:** "1", "1.1" in the headings and the contents (`DocumentTreeSection.number`,
+    a heading's `number`).
+  - **Banded rows:** the renderer marks every second row (`tbody.even`), so the bands do not restart where Paged.js
+    continues a table.
+  - **Keep a table on one page up to N:** an entity's block with at most N attributes is a group that is kept together
+    (`.dent.keep`). The sections get `keepRows` and the notation in `SectionBuildInput`.
+  - **The notation:** Conventions and notation draw their ends in the document's notation. The dictionary's
+    cardinalities print the same in both notations, as the prototype prints them.
+  - **The switches:** the title page, the contents (without them, the skipped sections' notes stand before the first
+    section), the running header (the header's two parts empty; the footer always prints), the draft mark.
+- **Header and footer fields** (D6, D8; built in step 2):
+  - the tokens `{org}`, `{title}`, `{client}`, `{workspace}`, `{version}`, `{status}`, `{state}`, `{date}`,
+    `{author}`; `{page}`, `{pages}` and `{pagelabel}` become counters;
+  - the header's left part drops the page tokens (D6);
+  - the quick sheet's footer prints the footer fields with "–" for the page numbers (D8).
+- **Every view follows the style:** the document page (`/view`), the preview's pages and the quick sheet, and print.
+  On a change of the paper, the orientation or the look, the old pages give way at once instead of taking on the new
+  layout's global `@page` rules while it runs (F7).
+- **IBM Plex Serif** (your OK on 13 November 2026):
+  - **The files:** `npm pack @ibm/plex-serif@2.0.0` (OFL 1.1), three unmodified files from `fonts/complete/woff2/` into
+    `src/app/fonts/ibm-plex/`, checked with `cmp`:
+
+    | File | SHA-256 | Bytes |
+    | --- | --- | ---: |
+    | Regular | `024ebce13cec984b46e350dd85fa7c01105c777e116bfe95f097ad7fa93f39f2` | 69,400 |
+    | Medium | `f66376aeb33a5b32116558e0de53b76b48531f6388e352aeeb35ad82ea05cfaa` | 73,052 |
+    | Italic | `ba5feed9ebae36e3b6ae3486052c90f4f42a294fa67a7c9415985175d19c4c82` | 73,852 |
+
+    The package's licence text is the one already hosted.
+  - **Loading:** `src/app/fonts/plex-serif.ts` (`next/font/local`, variable `--font-plex-serif`), loaded only by the
+    editor's and the document page's content. The canvas page keeps its fonts: the element guard's page totals are
+    unchanged, `<head>` included.
+- **Labels:** step 4 adds no document words. The style's words are the editor's (English, as the app); the document's
+  own words ("Page", "of", the headings) were already in three languages. Nothing new for the German review.
+
+### Differences from the prototype, and what I assumed
+
+1. **The title page's height** comes from the page's height less the margins (as the prototype's fixed values: 248, 160,
+   370 mm).
+2. **The language select** shows the language in effect for a document without its own. Choosing one stores it, so a
+   document cannot go back to "the workspace's" (the prototype has no such choice either).
+3. **The cover's fields stay in "Cover"** (slice 25), after Style and Header and footer, as in the prototype's order.
+4. **The draft mark prints black in black and white.** The prototype keeps it orange in every theme.
+
+### Earlier specs changed in step 4
+
+| Spec | Why |
+| --- | --- |
+| `e2e/slice-25/S25-04` to `S25-08` | Sections are numbered by default (the prototype's default, `numbers: true`); these specs compare headings' and contents' texts, so their documents get slice 25's look as test data (`unnumbered`). |
+| `e2e/slice-25/helpers.ts` | `unnumbered`; `sectionText` finds a heading without its number. |
+| `e2e/slice-26/S26-05`, `S26-06` | Their headings and contents carry numbers. |
+
+New: `e2e/slice-26/S26-08.spec.ts`, `S26-09.spec.ts`, S26-screens' step 4 part, and `tests/document-style.test.ts`
+(12 tests).
+
+### Checks run
+
+- Lint and typecheck pass; `npm test` passes: 177 files, 2,215 tests.
+- The slice 25 and 26 specs pass: 25 passed and 1 skipped in slice 25; all 21 in slice 26.
+- The element guard passes on the measurement build with the same counts as steps 2 and 3, page totals included.
+- **No full run in step 4.** It changes no shared infrastructure: the fonts are a new file loaded by InfoDocumenter's
+  pages only, and the root layout is unchanged.
+
+Screenshots: `docs/prd/slice-26-screens/step-4/` (a Formal A3 landscape title page and dictionary page; a Compact page
+in black and white, and its title page).
