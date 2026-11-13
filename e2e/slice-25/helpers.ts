@@ -91,6 +91,17 @@ export async function removeMember(userId: string, ws: string = RETAIL) {
   await writeDb(E2E_DB, db);
 }
 
+/**
+ * "Who sees this document" (slice 26: the editor's segmented choice, the prototype's, in place of slice 25's check box):
+ * its two buttons, the pressed one, and a choice.
+ */
+export const sharedChoice = (page: Page) => page.getByTestId("seg-shared");
+export const sharedButton = (page: Page, shared: boolean) => sharedChoice(page).getByRole("button", { name: shared ? "Shared with the workspace" : "Private" });
+export async function expectShared(page: Page, shared: boolean) {
+  await expect(sharedButton(page, shared)).toHaveAttribute("aria-pressed", "true");
+}
+export const setShared = (page: Page, shared: boolean) => sharedButton(page, shared).click();
+
 /** The document page: waits until Paged.js has laid out the pages, and returns how many. */
 export async function laidOut(page: Page): Promise<number> {
   const pages = page.getByTestId("document-pages");

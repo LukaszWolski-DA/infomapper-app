@@ -30,6 +30,8 @@ async function openView(page: Page) {
 /** Changes a choice in the form and waits until it is stored. */
 async function choose(page: Page, seg: string, label: string, stored: (d: NonNullable<Awaited<ReturnType<typeof storedDocument>>>) => unknown, value: unknown) {
   await page.goto(formUrl((await storedDocument(S2T))!.id));
+  // slice 26: a section's options are in the editor's right panel once the section is selected
+  if (seg === "seg-s2t-group") await page.locator('[data-testid="editor-section"][data-section="s2t"]').click();
   await page.getByTestId(seg).getByRole("button", { name: label, exact: true }).click();
   await expect.poll(async () => stored((await storedDocument(S2T))!)).toEqual(value);
 }

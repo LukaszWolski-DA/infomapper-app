@@ -21,7 +21,9 @@ test("S25 screens: the tab, the form, the title page and a dictionary page", asy
 
   const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.shared))!;
   await page.goto(formUrl(doc.id));
-  await expect(page.getByTestId("form-document")).toBeVisible();
+  // slice 26: the editor in place of the form
+  await expect(page.getByTestId("page-document-editor")).toBeVisible();
+  await laidOut(page);
   await page.screenshot({ path: path.join(OUT, "2-form.png"), fullPage: true });
 
   await page.goto(viewUrl(doc.id));

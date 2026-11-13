@@ -50,9 +50,9 @@ test("S25-06: with InfoCube off the section is skipped and the page says so", as
   const host = page.getByTestId("document-host");
   await expect(host.locator(".dtoc li")).toHaveText([/^Source-to-target mapping/]);
   await expect(host.getByTestId("document-skipped")).toHaveText("Skipped while InfoCube is off: Dimensional model.");
-  // the form keeps it, marked off
+  // the editor keeps it, marked off (slice 26: its row on the left)
   await page.goto(formUrl((await storedDocument(S2T))!.id));
-  const section = page.locator('[data-testid="form-section"][data-section="cube.dim"]');
+  const section = page.locator('[data-testid="editor-section"][data-section="cube.dim"]');
   await expect(section.getByTestId("tag-section-off")).toHaveAttribute("title", "InfoCube is off in this workspace");
 });
 
