@@ -890,3 +890,316 @@ All thirteen questions as proposed, with these additions:
 - **The element guard passed** on the measurement build (`S3B-15-elements` against `slice-08.json`): viewport 4,508 /
   19,305 / 1,465 / 4,907, page totals 6,137 / 20,934 / 3,004 / 6,446. The editor is not a canvas page.
 
+## Łukasz's answers to step 2 (13 November 2026)
+
+- The snapshot read once when the editor opens, and the stopped layout made to fail, stay as built. Both go into
+  `known-limitations.md` at the closing; the second goes beside the Paged.js alias (check both at a Paged.js upgrade).
+- "Model levels" is hidden while InfoCube is off, as the prototype; done in step 3.
+
+## Step 3: the sections (13 November 2026)
+
+### What was built
+
+- **The content tree's new kinds** (F6; `src/domain/document/content.ts`, InfoMapper's domain, so InfoCube builds them too):
+  - **Runs:**
+    - a chip (`plain`, `pii`, `bk`, `key`);
+    - a mark in a circle ("ƒ", "!");
+    - a concept's swatch;
+    - a coverage bar;
+    - a relationship end in a notation;
+    - a mapping line in its status's dash;
+    - the fed and not-fed dots;
+    - a passed check's tick;
+    - a moved text's reference.
+  - **Nodes:**
+    - `list`: bullets, numbered, in two columns, or plain;
+    - `cards`: one block per attribute or per requirement;
+    - `group`: an entity's block, with its concept's mark, kept together when step 4's keep-rows says so;
+    - a table's `style`: `narrow`, `fixed` (with the columns' widths), `checks`, `legend`, `matrix` (with vertical
+      headers);
+    - a heading's swatch.
+  - The renderer (`ui/document-html.tsx`) draws them from the prototype's classes, with React elements only (no HTML
+    from strings). The small drawings are React SVG.
+- **The long texts** (D1): `longTextTable` in `src/domain/document/blocks.ts` (the prototype's `ltable`). A table's long
+  columns go under each row (labelled when there are several), after the table as numbered notes (the row carries
+  "→ 1, 2"), or into their own column. Five sections use it: S2T, Source tables, the register, Requirements (table) and
+  Data quality rules.
+- **The sections**, each pure, each reading the document's state through the app's own rules:
+  - **Model overview** (`sections-model.ts`, D4): the workspace's description; the counts in scope (entities of both
+    drawn levels, source tables F13, shown mappings with how many are approved, every requirement); the concepts with
+    their entities.
+  - **Model readiness** (`readiness.ts`):
+    - definitions missing, and weak ones by InfoDocumenter's own rule (`isWeakDefinition`, D5);
+    - attributes neither mapped nor fed, by the app's rule (`countsAsMapped` with mappings and feeds, slice 18's F1);
+    - type problems of the shown mappings (`checkMappingTypes`);
+    - every mapping not approved;
+    - requirements touching the scope that are not covered (`coverage`);
+    - the model's own checks (`modelChecks` with the scope's entities and the modules' checks, D-75): the groups and
+      lines in English (D3), "High" as a pill;
+    - at most the chosen number of items per check, then "… and {n} more".
+  - **Conventions and notation** (`sections-model.ts`):
+    - the four relationship ends: crow's foot until step 4's notation style;
+    - the statuses, with their dashes and four-eyes when it is on;
+    - the eight marks;
+    - the stereotypes the scope's logical entities use, with the workspace's names and definitions (D-79,
+      `stereotypeUses`);
+    - the classifications the scope's tables use (D-78; Data Vault ones only in Data Vault 2.0 mode);
+    - the physical types in the sources with their logical types (`logicalTypeOf`);
+    - the workspace's naming conventions, then the document's own.
+  - **Source tables** (`sections-sources.ts`), each table in scope (F13) with:
+    - its path ("CRM / crmprod.dbo") and classifications;
+    - the modeller's note;
+    - its columns, with "missing from the source" or "retired", their classifications, what reads them (shown
+      mappings) and their notes;
+    - in Data Vault 2.0 mode, the Data Vault reading (`dataVaultReading`) in the document's language (D3: the lines are
+      structured, only the words are the document's).
+  - **Classification register** (`sections-sources.ts`):
+    - each chosen classification, in the workspace's list order (a built-in one stored by its code, an own one by its
+      id: an own one may have no code, D-78), with its definition;
+    - its tables, or its columns with what reads them;
+    - under personal data, the scope's logical attributes marked as personal data.
+  - **Requirements and coverage** (`sections-requirements.ts`):
+    - one block per requirement (its key chip and name, its properties, its parent, its description, a data quality
+      rule's expression), or one table;
+    - the coverage bar `{covered}/{total}` (D-31's rule at both levels, D-70);
+    - only those touching the scope when chosen.
+  - **Traceability**: per requirement (non-functional ones left out) its attributes in scope, with:
+    - where each is mapped from: a dimensional one through its feeds' inputs and their columns;
+    - the dimensional attributes it feeds (a column shown only with the dimensional level drawn);
+    - whether it is covered.
+
+    One table per requirement, or one matrix.
+  - **Data quality rules**: one table of the rules (requirements of that kind). The rule and the description are long
+    texts; "Applies to" lists the attributes, else the entities.
+  - **Bus matrix**, InfoCube's second section type (`CUBE_BUS_SECTION`, through the extension point): the scope's
+    facts against its dimensions (`busMatrix`), a dot per relationship, and the number of facts per dimension. It has
+    nothing to set (`optionNote`).
+- **The data dictionary** (`builders.ts`, D1):
+  - **The three layouts:**
+    - the definition under each row;
+    - the definition as a column, with its width; the other columns share the rest by the prototype's weights;
+    - one block per attribute.
+  - **Long definitions:** over 300 or 600 characters a definition moves to "Definitions in full" at the end, leaving
+    "→ note {n}".
+  - **Concepts:** grouped by concept or not; each concept on a new page.
+  - **Dimensional entities (PRD item 8):**
+    - the dimensional entities with their role in InfoCube's words, where a logical entity's stereotype stands;
+    - each dimensional attribute's "Mapped from" is its feeds, "Entity.attr + Entity.attr", with the status pill while
+      drafts are marked;
+    - the coverage line counts fed rows by the app's rule.
+
+  Slice 25's dictionaries keep their look: the new options have defaults.
+- **InfoCube's contributions** (Q6, F12; `DocumentContributions` in `src/domain/document/state.ts`):
+  - **What it gives:** whether the dimensional level is drawn (InfoCube on), an entity's role in a language
+    (`cubeDocumentRoles`: `cubeTitle`'s long text in InfoCube's document words), and its model checks
+    (`cubeModuleChecks`).
+  - **Wiring:** `documentStateFor` (`src/compose/documents.ts`) joins them; InfoDocumenter never names InfoCube.
+  - **A feed's status:** `AttributeFeed` gets an optional `status` for a document's mapping filter, which InfoCube's
+    `cubeRequirementFeeds` sets.
+- **Source tables in scope** (F13): `sourceTablesInScope` in `scope.ts` (`SectionScope.tableIds`), the prototype's
+  rule:
+  - the tables with a column a shown mapping reads into an entity in scope;
+  - with no concept chosen, also the tables on the scope's canvases;
+  - with neither a project nor a concept chosen, every table.
+
+  Source tables, the register, the conventions and the overview use it.
+- **The presets** (D2): the prototype's without Diagrams, Figure and Changes since a baseline.
+  - **Dictionary preset:** Text, Model overview, Conventions (statuses and types off), Data dictionary, Requirements,
+    Data quality rules, Classification register.
+  - **S2T preset:** Conventions (stereotypes off), Source-to-target, Source tables, InfoCube's Dimensional model in its
+    place while InfoCube is on, Data quality rules; no draft mark.
+  - **Blank preset:** Text.
+
+  The descriptions are D2's rewording. The demo's three documents are made by the same rule, so they have these
+  sections.
+- **The editor:**
+  - **Options:** every section's options as the prototype's (`app/section-options.tsx`, one spec per type: checks,
+    lists, segmented choices, selects, the conventions' naming text with its draft feeding the preview).
+  - **Add list:** the types in the prototype's order.
+  - **"Model levels":** shown only while the dimensional level is drawn (your answer).
+- **Labels:**
+  - **From the prototype:** 113 new keys in English, Polish and German, from its `LBL`.
+  - **New words** (the prototype prints them in English in every language):
+    - the requirements' kinds, statuses and priorities;
+    - the readiness note "Model checks: InfoMapper's validator (D-75), as the project home shows it.".
+  - **InfoCube:** the Bus matrix's title and "Fact" in its three languages.
+
+### Differences from the prototype, and what I assumed
+
+1. **Model checks stay in English** in Polish and German documents (D3), including their group titles in readiness's
+   table. "High" is translated.
+2. **The relationship ends are crow's foot until step 4** brings the style's notation; the end marks are the document's
+   own small SVGs (F6).
+3. **The register stores classifications by key:** a built-in one by its code ("PII"), an own one by its id (the
+   prototype stores codes; an own one may have no code, D-78). One that is gone is kept and ignored.
+4. **The overview's counts** are the scope's entities of both drawn levels, the scope's source tables (F13) and the
+   shown mappings, as the prototype counts them; the requirements are all of them (the prototype's).
+5. **Readiness's "notFed"** reads the app's fed rule (any mapping or feed, any status, or through a calculation), as
+   CLAUDE.md requires for every count of mapped or fed rows. The prototype's `rowStat` read the mapping filter.
+6. **An empty section prints "None."** in the document's language. The prototype's placeholders ("Tick at least one
+   part in the panel on the right.") are English UI words; the panel's hints say what to tick.
+7. **A bug found and fixed in the editor, from slice 25's form.** A list of check boxes (a dictionary's columns, the
+   scope's projects and concepts) built its stored list anew on every render. `useChoice` shows a choice only while the
+   stored value is the same object, so a ticked box went back at once. The lists keep one object while their content
+   is the same.
+
+### Reference figures: the longest preset on "Performance test" (no bar)
+
+The method is step 2's D7: the measurement build, headless Chromium 153, the laptop, one warm-up load of the editor,
+then 5 loads, medians. "Performance test" with every mapping shown (`scope.mappings` "all").
+
+| Preset | Pages | Document state | Tree | First layout |
+| --- | --- | --- | --- | --- |
+| Data dictionary for the business (7 sections) | 37 | 4.4 ms (2.8–4.6) | 3.5 ms (3.4–5.0) | 1.24 s (1.10–1.38) |
+| Source-to-target specification for ETL (4 sections; InfoCube off there) | 117 | 3.4 ms (2.7–6.7) | 9.9 ms (7.7–16.0) | 6.38 s (5.50–6.76) |
+
+- The tree is still under 20 ms; the layout is the cost.
+- The dictionary preset lays out in about 1.2 s, just over Auto's threshold: a change after its first layout shows the
+  quick sheet.
+- The S2T preset's Source tables (every column of 200 tables) make 117 pages.
+- The script is uncommitted: `scripts/s26-measure/S26-D7.spec.ts`, "the longest preset".
+
+### Earlier specs and tests changed in step 3
+
+| Spec or test | Why |
+| --- | --- |
+| `e2e/slice-25/S25-03` | The presets' sections are D2's; a section is found by its type, not its place. |
+| `e2e/slice-25/S25-04`, `S25-05`, `S25-06` | The demo's documents have D2's preset sections; each spec keeps only the section it reads on (`keepOnly`, test data) and finds sections by type. S25-04's dictionary is on the "docs" seed (InfoCube off): logical only, as before. |
+| `e2e/slice-25/S25-07` | The contents list D2's dictionary preset. |
+| `e2e/slice-25/S25-08` | The Polish and German documents have D2's sections: every heading checked in its language. |
+| `e2e/slice-25/S25-layout` | The dictionary section found by its type. |
+| `e2e/slice-25/helpers.ts` | `sectionOf`, `keepOnly`. |
+| `e2e/slice-26/S26-01` to `S26-03` | Counts from the stored document. S26-02 and S26-03 test the preview on the shared document's Text and dictionary (`keepOnly`). |
+| `tests/document-tree.test.ts` | An entity's block is a group node; with InfoCube on and the dimensional level in scope the dictionary lists the facts and dimensions (PRD item 8); "empty" now needs both levels out of scope. |
+| `src/modules/infodocumenter/domain/documents.test.ts`, `editor.test.ts`, `tests/infodocumenter-store.test.ts` | D2's presets; the registered kinds; the dictionary's layout is now an option. |
+
+New: `e2e/slice-26/S26-04` to `S26-07`; S26-screens' step 3 part; `tests/document-sections-26.test.ts` (S26-10, 26 tests).
+
+### Not in this step
+
+- The style's effect on the sections: the notation, keep-rows (the group's `keep` is never set yet), banded rows.
+  Step 4 brings it.
+- **No full run in this step.** It changes no shared infrastructure (undo, the save chain, the canvas's layers, the
+  table registry, the local adapter). The changes outside InfoDocumenter are:
+  - in InfoMapper's domain, the content tree's kinds, `blocks.ts`, `state.ts`'s contributions and `AttributeFeed`'s
+    optional `status`;
+  - in InfoCube, its document words, the Bus matrix section and the contributions.
+
+### German words for Łukasz's review (step 3's new labels)
+
+| Key | English | German |
+| --- | --- | --- |
+| `t_overview` | Model overview | Modellübersicht |
+| `t_sources` | Source tables | Quelltabellen |
+| `t_reqs` | Requirements and coverage | Anforderungen und Abdeckung |
+| `t_ready` | Model readiness | Modellreife |
+| `t_conv` | Conventions and notation | Konventionen und Notation |
+| `t_trace` | Traceability | Rückverfolgbarkeit |
+| `t_dq` | Data quality rules | Datenqualitätsregeln |
+| `t_classreg` | Classification register | Klassifikationsverzeichnis |
+| `t_longdefs` | Definitions in full | Vollständige Definitionen |
+| `defNote` | note | Fußnote |
+| `contents` | Model contents | Modellinhalt |
+| `count` | Count | Anzahl |
+| `entities` | Entities | Entitäten |
+| `tables` | Source tables | Quelltabellen |
+| `mappings` | Mappings | Mappings |
+| `reqN` | Requirements | Anforderungen |
+| `rc_entDef` | Entities without a definition | Entitäten ohne Definition |
+| `rc_attrDef` | Attributes without a definition | Attribute ohne Definition |
+| `rc_weak` | Definitions that repeat the name or have fewer than four words | Definitionen, die den Namen wiederholen oder kürzer als vier Wörter sind |
+| `rc_notFed` | Attributes with no mapping or feed | Attribute ohne Mapping oder Befüllung |
+| `rc_type` | Mappings with a type problem | Mappings mit Typproblem |
+| `rc_open` | Mappings not approved yet | Noch nicht freigegebene Mappings |
+| `rc_req` | Requirements not fully covered | Nicht vollständig abgedeckte Anforderungen |
+| `chk` | Check | Prüfung |
+| `result` | Result | Ergebnis |
+| `more` | … and {n} more | … und {n} weitere |
+| `readyOk` | Every check passes. | Alle Prüfungen bestanden. |
+| `readyIntro` | Checks of the model state this document describes. The items listed were open when it was generated. | Prüfungen des Modellstands, den dieses Dokument beschreibt. Die aufgeführten Punkte waren bei der Erstellung offen. |
+| `mchk` | Model checks | Modellprüfungen |
+| `high` | High | Hoch |
+| `c_notation` | Relationship notation | Beziehungsnotation |
+| `c_one` | Exactly one | Genau eins |
+| `c_01` | Zero or one | Null oder eins |
+| `c_1n` | One or more | Eins oder mehr |
+| `c_0n` | Zero or more | Null oder mehr |
+| `c_status` | Mapping statuses | Mapping-Status |
+| `s_draft` | Proposed; not reviewed yet. | Vorgeschlagen; noch nicht geprüft. |
+| `s_review` | Waiting for approval. | Wartet auf Freigabe. |
+| `s_approved` | Agreed; counts towards requirement coverage. | Abgestimmt; zählt zur Abdeckung der Anforderungen. |
+| `fourEyes` | Four-eyes approval applies: the author of a change does not approve it. | Es gilt das Vier-Augen-Prinzip: Wer eine Änderung macht, gibt sie nicht frei. |
+| `c_marks` | Marks in diagrams and tables | Kennzeichen in Diagrammen und Tabellen |
+| `mark` | Mark | Kennzeichen |
+| `meaning` | Meaning | Bedeutung |
+| `m_pk` | Primary key | Primärschlüssel |
+| `m_fk` | Foreign key | Fremdschlüssel |
+| `m_bk` | Business key in the source | Fachlicher Schlüssel in der Quelle |
+| `m_pii` | Personal data | Personenbezogene Daten |
+| `m_calc` | Calculated from other attributes of the same entity | Aus anderen Attributen derselben Entität berechnet |
+| `m_f` | Transformation rule on the mapping | Transformationsregel im Mapping |
+| `m_warn` | The source type does not fit the attribute | Der Quelltyp passt nicht zum Attribut |
+| `m_dot` | Row fed (filled) or not yet (ring) | Zeile befüllt (voll) oder noch nicht (Ring) |
+| `c_stereo` | Entity stereotypes | Entitätsstereotypen |
+| `used` | Used | Verwendet |
+| `c_types` | Physical types in the sources and their logical types | Physische Typen in den Quellen und ihre logischen Typen |
+| `phys` | Physical type | Physischer Typ |
+| `logical` | Logical type | Logischer Typ |
+| `c_naming` | Naming conventions | Namenskonventionen |
+| `c_cls` | Classifications used | Verwendete Klassifikationen |
+| `classif` | Classifications | Klassifikationen |
+| `code` | Code | Code |
+| `scopeL` | Applies to | Gilt für |
+| `appTbl` | Table | Tabelle |
+| `appCol` | Column | Spalte |
+| `own` | own | eigene |
+| `column` | Column | Spalte |
+| `usedBy` | Used by | Verwendet von |
+| `piiAttrs` | Logical attributes marked personal data | Logische Attribute mit personenbezogenen Daten |
+| `noneCls` | Nothing in this document's scope has this classification. | Nichts im Umfang dieses Dokuments hat diese Klassifikation. |
+| `dv_title` | Data Vault reading | Data-Vault-Lesart |
+| `dv_hub` | Hub on {c} | Hub auf {c} |
+| `dv_hubCand` | Marked as a hub candidate, but no column is a business key yet | Als Hub-Kandidat markiert, aber noch keine Spalte ist ein fachlicher Schlüssel |
+| `dv_link` | Link to {t} via {c} | Link zu {t} über {c} |
+| `dv_notLK` |  (foreign key; not marked Link key) |  (Fremdschlüssel; nicht als Link-Schlüssel markiert) |
+| `dv_lkNo` | Link key {c} with no known relationship: which table does it point to? | Link-Schlüssel {c} ohne bekannte Beziehung: auf welche Tabelle verweist er? |
+| `dv_dck` | Dependent child key {c}: part of the link's or satellite's key, not a hub | Abhängiger Kindschlüssel {c}: Teil des Schlüssels eines Links oder Satelliten, kein Hub |
+| `dv_dk` | Driving key {c}: an effectivity satellite on the link tracks it | Treiberschlüssel {c}: ein Effektivitätssatellit am Link verfolgt ihn |
+| `dv_mak` | Multi-active satellite keyed by {c} | Multi-aktiver Satellit mit Schlüssel {c} |
+| `dv_eff` | Effective-dated by {c} | Gültig ab {c} |
+| `dv_sat` | Satellite with {n} descriptive column(s) | Satellit mit {n} beschreibenden Spalte(n) |
+| `dv_satPii` | ; {n} with personal data: consider a separate satellite for {c} | ; {n} mit personenbezogenen Daten: einen eigenen Satelliten für {c} erwägen |
+| `dv_none` | No classifications that suggest a Data Vault reading yet. | Noch keine Klassifikationen, die eine Data-Vault-Lesart nahelegen. |
+| `dv_hint` | Hints from the classifications and the source's keys; nothing is created. | Hinweise aus den Klassifikationen und den Schlüsseln der Quelle; es wird nichts erzeugt. |
+| `key` | Key | Schlüssel |
+| `name` | Name | Name |
+| `kind` | Kind | Art |
+| `prio` | Priority | Priorität |
+| `cov` | Coverage | Abdeckung |
+| `scope` | Scope | Umfang |
+| `desc` | Description | Beschreibung |
+| `req` | Requirement | Anforderung |
+| `feeds` | Feeds | Befüllt |
+| `covered` | Covered | Abgedeckt |
+| `noTrace` | Nothing is traced to this requirement yet. | Mit dieser Anforderung ist noch nichts verknüpft. |
+| `severity` | On failure | Bei Verstoß |
+| `sev_warn` | Warn | Warnen |
+| `sev_block` | Block the load | Ladung blockieren |
+| `appliesTo` | Applies to | Gilt für |
+| `owner` | Owner | Verantwortlich |
+| `noDq` | There are no data quality rules in scope. | Im Umfang gibt es keine Datenqualitätsregeln. |
+| `mchkNote` | Model checks: InfoMapper's validator (D-75), as the project home shows it. | Modellprüfungen: der Validator von InfoMapper (D-75), wie ihn die Projektseite zeigt. |
+| `k_need` | Business need | Geschäftlicher Bedarf |
+| `k_data` | Data requirement | Datenanforderung |
+| `k_business_rule` | Business rule | Geschäftsregel |
+| `k_dq_rule` | Data quality rule | Datenqualitätsregel |
+| `k_non_functional` | Non-functional | Nicht-funktional |
+| `st_draft` | Draft | Entwurf |
+| `st_agreed` | Agreed | Abgestimmt |
+| `st_implemented` | Implemented | Umgesetzt |
+| `st_verified` | Verified | Verifiziert |
+| `pr_must` | Must | Muss |
+| `pr_should` | Should | Sollte |
+| `pr_could` | Could | Könnte |
+| `pr_wont` | Won't | Nicht jetzt |
+| (InfoCube) `busTitle`, `fact` | Bus matrix, Fact | Bus-Matrix, Fakt |
