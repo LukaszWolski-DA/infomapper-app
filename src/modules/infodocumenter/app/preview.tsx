@@ -50,7 +50,7 @@ export const PREVIEW_TEXTS = {
 interface PagedPreviewer {
   preview(content: Node, stylesheets: Record<string, string>[], renderTo: HTMLElement): Promise<unknown>;
   polisher: { destroy(): void };
-  chunker: { destroy(): void; renderAsync: (...args: unknown[]) => Promise<unknown> };
+  chunker: { destroy(): void; renderAsync: (...args: unknown[]) => Promise<unknown>; pages?: { removeListeners(): void }[] };
 }
 
 let pagedModule: Promise<{ Previewer: new () => PagedPreviewer }> | null = null;
@@ -64,9 +64,24 @@ interface Layout {
 
 const STOPPED = "stopped";
 
-/** Ends a layout's Paged.js: its styles out of the head, its pages with their container. */
+/**
+ * A finished (or stopped) layout's pages stop watching their size: Paged.js keeps a `ResizeObserver` on each page that
+ * checks it for underflow again, which on pages moved into view or zoomed walks a flow that has ended (and throws).
+ */
+function quiet(layout: Layout) {
+  for (const p of layout.previewer.chunker.pages ?? []) {
+    try {
+      p.removeListeners();
+    } catch {
+      // a page already gone
+    }
+  }
+}
+
+/** Ends a layout's Paged.js: its pages' observers, its styles out of the head, its pages with their container. */
 function destroy(layout: Layout | null) {
   if (!layout) return;
+  quiet(layout);
   try {
     layout.previewer.polisher.destroy();
     layout.previewer.chunker.destroy();
@@ -179,15 +194,27 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
         layout,
         stop: () => {
           stopped = true;
-          // Paged.js has no cancel: its next page is refused, which ends its flow (Q3)
+          // Paged.js has no cancel: its next page is refused, which ends its flow (Q3); the layout is destroyed once
+          // the flow has ended (below), never under a page Paged.js is still drawing
           previewer.chunker.renderAsync = () => Promise.reject(new Error(STOPPED));
-          destroy(layout);
         },
       };
       const started = performance.now();
-      await previewer.preview(content, [{ "infodocumenter.css": css }], host);
-      if (stopped) return;
+      try {
+        await previewer.preview(content, [{ "infodocumenter.css": css }], host);
+      } catch (e) {
+        if (stopped) {
+          destroy(layout);
+          return;
+        }
+        throw e;
+      }
+      if (stopped) {
+        destroy(layout);
+        return;
+      }
       const ms = Math.round(performance.now() - started);
+      quiet(layout);
       running.current = null;
       lastMs.current = ms;
       // the swap: the new pages in, the old ones (and their styles) out

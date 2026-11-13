@@ -867,7 +867,7 @@ const H = ({ children }: { children: ReactNode }) => <h3 className="mb-0 mt-5 te
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="mt-3">
+    <div className="de-wrap mt-3">
       <div className="mb-1 text-[11.5px] text-im-ink-3">{label}</div>
       {children}
       {hint && <div className="mt-1 text-[11.5px] text-im-ink-3">{hint}</div>}
@@ -895,6 +895,7 @@ const EDITOR_CSS = `
 .de-sec.off .de-name{text-decoration:line-through;color:var(--im-ink-3)}
 .de-flash{animation:de-flash .9s ease-out}
 @keyframes de-flash{0%{box-shadow:0 0 0 3px var(--im-logical)}100%{box-shadow:0 0 0 0 transparent}}
+.de-wrap [role=group]{display:flex;flex-wrap:wrap}
 @media (max-width:1100px){.de-body{grid-template-columns:220px minmax(0,1fr)!important}.de-body>aside{grid-column:1/-1;border-left:0;border-top:1px solid var(--im-line)}}
 @media (max-width:720px){.de-body{grid-template-columns:minmax(0,1fr)!important}}
 `;
