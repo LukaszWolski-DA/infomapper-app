@@ -144,7 +144,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       attributeDeleted(mappings.length, copies.length, moduleDelete?.toast),
       { undoable: true, deletes: true },
     );
-    if (result.ok) ui.select(null);
+    if (result.ok) ui.deselectDeleted(result.deleted);
   }
 
   const siblings = p.ix.attributesOf.get(a.entity_id) ?? [];

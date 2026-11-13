@@ -79,7 +79,7 @@ export function LabelPanel({ label }: { label: Label }) {
       (v) => `${wasContext ? `Deleted the label ${v.name}; the working context is off.` : `Deleted the label ${v.name}.`}${v.hadLiveCanvas ? " Its live canvas became a normal canvas." : ""}`,
       { undoable: true, deletes: true },
     );
-    if (r.ok) ui.select(null);
+    if (r.ok) ui.deselectDeleted(r.deleted);
     else if (wasContext) workingContext!.set(label.id, { silent: true });
   }
 
