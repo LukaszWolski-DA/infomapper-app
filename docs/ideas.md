@@ -936,33 +936,64 @@ their relationships' other ends. Measure first with `scripts/bench-checks-browse
 - **Marks on relationship and mapping lines**; a switch to hide the marks; marks on collapsed frames' blocks.
 - **Source-side and Data Vault checks**; a dimension's unknown member (slice 19, decision 5b; done in slice 22, D-77).
 
-## InfoDocumenter: done in slice 25, and what comes later (PRD section 9)
+## InfoDocumenter: done in slices 25 and 26, and the plan (the roadmap of 12 November 2026, moved here at slice 26's close)
 
-**Done in slice 25** (D-80): InfoDocumenter as a module with its licence and switch; documents as stored recipes from
-three presets, private and shared with their rights; the form on one page; the document page laid out in A4 by Paged.js
-with a title page, contents with page numbers, the running header and footer and the watermark; sections Text, Data
-dictionary (logical level), Source-to-target mapping and InfoCube's Dimensional model; the labels in English, Polish and
-German; the two extension points (document sections, the workspace home's module tab); the demo's three documents.
+This is the one place for InfoDocumenter's plan (slice 26's roadmap file points here).
 
-**Later:**
-- **Slice B:** the dictionary's dimensional entities through InfoCube's contributions (if needed); the editor with a
-  live preview, section order, adding and removing sections; the style (paper, orientation, theme, templates with IBM
-  Plex Serif, header and footer fields, logos); the sections overview, conventions and notation, readiness, sources,
-  classification register, requirements, traceability, data quality; the dictionary's other layouts and long
-  definitions moved to the end.
-- **Baselines** (their own slice, before the first that reads one): the snapshot as agreed (the entry below); then
-  documents from a baseline and "changes since a baseline".
-- **Slice C:** figures (canvases, frames, the star diagram drawn from the model), the canvas's page outline.
-- **Slice D:** versions (the generated file stored), links for people outside the workspace (a new AD for access
-  without a session), guests' restriction on versions and links (the export setting), where PDF files are made (browser
-  or server).
-- **Slice E:** Markdown export (metadata instead of images; one file or several).
-- Live label canvases in documents from a baseline (option a of 11 November 2026); a workspace transfer with baselines
-  holding InfoCube rows.
-- For a workspace's copy or transfer (step 1, F30): a document's author kept when they are a member of the target, else
-  the person copying; others' private documents never copied; the scope's project and concept ids remapped; the
-  licence checked as AD-35 says, also while the switch is off.
-- A module's switch states as one record when a third module comes (`docs/known-limitations.md`).
+**Done in slice 25 (A)** (D-80): InfoDocumenter as a module with its licence and switch; documents as stored recipes
+from three presets, private and shared with their rights; the form on one page; the document page laid out in A4 by
+Paged.js with a title page, contents with page numbers, the running header and footer and the watermark; sections Text,
+Data dictionary (logical level), Source-to-target mapping and InfoCube's Dimensional model; the labels in English,
+Polish and German; the two extension points (document sections, the workspace home's module tab); the demo's three
+documents.
+
+**Done in slice 26 (B)** (D-81): the prototype's editor (sections on the left with add, remove, move, switch and
+heading; the preview in the middle; the options on the right) in place of the form; the adaptive preview (Auto with a
+1,000 ms threshold, Exact pages, Quick preview, "Pages out of date" and "Update pages", about 500 ms after the last
+keystroke, a running layout stopped, the old pages kept, the sync, the zoom); the tree built in the browser from a
+snapshot read once; every section without figures (overview, readiness, conventions, source tables with the Data Vault
+reading, classification register, requirements, traceability, data quality rules, InfoCube's Bus matrix); the
+dictionary's three layouts, long definitions at the end and the dimensional entities through InfoCube's contribution;
+long texts under the row, after the table or as a column; the presets as the prototype's without figures; the style
+(language per document, templates with IBM Plex Serif, accent, black and white, A4 and A3, portrait and landscape,
+notation, keep-rows, numbering, banded rows, running header, draft mark, header and footer fields).
+
+**Then (proposed order, to confirm):**
+1. **Slice C – figures:** canvases and frames as SVG from the canvas's geometry (never screenshots), the star diagram
+   drawn from the model, a figure as a reusable block (canvas or frame, 1:1 or fitted, size, orientation, caption), the
+   list of figures, the canvas's page outline, the smallest attribute names in diagrams; Paged.js's limits (inline SVG
+   split: figures as `<img>` SVG; mixed page sizes).
+2. **Baselines** (their own InfoMapper slice; the design is the entry below), then **documents from a baseline**, the
+   section "changes since a baseline" and the sign-off preset.
+3. **Slice D – versions and links:** a version stores the generated file (where PDFs are made: browser or server),
+   links for people outside the workspace (a new AD: access without a session, expiry, revoke), guests' restriction on
+   versions and links (the export setting), logos (organization and client; needs file storage).
+4. **Slice E – Markdown export:** metadata instead of images (an AI agent or Mermaid draws the diagrams); one file or a
+   set of files (open).
+
+**Later, noted:**
+- Live label canvases in documents from a baseline (option a: freeze the labels and label links that drive them).
+- A workspace transfer with baselines holding InfoCube rows (the transfer slice's question).
+- Copy and transfer of documents (slice 25 step 1, F30): the author kept when a member of the target, others' private
+  documents never copied, scope ids remapped, the licence checked as AD-35 says, also while the switch is off.
+- Module switches and licences as one record when a third module comes (`docs/known-limitations.md`).
+- Step 2 of figures: a requirement's path from source to dimensional model, a canvas with a requirement's lens,
+  cross-references instead of duplicates.
+- Light markup in Text ("- " lists, **bold**, _italic_, as the prototype; slice 26 keeps D-80's plain text, D11).
+- A document's language back to "the workspace's" once one was chosen (slice 26, step 4: a choice in the select).
+- The editor's snapshot refreshed when others change the model, without a reload (slice 26, step 2).
+
+**Follow-ups outside the slices:**
+- **German words** (document labels, InfoCube's words, slice 26's new ones): Łukasz's review, then a small `fix/`
+  branch.
+- **The model checks' texts in Polish and German** (about 40 texts in the core, `CHECK_TEXTS` and the rules' `text()`,
+  and InfoCube's checks), with the German words' review; until then a Polish or German document prints them in English
+  (slice 26, D3).
+- **Part 8 of the full run:** its heap peaked at 2,088 MB in slice 26 (past CLAUDE.md's 2 GB); recut `PART_STARTS` on a
+  `chore/` branch after slice 26's merge.
+- **KB to format 17:** only on Łukasz's command, after the backup; then a dictionary of Kanton Basel.
+- **Paged.js** in `next.config.ts` (the alias) and the editor's two uses of its internals: check at each Paged.js or
+  Next.js upgrade (`docs/known-limitations.md`).
 
 ## Baselines: the design agreed for their slice (11 November 2026)
 

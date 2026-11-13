@@ -18,6 +18,7 @@ import { CUBE_SECTION_TABLES, CUBE_SECTION_TYPE } from "@/modules/infocube/domai
 import { CUBE_DOC_WORDS } from "@/modules/infocube/domain/document-words";
 import { buildDocument, type DocumentTree } from "@/modules/infodocumenter/domain/document";
 import { LABELS } from "@/modules/infodocumenter/domain/labels";
+import { defaultStyle, upgradeSection } from "@/modules/infodocumenter/domain/style";
 import type { DocumentScope, DocumentSection, MappingFilter } from "@/modules/infodocumenter/domain/types";
 
 const WS = SEED_IDS.wsRetailDwh;
@@ -45,13 +46,15 @@ function doc(
   { db = demo(), scope = {}, mappings = "all" }: { db?: DevDb; scope?: Partial<DocumentScope>; mappings?: MappingFilter } = {},
 ): DocumentTree {
   const state = documentStateFor(snapshotOf(db));
-  const list: DocumentSection[] = sections.map((s) => ({ id: sid(), type: s.type, on: s.on ?? true, options: s.options }));
+  // slice 25's shape, read as the store reads it (Text's heading moves to the entry, slice 26's upgrade)
+  const list: DocumentSection[] = sections.map((s) => upgradeSection({ id: sid(), type: s.type, on: s.on ?? true, options: s.options }));
   return buildDocument({
     definition: {
       name: "Retail Co – data dictionary",
       author_id: SEED_IDS.userLukasz,
       scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings, ...scope },
       cover: { title: null, subtitle: "For the business", version: "1.0", status: "Draft for review", preparedBy: null },
+      style: defaultStyle(),
       sections: list,
     },
     state,
@@ -61,6 +64,8 @@ function doc(
 }
 
 const words = (runs: DocRuns) => runs.map((r) => r.text).join("");
+/** Slice 26: an entity's block is a group node (kept together, its concept's mark); its nodes in their place. */
+const flat = (nodes: readonly DocNode[]): DocNode[] => nodes.flatMap((x) => (x.kind === "group" ? flat(x.nodes) : [x]));
 const headings = (nodes: readonly DocNode[], level: number) => nodes.flatMap((x) => (x.kind === "heading" && x.level === level ? [x.text] : []));
 /** The nodes of an entity's (or a concept's) part: from its heading to the next heading of the same level or above. */
 function part(nodes: readonly DocNode[], level: number, name: string): DocNode[] {
@@ -97,7 +102,13 @@ describe("the document (title page, contents, frame)", () => {
     expect(tree.contents.heading).toBe("Contents");
     expect(tree.contents.entries.map((e) => e.text)).toEqual(["Scope", "Source-to-target mapping"]);
     expect(tree.sections.map((s) => s.anchor)).toEqual(tree.contents.entries.map((e) => e.anchor));
-    expect(tree.frame).toEqual({ header: "InfoMate · Retail Co – data dictionary", footer: "Retail Co – DWH · Live model on 2026-11-12", watermark: "DRAFT · live model", page: "Page", of: "of" });
+    expect(tree.frame).toEqual({
+      headerLeft: "InfoMate · Retail Co – data dictionary",
+      headerRight: "",
+      footerLeft: "Retail Co – DWH · Live model on 2026-11-12",
+      footerRight: "Page {page} of {pages}",
+      watermark: "DRAFT · live model",
+    });
     expect(tree.skipped).toEqual([]);
   });
 
@@ -121,6 +132,7 @@ describe("the document (title page, contents, frame)", () => {
         author_id: SEED_IDS.userAnna,
         scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings: "all" },
         cover: { title: "Own title", subtitle: null, version: null, status: null, preparedBy: "Data office" },
+        style: defaultStyle(),
         sections: [],
       },
       state,
@@ -129,7 +141,7 @@ describe("the document (title page, contents, frame)", () => {
     });
     expect(tree.cover.title).toBe("Own title");
     expect(tree.cover.rows.map((r) => r.value)).toEqual(["Retail Co", "Retail Co – DWH", "Live model on 2026-11-12", "–", "–", "Data office"]);
-    expect(tree.frame.header).toBe("InfoMate · Own title");
+    expect(tree.frame.headerLeft).toBe("InfoMate · Own title");
   });
 });
 
@@ -145,13 +157,19 @@ describe("Text (D8)", () => {
 });
 
 describe("the data dictionary", () => {
-  const dict = (options = ALL_DICT, rest?: Parameters<typeof doc>[1]) => doc([{ type: "dict", options }], rest).sections[0]!.nodes;
+  const dict = (options: Record<string, unknown> = ALL_DICT, rest?: Parameters<typeof doc>[1]) => flat(doc([{ type: "dict", options }], rest).sections[0]!.nodes);
 
-  it("lists the logical entities only, by concept in the concepts' order, then by name", () => {
-    const nodes = dict();
-    expect(headings(nodes, 2)).toEqual(["Customer", "Sales", "Product", "Reference data"]);
-    expect(headings(part(nodes, 2, "Customer"), 3)).toEqual(["Customer", "Customer Address"]);
-    expect(headings(nodes, 3).some((x) => x.startsWith("Fact ") || x.startsWith("Dim "))).toBe(false);
+  it("lists the entities by concept in the concepts' order; the dimensional ones only with the level in scope and InfoCube on (slice 26, PRD item 8)", () => {
+    const logical = dict(ALL_DICT, { scope: { dimensional: false } });
+    expect(headings(logical, 2)).toEqual(["Customer", "Sales", "Product", "Reference data"]);
+    expect(headings(part(logical, 2, "Customer"), 3)).toEqual(["Customer", "Customer Address"]);
+    expect(headings(logical, 3).some((x) => x.startsWith("Fact ") || x.startsWith("Dim "))).toBe(false);
+    // the demo has InfoCube on: its facts and dimensions with their role in InfoCube's words (S26-07)
+    expect(headings(dict(), 3).filter((x) => x.startsWith("Fact ") || x.startsWith("Dim ")).length).toBeGreaterThan(0);
+    const off = demo((db) => {
+      for (const w of db.workspace) if (w.id === WS) w.infocube = false;
+    });
+    expect(headings(dict(ALL_DICT, { db: off }), 3).some((x) => x.startsWith("Fact ") || x.startsWith("Dim "))).toBe(false);
   });
 
   it("prints the chosen fields above an entity's table, the chosen columns in their order, the definition under the row and the relationships after", () => {
@@ -231,8 +249,8 @@ describe("the data dictionary", () => {
     expect(rel.rows.some((r) => words(r.cells[0]!).endsWith(" (outside this document)"))).toBe(true);
   });
 
-  it("is empty with the logical level out of scope", () => {
-    expect(dict(ALL_DICT, { scope: { logical: false } })).toEqual([{ kind: "paragraph", runs: [{ text: "None.", muted: true }] }]);
+  it("is empty with both levels out of scope", () => {
+    expect(dict(ALL_DICT, { scope: { logical: false, dimensional: false } })).toEqual([{ kind: "paragraph", runs: [{ text: "None.", muted: true }] }]);
   });
 });
 
@@ -349,7 +367,7 @@ describe("the labels in three languages (S25-08)", () => {
     expect(pl.sections.map((s) => s.heading)).toEqual(["Wprowadzenie", "Słownik danych", "Mapowanie źródło–cel", "Model wymiarowy"]);
     expect(pl.cover.rows.map((r) => r.label)).toEqual(["Klient", "Workspace", "Stan modelu", "Wersja", "Status", "Przygotował(a)"]);
     expect(pl.frame.watermark).toBe("WERSJA ROBOCZA · model bieżący");
-    const customer = part(pl.sections[1]!.nodes, 3, "Customer");
+    const customer = part(flat(pl.sections[1]!.nodes), 3, "Customer");
     expect(metaOf(customer)[0]![1]).toBe("7 z 9 atrybutów zmapowanych");
     expect(customer[2]).toEqual({ kind: "paragraph", runs: [{ text: "A person or organisation that buys from us." }] });
     expect(tables(customer)[0]!.columns[0]!.label).toBe("Atrybut");

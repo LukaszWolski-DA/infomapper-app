@@ -3,7 +3,7 @@
 // guest reviewer there and makes a private document as every member may); "Retail Co – DWH" is set to German.
 
 import { expect, test } from "./fixtures";
-import { createDocumentAs, DEMO_DOCUMENT_NAMES, grantDocLicence, laidOut, marginContent, RETAIL, SEED_IDS, setWorkspace, signInAs, storedDocument, viewUrl } from "./helpers";
+import { createDocumentAs, DEMO_DOCUMENT_NAMES, grantDocLicence, laidOut, marginContent, RETAIL, SEED_IDS, setWorkspace, signInAs, storedDocument, unnumbered, viewUrl } from "./helpers";
 
 const texts = (page: import("@playwright/test").Page) =>
   page.evaluate(() => {
@@ -21,12 +21,15 @@ test("S25-08: a Polish workspace prints its headings and labels in Polish", asyn
   await grantDocLicence(SEED_IDS.orgRetailCo);
   await setWorkspace(SEED_IDS.wsSales, { infodoc: true });
   const { document } = await createDocumentAs(SEED_IDS.userLukasz, "dictionary", SEED_IDS.wsSales);
+  // slice 26, step 4: slice 25's look, the sections unnumbered (numbered by default since)
+  await unnumbered(document.name);
   await signInAs(page, "Łukasz");
   await page.goto(viewUrl(document.id, SEED_IDS.wsSales));
   await laidOut(page);
   const t = await texts(page);
   expect(t.toc).toBe("Spis treści");
-  expect(t.sections).toEqual(["Wprowadzenie", "Słownik danych"]);
+  // slice 26 (D2): the preset's sections, every heading in Polish
+  expect(t.sections).toEqual(["Wprowadzenie", "Przegląd modelu", "Konwencje i notacja", "Słownik danych", "Wymagania i pokrycie", "Reguły jakości danych", "Rejestr klasyfikacji"]);
   expect(t.cover).toEqual(["Klient", "Workspace", "Stan modelu", "Wersja", "Status", "Przygotował(a)"]);
   expect(t.heads).toEqual(expect.arrayContaining(["Atrybut", "Typ", "Dane osobowe"]));
   expect(await marginContent(page, 1, "top-center")).toBe('"WERSJA ROBOCZA · model bieżący"');
@@ -36,11 +39,12 @@ test("S25-08: a Polish workspace prints its headings and labels in Polish", asyn
 test("S25-08: a German workspace prints its headings and labels in German; names and definitions unchanged", async ({ page }) => {
   await setWorkspace(RETAIL, { doc_language: "de" });
   await signInAs(page, "Łukasz");
+  await unnumbered(DEMO_DOCUMENT_NAMES.shared);
   await page.goto(viewUrl((await storedDocument(DEMO_DOCUMENT_NAMES.shared))!.id));
   await laidOut(page);
   const t = await texts(page);
   expect(t.toc).toBe("Inhalt");
-  expect(t.sections).toEqual(["Einleitung", "Datenkatalog"]);
+  expect(t.sections).toEqual(["Einleitung", "Modellübersicht", "Konventionen und Notation", "Datenkatalog", "Anforderungen und Abdeckung", "Datenqualitätsregeln", "Klassifikationsverzeichnis"]);
   expect(t.cover).toEqual(["Kunde", "Workspace", "Modellstand", "Version", "Status", "Erstellt von"]);
   expect(t.heads).toEqual(expect.arrayContaining(["Attribut", "Typ", "Personenbezogene Daten"]));
   expect(t.entities).toContain("Customer");

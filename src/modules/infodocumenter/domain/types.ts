@@ -3,7 +3,7 @@
 // (AD-33).
 
 import type { Uuid } from "@/domain/ids";
-import type { StandardColumns } from "@/domain/types";
+import type { DocLanguage, StandardColumns } from "@/domain/types";
 
 /** The presets a document is made from (PRD section 3, D1). */
 export const DOCUMENT_PRESETS = ["dictionary", "s2t", "blank"] as const;
@@ -53,7 +53,40 @@ export interface DocumentSection {
   id: Uuid;
   type: string;
   on: boolean;
+  /** Slice 26 (F10): null, the type's default heading in the document's language. */
+  heading: string | null;
+  /** Slice 26: starts on a new page (the Compact template runs sections on, step 4). */
+  newPage: boolean;
   options: Record<string, unknown>;
+}
+
+/** A header's or a footer's two parts; null: the grey example (slice 26, F9). */
+export interface DocumentFrameFields {
+  left: string | null;
+  right: string | null;
+}
+
+/**
+ * How a document looks (slice 26, F9; the prototype's style without figures, logos and baselines). `language` null: the
+ * workspace's documentation language (Q8). The style panel comes with step 4; step 2 stores and reads the shape.
+ */
+export interface DocumentStyle {
+  language: DocLanguage | null;
+  template: "standard" | "formal" | "compact";
+  accent: "indigo" | "teal" | "graphite" | "burgundy";
+  colours: "colour" | "mono";
+  paper: "A4" | "A3";
+  orientation: "portrait" | "landscape";
+  notation: "ie" | "uml";
+  keepRows: 0 | 10 | 15 | 25 | 40;
+  cover: boolean;
+  contents: boolean;
+  numbers: boolean;
+  banded: boolean;
+  runningHeader: boolean;
+  watermark: boolean;
+  header: DocumentFrameFields;
+  footer: DocumentFrameFields;
 }
 
 /** A stored document definition (`document_definition`). */
@@ -70,7 +103,9 @@ export interface DocumentDefinition extends StandardColumns {
   baseline_id: Uuid | null;
   scope: DocumentScope;
   cover: DocumentCover;
-  /** In the document's order. */
+  /** Slice 26: a recipe stored before it reads with the defaults and the workspace's language (`upgradeDocument`). */
+  style: DocumentStyle;
+  /** In the document's order; at most `SECTIONS_MAX`. */
   sections: DocumentSection[];
 }
 

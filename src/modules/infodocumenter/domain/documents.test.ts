@@ -115,18 +115,19 @@ describe("creating from a preset (D1, D13)", () => {
         expect(d).toMatchObject({ name: p.label, author_id: ME, shared: false, audience: p.audience, preset: p.code, source_kind: "live", baseline_id: null });
         expect(d.scope).toEqual({ projects: [], concepts: [], logical: true, dimensional: true, mappings: p.mappings });
         expect(d.cover).toEqual({ title: null, subtitle: null, version: null, status: null, preparedBy: null });
-        expect(d.sections.map((s) => s.type)).toEqual(p.sections.map((s) => s.type));
+        // slice 26: the module's place holds nothing while InfoCube is off
+        expect(d.sections.map((s) => s.type)).toEqual(p.sections.flatMap((s) => ("type" in s ? [s.type] : [])));
         expect(d.sections.every((s) => s.on)).toBe(true);
       }
     }
   });
 
-  it("ends the source-to-target preset with the Dimensional model only while InfoCube is on", () => {
-    expect(made("s2t").sections.map((s) => s.type)).toEqual(["s2t"]);
+  it("puts the Dimensional model in the source-to-target preset's place only while InfoCube is on (slice 26: D2's presets)", () => {
+    expect(made("s2t").sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", "dq"]);
     const withCube = made("s2t", { infocube: true });
-    expect(withCube.sections.map((s) => s.type)).toEqual(["s2t", "cube.dim"]);
-    expect(withCube.sections[1]!.options).toEqual(CUBE_SECTION_KIND.defaults());
-    expect(made("dictionary", { infocube: true }).sections.map((s) => s.type)).toEqual(["text", "dict"]);
+    expect(withCube.sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", "cube.dim", "dq"]);
+    expect(withCube.sections[3]!.options).toEqual(CUBE_SECTION_KIND.defaults());
+    expect(made("dictionary", { infocube: true }).sections.map((s) => s.type)).toEqual(["text", "overview", "conv", "dict", "reqs", "dq", "classreg"]);
   });
 
   it("is one change event, outside the undo history (R2-4a2)", () => {
@@ -167,16 +168,25 @@ describe("saving (D-59, F19)", () => {
     const d = made("dictionary");
     const dict = d.sections.find((s) => s.type === "dict")!;
     const r = updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: dict.id, options: { columns: ["definition", "attribute", "keys"] } } }, KINDS);
-    expect(ok(r).document.sections.find((s) => s.id === dict.id)!.options).toEqual({ entity: dict.options.entity, columns: ["attribute", "keys", "definition"] });
+    expect(ok(r).document.sections.find((s) => s.id === dict.id)!.options).toEqual({ ...dict.options, columns: ["attribute", "keys", "definition"] });
     expect(updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: dict.id, options: { columns: ["colour"] } } }, KINDS)).toMatchObject({ ok: false, error: { code: "invalid" } });
-    expect(updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: dict.id, options: { layout: "column" } } }, KINDS)).toMatchObject({ ok: false, error: { code: "invalid" } });
+    // slice 26: the dictionary's layouts (D1); a layout it does not have is refused
+    expect(ok(updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: dict.id, options: { layout: "column" } } }, KINDS)).document.sections.find((s) => s.id === dict.id)!.options.layout).toBe("column");
+    expect(updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: dict.id, options: { layout: "grid" } } }, KINDS)).toMatchObject({ ok: false, error: { code: "invalid" } });
     const off = updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: dict.id, on: false } }, KINDS);
     expect(ok(off).document.sections.find((s) => s.id === dict.id)!.on).toBe(false);
   });
 
   it("keeps a section of a type no module knows: its switch changes, its options do not", () => {
-    const d = { ...made(), sections: [{ id: ids.canvas1, type: "gone.part", on: true, options: { x: 1 } }] };
-    expect(ok(updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: ids.canvas1, on: false } }, KINDS)).document.sections[0]).toEqual({ id: ids.canvas1, type: "gone.part", on: false, options: { x: 1 } });
+    const d = { ...made(), sections: [{ id: ids.canvas1, type: "gone.part", on: true, heading: null, newPage: true, options: { x: 1 } }] };
+    expect(ok(updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: ids.canvas1, on: false } }, KINDS)).document.sections[0]).toEqual({
+      id: ids.canvas1,
+      type: "gone.part",
+      on: false,
+      heading: null,
+      newPage: true,
+      options: { x: 1 },
+    });
     expect(updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: ids.canvas1, options: { x: 2 } } }, KINDS)).toMatchObject({ ok: false, error: { code: "invalid" } });
   });
 

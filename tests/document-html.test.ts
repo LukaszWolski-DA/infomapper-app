@@ -11,6 +11,7 @@ import { buildSeed, SEED_IDS } from "@/data/local/seed";
 import { workspaceSnapshotOf, type StoredRows } from "@/domain/model/workspace-model";
 import type { ModuleTable } from "@/domain/types";
 import { buildDocument } from "@/modules/infodocumenter/domain/document";
+import { defaultStyle } from "@/modules/infodocumenter/domain/style";
 import { cssString, documentCss } from "@/modules/infodocumenter/ui/document-css";
 import { DocumentHtml } from "@/modules/infodocumenter/ui/document-html";
 
@@ -31,9 +32,10 @@ function html(title: string) {
       author_id: SEED_IDS.userLukasz,
       scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings: "all" },
       cover: { title: null, subtitle: MARKUP, version: null, status: null, preparedBy: null },
+      style: defaultStyle(),
       sections: [
-        { id: "00000000-0000-7000-8000-000000000001", type: "text", on: true, options: { heading: MARKUP, body: MARKUP } },
-        { id: "00000000-0000-7000-8000-000000000002", type: "dict", on: true, options: { entity: ["definition"], columns: ["attribute", "definition"] } },
+        { id: "00000000-0000-7000-8000-000000000001", type: "text", on: true, heading: MARKUP, newPage: true, options: { body: MARKUP } },
+        { id: "00000000-0000-7000-8000-000000000002", type: "dict", on: true, heading: null, newPage: true, options: { entity: ["definition"], columns: ["attribute", "definition"] } },
       ],
     },
     state: documentStateFor(snapshot),
@@ -64,8 +66,9 @@ describe("the document's HTML", () => {
 
   it("escapes the frame's texts in the CSS strings", () => {
     expect(cssString(`a "b" \\ c\nd`)).toBe(`"a \\"b\\" \\\\ c d"`);
-    const css = documentCss({ header: `Org"}*{display:none} · T`, footer: "W · Live", watermark: "DRAFT", page: "Page", of: "of" });
+    const css = documentCss({ headerLeft: `Org"}*{display:none} · T`, headerRight: "", footerLeft: "W · Live", footerRight: "Page {page} of {pages}", watermark: "DRAFT" });
     expect(css).toContain(`@top-left{content:"Org\\"}*{display:none} · T"`);
+    expect(css).toContain(`@top-right{content:none`);
     expect(css).toContain(`@bottom-right{content:"Page " counter(page) " of " counter(pages)`);
   });
 });

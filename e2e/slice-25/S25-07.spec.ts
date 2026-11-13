@@ -3,11 +3,13 @@
 // new page; print uses A4 portrait and shows the pages alone. Read in the DOM Paged.js lays out, and with print media.
 
 import { expect, test } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, laidOut, marginContent, pagesOf, signInAs, storedDocument, viewUrl } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, laidOut, marginContent, pagesOf, signInAs, storedDocument, unnumbered, viewUrl } from "./helpers";
 
 const A4 = { width: 793.7, height: 1122.5 }; // 210 × 297 mm at 96 px per inch
 
 test("S25-07: title page, contents with matching page numbers, header and footer, watermark, sections on new pages", async ({ page }) => {
+  // slice 26, step 4: slice 25's look, the sections unnumbered (numbered by default since)
+  await unnumbered(DEMO_DOCUMENT_NAMES.shared);
   await signInAs(page, "Łukasz");
   const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.shared))!;
   await page.goto(viewUrl(doc.id));
@@ -52,7 +54,8 @@ test("S25-07: title page, contents with matching page numbers, header and footer
       };
     });
   });
-  expect(toc.map((t) => t.text)).toEqual(["Introduction", "Data dictionary"]);
+  // slice 26 (D2): the dictionary preset's sections
+  expect(toc.map((t) => t.text)).toEqual(["Introduction", "Model overview", "Conventions and notation", "Data dictionary", "Requirements and coverage", "Data quality rules", "Classification register"]);
   for (const t of toc) {
     expect(t.number, t.text!).toBe(t.page);
     expect(t.first, t.text!).toBe(true);

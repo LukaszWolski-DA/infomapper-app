@@ -1,4 +1,4 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 25's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 26's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
@@ -35,7 +35,7 @@ docs (some are repeated below where they explain an item).
 | Labels and notes | rich text in notes | known limitation |
 | Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer | baselines: decision only (AD-03, AD-14); the rest: – |
 | Settings and roles | inviting people by e-mail (slice 8 adds them at once instead) | database (AD-04) |
-| InfoDocumenter | the editor with a live preview, style, templates and logos, the other sections, figures, versions, links, documents from a baseline, Markdown | idea (slices B to E, baselines; `docs/ideas.md`) |
+| InfoDocumenter | logos, figures and the star diagram, versions, links, documents from a baseline, changes since a baseline, Markdown | idea (slices C to E, baselines; `docs/ideas.md`) |
 
 ## Canvas
 
@@ -469,39 +469,49 @@ once in a dimension's delete preview; paste within one level only (the prototype
 
 ## InfoDocumenter
 
-The prototype is slice 25's (`docs/prd/slice-25-infodocumenter-documents.md`, section 4; 950,304 bytes). What it has
-that the app does not:
+The prototype is slice 26's (`docs/prd/slice-26-infodocumenter-editor.md`, section 4; 951,539 bytes). What it has that
+the app does not:
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| The editor with a live preview | sections on the left, the preview in the middle, properties on the right; "Exact pages" and "Quick preview", zoom | the document editor (`DOC`) | idea (slice B) |
-| Section order, adding and removing sections | move up and down, "+ Add section", remove | the editor's left panel | idea (slice B) |
-| The style | paper (A4, A3), orientation, theme, templates (standard, formal with IBM Plex Serif, compact), accent, notation, header and footer fields, minimum font size, keep rows, section numbers, the watermark's switch | the editor's Document panel | idea (slice B) |
-| Logos | on the title page and in the header | the editor's Document panel | idea (slice B) |
-| The other sections | overview, conventions and notation, readiness, diagrams and figures, sources, classification register, requirements, traceability, data quality, changes since a baseline, the bus matrix | "+ Add section" | idea (slices B, C) |
-| The dictionary's other layouts | definition as a column, one block per attribute; long definitions moved to the end; each concept on a new page | the dictionary's properties | idea (slice B) |
-| The dictionary's dimensional entities | facts and dimensions with their role in the dictionary | the dictionary | idea (slice B, if needed) |
-| Figures and the star diagram | canvases, frames, a star drawn from the model; the canvas's page outline | the diagrams section, `cube.dim`'s star, `pageArea` | idea (slice C) |
-| Versions and links | "Generate version", the versions list, links for people outside the workspace, the recipient's view | the Documentation tab | idea (slice D) |
-| Documents from a baseline | a document's source a baseline; "New document from it" on a baseline | the Documentation tab, the Baselines tab | idea (baselines' slice) |
+| Logos | the organization's and the client's, on the title page and in the header; "Also in the page header" | the editor's Document panel, InfoDocumenter's box | idea (slice D) |
+| Figures and the star diagram | the Diagrams and Figure sections, Overview's and the Dimensional model's figures, the star drawn from the model, the dictionary's concept figure, the list of figures, "Smallest attribute names in diagrams", the canvas's page outline | "+ Add section", the sections' options, `pageArea` | idea (slice C) |
+| Versions and links | "Generate version", the versions list, links for people outside the workspace, the recipient's view | the Documentation tab, the editor's top bar | idea (slice D) |
+| Documents from a baseline | a document's source a baseline; "Changes since a baseline"; the sign-off preset | the Documentation tab, the Baselines tab | idea (baselines' slice) |
 | Settings for links and guests | "Modelers may share links", "Guests may generate versions, print and share links" | InfoDocumenter's box | idea (slice D) |
-| A language per document | the document's own language | the editor's Document panel | – (D-80: the workspace's) |
+| Light markup in Text | "- " lists, **bold**, _italic_ | the Text section | idea (D-81: plain text for now) |
 | Markdown export | | – | idea (slice E) |
 
-**Present (slice 25, D-80):** InfoDocumenter's box in Settings (the licence line, the switch for owners and admins,
-"turning it off deletes nothing"); the Documentation tab with New document and its three presets, shared and private
-documents with their meta line, Edit or Open, Duplicate and Delete; the form on one page (name, audience, Shared, model
-state, title page, scope, sections with their options, Open document, Print); the document page laid out in A4 by
-Paged.js (title page, contents with page numbers, header and footer, "Page n of m", the watermark), print; sections Text,
-Data dictionary, Source-to-target mapping and InfoCube's Dimensional model; the labels in English, Polish and German.
+**Present (slices 25 and 26, D-80, D-81):** InfoDocumenter's box in Settings; the Documentation tab with New document and
+its three presets (the prototype's without figures and baselines); the editor (the sections with add, remove, move, the
+switch and the heading; the preview in Auto, Exact pages and Quick preview with "Pages out of date" and "Update pages";
+the zoom; Print / PDF; the sync; every section's options; the style and the header and footer fields); the document
+page laid out by Paged.js in the style's paper and orientation; the sections Text, Model overview, Data dictionary
+(three layouts, long definitions at the end, the dimensional entities), Source-to-target mapping, Source tables (with
+the Data Vault reading), Classification register, Requirements and coverage, Model readiness, Conventions and notation,
+Traceability, Data quality rules, InfoCube's Dimensional model and Bus matrix; long texts under the row, after the
+table or as a column; the labels in English, Polish and German; a document's own language.
 
-**Deliberate differences** (slice 25's step 1, D1 to D13, and step 4b): the form is one page without a preview (D5); a
-check box "Shared with the workspace" for owners, admins and modelers, at once, and only the author makes a shared
-document private (D4, step 4b); every section starts a new page and only Text has its own heading (D6); the language is
-the workspace's (D7); Text is plain (D8); the source-to-target's rule and note are under the row (D9); the tab's texts
-do not mention versions or links (D10); "Prepared by" falls back to the author (D11); the organization's name on the
-title page, without initials (D12); New document opens the form (D13); the presets end with this slice's sections; the
-watermark has no switch (D2); the title page is in IBM Plex Sans (step 4b; Serif comes with the templates).
+**Deliberate differences** (slice 25's D1 to D13 where slice 26 keeps them; slice 26's step 1 D1 to D11 and steps 2 to
+4):
+- **The editor is a page in the shell**, not a full-screen overlay; the name saves when it is left (D-66), and the
+  preview reads its draft as it is typed.
+- **"Who sees this document"** is shown to everyone; only its author makes a shared document private (slice 25, step
+  4b). A section is removed without a question, as in the prototype; documents are outside undo.
+- **The double-click** on a section goes to its Heading (no rename in the list, as the prototype).
+- **The preview:** a running layout is stopped, not thrown away; the busy text says "Laying out pages…" while any layout
+  runs; the old pages give way at once when the paper, the orientation or the look changes.
+- **The quick sheet's footer** prints the footer fields (D8), not a fixed line.
+- **The model checks' texts** are in English in Polish and German documents (D3); the requirements' kinds, statuses and
+  priorities are translated (the prototype prints them in English).
+- **Readiness's "attributes with no mapping or feed"** counts by the app's fed rule (any status, or through a
+  calculation), not by the document's mapping filter.
+- **The Overview** has no "what is on no canvas" (D4).
+- **The register's choices:** a built-in classification is stored by its code and an own one by its id (an own one may
+  have no code, D-78).
+- **The style:** the draft mark prints black in black and white; the title page's height comes from the page size; the
+  language, once chosen, does not go back to the workspace's; "Model levels" shows only while InfoCube is on.
+- **Text is plain** (D-80, D11); the cover's fields stay in "Cover".
 
 ## The app ahead of the prototype (slice 22)
 

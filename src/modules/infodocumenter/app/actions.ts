@@ -6,15 +6,25 @@
 // (`rights.ts`): a guest makes and prints private documents, an archived workspace's are read only.
 
 import { revalidatePath } from "next/cache";
-import { DOCUMENT_SECTION_KINDS } from "@/app/_lib/documents";
-import { loadAccess } from "@/app/_lib/model-command";
+import { DOCUMENT_SECTION_KINDS, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES } from "@/app/_lib/documents";
+import { loadAccess, modelRead } from "@/app/_lib/model-command";
 import { documentHref } from "@/app/_lib/paths";
 import { runCommand, type ActionResult, type Saved } from "@/app/_lib/run-command";
 import type { DataStore } from "@/data";
 import type { CommandResult } from "@/domain/changes";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
+import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
+import type { ModuleTable } from "@/domain/types";
+import { openRefusal } from "../domain/rights";
+import { browserSnapshot } from "./snapshot";
 import {
+  addDocumentSection,
+  moveDocumentSection,
+  removeDocumentSection,
+  type AddDocumentSectionInput,
+  type MoveDocumentSectionInput,
+  type RemoveDocumentSectionInput,
   createDocument,
   deleteDocument,
   duplicateDocument,
@@ -88,4 +98,45 @@ export async function deleteDocumentAction(input: DeleteDocumentInput): Promise<
     const r = deleteDocument(ctx, access, doc, input);
     return r.ok ? { ...r, value: null } : r;
   });
+}
+
+// ---- the editor (slice 26) ----
+
+/** "+ Add section": a registered type at the end; the answer names the new section, which the editor selects. */
+export async function addDocumentSectionAction(input: AddDocumentSectionInput): Promise<ActionResult<Saved<{ sectionId: Uuid }>>> {
+  return documentCommand(input, (access, doc, _store, ctx) => {
+    const r = addDocumentSection(ctx, access, doc, input, DOCUMENT_SECTION_TYPES);
+    return r.ok ? { ...r, value: { version: r.value.document.version, sectionId: r.value.sectionId } } : r;
+  });
+}
+
+/** A section's remove (no question, the prototype's); outside undo. */
+export async function removeDocumentSectionAction(input: RemoveDocumentSectionInput): Promise<ActionResult<Saved>> {
+  return documentCommand(input, (access, doc, _store, ctx) => {
+    const r = removeDocumentSection(ctx, access, doc, input);
+    return r.ok ? { ...r, value: { version: r.value.document.version } } : r;
+  });
+}
+
+/** A section's move up or down. */
+export async function moveDocumentSectionAction(input: MoveDocumentSectionInput): Promise<ActionResult<Saved>> {
+  return documentCommand(input, (access, doc, _store, ctx) => {
+    const r = moveDocumentSection(ctx, access, doc, input);
+    return r.ok ? { ...r, value: { version: r.value.document.version } } : r;
+  });
+}
+
+/**
+ * The editor's model, read once when it opens (D7): one snapshot of the workspace (F1) with the document's tables, as
+ * the browser may hold it (`browserSnapshot`: no e-mail address, no member rows). Only for a document the person may
+ * open; a read, no write.
+ */
+export async function documentSnapshotAction(input: { workspaceId: string; documentId: string }): Promise<ActionResult<WorkspaceSnapshot<ModuleTable>>> {
+  return modelRead(input?.workspaceId, async (access, _model, store) => {
+    const doc = await documentOf(store, access, input?.documentId);
+    if (openRefusal(access, doc)) throw new Error("not_found");
+    const snapshot = await store.snapshot(access.workspace.id, DOCUMENT_TABLES);
+    if (!snapshot) throw new Error("not_found");
+    return browserSnapshot(snapshot);
+  }).catch(() => ({ ok: false as const, code: "not_found" as const, message: "This document is no longer available to you." }));
 }

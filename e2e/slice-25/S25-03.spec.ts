@@ -3,14 +3,15 @@
 // Duplicate makes a private copy; Undo does not touch documents.
 
 import { expect, test, type Page } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, docRow, docsUrl, documentEvents, expectToast, formUrl, SEED_IDS, signInAs, storedDocument, storedDocuments, updateDocumentAs } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, docRow, docsUrl, documentEvents, expectToast, formUrl, sectionOf, SEED_IDS, signInAs, storedDocument, storedDocuments, updateDocumentAs } from "./helpers";
 
 async function fromPreset(page: Page, preset: "dictionary" | "s2t" | "blank") {
   await page.goto(docsUrl());
   await page.getByTestId("button-new-document").click();
   await expect(page.getByTestId("dialog-new-document")).toContainText("Start from a preset; everything can be changed afterwards. A new document is private until you share it.");
   await page.getByTestId(`button-preset-${preset}`).click();
-  await expect(page.getByTestId("form-document")).toBeVisible();
+  // slice 26: the editor in place of the form
+  await expect(page.getByTestId("page-document-editor")).toBeVisible();
   return (await storedDocuments()).find((d) => d.id === page.url().split("/d/")[1])!;
 }
 
@@ -19,23 +20,30 @@ test("S25-03: each preset makes a private document with its sections, and opens 
   const dictionary = await fromPreset(page, "dictionary");
   expect(dictionary).toMatchObject({ name: "Data dictionary for the business", shared: false, author_id: SEED_IDS.userLukasz, audience: "Business", preset: "dictionary", source_kind: "live" });
   expect(dictionary.scope.mappings).toBe("approved");
+  // slice 26 (D2): the prototype's preset without Diagrams
   expect(dictionary.sections.map((s) => [s.type, s.on])).toEqual([
     ["text", true],
+    ["overview", true],
+    ["conv", true],
     ["dict", true],
+    ["reqs", true],
+    ["dq", true],
+    ["classreg", true],
   ]);
-  await expect(page.getByTestId("form-section")).toHaveCount(2);
+  await expect(page.getByTestId("editor-section")).toHaveCount(7);
   await expect(page.getByTestId("text-model-state")).toHaveText("Live model (changes as people work)");
 
   const s2t = await fromPreset(page, "s2t");
   // InfoCube is off in this seed: no Dimensional model (D1)
   expect(s2t).toMatchObject({ name: "Source-to-target specification for ETL", audience: "ETL developers" });
   expect(s2t.scope.mappings).toBe("notdraft");
-  expect(s2t.sections.map((s) => s.type)).toEqual(["s2t"]);
-  expect(s2t.sections[0]!.options).toMatchObject({ unmapped: true, group: "entity" });
+  expect(s2t.sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", "dq"]);
+  expect(sectionOf(s2t, "s2t").options).toMatchObject({ unmapped: true, group: "entity" });
 
   const blank = await fromPreset(page, "blank");
   expect(blank).toMatchObject({ name: "Blank document", audience: null });
-  expect(blank.sections.map((s) => [s.type, s.options])).toEqual([["text", { heading: null, body: "" }]]);
+  // slice 26: the heading is the entry's (F10)
+  expect(blank.sections.map((s) => [s.type, s.heading, s.options])).toEqual([["text", null, { body: "" }]]);
 });
 
 test("S25-03: a change is saved with a version and a change event; a stale save is refused and the field keeps the draft", async ({ page }) => {
@@ -51,10 +59,12 @@ test("S25-03: a change is saved with a version and a change event; a stale save 
   const saved = (await storedDocument(DEMO_DOCUMENT_NAMES.shared))!;
   expect(saved.version).toBe(doc.version + 1);
   expect(await documentEvents(doc.id)).toHaveLength(before + 1);
-  // a section's switch and its options too
-  await page.locator('[data-testid="form-section"][data-section="dict"]').getByTestId("checks-dict-columns-keys").check();
-  await expect.poll(async () => (await storedDocument(DEMO_DOCUMENT_NAMES.shared))?.sections[1]?.options.columns).toEqual(["attribute", "type", "keys", "pii", "definition"]);
+  // a section's switch and its options too (slice 26: in the editor's right panel once the section is selected)
+  await page.locator('[data-testid="editor-section"][data-section="dict"]').click();
+  await page.locator('[data-testid="panel-section"][data-section="dict"]').getByTestId("checks-dict-columns-keys").check();
+  await expect.poll(async () => sectionOf((await storedDocument(DEMO_DOCUMENT_NAMES.shared))!, "dict").options.columns).toEqual(["attribute", "type", "keys", "pii", "definition"]);
 
+  await page.getByTestId("row-editor-document").click();
   // Anna changes the subtitle meanwhile; Łukasz's save of the same field is refused as stale and keeps his text
   await expect(page.getByTestId("input-cover-subtitle")).toHaveValue("For the business");
   await updateDocumentAs(SEED_IDS.userAnna, DEMO_DOCUMENT_NAMES.shared, { cover: { subtitle: "For the data office" } });

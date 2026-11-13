@@ -16,6 +16,7 @@ import type { DocNode } from "../src/domain/document/content";
 import { workspaceSnapshotOf, type StoredRows } from "../src/domain/model/workspace-model";
 import type { ModuleTable } from "../src/domain/types";
 import { buildDocument } from "../src/modules/infodocumenter/domain/document";
+import { defaultStyle, upgradeSection } from "../src/modules/infodocumenter/domain/style";
 
 const ROUNDS = 9;
 const ms = (v: number) => `${v.toFixed(1)} ms`;
@@ -49,7 +50,7 @@ const SECTIONS = [
     options: { columns: ["target", "targetType", "system", "sourceColumn", "sourceType", "rule", "status", "typeCheck", "note", "requirements"], group: "entity", unmapped: true },
   },
   { id: "00000000-0000-7000-8000-000000000004", type: "cube.dim", on: true, options: { facts: true, dimensions: true, dimensionDefinitions: true, measures: true, relationships: true, feeds: true } },
-];
+].map((x) => upgradeSection(x));
 
 const count = (nodes: readonly DocNode[]) => ({
   nodes: nodes.length,
@@ -66,6 +67,7 @@ function report(name: string, db: DevDb, ws: string) {
     author_id: SEED_IDS.userLukasz,
     scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings: "all" as const },
     cover: { title: null, subtitle: null, version: "1.0", status: null, preparedBy: null },
+    style: defaultStyle(),
     sections: SECTIONS,
   };
   const state = documentStateFor(s);

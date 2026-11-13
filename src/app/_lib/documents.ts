@@ -6,7 +6,7 @@
 import { STORE_SCHEMA } from "@/compose";
 import { getDataStore, type DataStore } from "@/data";
 
-export { DOCUMENT_SECTION_KINDS, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES, documentStateFor } from "@/compose/documents";
+export { DOCUMENT_SECTION_KINDS, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES, dimensionalLevelOn, documentStateFor } from "@/compose/documents";
 
 /** The store that knows the modules' tables. */
 export const composedStore = (): DataStore => getDataStore(STORE_SCHEMA);

@@ -892,6 +892,7 @@ export function cubeRequirementFeeds(index: MappingIndex, attributes: readonly {
       approved: m.status === "approved",
       typeConflict: hasTypeConflict(index, m),
       inputs: index.inputsOf(m.id).map((i) => i.attribute_id),
+      status: m.status,
     }));
   }
   return out;

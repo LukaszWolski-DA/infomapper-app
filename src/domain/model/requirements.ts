@@ -112,6 +112,8 @@ export interface AttributeFeed {
   typeConflict: boolean;
   /** The attributes it reads, in their order. */
   inputs: readonly Uuid[];
+  /** Slice 26: its status, for a document's mapping filter and status pill; absent from a module that has none. */
+  status?: "draft" | "review" | "approved";
 }
 
 /** What feeds each dimensional attribute (slice 15d), by the target attribute's id; absent or empty: nothing. */

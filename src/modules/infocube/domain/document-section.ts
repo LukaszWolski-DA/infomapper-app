@@ -11,7 +11,9 @@ import type { DocumentSectionKind, DocumentSectionType, SectionBuildInput } from
 import type { Uuid } from "@/domain/ids";
 import type { AttributeFeeds } from "@/domain/model/requirements";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
-import type { Entity } from "@/domain/types";
+import type { DocLanguage, Entity } from "@/domain/types";
+import { busMatrix } from "./bus-matrix";
+import type { CubeCheckRows } from "./checks";
 import { CUBE_DOC_WORDS, type CubeDocWords } from "./document-words";
 import { cubeIndex } from "./keys";
 import { cubeRequirementFeeds, mappingIndex, type MappingIndex } from "./mappings";
@@ -204,6 +206,8 @@ export const CUBE_SECTION: DocumentSectionType<CubeSectionTable> = {
   ...CUBE_SECTION_KIND,
   module: "InfoCube",
   label: (language) => CUBE_DOC_WORDS[language].title,
+  // slice 26: the prototype's line without the star diagram and the canvases' figures (slice C)
+  description: "Facts with grain and type, dimensions and measures; dimensions with history; every dimensional attribute's feed.",
   // the form's check boxes (step 1's list of texts); the dimensions' definitions and the measures keep their defaults
   optionChecks: [
     { key: "facts", label: "Facts: type, grain, dimensions, measures" },
@@ -214,3 +218,83 @@ export const CUBE_SECTION: DocumentSectionType<CubeSectionTable> = {
   tables: CUBE_SECTION_TABLES,
   build: buildCubeSection,
 };
+
+// ---- slice 26: the Bus matrix, and what InfoCube contributes to InfoDocumenter's own sections (Q6, F12) ----
+
+const cubeIndexOf = (snapshot: WorkspaceSnapshot<CubeSectionTable>) =>
+  cubeIndex({
+    entities: snapshot.model.entities,
+    attributes: snapshot.model.attributes,
+    relationships: snapshot.model.relationships,
+    cubeEntities: snapshot.modules.cube_entity,
+    cubeMeasures: snapshot.modules.cube_measure,
+    cubeKeys: snapshot.modules.cube_key,
+    cubeAttributes: snapshot.modules.cube_attribute,
+  });
+
+/** The stored name of InfoCube's second section. */
+export const CUBE_BUS_SECTION_TYPE = "cube.bus";
+
+/**
+ * The Bus matrix (the prototype's `cube.bus`): the scope's facts against its dimensions, a dot where a relationship joins
+ * them (`busMatrix`, the Cube tab's dialog's rows), and under each dimension how many facts use it (conformed when more
+ * than one). Nothing to set.
+ */
+export function buildBusSection({ state, scope, language }: SectionBuildInput<CubeSectionTable>): DocNode[] {
+  const w = CUBE_DOC_WORDS[language];
+  const { snapshot } = state;
+  const ix = cubeIndexOf(snapshot);
+  const inScope = scope.dimensional ? snapshot.model.entities.filter((e) => e.model_level === "dimensional" && scope.entityIds.has(e.id)) : [];
+  const m = busMatrix(ix, inScope, snapshot.model.concepts);
+  if (!m.facts.length || !m.dimensions.length) return [{ kind: "paragraph", runs: [muted(w.noDims)] }];
+  const users = (dimensionId: Uuid) => m.facts.filter((f) => m.cells[f.id]?.[dimensionId]?.length).length;
+  return [
+    {
+      kind: "table",
+      style: "matrix",
+      columns: [{ key: "fact", label: w.fact }, ...m.dimensions.map((d) => ({ key: d.id, label: d.name, vertical: true }))],
+      rows: [
+        ...m.facts.map((f): DocRow => ({ cells: [[strong(f.name)], ...m.dimensions.map((d) => (m.cells[f.id]?.[d.id]?.length ? [text("●")] : EMPTY))] })),
+        { cells: [EMPTY, ...m.dimensions.map((d) => [muted(String(users(d.id)))])] },
+      ],
+    },
+  ];
+}
+
+/** The Bus matrix's kind: available while InfoCube is on; in no preset (the prototype's). */
+export const CUBE_BUS_SECTION: DocumentSectionType<CubeSectionTable> = {
+  type: CUBE_BUS_SECTION_TYPE,
+  available: (workspace) => workspace.infocube,
+  presets: [],
+  defaults: () => ({}),
+  options: z.object({}).strict() as unknown as z.ZodType<Record<string, unknown>>,
+  module: "InfoCube",
+  label: (language) => CUBE_DOC_WORDS[language].busTitle,
+  description: "Facts against dimensions: which fact uses which dimension, and the conformed ones.",
+  optionNote: "Derived from relationships between facts and dimensions; nothing to set.",
+  tables: CUBE_SECTION_TABLES,
+  build: buildBusSection,
+};
+
+/**
+ * A dimensional entity's role in a document's language (Q6: the dictionary prints it where a logical entity's stereotype
+ * stands): `cubeTitle`'s long text in InfoCube's document words; null for an entity without a role.
+ */
+export function cubeDocumentRoles(snapshot: WorkspaceSnapshot<CubeSectionTable>): (entityId: Uuid, language: DocLanguage) => string | null {
+  const ix = cubeIndexOf(snapshot);
+  const context: TypeContext = { aggregates: ix.aggregates(), outriggers: ix.outriggers(), nameOf: ix.nameOf };
+  return (entityId, language) => {
+    const c = ix.cubeOf(entityId);
+    return c ? cubeTitle(c, context, CUBE_DOC_WORDS[language].titles).long : null;
+  };
+}
+
+/** InfoCube's rows as its model checks read them (`cubeChecks`), from a document's snapshot. */
+export const cubeCheckRowsOf = (snapshot: WorkspaceSnapshot<CubeSectionTable>): CubeCheckRows => ({
+  cubeEntities: snapshot.modules.cube_entity,
+  cubeMeasures: snapshot.modules.cube_measure,
+  cubeKeys: snapshot.modules.cube_key,
+  cubeMappings: snapshot.modules.cube_mapping,
+  cubeMappingInputs: snapshot.modules.cube_mapping_input,
+  cubeAttributes: snapshot.modules.cube_attribute,
+});

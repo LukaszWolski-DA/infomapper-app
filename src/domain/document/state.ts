@@ -8,12 +8,30 @@
 // (CLAUDE.md, slice 15d).
 
 import type { Uuid } from "../ids";
+import type { CheckInput, ModuleChecks } from "../model/checks";
+import { classificationIndex, type ClassificationIndex } from "../model/classifications";
 import { countsAsMapped, derivationIndex, type DerivationIndex } from "../model/derivations";
 import { buildRequirementIndex, type RequirementIndex } from "../model/requirement-index";
 import type { AttributeFeeds, ModelLookup } from "../model/requirements";
 import { stereotypeIndex, type StereotypeIndex } from "../model/stereotypes";
 import type { WorkspaceSnapshot } from "../model/workspace-model";
-import type { Concept, Entity, ModuleTable, SourceSystem, SourceTable } from "../types";
+import type { Concept, DocLanguage, Entity, ModuleTable, SourceSystem, SourceTable } from "../types";
+
+/**
+ * What the modules give a document (slice 26, Q6, F12): a module's words for an entity's role and its model checks. The
+ * composition root joins them (`documentStateFor`); InfoDocumenter reads them without knowing the module (AD-33).
+ */
+export interface DocumentContributions {
+  /** Whether the dimensional level is drawn: the module that has it is on in the workspace. */
+  readonly dimensionalOn: boolean;
+  /** A dimensional entity's role in the document's language ("Transaction fact, factless"); null: no module's. */
+  readonly entityRole: (entityId: Uuid, language: DocLanguage) => string | null;
+  /** The modules' model checks (D-75) for an input, as the project home reads them. */
+  readonly moduleChecks: (input: CheckInput) => ModuleChecks[];
+}
+
+/** No module: no dimensional level, no role, no checks. */
+export const NO_CONTRIBUTIONS: DocumentContributions = { dimensionalOn: false, entityRole: () => null, moduleChecks: () => [] };
 
 export interface DocumentState<T extends ModuleTable = ModuleTable> {
   readonly snapshot: WorkspaceSnapshot<T>;
@@ -32,10 +50,14 @@ export interface DocumentState<T extends ModuleTable = ModuleTable> {
    * through its calculation (`countsAsMapped`), as the cards, the Overview and the project home count it (Q-L3).
    */
   readonly mapped: (attributeId: Uuid) => boolean;
+  /** Slice 26: the workspace's classifications on tables and columns (D-78), built once. */
+  readonly classifications: ClassificationIndex;
+  /** Slice 26: the modules' contributions. */
+  readonly modules: DocumentContributions;
 }
 
 /** The state of one document's model, from a snapshot and the modules' feeds. Pure. */
-export function documentStateOf<T extends ModuleTable>(snapshot: WorkspaceSnapshot<T>, feeds: AttributeFeeds = {}): DocumentState<T> {
+export function documentStateOf<T extends ModuleTable>(snapshot: WorkspaceSnapshot<T>, feeds: AttributeFeeds = {}, modules: DocumentContributions = NO_CONTRIBUTIONS): DocumentState<T> {
   const model = snapshot.model;
   const requirements = buildRequirementIndex(snapshot.requirements, snapshot.requirementLinks, model, feeds);
   const lookup = requirements.lookup;
@@ -53,5 +75,7 @@ export function documentStateOf<T extends ModuleTable>(snapshot: WorkspaceSnapsh
     table: new Map(model.sourceTables.map((t) => [t.id, t])),
     system: new Map(model.sourceSystems.map((s) => [s.id, s])),
     mapped: countsAsMapped(derivations, direct),
+    classifications: classificationIndex(model.classifications, model.classificationLinks),
+    modules,
   };
 }

@@ -68,7 +68,11 @@ licence and switch, the workspace home's Documentation tab, documents as recipes
 with the workspace; only the author makes a shared one private), a form on one page, and the document page built from
 one snapshot of the live model and laid out in A4 pages by Paged.js (title page, contents with page numbers, header,
 footer, watermark), printed by the browser; sections Text, Data dictionary, Source-to-target and InfoCube's Dimensional
-model, in the workspace's documentation language.
+model, in the workspace's documentation language. Slice 26 (D-81) replaces the form with the editor: the sections on the
+left (add, remove up to 50, move, heading, switch), an adaptive preview built in the browser from a snapshot read once
+(Auto under 1,000 ms, Exact pages, Quick preview with "Update pages"), the options on the right; every section of the
+prototype without figures (InfoCube's Bus matrix too); the dictionary's layouts and its facts and dimensions; and a style
+per document (its own language, templates with IBM Plex Serif, paper and orientation, header and footer fields).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -262,6 +266,30 @@ list up to date in each sub-slice):
   tree; a section whose type no module knows, or whose module is off, is kept, skipped and named in a note.
   Since step 4 a type may give `optionChecks` (its boolean options as the form's check boxes, plain data), so the form
   draws a module's options without knowing the module.
+  **Slice 26 (D-81):**
+  - The content tree's kinds (`content.ts`): runs with a chip, a circle mark, a swatch, a coverage bar, a notation end,
+    a status line, dots, a tick, a reference; nodes `list`, `cards`, `group` (an entity's block, `keep`, its concept's
+    `mark`), a table's `style`, a heading's `swatch` and `number`. The renderer is `document-html.tsx`.
+  - `longTextTable` (`blocks.ts`): long texts under each row, after the table numbered, or a column (D1).
+  - `SectionBuildInput` has the style's `notation` and `keepRows`; `SectionScope.tableIds` is the source tables in scope
+    (`sourceTablesInScope`, `scope.ts`, F13).
+  - **What a module gives a document:** `DocumentContributions` in `DocumentState.modules` (`state.ts`): whether the
+    dimensional level is drawn, an entity's role in a language, the module checks; `documentStateFor` joins InfoCube's
+    (`cubeDocumentRoles`, `cubeModuleChecks`). A type may give a `description` and an `optionNote`. `AttributeFeed` has
+    an optional `status`.
+  - InfoDocumenter's sections are `builders.ts` (text, dictionary, source-to-target), `sections-model.ts` (overview,
+    conventions), `readiness.ts` (with the weak-definition rule), `sections-sources.ts`, `sections-requirements.ts`; the
+    shared pieces are `parts.ts`. InfoCube's Bus matrix is `CUBE_BUS_SECTION`.
+  - **The recipe:** `style` and each entry's `heading` and `newPage` (`domain/style.ts`, `upgradeDocument` as the
+    table's row upgrade, no file format); the commands add, remove (at most 50) and move a section.
+- **InfoDocumenter's editor** (slice 26): `app/editor.tsx` (the panels), `app/preview.tsx` (the modes; a layout off
+  screen, swapped in when done; a newer change stops a running layout by failing its next page; finished pages stop
+  watching their size; known limitations), `app/section-options.tsx` (each type's options from one spec),
+  `app/style-panel.tsx`, `ui/drafts.ts` (the text fields' drafts in the preview). The snapshot comes from
+  `documentSnapshotAction` once when the editor opens (`app/snapshot.ts`: people as id and name only); the tree is built
+  in the browser (`src/app/_lib/document-sections.ts`, pure). The document's CSS is `ui/document-css.ts` (`pageCss` with
+  the paper and orientation, `styleCss`, `quickSheetCss`). IBM Plex Serif loads only on the editor and the document
+  page (`src/app/fonts/plex-serif.ts`).
 - **A module's own pages** (slice 25, step 4): the routes stay in `src/app` (`/w/{ws}/d/{id}` and `/view`), load the
   shell and render a module's pages through `src/compose/documents-pages.tsx`; `loadShell`'s `rest` keeps such a path for
   the locked organization's return (F27). The pages render `AppShell` with a `trail` (the breadcrumbs after the
@@ -478,6 +506,8 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
 npx tsx scripts/bench-thumbnails.ts                           # slice 12b: the homes' server work and the thumbnails' cost (index, shapes, paths, bytes, 20 requests, keys; not a gate)
 MEASURE=1 npx playwright test e2e/slice-25/S25-layout.spec.ts                             # slice 25: a full data dictionary of Performance test laid out by Paged.js, headless (reference figure)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-26/S26-10-figures.spec.ts  # slice 26: the editor on Performance test and the demo: the snapshot's bytes, the state, the tree, the first layout (reference figures)
+SCREENS=<folder> npx playwright test e2e/slice-26/S26-screens.spec.ts                     # slice 26: the editor (Auto, a section, Pages out of date), readiness, source tables, the dimensional entities, Formal A3 landscape, Compact in black and white
 SCREENS=<folder> npx playwright test e2e/slice-24/S24-screens.spec.ts                     # slice 24: the Entity stereotypes box, its remove dialog, the entity panel's select with the definition; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-23/S23-screens.spec.ts                     # slice 23: the Metadata conventions tab, the remove dialog, Settings' Model conventions, the new workspace's language; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts                     # slice 22: the unknown member's section (a value, a value that does not fit, off), Fact Sales' Dimensions; light and dark
@@ -739,6 +769,18 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - wait until Paged.js has laid out the pages (`laidOut`, the page count) and read them (`pagesOf`, `sectionText`, and
     `marginContent`: a margin box's computed `content`, which Paged.js draws in `::after`).
   Paged.js lays out a copy of the hidden source in `document-host`; read the laid-out pages there, not the source.
+
+  Slice 26's fixtures are slice 25's (`seed` "docs", "plain" or "full"). Its helpers do the following:
+  - open the editor and wait for its first pages (`openEditor`); find a section's row (`sectionRow`, `rowOfType`); read
+    the preview (`preview`, `layouts`, `builds`, `shown`, `expectLayouts`);
+  - set Auto's threshold before the page loads (`setThreshold`, the test hook `window.__imDocLayoutMs`); probe what the
+    preview shows while a layout runs (`probeWhileLaying`, `whileLaying`) and when the tree is built (`probeBuilds`,
+    `buildTimes`);
+  - write test data: a document's sections (`setSections`), only some on (slice 25's `keepOnly`), slice 25's
+    unnumbered look (`unnumbered`), any change of the e2e file (`changeDb`); read a section by type (`sectionOf`) and
+    several sections' laid-out text (`sectionsText`; `sectionText` ignores a heading's number).
+  The editor shows the quick sheet in Auto after a slow layout: a spec that needs real pages after each change selects
+  "Exact pages" (S26-07).
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,
@@ -1166,6 +1208,9 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     `locked`: "Not saved", editable; `not_found`: the draft goes. Escape puts the stored value back. Rich-text fields
     show the line in their dialog (`RichConflict`, the editor's `notice` and `replace`). Folds use `line-clamp`, never
     a measured height.
+  - **Typing before the save** (slice 26, F1 a): `useDraft`, `TextField` and `TextArea` take an optional `onType(text)`,
+    called on the element's own `input` event and when the field writes its element itself (a stored value taken,
+    Escape, "Use this", a trim). It never saves or renders; InfoDocumenter's preview reads it.
   - **A closed panel's draft:** a field with `keep` (`DraftKeep`: its `fieldKey`, field and object names) leaves its
     draft in `src/ui/field-drafts.ts`, the page's memory for its path; it comes back when the field mounts again.
 

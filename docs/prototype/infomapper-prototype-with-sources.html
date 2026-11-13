@@ -10075,7 +10075,7 @@ ${admin ? `<label class="btn sm">${w.clientLogo ? "Replace" : "Upload"}<input ty
   function openEditor(id) { ST.defId = id; ST.sel = "doc"; ST.addOpen = false; ST.zoom = "fit"; box.hidden = false; document.body.classList.add("dedit-on"); drawEditor(); }
   function closeEditor() { box.hidden = true; document.body.classList.remove("dedit-on"); ST.defId = null; renderWsHome(); }
   function touch(fn, keepFocus) { const d = cur(); if (!d || !can.edit(d)) { toast(whyNot.edit(d)); drawEditor(); return; } fn(d); d.updated = nowT(); save();
-    if (keepFocus) { clearTimeout(ST.dirtyT); ST.dirtyT = setTimeout(() => { drawPreview(); keepView(drawLeft); }, 260); } else keepView(drawEditor); }
+    if (keepFocus) { clearTimeout(ST.dirtyT); ST.dirtyT = setTimeout(() => { drawPreview(); keepView(drawLeft); }, 500); } else keepView(drawEditor); }
   /* a change redraws the panels; the scroll positions, and the field being edited, stay where they were */
   const focusKey = a => { const at = [...a.attributes].filter(x => x.name.startsWith("data-")).map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join(""); return at ? a.tagName.toLowerCase() + at : null; };
   function keepView(fn) {
@@ -10091,7 +10091,7 @@ ${admin ? `<label class="btn sm">${w.clientLogo ? "Replace" : "Upload"}<input ty
     box.innerHTML = `<div class="de-top"><button class="btn sm" data-de="back" title="Back to the Documentation tab (Escape)">← Documentation</button>
 <div class="de-title"><input class="de-name" data-dprop="name" value="${esc(d.name)}" ${ro} aria-label="Document name"><div class="de-url">infomapper.app/${esc(snake(w.name).replace(/_/g, "-"))}/docs/${esc(d.id.slice(5))}</div></div>
 <span class="de-badge ${d.shared ? "sh" : ""}">${d.shared ? "Shared" : "Private"}</span>${ro ? `<span class="de-badge ro">Read only</span>` : ""}
-<span class="sp" style="flex:1"></span><span class="de-busy" id="de-busy" hidden>Laying out pages…</span><span class="de-zoom"><select data-de="pages" aria-label="Preview pages" title="Exact: real pages, as they will print. Quick: one long sheet, faster while you edit."><option value="exact" ${ST.pages !== "quick" ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Exact pages</option><option value="quick" ${ST.pages === "quick" || !window.Paged ? "selected" : ""}>Quick preview</option></select></span><span class="de-zoom"><select data-de="zoom" aria-label="Preview zoom"><option value="fit">Fit width</option><option value="0.75">75 %</option><option value="1">100 %</option></select></span>
+<span class="sp" style="flex:1"></span><span class="de-busy" id="de-busy" hidden>Laying out pages…</span><span class="de-zoom"><select data-de="pages" aria-label="Preview pages" title="Auto: real pages while they lay out quickly, otherwise the quick sheet until you update them. Exact: real pages after every change. Quick: one sheet per page break, at once."><option value="auto" ${(ST.pages || "auto") === "auto" && window.Paged ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Auto</option><option value="exact" ${ST.pages === "exact" ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Exact pages</option><option value="quick" ${ST.pages === "quick" || !window.Paged ? "selected" : ""}>Quick preview</option></select></span><span class="de-zoom"><select data-de="zoom" aria-label="Preview zoom"><option value="fit">Fit width</option><option value="0.75">75 %</option><option value="1">100 %</option></select></span>
 <button class="btn sm" data-de="print" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Print / PDF</button><button class="btn sm pri" data-de="gen" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Generate version</button></div>
 ${ro ? `<div class="de-ro">${esc(whyNot.edit(d))}${can.create() ? ` <button class="btn sm" data-de="dup">Duplicate as my document</button>` : ""}</div>` : ""}
 <div class="de-body"><div class="de-left" id="de-left"></div><div class="de-mid" id="de-mid"></div><div class="de-right" id="de-right"></div></div>`;
@@ -10111,22 +10111,28 @@ ${ro ? "" : `<button class="btn sm de-add" data-de="add">+ Add section</button>$
   return `<button data-deadd="${T0.type}" ${na ? "disabled" : ""}><b>${esc(T0.label)}${T0.module ? `<span class="dmod">${esc(T0.module)}</span>` : ""}</b><span>${esc(na ? T0.module + " is off in this workspace." : T0.desc)}</span></button>`; }).join("")}</div>` : ""}`}`;
   }
   let PJ = 0, liveFlow = null;
+  const LAYOUT_MS = () => window.__docLayoutMs ?? 1000;   /* the threshold; step 1 of slice 26 sets it by measuring */
   const fitZoom = (host, pgw) => { const mid = host.parentElement; const avail = (mid?.clientWidth || 900) - 48; return ST.zoom === "fit" ? Math.min(1, avail / (pgw * 3.7795)) : +ST.zoom; };
   /* lays the document out on real pages with Paged.js, off screen, then swaps it in */
   async function paginate(html, pcss, cls, holder) {
     const host = document.createElement("div"); host.className = "dpages dpaged " + (cls || "");
     host.style.cssText = "position:absolute;left:-20000px;top:0;visibility:hidden"; document.body.appendChild(host);
-    const pv = new Paged.Previewer();
-    try { await pv.preview(html, [{["infodoc-" + Date.now()]:pcss}], host); }
+    const pv = new Paged.Previewer(), t0 = performance.now();
+    try { await pv.preview(html, [{["infodoc-" + Date.now()]:pcss}], host); ST.lastMs = performance.now() - t0; }
     catch (e) { console.error(e); host.remove(); try { pv.polisher.destroy(); } catch (x) {} return null; }
     host.style.cssText = ""; holder.appendChild(host);
     return {host, pv, pages:host.querySelectorAll(".pagedjs_page").length};
   }
   function drawPreview() {
-    const d = cur(); if (!d) return; const mid = $("#de-mid"), exact = !!window.Paged && ST.pages !== "quick";
+    const d = cur(); if (!d) return; const mid = $("#de-mid"), mode = window.Paged ? (ST.pages || "auto") : "quick";
+    /* round P (P2 d): Auto lays out real pages while the last layout took less than the threshold; above it the quick
+       sheet shows at once, marked out of date, until "Update pages" */
+    const slow = mode === "auto" && ST.lastMs != null && ST.lastMs >= LAYOUT_MS() && !ST.force;
+    const exact = mode === "exact" || (mode === "auto" && !slow); ST.force = false;
     const r = render(d, {preview:true, paged:exact}), pg = pageCSS(d);
-    const notes = `${r.warn.map(x => `<div class="de-warn">${esc(x)}</div>`).join("")}${d.source.kind === "baseline" ? `<div class="de-note">Tables come from the baseline. Diagrams use today's canvas layout with the baseline's objects: baselines do not freeze canvases yet.</div>` : ""}`;
-    if (!exact) { const avail = mid.clientWidth - 48, z = ST.zoom === "fit" ? Math.min(1, avail / (pg.w * 3.7795)) : +ST.zoom, top = mid.scrollTop;
+    const notes = `${slow ? `<div class="de-note de-stale">Pages out of date: this document took ${(ST.lastMs / 1000).toFixed(1)} s to lay out, so the preview shows the quick sheet while you edit. <button class="btn sm" data-de="upd">Update pages</button></div>` : ""}${r.warn.map(x => `<div class="de-warn">${esc(x)}</div>`).join("")}${d.source.kind === "baseline" ? `<div class="de-note">Tables come from the baseline. Diagrams use today's canvas layout with the baseline's objects: baselines do not freeze canvases yet.</div>` : ""}`;
+    if (!exact) { ++PJ; const b0 = $("#de-busy"); if (b0) b0.hidden = true;   /* a layout still running is dropped; no page count on the quick sheet */
+      const avail = mid.clientWidth - 48, z = ST.zoom === "fit" ? Math.min(1, avail / (pg.w * 3.7795)) : +ST.zoom, top = mid.scrollTop;
       mid.innerHTML = notes + `<div class="dpages ${r.cls || ""}" style="zoom:${z.toFixed(3)};--pw:${pg.w}mm;--ph:${pg.h}mm">${r.html}</div>`; mid.scrollTop = top; drawRight(true); return; }
     const tok = ++PJ, busy = $("#de-busy"); if (busy) busy.hidden = false;
     const tmp = document.createElement("div");
@@ -10195,6 +10201,7 @@ ${[["hL", "Header, left"], ["hR", "Header, right"], ["fL", "Footer, left"], ["fR
     if ((x = g("[data-de]"))) { const a = x.dataset.de;
       if (a === "back") closeEditor();
       else if (a === "gen") { const v = generate(cur()); if (v) drawEditor(); }
+      else if (a === "upd") { ST.force = true; drawPreview(); }
       else if (a === "print") { const d = cur(), r = render(d, {}), rp = render(d, {paged:true}); printHTML(r.html, r.cls, pageCSS(d), rp.html, rp.pcss); }
       else if (a === "dup") { const nd = dup(ST.defId); openEditor(nd.id); }
       else if (a === "add") { ST.addOpen = !ST.addOpen; drawLeft(); }

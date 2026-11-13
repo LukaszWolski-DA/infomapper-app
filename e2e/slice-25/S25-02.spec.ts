@@ -22,6 +22,9 @@ import {
   READER,
   removeMember,
   SEED_IDS,
+  setShared,
+  expectShared,
+  sharedButton,
   shareDocumentAs,
   signInAs,
   signInByName,
@@ -35,7 +38,8 @@ async function newDocument(page: Page, preset: "dictionary" | "s2t" | "blank" = 
   await page.goto(docsUrl());
   await page.getByTestId("button-new-document").click();
   await page.getByTestId(`button-preset-${preset}`).click();
-  await expect(page.getByTestId("form-document")).toBeVisible();
+  // slice 26: the editor in place of the form
+  await expect(page.getByTestId("page-document-editor")).toBeVisible();
   return page.url().split("/d/")[1]!;
 }
 
@@ -57,7 +61,7 @@ test("S25-02: an owner shares a document; a modeler changes it but cannot delete
   await signInAs(page, "Łukasz");
   const id = await newDocument(page, "dictionary");
   await expect(page.getByTestId("badge-sharing")).toHaveText("Private");
-  await page.getByTestId("check-shared").check();
+  await setShared(page, true);
   await expect.poll(async () => (await storedDocuments()).find((d) => d.id === id)?.shared).toBe(true);
   await rename(page, id, "Shared by the owner");
 
@@ -111,7 +115,9 @@ test("S25-02: a reader makes, changes and deletes a private document, and opens 
   await expect(page.getByTestId("banner-document-read-only")).toContainText("A shared document is changed by modelers, admins and owners. Duplicate it to make your own copy.");
   await expect(page.getByTestId("button-duplicate-mine")).toHaveText("Duplicate as my document");
   await expect(page.getByTestId("input-document-name")).toHaveAttribute("readonly", "");
-  await expect(page.getByTestId("check-shared")).toHaveCount(0);
+  // slice 26: "Who sees this document" is shown to everyone, disabled with the prototype's hint
+  await expect(sharedButton(page, false)).toBeDisabled();
+  await expect(page.getByTestId("panel-document")).toContainText("Only modelers, admins and owners share documents.");
   await printable(page, shared.id);
 });
 
@@ -121,7 +127,7 @@ test("S25-02: a guest makes a private document and prints it; nobody sees anothe
   // Kasia is a guest: she sees the shared document only
   await expect(page.getByTestId("row-document")).toHaveCount(1);
   const id = await newDocument(page, "dictionary");
-  await expect(page.getByTestId("check-shared")).toHaveCount(0);
+  await expect(sharedButton(page, true)).toBeDisabled();
   await printable(page, id);
 
   const anna = await browser.newContext();
@@ -146,8 +152,8 @@ test("S25-02: only its author makes a shared document private; whoever else had 
   const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.anna))!;
   await signInAs(page, "Łukasz");
   await page.goto(formUrl(doc.id));
-  await expect(page.getByTestId("check-shared")).toBeChecked();
-  await expect(page.getByTestId("check-shared")).toBeDisabled();
+  await expectShared(page, true);
+  await expect(sharedButton(page, false)).toBeDisabled();
   await expect(page.getByTestId("text-shared-locked")).toHaveText("Only Anna Nowak can make it private.");
   // the domain refuses it too, whatever the page shows
   expect(
@@ -161,7 +167,7 @@ test("S25-02: only its author makes a shared document private; whoever else had 
   await signInAs(a, "Anna Nowak");
   await a.goto(formUrl(doc.id));
   await expect(a.getByTestId("text-shared-locked")).toHaveCount(0);
-  await a.getByTestId("check-shared").uncheck();
+  await setShared(a, false);
   await expect.poll(async () => (await storedDocument(DEMO_DOCUMENT_NAMES.anna))!.shared).toBe(false);
   await anna.close();
 
@@ -180,7 +186,7 @@ test("S25-02: a shared document whose author left cannot be made private", async
   await signInAs(page, "Łukasz");
   const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.anna))!;
   await page.goto(formUrl(doc.id));
-  await expect(page.getByTestId("check-shared")).toBeDisabled();
+  await expect(sharedButton(page, false)).toBeDisabled();
   await expect(page.getByTestId("text-shared-locked")).toHaveText("Anna Nowak is no longer a member of this workspace, so the document stays shared.");
   expect(
     await refusalAs(SEED_IDS.userLukasz, (ctx, access) =>

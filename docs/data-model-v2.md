@@ -86,7 +86,7 @@ the client never writes `_text`.
 
 **JSON (AD-18).** Only three places use JSON: `canvas.look`, `baseline.snapshot` and the before/after images in
 `change_event`; since slice 25 (AD-18's addition as proposed, step 1's F5 a) a fourth, InfoDocumenter's document recipe
-(`document_definition.scope`, `cover`, `sections`), read and written whole and never searched. Everything that is
+(`document_definition.scope`, `cover`, `sections`, and since slice 26 `style`), read and written whole and never searched. Everything that is
 queried, filtered or joined is a real column.
 
 **Portability (AD-18).** The model core avoids database-specific features: no enum types, no triggers, no stored
@@ -852,10 +852,12 @@ mapping (the panel offers × only while it has more than one). The local data fi
 
 ### InfoDocumenter: `document_definition`
 A document's stored definition, its recipe (slice 25, D-80 as proposed): what a generated document shows, made from a
-preset and changed in a form; the document itself is built from the live model when it is opened and never stored.
+preset and changed in the editor (slice 26, D-81; a form on one page in slice 25); the document itself is built from the
+live model when it is opened and never stored.
 Outside the model and **outside undo** (R2-4a2): every save writes its change event (AD-13) and checks the row's
 version (D-59), and no save is an undo step. Its rows point to InfoMapper's (`workspace`, `app_user`), never the other
-way. Migration `20261111120000_infodocumenter.sql`. A private document is seen and changed only by its author, a shared
+way. Migrations `20261111120000_infodocumenter.sql` and `20261113120000_document_style.sql` (slice 26: `style`). A
+private document is seen and changed only by its author, a shared
 one by every member (who changes and deletes it: InfoDocumenter's rights, PRD item 10); the pages and the commands filter
 on the server, so another's private document never reaches the browser.
 
@@ -871,10 +873,12 @@ on the server, so another's private document never reaches the browser.
 | `baseline_id` | uuid | yes | FK `baseline`, set exactly when `source_kind` is `baseline` (CHECK `document_definition_source_ck`); null in this slice; no key in the local adapter while `baseline` is not in the domain |
 | `scope` | jsonb | no | `{ projects, concepts, logical, dimensional, mappings }`: no project = the whole model, a project its canvases' entities; no concept = all; `mappings` `all`, `notdraft`, `approved`. Ids of deleted projects and concepts are kept and ignored |
 | `cover` | jsonb | no | the title page's `{ title, subtitle, version, status, preparedBy }`, each null when not set (the title is then the name, "prepared by" the author) |
-| `sections` | jsonb | no | the ordered list `{ id, type, on, options }`: InfoDocumenter's types `text`, `dict`, `s2t` and a module's by its registered name (`cube.dim`); a type whose module is off or unknown is kept and skipped when drawn |
+| `style` | jsonb | no | slice 26 (F9, D-81): `{ language, template, accent, colours, paper, orientation, notation, keepRows, cover, contents, numbers, banded, runningHeader, watermark, header: { left, right }, footer: { left, right } }`; `language` null follows the workspace's documentation language (a recipe stored before slice 26 is read with the defaults and `language` null); a header or footer part null shows its example; SQL default `{}` |
+| `sections` | jsonb | no | the ordered list `{ id, type, on, heading, newPage, options }` (at most 50; `heading` null is the type's default heading in the document's language; slice 25's Text kept its heading in its options, moved to the entry on read): InfoDocumenter's types `text`, `overview`, `dict`, `s2t`, `sources`, `classreg`, `reqs`, `ready`, `conv`, `trace`, `dq` and a module's by its registered name (`cube.dim`, `cube.bus`); a type whose module is off or unknown is kept and skipped when drawn; an option added later has a default |
 
-`scope`, `cover` and `sections` are one recipe, checked by the module's schemas on every save and by the CHECK
-`document_definition_recipe_ck` for their JSON kinds. Indexes: `document_definition_workspace_ix` on live rows,
+`scope`, `cover`, `style` and `sections` are one recipe, checked by the module's schemas on every save and by the CHECK
+`document_definition_recipe_ck` for their JSON kinds. A row stored in an older shape is read through the module's row
+upgrade (`upgradeDocument`, AD-33's `TableRules.upgrade`), with no change to the local file's format. Indexes: `document_definition_workspace_ix` on live rows,
 `document_definition_author_ix`. Turning InfoDocumenter off keeps every row (AD-35's addition as proposed); while it is
 off, nothing creates, changes or deletes one. The local data file needs no new format for the table: it appears with
 the first document.

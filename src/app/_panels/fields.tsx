@@ -111,6 +111,10 @@ export const notSavedAway = (field: string, object: string): string => `Not save
  * the stored value is written into the element even when it never equalled the text (a command's trim) or the save's page
  * was drawn together with a later one (an Undo right after the save). `null`: the field's row has no version to show
  * (today's rules only).
+ *
+ * `onType` (slice 26, F1 a): called with the element's text whenever it changes, typed (the element's own `input` event)
+ * or written by the field itself (a stored value taken, Escape, "Use this", a trim on leaving): what a live preview
+ * reads before the field saves. It never saves and never renders the field.
  */
 export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
   stored: string,
@@ -124,6 +128,7 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     keep?: DraftKeep;
     outside?: OutsideDraft;
     version?: number | null;
+    onType?: (text: string) => void;
   } = {},
 ) {
   const toast = useToast();
@@ -141,6 +146,14 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
   /** The stored value and the row's version the field was last drawn with, for a save's answer that comes after them. */
   const storedNow = useRef(stored);
   const versionNow = useRef(o.version);
+  /** The newest `onType` (slice 26): read by the element's listener and the field's own writes. */
+  const typedNow = useRef(o.onType);
+  /** The field's own write into its element; `onType` hears a change. */
+  const [put] = useState(() => (el: HTMLInputElement | HTMLTextAreaElement, text: string) => {
+    if (el.value === text) return;
+    el.value = text;
+    typedNow.current?.(text);
+  });
   /**
    * The leave guard (slice 14b): held while the field has a refused draft (any mark but a deleted object's) or the focus
    * with typed text not yet sent; a sent text is a save on its way, which the save chain holds.
@@ -163,6 +176,7 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
   useEffect(() => {
     keepNow.current = o.keep;
     toastNow.current = toast;
+    typedNow.current = o.onType;
   });
   const version = o.version;
   useEffect(() => {
@@ -171,13 +185,13 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     const el = element.current;
     // a DOM write after the commit, never a layout read (CLAUDE.md, slice 6a)
     const take = el ? draft.receive(stored, el.value, document.activeElement === el, version) : "keep";
-    if (el && take === "take") el.value = stored;
+    if (el && take === "take") put(el, stored);
     if (take === "end" && refusalNow.current && refusalNow.current.kind !== "copy") {
       setRefusalNow(null);
       // the stored value came to equal the draft: its mark goes
       setRefusal(null);
     }
-  }, [stored, version, draft, setRefusalNow]);
+  }, [stored, version, draft, setRefusalNow, put]);
   // a draft kept outside the field (slice 14a): taken while the field has neither the focus nor a text of its own
   const outside = o.outside?.draft;
   const hasOutside = !!o.outside;
@@ -185,7 +199,7 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     const el = element.current;
     if (!hasOutside || !el || document.activeElement === el) return;
     if (outside) {
-      if (el.value !== outside.text) el.value = outside.text;
+      put(el, outside.text);
       const r: Refusal | null = outside.refusal ? { kind: outside.refusal, base: outside.base } : null;
       if (refusalNow.current?.kind !== r?.kind || refusalNow.current?.base !== r?.base) {
         setRefusalNow(r);
@@ -193,12 +207,12 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
       }
     } else if (refusalNow.current || draft.hasDraft(el.value)) {
       // the draft ended outside (stored, or "Use this" on the canvas): the stored value shows
-      el.value = stored;
+      put(el, stored);
       draft.reset(stored);
       setRefusalNow(null);
       setRefusal(null);
     }
-  }, [outside, hasOutside, stored, draft, setRefusalNow]);
+  }, [outside, hasOutside, stored, draft, setRefusalNow, put]);
   const keepKey = o.keep?.key;
   useEffect(() => {
     mounted.current = true;
@@ -207,7 +221,7 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     const back = keepKey ? takeDraft(keepKey) : null;
     const el = element.current;
     if (back && el) {
-      el.value = back.text;
+      put(el, back.text);
       draft.reset(back.base);
       setRefusalNow(back.refused ? { kind: "mark", base: back.base } : null);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- a draft kept while the panel was closed (item 5a)
@@ -229,12 +243,15 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
       // save's transition holds the selection's): the toast says where it is
       if (refused && keep) toastNow.current(notSavedAway(keep.field, keep.object), "refusal");
     };
-  }, [keepKey, draft, setRefusalNow]);
+  }, [keepKey, draft, setRefusalNow, put]);
 
   // the field unmounted: a draft it leaves to `field-drafts` is held there
   useEffect(() => () => release(draft), [draft]);
   /** Typing, focus and blur change what the guard holds: read from the element, so no render is needed. */
-  const [onType] = useState(() => (e: Event) => guardNow(e.type === "blur" ? false : undefined));
+  const [onType] = useState(() => (e: Event) => {
+    guardNow(e.type === "blur" ? false : undefined);
+    if (e.type === "input") typedNow.current?.((e.target as HTMLInputElement | HTMLTextAreaElement).value);
+  });
 
   const { elementRef } = o;
   /** The element's ref callback; the text it had when it was last detached is what an unmount keeps. */
@@ -280,7 +297,7 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
       if (r) refuse(r);
       // the page with the save's version may be drawn already (it came first): the stored value shows now
       const el = element.current;
-      if (ok === true && el && draft.settle(storedNow.current, versionNow.current, el.value, document.activeElement === el)) el.value = storedNow.current;
+      if (ok === true && el && draft.settle(storedNow.current, versionNow.current, el.value, document.activeElement === el)) put(el, storedNow.current);
     };
     Promise.resolve(save!(value)).then(answered, () => answered(false));
   };
@@ -295,17 +312,17 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     const value = o.prepare ? o.prepare(raw) : raw;
     if (value === null) return;
     if (o.required && !value) {
-      el.value = stored;
+      put(el, stored);
       draft.reset(stored);
       refuse(null);
       o.onEmpty?.();
       return;
     }
-    if (value !== raw) el.value = value;
+    if (value !== raw) put(el, value);
     // the text is the stored save's, left untouched since: the field takes the stored value, saving nothing (an undo
     // while the field had the focus is not undone by leaving it)
     if (draft.settle(stored, version, value, false)) {
-      el.value = stored;
+      put(el, stored);
       return;
     }
     if (!draft.shouldSave(value, stored)) return;
@@ -315,7 +332,7 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
   /** "Use this": the field takes the newest stored value; the draft ends. */
   const takeStored = () => {
     const el = element.current;
-    if (el) el.value = stored;
+    if (el) put(el, stored);
     draft.reset(stored);
     refuse(null);
     if (keepKey) dropDraft(keepKey);
@@ -455,10 +472,13 @@ export function TextField({
   keep,
   invalid,
   version,
+  onType,
 }: {
   id?: string;
   value: string;
   onSave: FieldSave<string>;
+  /** Slice 26: the text as typed, before it is saved (`useDraft`'s `onType`). */
+  onType?: (text: string) => void;
   readOnly?: boolean;
   required?: boolean;
   /** An empty required field went back (a toast, where the server would have refused it: slice 13, F14). */
@@ -482,6 +502,7 @@ export function TextField({
     readOnly,
     elementRef: inputRef,
     keep,
+    onType,
   });
   return (
     <>
@@ -525,14 +546,17 @@ export function TextArea({
   prepare?: (text: string) => string | null;
   /** The shown version of the row it saves, or null when there is none (`useDraft`'s `version`). Required, so no field goes without one by mistake. */
   version: number | null;
+  /** Slice 26: the text as typed, before it is saved (`useDraft`'s `onType`). */
+  onType?: (text: string) => void;
 } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
-  const { keep, outside, prepare, version, ...props } = rest;
+  const { keep, outside, prepare, version, onType, ...props } = rest;
   const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLTextAreaElement>(value, onSave, {
     version,
     readOnly: !!props.readOnly || !!props.disabled,
     keep,
     outside,
     prepare,
+    onType,
   });
   return (
     <>

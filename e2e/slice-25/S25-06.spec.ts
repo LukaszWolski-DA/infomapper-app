@@ -5,19 +5,22 @@
 
 import { writeInfoCubeOff } from "../slice-22/helpers";
 import { expect, test, type Page } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, formUrl, laidOut, RETAIL, sectionText, setWorkspace, signInAs, storedDocument, viewUrl } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, formUrl, keepOnly, laidOut, RETAIL, sectionText, setWorkspace, signInAs, storedDocument, unnumbered, viewUrl } from "./helpers";
 
 test.use({ seed: "full" });
 
 const S2T = DEMO_DOCUMENT_NAMES.s2t;
 
 async function openView(page: Page) {
+  await keepOnly(S2T, ["s2t", "cube.dim"]);
+  await unnumbered(S2T);
   await page.goto(viewUrl((await storedDocument(S2T))!.id));
   await laidOut(page);
 }
 
 test("S25-06: facts with grain, dimensions with role, key and no-match value, measures, unknown member and feeds", async ({ page }) => {
-  expect((await storedDocument(S2T))!.sections.map((s) => s.type)).toEqual(["s2t", "cube.dim"]);
+  // slice 26 (D2): the preset's Dimensional model in its place; this spec reads the S2T and it alone
+  expect((await storedDocument(S2T))!.sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", "cube.dim", "dq"]);
   await signInAs(page, "Łukasz");
   await openView(page);
   await expect(page.getByTestId("document-host").locator(".dtoc li")).toHaveText([/^Source-to-target mapping/, /^Dimensional model/]);
@@ -50,9 +53,9 @@ test("S25-06: with InfoCube off the section is skipped and the page says so", as
   const host = page.getByTestId("document-host");
   await expect(host.locator(".dtoc li")).toHaveText([/^Source-to-target mapping/]);
   await expect(host.getByTestId("document-skipped")).toHaveText("Skipped while InfoCube is off: Dimensional model.");
-  // the form keeps it, marked off
+  // the editor keeps it, marked off (slice 26: its row on the left)
   await page.goto(formUrl((await storedDocument(S2T))!.id));
-  const section = page.locator('[data-testid="form-section"][data-section="cube.dim"]');
+  const section = page.locator('[data-testid="editor-section"][data-section="cube.dim"]');
   await expect(section.getByTestId("tag-section-off")).toHaveAttribute("title", "InfoCube is off in this workspace");
 });
 
