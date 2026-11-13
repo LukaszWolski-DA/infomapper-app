@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ids, makeCtx, member, T0 } from "./__fixtures__/domain";
-import { buildWriteSet, SECRET_CHANGED, SECRET_UNCHANGED, writtenVersions } from "./changes";
+import { buildWriteSet, deletedIds, SECRET_CHANGED, SECRET_UNCHANGED, writtenVersions } from "./changes";
 import type { OrganizationAccess } from "./types";
 
 const access: OrganizationAccess = { organization_id: ids.org, access_hash: "scrypt$15$8$1$a$b", changed_at: T0, changed_by: ids.actor, version: 1 };
@@ -48,5 +48,20 @@ describe("writtenVersions (slice 9 undo; slice 10a, F2)", () => {
       { kind: "update", table: "organization_access", before: access, row: { ...access, version: 2 } },
     ] as unknown as Parameters<typeof writtenVersions>[0];
     expect(writtenVersions(writes)).toEqual({ e1: 4, r1: 1 });
+  });
+});
+
+describe("deletedIds (fix/selection-after-delete)", () => {
+  it("gives the rows a write set soft-deletes; updates of live rows, inserts, restores, removed links and rows already deleted are left out", () => {
+    const writes = [
+      { kind: "update", table: "attribute", before: { id: "a1", deleted_at: null }, row: { id: "a1", deleted_at: T0 } },
+      { kind: "update", table: "attribute", before: { id: "a2", deleted_at: null }, row: { id: "a2", deleted_at: null, position: 3 } },
+      { kind: "update", table: "mapping", before: { id: "m1", deleted_at: T0 }, row: { id: "m1", deleted_at: null } },
+      { kind: "update", table: "mapping", before: { id: "m2", deleted_at: T0 }, row: { id: "m2", deleted_at: T0 } },
+      { kind: "insert", table: "relationship", row: { id: "r1", deleted_at: null } },
+      { kind: "remove", table: "project_canvas", before: { project_id: "p", canvas_id: "c" } },
+      { kind: "update", table: "canvas_item", before: { id: "c1", deleted_at: null }, row: { id: "c1", deleted_at: T0 } },
+    ] as unknown as Parameters<typeof deletedIds>[0];
+    expect(deletedIds(writes)).toEqual(["a1", "c1"]);
   });
 });

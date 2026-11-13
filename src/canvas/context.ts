@@ -428,6 +428,12 @@ export interface CanvasUiApi extends CanvasHandle {
   /** What is selected on the canvas; the right panel shows it. */
   selection: Selection;
   select: (sel: Selection) => void;
+  /**
+   * After a delete's answer (fix/selection-after-delete): clears the selection only if it still points at a row the
+   * delete removed, its cascades included (`deleted`: the answer's `deleted`; `selectionDeleted`). A selection the
+   * person made while the delete was on its way stays. Every delete that used to clear the selection calls it.
+   */
+  deselectDeleted: (deleted: readonly string[] | undefined) => void;
   registerCanvas: (handle: CanvasHandle | null) => void;
   /** The active canvas tool, shared with the top bar's Entity tool button. */
   mode: CanvasMode;
@@ -461,6 +467,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   setNotation: noop,
   selection: null,
   select: noop,
+  deselectDeleted: noop,
   fit: noop,
   shiftView: noop,
   place: async () => null,

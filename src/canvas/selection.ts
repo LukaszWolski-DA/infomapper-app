@@ -170,3 +170,25 @@ export function selectionBounds(rects: readonly Rect[], margin = 12): Rect | nul
   const x1 = Math.max(...rects.map((r) => r.x + r.w)), y1 = Math.max(...rects.map((r) => r.y + r.h));
   return { x: x0 - margin, y: y0 - margin, w: x1 - x0 + 2 * margin, h: y1 - y0 + 2 * margin };
 }
+
+/**
+ * Whether a selection points at a row a delete removed (fix/selection-after-delete): `deleted` is the delete's answer,
+ * every row its write soft-deleted, its cascades included (`deletedIds`, the answer's `deleted`). The one rule for
+ * clearing the selection after a delete's answer (`ui.deselectDeleted`): a selection the person made while the delete
+ * was on its way stays unless the delete took it along. Ids are compared as they are stored: a card's and a row's card
+ * are canvas items, a row is an attribute, a multi-selection's keys name their element, frame, note or requirement. A
+ * multi-selection with one deleted key points at it. A bundle's key is not a row: it never does.
+ */
+export function selectionDeleted(sel: Selection, deleted: ReadonlySet<string>): boolean {
+  if (!sel || deleted.size === 0) return false;
+  switch (sel.t) {
+    case "multi":
+      return sel.keys.some((k) => deleted.has(k.slice(k.indexOf(":") + 1)));
+    case "row":
+      return deleted.has(sel.id) || deleted.has(sel.cardId);
+    case "bundle":
+      return false;
+    default:
+      return deleted.has(sel.id);
+  }
+}

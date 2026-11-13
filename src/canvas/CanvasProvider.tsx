@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ReactFlowProvider } from "@xyflow/react";
 import { CanvasUiCtx, type CanvasHandle, type CanvasHost, type CanvasMode, type CanvasUiApi, type Notation, type UndoHooks } from "./context";
 import type { Selection } from "./line-data";
+import { selectionDeleted } from "./selection";
 import { NO_NOTE_DRAFTS } from "./note-drafts";
 
 const OVERVIEW_KEY = "infomapper:overview";
@@ -88,6 +89,12 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       setNotation,
       selection,
       select,
+      // the selection as it is when the answer arrives, not as the delete's caller saw it
+      deselectDeleted: (deleted) => {
+        if (!deleted?.length) return;
+        const gone = new Set(deleted);
+        select((current) => (selectionDeleted(current, gone) ? null : current));
+      },
       fit: () => handle.current?.fit(),
       shiftView: (dx) => handle.current?.shiftView(dx),
       place: (target, rows, options) => handle.current?.place(target, rows, options) ?? Promise.resolve(null),

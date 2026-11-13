@@ -168,3 +168,18 @@ export function writtenVersions(writes: readonly Write[]): Record<Uuid, number> 
   }
   return out;
 }
+
+/**
+ * The ids of the rows a write set soft-deletes: updates that set `deleted_at` on a live row (fix/selection-after-delete).
+ * Every cascade the domain adds to the group is in it (an entity's attributes, mappings, relationships and cards, a
+ * module's rows), so the browser never guesses what a delete took along. Removed link rows have no id and are left out.
+ */
+export function deletedIds(writes: readonly Write[]): Uuid[] {
+  const out: Uuid[] = [];
+  for (const w of writes) {
+    if (w.kind !== "update") continue;
+    const before = w.before as { deleted_at?: unknown }, row = w.row as { id?: unknown; deleted_at?: unknown };
+    if (typeof row.id === "string" && before.deleted_at == null && row.deleted_at != null) out.push(row.id);
+  }
+  return out;
+}
