@@ -1184,6 +1184,11 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - **Rows only the server knows:** the change-to-resolve actions return `versions`, and since slice 14b run through
     `saveRows` (`useChangeRun` in `source-changes.tsx`): the change's row checked, the rows of its table held
     (`src/domain/source-changes/held.ts`, below). Still off the chain: only the role select (`docs/known-limitations.md`).
+  - **The selection after a delete** (fix/selection-after-delete): a write's answer carries `deleted` (every row it
+    soft-deleted, cascades included; `deletedIds`), and a delete clears the selection only through
+    `ui.deselectDeleted(result.deleted)` (the rule `selectionDeleted`, `src/canvas/selection.ts`): a selection made
+    while the delete was on its way stays unless the delete took it along. **A later delete** calls it, never
+    `ui.select(null)` after its answer.
 
   **Slice 13 (D-66):**
   - **The draft:** a text field is uncontrolled and keeps what was typed (`useDraft` in `src/app/_panels/fields.tsx`; the

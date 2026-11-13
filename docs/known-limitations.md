@@ -1029,6 +1029,26 @@ of 3 on its own:
 The cause is unknown. Both error texts and traces are in `.data/e2e-11-close/` (git-ignored). From now on, keep a
 failing run's trace and error output before any rerun (copy `test-results/` and the log).
 
+### RP-07 failed once: a delete's answer cleared a newer selection (a bug, fixed on fix/selection-after-delete)
+
+In slice 26's first closing full run (run 43481776730, 12 November 2026), `e2e/slice-15b/RP-07.spec.ts` timed out
+waiting for Fact Sales' panel; it passed 3 of 3 on its own. **The cause was in the app, found through the test** (CLAUDE.md,
+"A race in a test"). Every delete that cleared the selection did so when its answer arrived (`if (result.ok)
+ui.select(null)`), whatever was selected by then. The test waits for the data file, which is written before the answer
+reaches the page, and then clicks Fact Sales' name. In the trace the click selected Fact Sales about 60 ms before the
+answer arrived, and the answer then cleared that selection. A person who clicks another card while a delete is on its
+way loses their selection the same way. A probe that held the delete's answer (slice 13's `holdUntil`) reproduced it
+every time.
+
+**The fix:** a write's answer carries `deleted`, the ids of every row it soft-deleted, its cascades included
+(`deletedIds`, `src/domain/changes.ts`; `runCommand`). The one rule is `selectionDeleted` (`src/canvas/selection.ts`),
+applied by `ui.deselectDeleted` (`CanvasUiApi`, `CanvasProvider`) to the selection as it is when the answer arrives. It
+clears the selection only if it points at a deleted row, and every site that cleared it after a delete calls it,
+InfoCube's dimensional mapping delete included. RP-07's assertions are unchanged. The fix is checked by
+`e2e/fixes/selection-after-delete.spec.ts` (a card clicked while the delete is held stays selected) and
+`e2e/fixes/selection-after-entity-delete.spec.ts` (a selected attribute of an entity whose delete is held is cleared),
+with the cascade cases in `src/canvas/selection.test.ts`.
+
 ## Source import (slice 7a)
 
 ### Every write rewrites the whole local data file
