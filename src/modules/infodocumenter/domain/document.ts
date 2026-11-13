@@ -38,6 +38,8 @@ export interface DocumentTreeSection {
   readonly heading: string;
   /** Starts a new page (and a new sheet on the quick sheet, slice 26). */
   readonly newPage: boolean;
+  /** Its number when the style numbers sections ("3"); its subsections are "3.1", "3.2" (slice 26, step 4). */
+  readonly number: string | null;
   readonly nodes: readonly DocNode[];
 }
 
@@ -62,7 +64,7 @@ export interface DocumentTree {
     readonly subtitle: string | null;
     readonly rows: readonly DocumentCoverRow[];
   };
-  readonly contents: { readonly heading: string; readonly entries: readonly { readonly anchor: string; readonly text: string }[] };
+  readonly contents: { readonly heading: string; readonly entries: readonly { readonly anchor: string; readonly text: string; readonly number: string | null }[] };
   /** The running header and footer (D3; slice 26's fields), the watermark on every page but the title page (D2). */
   readonly frame: DocumentFrame;
   /** The style the pages are laid out with (slice 26; its CSS comes with step 4). */
@@ -107,7 +109,11 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
       continue;
     }
     const heading = s.heading?.trim() || type.label(language);
-    sections.push({ id: s.id, type: s.type, anchor: `ds-${s.id}`, heading, newPage: s.newPage, nodes: type.build({ state, scope, options: s.options, language }) });
+    // the Compact template runs sections on (the prototype's)
+    const newPage = s.newPage && definition.style.template !== "compact";
+    const nodes = type.build({ state, scope, options: s.options, language, notation: definition.style.notation, keepRows: definition.style.keepRows });
+    const number = definition.style.numbers ? String(sections.length + 1) : null;
+    sections.push({ id: s.id, type: s.type, anchor: `ds-${s.id}`, heading, newPage, number, nodes: number ? numbered(nodes, number) : nodes });
   }
 
   return {
@@ -125,7 +131,7 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
         { key: "preparedBy", label: t("by"), value: orDash(cover.preparedBy?.trim() || author) },
       ],
     },
-    contents: { heading: t("toc"), entries: sections.map((s) => ({ anchor: s.anchor, text: s.heading })) },
+    contents: { heading: t("toc"), entries: sections.map((s) => ({ anchor: s.anchor, text: s.heading, number: s.number })) },
     frame: frameOf(definition.style, {
       org: organization,
       title,
@@ -157,4 +163,12 @@ function frameOf(style: DocumentStyle, values: Readonly<Record<string, string>>,
     footerRight: field(style.footer.right, FRAME_DEFAULTS.footerRight),
     watermark: style.watermark ? watermark : "",
   };
+}
+
+/** A section's subsections (its level-2 headings, in groups too) numbered "{n}.1", "{n}.2" (the prototype's `h3.dh3`). */
+function numbered(nodes: readonly DocNode[], n: string): DocNode[] {
+  let k = 0;
+  const walk = (list: readonly DocNode[]): DocNode[] =>
+    list.map((x) => (x.kind === "heading" && x.level === 2 ? { ...x, number: `${n}.${++k}` } : x.kind === "group" ? { ...x, nodes: walk(x.nodes) } : x));
+  return walk(nodes);
 }

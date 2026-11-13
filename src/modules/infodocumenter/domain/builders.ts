@@ -130,7 +130,7 @@ const CARD_LINES: readonly DictionaryColumn[] = ["mappedFrom", "calculation", "r
  * longer definition leaves "→ note {n}" and comes in full at the section's end. The coverage line counts by the app's
  * rule whatever the mapping filter (Q-L3): any mapping or feed, any status, or through a calculation.
  */
-export function buildDictionary({ state, scope, options, language }: SectionBuildInput): DocNode[] {
+export function buildDictionary({ state, scope, options, language, keepRows }: SectionBuildInput): DocNode[] {
   const o: DictionaryOptions = dictionaryOptions.parse(options);
   const t = wordsOf(language);
   const fed = fedRule(state);
@@ -196,7 +196,8 @@ export function buildDictionary({ state, scope, options, language }: SectionBuil
     if (o.entity.includes("definition") && e.definition_text) nodes.push({ kind: "paragraph", runs: [text(e.definition_text)] });
     nodes.push(attributes.length ? attributesNode(attributes) : NONE(t));
     if (o.entity.includes("relationships")) nodes.push(...relationshipsBlock(state, e.id, scope, words));
-    return [{ kind: "group", nodes, mark: state.concept.get(e.concept_id)?.color }];
+    // a short entity moves whole to the next page (the style's "keep a table on one page up to", step 4)
+    return [{ kind: "group", nodes, mark: state.concept.get(e.concept_id)?.color, ...(keepRows && attributes.length <= keepRows ? { keep: true } : {}) }];
   };
 
   // the dimensional entities with a role from their module (PRD item 8); with it off or out of scope, none

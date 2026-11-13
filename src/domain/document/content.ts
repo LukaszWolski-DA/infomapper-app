@@ -58,7 +58,7 @@ export interface DocRow {
 
 export type DocNode =
   /** Level 1 is a section's heading, numbered and listed in the contents; levels 2 to 4 are within a section. */
-  | { readonly kind: "heading"; readonly level: 1 | 2 | 3 | 4; readonly text: string; readonly anchor?: string; /** Slice 26: a concept's colour before it. */ readonly swatch?: string }
+  | { readonly kind: "heading"; readonly level: 1 | 2 | 3 | 4; readonly text: string; readonly anchor?: string; /** Slice 26: a concept's colour before it. */ readonly swatch?: string; /** Slice 26: its number ("2.3") when the document numbers its sections. */ readonly number?: string }
   | { readonly kind: "paragraph"; readonly runs: DocRuns }
   /** One line of parts joined by the renderer (" · "), e.g. a stereotype and a coverage line above a table. */
   | { readonly kind: "meta"; readonly parts: readonly DocRuns[] }

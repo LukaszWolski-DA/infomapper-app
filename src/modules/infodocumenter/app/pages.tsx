@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/app/_components/app-shell";
+import { plexSerif } from "@/app/fonts/plex-serif";
 import { composedStore, dimensionalLevelOn, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES, documentStateFor } from "@/app/_lib/documents";
 import { classificationIndex, isBuiltin, isDataVault } from "@/domain/model/classifications";
 import { registerKey } from "../domain/sections-sources";
@@ -82,32 +83,36 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
     .map((c) => ({ key: registerKey(c), name: c.name, scope: c.scope, own: !isBuiltin(c) }));
   return (
     <AppShell shell={shell} trail={trail(workspaceId, doc, false)}>
-      <DocumentEditor
-        workspaceId={workspaceId}
-        document={{
-          id: doc.id,
-          version: doc.version,
-          name: doc.name,
-          audience: doc.audience,
-          shared: doc.shared,
-          scope: doc.scope,
-          cover: doc.cover,
-          style: doc.style,
-          sections: doc.sections,
-          author_id: doc.author_id,
-        }}
-        types={types}
-        rights={documentRights(access, doc)}
-        archived={access.workspace.archived_at !== null}
-        author={nameOf(people, doc.author_id)}
-        authorMember={authorMember !== null}
-        projects={projects.map((p) => ({ id: p.id, name: p.name }))}
-        concepts={model.concepts.map((c) => ({ id: c.id, name: c.name }))}
-        date={today()}
-        testHooks={areTestHooksOn()}
-        dimensional={dimensionalLevelOn(access.workspace)}
-        optionContext={{ dataVault: access.workspace.dv2_mode, hasNaming: !!access.workspace.naming_conventions?.trim(), classifications }}
-      />
+      {/* the Formal template's serif, on this page only (slice 26, step 4) */}
+      <div className={`${plexSerif.variable} h-full`}>
+        <DocumentEditor
+          workspaceId={workspaceId}
+          document={{
+            id: doc.id,
+            version: doc.version,
+            name: doc.name,
+            audience: doc.audience,
+            shared: doc.shared,
+            scope: doc.scope,
+            cover: doc.cover,
+            style: doc.style,
+            sections: doc.sections,
+            author_id: doc.author_id,
+          }}
+          types={types}
+          rights={documentRights(access, doc)}
+          archived={access.workspace.archived_at !== null}
+          author={nameOf(people, doc.author_id)}
+          authorMember={authorMember !== null}
+          projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+          concepts={model.concepts.map((c) => ({ id: c.id, name: c.name }))}
+          date={today()}
+          testHooks={areTestHooksOn()}
+          dimensional={dimensionalLevelOn(access.workspace)}
+          workspaceLanguage={access.workspace.doc_language}
+          optionContext={{ dataVault: access.workspace.dv2_mode, hasNaming: !!access.workspace.naming_conventions?.trim(), classifications }}
+        />
+      </div>
     </AppShell>
   );
 }
@@ -121,7 +126,7 @@ export async function DocumentViewPage({ shell, documentId, print }: { shell: Sh
   const sourceId = `document-source-${doc.id}`;
   return (
     <AppShell shell={shell} trail={trail(workspaceId, doc, true)}>
-      <div className="min-h-full bg-im-canvas px-[clamp(16px,4vw,48px)] pb-12 pt-5" data-testid="page-document-view">
+      <div className={`${plexSerif.variable} min-h-full bg-im-canvas px-[clamp(16px,4vw,48px)] pb-12 pt-5`} data-testid="page-document-view">
         <div className="mx-auto max-w-[900px]">
           <div className="mb-3 flex flex-wrap items-center gap-3 print:hidden">
             {backLink(workspaceId)}
@@ -135,7 +140,7 @@ export async function DocumentViewPage({ shell, documentId, print }: { shell: Sh
           <div hidden id={sourceId}>
             <DocumentHtml tree={tree} />
           </div>
-          <PagedView sourceId={sourceId} css={documentCss(tree.frame)} print={print} />
+          <PagedView sourceId={sourceId} css={documentCss(tree.frame, tree.style)} print={print} />
         </div>
       </div>
     </AppShell>

@@ -108,9 +108,9 @@ export function Runs({ runs }: { runs: DocRuns }) {
   );
 }
 
-function Row({ row, span }: { row: DocRow; span: number }) {
+function Row({ row, span, even }: { row: DocRow; span: number; even: boolean }) {
   return (
-    <tbody className="dat">
+    <tbody className={even ? "dat even" : "dat"}>
       <tr className={row.below?.length ? "hasdef" : undefined}>
         {row.cells.map((c, i) => (
           <td key={i}>
@@ -157,7 +157,7 @@ function Table({ node }: { node: Extract<DocNode, { kind: "table" }> }) {
         </tr>
       </thead>
       {node.rows.map((r, i) => (
-        <Row key={i} row={r} span={node.columns.length} />
+        <Row key={i} row={r} span={node.columns.length} even={i % 2 === 1} />
       ))}
     </table>
   );
@@ -171,6 +171,7 @@ function Heading({ node }: { node: Extract<DocNode, { kind: "heading" }> }) {
   if (node.level === 2)
     return (
       <h3 className="dh3">
+        {node.number && <span className="dnum">{node.number}</span>}
         {swatch}
         {node.text}
       </h3>
@@ -306,7 +307,13 @@ export function Nodes({ nodes }: { nodes: readonly DocNode[] }) {
  * watermark at the top and the footer fields' text after the last sheet, page numbers as "–" (D8).
  */
 export function DocumentHtml({ tree, id, quick }: { tree: DocumentTree; id?: string; quick?: boolean }) {
-  const cover = (
+  // slice 26, step 4: the style's title page and contents switches; the skipped sections' notes stay without contents
+  const notes = tree.skipped.map((s) => (
+    <p key={s.id} className="dnote" data-testid="document-skipped">
+      {s.text}
+    </p>
+  ));
+  const cover = !tree.style.cover ? null : (
     <section className="dsheet dcover" data-testid="document-cover" data-sec="doc">
       <div className="dorg">{tree.cover.organization}</div>
       <h1>{tree.cover.title}</h1>
@@ -323,26 +330,30 @@ export function DocumentHtml({ tree, id, quick }: { tree: DocumentTree; id?: str
       </table>
     </section>
   );
-  const contents = (
+  const contents = !tree.style.contents ? (
+    notes.length ? <div data-sec="doc">{notes}</div> : null
+  ) : (
     <section className="dsheet dtoc" data-testid="document-contents" data-sec="doc">
       <h2>{tree.contents.heading}</h2>
       <ol>
         {tree.contents.entries.map((e) => (
           <li key={e.anchor}>
-            <a href={`#${e.anchor}`}>{e.text}</a>
+            <a href={`#${e.anchor}`}>
+              {e.number && <span className="dnum">{e.number}</span>}
+              {e.text}
+            </a>
           </li>
         ))}
       </ol>
-      {tree.skipped.map((s) => (
-        <p key={s.id} className="dnote" data-testid="document-skipped">
-          {s.text}
-        </p>
-      ))}
+      {notes}
     </section>
   );
   const section = (s: DocumentTree["sections"][number], sheet: boolean) => (
     <section key={s.id} className={sheet ? "dsheet dsec" : "dsec"} data-section={s.type} data-sec={s.id} data-testid="document-section">
-      <h2 id={s.anchor}>{s.heading}</h2>
+      <h2 id={s.anchor}>
+        {s.number && <span className="dnum">{s.number}</span>}
+        {s.heading}
+      </h2>
       <Nodes nodes={s.nodes} />
     </section>
   );

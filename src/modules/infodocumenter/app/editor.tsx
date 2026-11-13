@@ -21,7 +21,7 @@ import { useAction } from "@/app/_components/use-action";
 import { DOCUMENT_SECTION_TYPES, documentStateFor } from "@/app/_lib/document-sections";
 import { Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
-import type { ModuleTable } from "@/domain/types";
+import type { DocLanguage, ModuleTable } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { DOCUMENT_TEXTS, NAME_REQUIRED, type UpdateDocumentInput } from "../domain/commands";
 import { buildDocument, type DocumentTree } from "../domain/document";
@@ -38,6 +38,7 @@ import {
 } from "./actions";
 import { nextDraft, withDrafts, type TextDraft } from "../ui/drafts";
 import { hasSpec, SectionOptions, type OptionContext } from "./section-options";
+import { StylePanel } from "./style-panel";
 import { DocumentPreview, LAYOUT_THRESHOLD_MS, PREVIEW_TEXTS, type PreviewHandle, type PreviewMode, type PreviewZoom } from "./preview";
 
 /** A registered section type as the editor lists it (the server computes it for the workspace). */
@@ -75,6 +76,7 @@ export const EDITOR_TEXTS = {
   rowTitle: "Double-click to edit",
   headingHint: "Empty: the default heading in the document's language.",
   newPage: "Start on a new page",
+  compactRunsOn: "The Compact template runs sections on.",
   whoSees: "Who sees this document",
 } as const;
 
@@ -107,6 +109,8 @@ export interface EditorProps {
   dimensional: boolean;
   /** What the sections' options need from the workspace. */
   optionContext: OptionContext;
+  /** The workspace's documentation language: what a document without its own follows (Q8). */
+  workspaceLanguage: DocLanguage;
 }
 
 type Patch = Omit<UpdateDocumentInput, "workspaceId" | "documentId" | "expectedVersion">;
@@ -128,7 +132,7 @@ const readMode = (): PreviewMode => {
 export const TYPING_PAUSE_MS = 500;
 
 export function DocumentEditor(props: EditorProps) {
-  const { workspaceId, document: doc, types, rights, archived, author, authorMember, projects, concepts, date, testHooks, dimensional, optionContext } = props;
+  const { workspaceId, document: doc, types, rights, archived, author, authorMember, projects, concepts, date, testHooks, dimensional, optionContext, workspaceLanguage } = props;
   const { saveRow, run, pending } = useAction();
   const toast = useToast();
   const router = useRouter();
@@ -446,6 +450,7 @@ export function DocumentEditor(props: EditorProps) {
               }}
               typed={typed}
               context={optionContext}
+              compact={doc.style.template === "compact"}
               save={(patch) => save({ section: { id: selectedSection.id, ...patch } })}
             />
           ) : (
@@ -489,6 +494,16 @@ export function DocumentEditor(props: EditorProps) {
               <Field label="Audience (for your own orientation)">
                 {text("audience", doc.audience, (v) => ({ audience: v }), { testId: "input-document-audience", placeholder: "e.g. Business, ETL developers, Client" })}
               </Field>
+
+              <StylePanel
+                style={doc.style}
+                workspaceLanguage={workspaceLanguage}
+                readOnly={ro}
+                version={doc.version}
+                documentId={doc.id}
+                typed={typed}
+                save={(patch) => save({ style: patch })}
+              />
 
               <H>Cover</H>
               <Field label="Title">{text("cover.title", doc.cover.title, (v) => ({ cover: { title: v } }), { testId: "input-cover-title", placeholder: doc.name })}</Field>
@@ -599,7 +614,10 @@ function SectionPanel({
   typed,
   save,
   context,
+  compact,
 }: {
+  /** The Compact template runs sections on: "Start on a new page" is disabled (the prototype's). */
+  compact: boolean;
   section: Recipe["sections"][number];
   type: EditorSectionType | null;
   readOnly: boolean;
@@ -661,7 +679,8 @@ function SectionPanel({
         />
       </Field>
       <div className="mt-3">
-        <Check testId="check-section-new-page" label={EDITOR_TEXTS.newPage} stored={s.newPage} disabled={readOnly} onSave={(v) => save({ newPage: v })} />
+        <Check testId="check-section-new-page" label={EDITOR_TEXTS.newPage} stored={s.newPage} disabled={readOnly || compact} onSave={(v) => save({ newPage: v })} />
+        {compact && <div className="mt-1 text-[11.5px] text-im-ink-3">{EDITOR_TEXTS.compactRunsOn}</div>}
       </div>
       {body}
     </div>

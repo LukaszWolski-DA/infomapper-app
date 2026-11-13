@@ -16,7 +16,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { DocumentTree } from "../domain/document";
-import { DOCUMENT_LOOK_CSS, documentCss, PAGES_SCREEN_CSS, QUICK_SHEET_CSS } from "../ui/document-css";
+import { DOCUMENT_LOOK_CSS, documentCss, PAGES_SCREEN_CSS, pageSize, quickSheetCss, styleCss } from "../ui/document-css";
 import { DocumentHtml } from "../ui/document-html";
 import { LAYING_OUT, LAYOUT_FAILED, pagesText } from "./paged-view";
 
@@ -25,8 +25,18 @@ export type PreviewZoom = "fit" | "0.75" | "1";
 
 /** Auto's threshold (Q3: the measured split between the demo's documents and "Performance test"). */
 export const LAYOUT_THRESHOLD_MS = 1000;
-/** The page's width in CSS pixels, A4 portrait (210 mm). */
-const PAGE_WIDTH_PX = (210 * 96) / 25.4;
+/** Millimetres in CSS pixels. */
+const PX_PER_MM = 96 / 25.4;
+
+/**
+ * What the pages' look depends on beyond their content (slice 26, step 4): while a layout runs, the old pages would
+ * take on the new layout's `@page` and style rules (they are global), so on a change of these the old pages give way
+ * at once (F7).
+ */
+const lookKey = (tree: DocumentTree) => {
+  const s = tree.style;
+  return [s.paper, s.orientation, s.template, s.colours, s.accent, s.banded, s.numbers].join("|");
+};
 
 export const PREVIEW_TEXTS = {
   modeTitle:
@@ -138,7 +148,9 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
   const [trigger, setTrigger] = useState(0);
   const [layouts, setLayouts] = useState(0);
   const [lastShownMs, setLastShownMs] = useState<number | null>(null);
-  const [fit, setFit] = useState(1);
+  const [width, setWidth] = useState(0);
+  /** The look the shown pages were laid out with. */
+  const shownLook = useRef<string | null>(null);
 
   // "Fit width" from the middle's width, reported after the browser's layout
   useEffect(() => {
@@ -146,7 +158,7 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width ?? 0;
-      if (w > 0) setFit(Math.min(1, (w - 48) / PAGE_WIDTH_PX));
+      if (w > 0) setWidth(w);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -173,6 +185,16 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
       return;
     }
     setStale(null);
+    // the paper, the orientation or the look changed: the old pages give way at once (F7)
+    const look = lookKey(tree);
+    if (shownLook.current !== null && shownLook.current !== look && shownLayout.current) {
+      destroy(shownLayout.current);
+      shownLayout.current = null;
+      laidTree.current = null;
+      shownLook.current = null;
+      pagesBox.current?.replaceChildren();
+      setShown("none");
+    }
     // a mode switched on the same document: its pages are laid out already
     if (!forced && laidTree.current === tree && shownLayout.current) {
       setShown("pages");
@@ -188,7 +210,7 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
     let stopped = false;
     setBusy(true);
     setFailed(false);
-    const css = documentCss(tree.frame);
+    const css = documentCss(tree.frame, tree.style);
     const content = from.cloneNode(true);
     (async () => {
       const { Previewer } = await loadPaged();
@@ -229,6 +251,7 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
       const old = shownLayout.current;
       shownLayout.current = layout;
       laidTree.current = tree;
+      shownLook.current = look;
       pagesBox.current?.replaceChildren(host);
       destroy(old);
       setPages(host.querySelectorAll(".pagedjs_page").length);
@@ -302,7 +325,8 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
     const sec = (e.target as Element).closest?.("[data-sec]")?.getAttribute("data-sec");
     if (sec) then(sec);
   };
-  const zoomValue = zoom === "fit" ? fit : Number(zoom);
+  const pageWidth = tree ? pageSize(tree.style).w * PX_PER_MM : 210 * PX_PER_MM;
+  const zoomValue = zoom === "fit" ? (width > 0 ? Math.min(1, (width - 48) / pageWidth) : 1) : Number(zoom);
   const state = busy ? "laying" : failed ? "failed" : shown === "pages" ? "done" : shown;
   return (
     <div
@@ -317,7 +341,7 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
       onClick={(e) => pick(e, onSelect)}
       onDoubleClick={(e) => pick(e, onOpen)}
     >
-      <style>{PAGES_SCREEN_CSS + DOCUMENT_LOOK_CSS + QUICK_SHEET_CSS + PREVIEW_CSS}</style>
+      <style>{PAGES_SCREEN_CSS + DOCUMENT_LOOK_CSS + (tree ? quickSheetCss(tree.style) + styleCss(tree.style) : quickSheetCss()) + PREVIEW_CSS}</style>
       {stale !== null && (
         <div className="de-note mb-3 flex flex-wrap items-center gap-2.5 rounded-lg bg-im-logical-soft px-3.5 py-2 text-[12.5px]" data-testid="note-stale">
           {PREVIEW_TEXTS.stale(stale)}

@@ -75,13 +75,13 @@ const ENDS: readonly { key: "c_one" | "c_01" | "c_1n" | "c_0n"; min: 0 | 1; many
 ];
 
 /**
- * How to read the document (the prototype's `conv`): the relationship notation in the document's notation (step 4's
- * style; crow's foot until then), the mapping statuses (and four-eyes when on), the marks, the stereotypes the scope's
+ * How to read the document (the prototype's `conv`): the relationship notation in the document's notation (the
+ * style's, step 4), the mapping statuses (and four-eyes when on), the marks, the stereotypes the scope's
  * logical entities use (names and definitions from the workspace's list, D-79), the classifications its source tables
  * use (D-78; Data Vault ones only in Data Vault 2.0 mode), the physical types in its sources with their logical types,
  * and the naming conventions: the workspace's, then the document's own.
  */
-export function buildConventions({ state, scope, options, language }: SectionBuildInput): DocNode[] {
+export function buildConventions({ state, scope, options, language, notation }: SectionBuildInput): DocNode[] {
   const o = conventionsOptions.parse(options);
   const t = wordsOf(language);
   const ws = state.snapshot.workspace;
@@ -94,7 +94,7 @@ export function buildConventions({ state, scope, options, language }: SectionBui
     rows: rows.map((cells) => ({ cells })),
   });
   if (o.notation) {
-    out.push({ kind: "heading", level: 2, text: t("c_notation") }, legend(["", t("meaning")], ENDS.map((e) => [[{ text: "", end: { notation: "ie", min: e.min, many: e.many } }], [text(t(e.key))]])));
+    out.push({ kind: "heading", level: 2, text: t("c_notation") }, legend(["", t("meaning")], ENDS.map((e) => [[{ text: "", end: { notation, min: e.min, many: e.many } }], [text(t(e.key))]])));
   }
   if (o.statuses) {
     out.push(

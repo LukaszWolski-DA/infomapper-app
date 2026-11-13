@@ -54,6 +54,10 @@ export interface SectionBuildInput<T extends ModuleTable = ModuleTable> {
   readonly scope: SectionScope;
   readonly options: Record<string, unknown>;
   readonly language: DocLanguage;
+  /** Slice 26, step 4: the document's relationship notation (the conventions draw its ends). */
+  readonly notation: "ie" | "uml";
+  /** Slice 26, step 4: an entity's block with at most this many attributes stays on one page; 0: never. */
+  readonly keepRows: number;
 }
 
 export interface DocumentSectionType<T extends ModuleTable = ModuleTable> extends DocumentSectionKind {
