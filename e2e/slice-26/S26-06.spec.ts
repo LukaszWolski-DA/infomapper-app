@@ -50,6 +50,6 @@ test("S26-06: the bus matrix is skipped while InfoCube is off, and the page says
   await writeInfoCubeOff();
   await open(page);
   const host = page.getByTestId("document-host");
-  await expect(host.locator(".dtoc li")).toHaveText([/^Requirements and coverage/]);
+  await expect(host.locator(".dtoc li")).toHaveText([/^1Requirements and coverage/]);
   await expect(host.getByTestId("document-skipped")).toHaveText("Skipped while InfoCube is off: Bus matrix.");
 });

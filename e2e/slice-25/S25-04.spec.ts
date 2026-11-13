@@ -6,7 +6,7 @@
 import { readDb, writeDb } from "../../src/data/local/file";
 import { E2E_DB } from "../config";
 import { expect, test, type Page } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, keepOnly, laidOut, RETAIL, sectionOf, SEED_IDS, signInAs, storedDocument, updateDocumentAs, viewUrl } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, keepOnly, laidOut, RETAIL, sectionOf, SEED_IDS, signInAs, storedDocument, unnumbered, updateDocumentAs, viewUrl } from "./helpers";
 
 const MARKUP = `<img src=x onerror="window.__imXss=1"><b>bold</b> where we write to the customer`;
 
@@ -32,6 +32,7 @@ const metaOf = (page: Page, entity: string) =>
 async function openDictionary(page: Page) {
   // slice 26 (D2): the preset has more sections; this spec reads the dictionary alone
   await keepOnly(DEMO_DOCUMENT_NAMES.shared, ["dict"]);
+  await unnumbered(DEMO_DOCUMENT_NAMES.shared);
   const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.shared))!;
   await page.goto(viewUrl(doc.id));
   await laidOut(page);

@@ -66,3 +66,25 @@ test("S26 screens: readiness, source tables, the dictionary's dimensional entiti
   await pageWith("Source tables").screenshot({ path: path.join(OUT, "5-source-tables-page.png") });
   await pagesOf(page).filter({ has: page.locator("h4", { hasText: "Fact Sales" }) }).first().screenshot({ path: path.join(OUT, "6-dictionary-dimensional-page.png") });
 });
+
+// step 4: a Formal A3 landscape page and a Compact page in black and white, as they print
+for (const [file, style] of [
+  ["7-formal-a3-landscape.png", { template: "formal", paper: "A3", orientation: "landscape", accent: "burgundy" }],
+  ["8-compact-black-and-white.png", { template: "compact", colours: "mono", banded: true }],
+] as const) {
+  test(`S26 screens: ${file}`, async ({ page }) => {
+    await setSections(DEMO_DOCUMENT_NAMES.shared, [{ type: "text", options: { body: "This document describes the data the warehouse will hold, in business terms." } }, { type: "dict", options: { entity: ["stereotype", "definition", "coverage"], columns: ["attribute", "type", "keys", "pii", "definition", "mappedFrom"] } }, { type: "conv" }]);
+    await changeDb((db) => {
+      const d = (db as unknown as { document_definition: { name: string; style: Record<string, unknown> }[] }).document_definition.find((x) => x.name === DEMO_DOCUMENT_NAMES.shared)!;
+      Object.assign(d.style, style);
+    });
+    await signInAs(page, "Łukasz");
+    await page.goto(viewUrl((await storedDocument(DEMO_DOCUMENT_NAMES.shared))!.id));
+    await laidOut(page);
+    await page.setViewportSize({ width: 1700, height: 1300 });
+    await page.emulateMedia({ media: "print" });
+    // the title page, and the dictionary's first page
+    await pagesOf(page).first().screenshot({ path: path.join(OUT, file.replace(".png", "-title.png")) });
+    await pagesOf(page).filter({ has: page.locator("h2", { hasText: "Data dictionary" }) }).first().screenshot({ path: path.join(OUT, file) });
+  });
+}

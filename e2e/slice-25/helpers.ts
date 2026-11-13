@@ -48,6 +48,16 @@ export async function keepOnly(name: string, types: readonly string[]) {
   await writeDb(E2E_DB, db);
 }
 
+/**
+ * Test data (slice 26, step 4): a stored document without numbered sections, slice 25's look, for the specs that compare
+ * headings' texts (the style numbers sections by default, the prototype's).
+ */
+export async function unnumbered(name: string) {
+  const db = await readDb(E2E_DB);
+  for (const d of (db as unknown as { document_definition: DocumentDefinition[] }).document_definition) if (d.name === name) d.style = { ...d.style, numbers: false };
+  await writeDb(E2E_DB, db);
+}
+
 /** A row of the Documentation tab by the document's name. */
 export const docRow = (page: Page, name: string): Locator => page.locator(`[data-testid="row-document"][data-name="${name}"]`);
 
@@ -131,7 +141,9 @@ export const pagesOf = (page: Page) => page.locator('[data-testid="document-host
 export async function sectionText(page: Page, heading: string): Promise<string> {
   return page.evaluate((h) => {
     const all = [...document.querySelectorAll('[data-testid="document-host"] .pagedjs_page')];
-    const at = all.findIndex((p) => [...p.querySelectorAll("h2")].some((x) => x.textContent === h));
+    // a numbered heading's number (slice 26, step 4) is not part of its text
+    const text = (x: Element) => [...x.childNodes].filter((c) => !(c instanceof Element && c.classList.contains("dnum"))).map((c) => c.textContent).join("");
+    const at = all.findIndex((p) => [...p.querySelectorAll("h2")].some((x) => text(x) === h));
     if (at < 0) return "";
     const out: string[] = [];
     for (let i = at; i < all.length; i++) {

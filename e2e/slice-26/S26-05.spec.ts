@@ -55,6 +55,6 @@ test("S26-05: the classification register: each chosen classification's columns 
     expect(text, part).toContain(part);
   }
   const headings = await page.locator('[data-testid="document-host"] h3.dh3').allTextContents();
-  // in the workspace's list order, whatever the order they were chosen in
-  expect(headings).toEqual(["Business key", "Personal data"]);
+  // in the workspace's list order, whatever the order they were chosen in; numbered (the style's default)
+  expect(headings).toEqual(["1.1Business key", "1.2Personal data"]);
 });

@@ -3,7 +3,7 @@
 // are listed when chosen. Łukasz's private S2T of the demo (scope Order management, approved and in review).
 
 import { expect, test, type Page } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, formUrl, keepOnly, laidOut, sectionOf, signInAs, storedDocument, viewUrl } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, formUrl, keepOnly, laidOut, sectionOf, signInAs, storedDocument, unnumbered, viewUrl } from "./helpers";
 
 const S2T = DEMO_DOCUMENT_NAMES.s2t;
 
@@ -24,6 +24,7 @@ const read = (page: Page) =>
 async function openView(page: Page) {
   // slice 26 (D2): the preset has more sections; this spec reads the S2T alone
   await keepOnly(S2T, ["s2t"]);
+  await unnumbered(S2T);
   await page.goto(viewUrl((await storedDocument(S2T))!.id));
   await laidOut(page);
   return read(page);

@@ -5,7 +5,7 @@
 
 import { writeInfoCubeOff } from "../slice-22/helpers";
 import { expect, test, type Page } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, formUrl, keepOnly, laidOut, RETAIL, sectionText, setWorkspace, signInAs, storedDocument, viewUrl } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, formUrl, keepOnly, laidOut, RETAIL, sectionText, setWorkspace, signInAs, storedDocument, unnumbered, viewUrl } from "./helpers";
 
 test.use({ seed: "full" });
 
@@ -13,6 +13,7 @@ const S2T = DEMO_DOCUMENT_NAMES.s2t;
 
 async function openView(page: Page) {
   await keepOnly(S2T, ["s2t", "cube.dim"]);
+  await unnumbered(S2T);
   await page.goto(viewUrl((await storedDocument(S2T))!.id));
   await laidOut(page);
 }
