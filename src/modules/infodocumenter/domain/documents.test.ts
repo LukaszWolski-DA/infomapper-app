@@ -175,8 +175,15 @@ describe("saving (D-59, F19)", () => {
   });
 
   it("keeps a section of a type no module knows: its switch changes, its options do not", () => {
-    const d = { ...made(), sections: [{ id: ids.canvas1, type: "gone.part", on: true, options: { x: 1 } }] };
-    expect(ok(updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: ids.canvas1, on: false } }, KINDS)).document.sections[0]).toEqual({ id: ids.canvas1, type: "gone.part", on: false, options: { x: 1 } });
+    const d = { ...made(), sections: [{ id: ids.canvas1, type: "gone.part", on: true, heading: null, newPage: true, options: { x: 1 } }] };
+    expect(ok(updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: ids.canvas1, on: false } }, KINDS)).document.sections[0]).toEqual({
+      id: ids.canvas1,
+      type: "gone.part",
+      on: false,
+      heading: null,
+      newPage: true,
+      options: { x: 1 },
+    });
     expect(updateDocument(makeCtx(ME), as("reader"), d, { ...base(d), section: { id: ids.canvas1, options: { x: 2 } } }, KINDS)).toMatchObject({ ok: false, error: { code: "invalid" } });
   });
 

@@ -21,7 +21,6 @@ import {
   type DictionaryOptions,
   type S2TColumn,
   type S2TOptions,
-  type TextOptions,
 } from "./sections";
 
 type L = (key: LabelKey, values?: Readonly<Record<string, string | number>>) => string;
@@ -280,7 +279,22 @@ const titled = (key: LabelKey) => (language: DocLanguage) => label(language, key
 
 /** InfoDocumenter's three section types: their kinds (`sections.ts`) with their headings and builders. */
 export const INFODOC_SECTION_TYPES: readonly DocumentSectionType[] = [
-  { ...kind("text"), module: null, label: titled("t_text"), heading: (options) => (options as Partial<TextOptions>).heading ?? null, tables: [], build: buildText },
-  { ...kind("dict"), module: null, label: titled("t_dict"), tables: [], build: buildDictionary },
-  { ...kind("s2t"), module: null, label: titled("t_s2t"), tables: [], build: buildS2T },
+  // the descriptions are the prototype's "+ Add section" lines (slice 26)
+  {
+    ...kind("text"),
+    module: null,
+    label: titled("t_text"),
+    description: "Your own words: introduction, scope, assumptions, open points. Not stored in the model.",
+    tables: [],
+    build: buildText,
+  },
+  { ...kind("dict"), module: null, label: titled("t_dict"), description: "Entities by concept with the attribute properties you choose.", tables: [], build: buildDictionary },
+  {
+    ...kind("s2t"),
+    module: null,
+    label: titled("t_s2t"),
+    description: "Every mapping from source columns to logical attributes, with rules, types and status.",
+    tables: [],
+    build: buildS2T,
+  },
 ];

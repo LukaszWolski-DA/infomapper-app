@@ -30,7 +30,7 @@ export const PRESETS: readonly Preset[] = [
     audience: "Business",
     mappings: "approved",
     sections: [
-      { type: "text", options: { heading: null, body: INTRODUCTION } },
+      { type: "text", options: { body: INTRODUCTION } },
       { type: "dict", options: { entity: ["definition"], columns: ["attribute", "type", "pii", "definition"] } },
     ],
   },
@@ -53,9 +53,12 @@ export const PRESETS: readonly Preset[] = [
     description: "A title page and an empty introduction.",
     audience: null,
     mappings: "all",
-    sections: [{ type: "text", options: { heading: null, body: "" } }],
+    sections: [{ type: "text", options: { body: "" } }],
   },
 ];
+
+/** A new section entry: on, the type's default heading, on a new page (slice 26, F10). */
+export const newSection = (id: Uuid, type: string, options: Record<string, unknown>): DocumentSection => ({ id, type, on: true, heading: null, newPage: true, options });
 
 export const presetOf = (code: DocumentPreset): Preset => PRESETS.find((p) => p.code === code)!;
 
@@ -64,9 +67,7 @@ export const presetOf = (code: DocumentPreset): Preset => PRESETS.find((p) => p.
  * available in the workspace now, with its defaults; all on.
  */
 export function presetSections(preset: Preset, kinds: Iterable<DocumentSectionKind>, workspace: Workspace, newId: () => Uuid): DocumentSection[] {
-  const own = preset.sections.map((s) => ({ id: newId(), type: s.type, on: true, options: structuredClone(s.options) as Record<string, unknown> }));
-  const modules = [...kinds]
-    .filter((k) => k.presets.includes(preset.code) && k.available(workspace))
-    .map((k) => ({ id: newId(), type: k.type, on: true, options: k.defaults() }));
+  const own = preset.sections.map((s) => newSection(newId(), s.type, structuredClone(s.options) as Record<string, unknown>));
+  const modules = [...kinds].filter((k) => k.presets.includes(preset.code) && k.available(workspace)).map((k) => newSection(newId(), k.type, k.defaults()));
   return [...own, ...modules];
 }

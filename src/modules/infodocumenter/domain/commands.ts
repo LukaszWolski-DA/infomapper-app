@@ -1,5 +1,6 @@
 // InfoDocumenter's commands (slice 25, PRD section 5, step 2): create from a preset, save, share and unshare,
-// duplicate, delete. Each is a write of `document_definition` outside undo (R2-4a2): one change group with its change
+// duplicate, delete; since slice 26 (F12) a save takes the style and a section's heading and page break, and a
+// section is added, removed and moved. Each is a write of `document_definition` outside undo (R2-4a2): one change group with its change
 // event (AD-13) that never becomes an undo step, saved against the row's version (D-59). A save takes only the fields
 // that changed (slice 9, P3) and checks the recipe it leaves against the section kinds' schemas.
 
@@ -8,10 +9,12 @@ import { buildWriteSet, fail, newRowColumns, nextVersion, type CommandContext, t
 import { current, nothingToChange, softDeleted } from "@/domain/commands/shared";
 import type { DocumentSectionKind } from "@/domain/document/sections";
 import { sectionOptionsRefusal } from "@/domain/document/sections";
-import { domainError, notFound } from "@/domain/errors";
+import { domainError, notFound, type DomainError } from "@/domain/errors";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { parseInput, uuidSchema, versionSchema } from "@/domain/validation";
-import { presetOf, presetSections } from "./presets";
+import { newSection, presetOf, presetSections } from "./presets";
+import { headingSchema } from "./sections";
+import { defaultStyle, patchedStyle, SECTIONS_MAX, stylePatch } from "./style";
 import { canSee, createRefusal, deleteRefusal, editRefusal, shareRefusal } from "./rights";
 import { DOCUMENT_PRESETS, MAPPING_FILTERS, type DocumentCover, type DocumentDefinition, type DocumentScope } from "./types";
 
@@ -21,6 +24,13 @@ export const NAME_REQUIRED = "A document needs a name.";
 export const SHORT_TEXT_MAX = 200;
 /** The most projects or concepts a scope names. */
 export const SCOPE_IDS_MAX = 500;
+
+/** Slice 26's refusals (step 1's list of new texts). */
+export const SECTION_TEXTS = {
+  tooMany: `A document holds at most ${SECTIONS_MAX} sections.`,
+  notInstalled: "This section type is not installed.",
+  off: (module: string) => `${module} is off in this workspace.`,
+} as const;
 
 /** The toasts (step 1's list of new texts); no Undo: documents are outside undo. */
 export const DOCUMENT_TEXTS = {
@@ -51,7 +61,9 @@ const scopePatch = z
   .object({ projects: idList, concepts: idList, logical: z.boolean(), dimensional: z.boolean(), mappings: z.enum(MAPPING_FILTERS) })
   .partial()
   .strict();
-const sectionPatch = z.object({ id: uuidSchema, on: z.boolean().optional(), options: z.record(z.string(), z.unknown()).optional() }).strict();
+const sectionPatch = z
+  .object({ id: uuidSchema, on: z.boolean().optional(), heading: headingSchema.optional(), newPage: z.boolean().optional(), options: z.record(z.string(), z.unknown()).optional() })
+  .strict();
 
 const of = { workspaceId: uuidSchema, documentId: uuidSchema };
 
@@ -86,6 +98,8 @@ export function createDocument(ctx: CommandContext, access: WorkspaceAccess, inp
     baseline_id: null,
     scope,
     cover: { ...EMPTY_COVER },
+    // a new document takes the workspace's documentation language (Q8); the ETL preset has no draft mark (the prototype's)
+    style: defaultStyle({ language: access.workspace.doc_language, watermark: preset.code !== "s2t" }),
     sections: presetSections(preset, kinds.values(), access.workspace, ctx.newId),
   };
   return { ok: true, value: { document: row }, writeSet: buildWriteSet(ctx, access.workspace.id, [{ kind: "insert", table: "document_definition", row }]) };
@@ -101,6 +115,7 @@ const updateInput = z
     audience: shortText.optional(),
     cover: coverPatch.optional(),
     scope: scopePatch.optional(),
+    style: stylePatch.optional(),
     section: sectionPatch.optional(),
   })
   .strict();
@@ -134,6 +149,7 @@ export function updateDocument(
   if (p.audience !== undefined) patch.audience = p.audience;
   if (p.cover) patch.cover = { ...before.cover, ...p.cover };
   if (p.scope) patch.scope = { ...before.scope, ...p.scope };
+  if (p.style) patch.style = patchedStyle(before.style, p.style);
   if (p.section) {
     const at = before.sections.findIndex((s) => s.id === p.section!.id);
     if (at < 0) return fail(notFound("section"));
@@ -147,12 +163,96 @@ export function updateDocument(
       if (refusal) return fail(refusal);
       options = kind!.options.parse(merged);
     }
-    const next = { ...section, on: p.section.on ?? section.on, options };
+    const next = {
+      ...section,
+      on: p.section.on ?? section.on,
+      heading: p.section.heading !== undefined ? p.section.heading : section.heading,
+      newPage: p.section.newPage ?? section.newPage,
+      options,
+    };
     patch.sections = before.sections.map((s, i) => (i === at ? next : s));
   }
   if (Object.entries(patch).every(([k, v]) => same(v, before[k as keyof DocumentDefinition]))) return fail(nothingToChange());
   const row = nextVersion(ctx, before, patch);
   return { ok: true, value: { document: row }, writeSet: buildWriteSet(ctx, access.workspace.id, [{ kind: "update", table: "document_definition", before, row }]) };
+}
+
+// ---- sections: add, remove, move (slice 26, F12) ----
+
+const addInput = z.object({ ...of, expectedVersion: versionSchema, type: z.string().min(1).max(64) }).strict();
+export type AddDocumentSectionInput = z.input<typeof addInput>;
+
+/** The row with its sections changed, against its version; the edit rights first (Q9). */
+function withSections(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  doc: DocumentDefinition | null | undefined,
+  input: { documentId: string; expectedVersion: number },
+  change: (sections: DocumentDefinition["sections"]) => DocumentDefinition["sections"] | DomainError,
+): CommandResult<{ document: DocumentDefinition }> {
+  const refused = editRefusal(access, doc);
+  if (refused) return fail(refused);
+  const found = current(doc, access, input.documentId, input.expectedVersion, "document");
+  if (!found.ok) return fail(found.error);
+  const sections = change(found.row.sections);
+  if (!Array.isArray(sections)) return fail(sections as DomainError);
+  const row = nextVersion(ctx, found.row, { sections });
+  return { ok: true, value: { document: row }, writeSet: buildWriteSet(ctx, access.workspace.id, [{ kind: "update", table: "document_definition", before: found.row, row }]) };
+}
+
+/**
+ * Adds a section of a registered type at the end, on, with its kind's defaults (the prototype's "+ Add section");
+ * refused for a type no module knows, one whose module is off, and past `SECTIONS_MAX` (D10). The new section's id is
+ * in the answer, for the editor to select it.
+ */
+export function addDocumentSection(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  doc: DocumentDefinition | null | undefined,
+  input: unknown,
+  kinds: ReadonlyMap<string, DocumentSectionKind & { readonly module?: string | null }>,
+): CommandResult<{ document: DocumentDefinition; sectionId: string }> {
+  const parsed = parseInput(addInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const id = ctx.newId();
+  const r = withSections(ctx, access, doc, parsed.data, (sections) => {
+    const kind = kinds.get(parsed.data.type);
+    if (!kind) return domainError("invalid", SECTION_TEXTS.notInstalled);
+    if (!kind.available(access.workspace)) return domainError("invalid", SECTION_TEXTS.off(kind.module ?? "Its module"));
+    if (sections.length >= SECTIONS_MAX) return domainError("invalid", SECTION_TEXTS.tooMany);
+    return [...sections, newSection(id, kind.type, kind.defaults())];
+  });
+  return r.ok ? { ...r, value: { ...r.value, sectionId: id } } : r;
+}
+
+const removeInput = z.object({ ...of, expectedVersion: versionSchema, sectionId: uuidSchema }).strict();
+export type RemoveDocumentSectionInput = z.input<typeof removeInput>;
+
+/** Removes a section, without a question (the prototype's); outside undo, so it is gone (D-80). */
+export function removeDocumentSection(ctx: CommandContext, access: WorkspaceAccess, doc: DocumentDefinition | null | undefined, input: unknown): CommandResult<{ document: DocumentDefinition }> {
+  const parsed = parseInput(removeInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  return withSections(ctx, access, doc, parsed.data, (sections) =>
+    sections.some((s) => s.id === parsed.data.sectionId) ? sections.filter((s) => s.id !== parsed.data.sectionId) : notFound("section"),
+  );
+}
+
+const moveInput = z.object({ ...of, expectedVersion: versionSchema, sectionId: uuidSchema, direction: z.enum(["up", "down"]) }).strict();
+export type MoveDocumentSectionInput = z.input<typeof moveInput>;
+
+/** Moves a section one place up or down; the first one up or the last one down changes nothing. */
+export function moveDocumentSection(ctx: CommandContext, access: WorkspaceAccess, doc: DocumentDefinition | null | undefined, input: unknown): CommandResult<{ document: DocumentDefinition }> {
+  const parsed = parseInput(moveInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  return withSections(ctx, access, doc, parsed.data, (sections) => {
+    const at = sections.findIndex((s) => s.id === parsed.data.sectionId);
+    if (at < 0) return notFound("section");
+    const to = parsed.data.direction === "up" ? at - 1 : at + 1;
+    if (to < 0 || to >= sections.length) return nothingToChange();
+    const next = [...sections];
+    [next[at], next[to]] = [next[to]!, next[at]!];
+    return next;
+  });
 }
 
 // ---- share and unshare ----
@@ -208,6 +308,7 @@ export function duplicateDocument(ctx: CommandContext, access: WorkspaceAccess, 
     baseline_id: doc.baseline_id,
     scope: structuredClone(doc.scope),
     cover: structuredClone(doc.cover),
+    style: structuredClone(doc.style),
     sections: structuredClone(doc.sections),
   };
   return { ok: true, value: { document: row }, writeSet: buildWriteSet(ctx, access.workspace.id, [{ kind: "insert", table: "document_definition", row }]) };

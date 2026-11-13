@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 import type { DocNode, DocRow, DocRun, DocRuns } from "@/domain/document/content";
 import type { DocumentTree } from "../domain/document";
+import { frameQuickText } from "./document-css";
 
 function Run({ run }: { run: DocRun }) {
   let el: ReactNode = run.text;
@@ -115,47 +116,84 @@ export function Nodes({ nodes }: { nodes: readonly DocNode[] }) {
 
 /**
  * The whole document: the title page (a named page without header, footer or watermark), the contents with the
- * skipped sections' notes, then each section on a new page. `id` is the source Paged.js lays out.
+ * skipped sections' notes, then each section, on a new page unless it runs on (slice 26). `id` is the source Paged.js
+ * lays out. Every part carries `data-sec` (a section's id, "doc" for the title page and the contents), which the
+ * editor's preview selects by (P5).
+ *
+ * `quick` (slice 26, F3): the quick sheet, one `.dsheet` per page break holding the sections that run on in it, the
+ * watermark at the top and the footer fields' text after the last sheet, page numbers as "–" (D8).
  */
-export function DocumentHtml({ tree, id }: { tree: DocumentTree; id?: string }) {
-  return (
-    <div id={id} className="dpages" lang={tree.language} data-testid="document-source">
-      <section className="dsheet dcover" data-testid="document-cover">
-        <div className="dorg">{tree.cover.organization}</div>
-        <h1>{tree.cover.title}</h1>
-        {tree.cover.subtitle && <div className="dsub">{tree.cover.subtitle}</div>}
-        <table className="dcovt">
-          <tbody>
-            {tree.cover.rows.map((r) => (
-              <tr key={r.key} data-testid={`cover-${r.key}`}>
-                <th>{r.label}</th>
-                <td>{r.value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-      <section className="dsheet dtoc" data-testid="document-contents">
-        <h2>{tree.contents.heading}</h2>
-        <ol>
-          {tree.contents.entries.map((e) => (
-            <li key={e.anchor}>
-              <a href={`#${e.anchor}`}>{e.text}</a>
-            </li>
+export function DocumentHtml({ tree, id, quick }: { tree: DocumentTree; id?: string; quick?: boolean }) {
+  const cover = (
+    <section className="dsheet dcover" data-testid="document-cover" data-sec="doc">
+      <div className="dorg">{tree.cover.organization}</div>
+      <h1>{tree.cover.title}</h1>
+      {tree.cover.subtitle && <div className="dsub">{tree.cover.subtitle}</div>}
+      <table className="dcovt">
+        <tbody>
+          {tree.cover.rows.map((r) => (
+            <tr key={r.key} data-testid={`cover-${r.key}`}>
+              <th>{r.label}</th>
+              <td>{r.value}</td>
+            </tr>
           ))}
-        </ol>
-        {tree.skipped.map((s) => (
-          <p key={s.id} className="dnote" data-testid="document-skipped">
-            {s.text}
-          </p>
+        </tbody>
+      </table>
+    </section>
+  );
+  const contents = (
+    <section className="dsheet dtoc" data-testid="document-contents" data-sec="doc">
+      <h2>{tree.contents.heading}</h2>
+      <ol>
+        {tree.contents.entries.map((e) => (
+          <li key={e.anchor}>
+            <a href={`#${e.anchor}`}>{e.text}</a>
+          </li>
         ))}
-      </section>
-      {tree.sections.map((s) => (
-        <section key={s.id} className="dsheet dsec" data-section={s.type} data-testid="document-section">
-          <h2 id={s.anchor}>{s.heading}</h2>
-          <Nodes nodes={s.nodes} />
-        </section>
+      </ol>
+      {tree.skipped.map((s) => (
+        <p key={s.id} className="dnote" data-testid="document-skipped">
+          {s.text}
+        </p>
       ))}
+    </section>
+  );
+  const section = (s: DocumentTree["sections"][number], sheet: boolean) => (
+    <section key={s.id} className={sheet ? "dsheet dsec" : "dsec"} data-section={s.type} data-sec={s.id} data-testid="document-section">
+      <h2 id={s.anchor}>{s.heading}</h2>
+      <Nodes nodes={s.nodes} />
+    </section>
+  );
+  if (!quick)
+    return (
+      <div id={id} className="dpages" lang={tree.language} data-testid="document-source">
+        {cover}
+        {contents}
+        {tree.sections.map((s, i) => section(s, i === 0 || s.newPage))}
+      </div>
+    );
+  // the quick sheet: the sections grouped by their page breaks
+  const sheets: DocumentTree["sections"][number][][] = [];
+  tree.sections.forEach((s, i) => {
+    if (i === 0 || s.newPage || !sheets.length) sheets.push([s]);
+    else sheets[sheets.length - 1]!.push(s);
+  });
+  const footer = [tree.frame.footerLeft, tree.frame.footerRight].map(frameQuickText).filter(Boolean).join(" · ");
+  return (
+    <div id={id} className="dpages dquick" lang={tree.language} data-testid="document-quick">
+      {tree.frame.watermark && <div className="dwm">{tree.frame.watermark}</div>}
+      {cover}
+      {contents}
+      {sheets.map((group) => (
+        <div key={group[0]!.id} className="dsheet" data-testid="quick-sheet">
+          {group.map((s) => section(s, false))}
+        </div>
+      ))}
+      {footer && (
+        <div className="dfoot" data-testid="quick-footer">
+          {footer}
+        </div>
+      )}
     </div>
   );
 }

@@ -93,8 +93,40 @@ describe("documents in the local adapter", () => {
     };
     expect(await insert({ source_kind: "baseline", baseline_id: uuidv7() })).toMatchObject({ ok: false, error: { message: expect.stringContaining("document_definition_source_ck") } });
     expect(await insert({ sections: {} as never })).toMatchObject({ ok: false, error: { message: expect.stringContaining("document_definition_recipe_ck") } });
+    // slice 26: the style is part of the recipe
+    expect(await insert({ style: [] as never })).toMatchObject({ ok: false, error: { message: expect.stringContaining("document_definition_recipe_ck") } });
     expect(await insert({ name: " padded " })).toMatchObject({ ok: false, error: { message: expect.stringContaining("document_definition_name_ck") } });
     expect(await insert({ author_id: uuidv7() })).toMatchObject({ ok: false, error: { code: "not_found" } });
+  });
+
+  it("reads a recipe stored before slice 26 with the style's defaults and Text's heading on its entry (F11); the file's format stays", async () => {
+    await turnOn();
+    const d = await created(SEED_IDS.userAnna);
+    const db = await readDb(file);
+    const format = (db as unknown as { format: number }).format;
+    expect(format).toBe(17);
+    const rows = (db as unknown as { document_definition: Record<string, unknown>[] }).document_definition;
+    // the row as slice 25 stored it
+    const old = rows.find((r) => r.id === d.id)!;
+    delete old.style;
+    old.sections = (old.sections as Record<string, unknown>[]).map((s) => ({
+      id: s.id,
+      type: s.type,
+      on: s.on,
+      options: s.type === "text" ? { heading: "Scope", ...(s.options as object) } : s.options,
+    }));
+    await writeDb(file, db);
+    const fresh = createLocalDataStore(file, STORE_SCHEMA);
+    const [read] = await fresh.modules.list(WS, "document_definition");
+    expect(read!.style).toEqual({ ...d.style, language: null });
+    expect(read!.sections.map((s) => [s.type, s.heading, s.newPage, "heading" in s.options])).toEqual([
+      ["text", "Scope", true, false],
+      ["dict", null, true, false],
+    ]);
+    // a read writes nothing: the file keeps its format and the old row until the next write
+    const after = await readDb(file);
+    expect((after as unknown as { format: number }).format).toBe(17);
+    expect((after as unknown as { document_definition: Record<string, unknown>[] }).document_definition.find((r) => r.id === d.id)!.style).toBeUndefined();
   });
 
   it("keeps the documents while InfoDocumenter is off, and refuses to turn it on without the licence", async () => {

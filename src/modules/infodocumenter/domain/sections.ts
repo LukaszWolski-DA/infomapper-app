@@ -29,7 +29,8 @@ const subsetOf = <const T extends readonly [string, ...string[]]>(values: T) =>
     .refine((list) => new Set(list).size === list.length, "Each column is chosen once.")
     .transform((list) => values.filter((v): v is T[number] => (list as readonly string[]).includes(v)));
 
-const headingSchema = z
+/** A section's own heading (slice 26: the entry's, every type's; Text's moved there from its options). */
+export const headingSchema = z
   .string()
   .trim()
   .max(HEADING_MAX, "This heading is too long.")
@@ -38,8 +39,6 @@ const headingSchema = z
 
 export const textOptions = z
   .object({
-    /** Null: the language's "Introduction". */
-    heading: headingSchema,
     /** Plain text; a blank line starts a paragraph (D8). */
     body: z.string().max(TEXT_BODY_MAX, "This text is too long."),
   })
@@ -53,7 +52,7 @@ export const s2tOptions = z.object({ columns: subsetOf(S2T_COLUMNS), group: z.en
 export type S2TOptions = z.output<typeof s2tOptions>;
 
 /** The prototype's defaults for a section added without a preset's own choice. */
-export const TEXT_DEFAULTS: TextOptions = { heading: null, body: "" };
+export const TEXT_DEFAULTS: TextOptions = { body: "" };
 export const DICTIONARY_DEFAULTS: DictionaryOptions = {
   entity: ["stereotype", "definition", "coverage", "relationships"],
   columns: ["attribute", "type", "keys", "pii", "definition", "mappedFrom"],

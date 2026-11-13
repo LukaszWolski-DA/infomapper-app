@@ -8,7 +8,7 @@
 //
 // Texts from the model (the organization's, the title, the workspace's) go into CSS strings, escaped by `cssString`.
 
-import type { DocumentTree } from "../domain/document";
+import type { DocumentFrame } from "../domain/document";
 
 /** A CSS string literal: quotes, backslashes and line breaks escaped, so a name ends nowhere but at its own quote. */
 export const cssString = (text: string): string => `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n\f]+/g, " ")}"`;
@@ -16,22 +16,45 @@ export const cssString = (text: string): string => `"${text.replace(/\\/g, "\\\\
 /** The page's margin in millimetres (the prototype's `MARG`). */
 export const PAGE_MARGIN_MM = 18;
 
-export function documentCss(frame: DocumentTree["frame"]): string {
+/**
+ * A frame field as a CSS `content` value (slice 26): its text parts as escaped strings, `{page}` and `{pages}` as the
+ * page counters; `none` when it is empty.
+ */
+export function frameContent(text: string): string {
+  if (!text) return "none";
+  const parts = text.split(/(\{page\}|\{pages\})/).filter(Boolean);
+  return parts.map((p) => (p === "{page}" ? "counter(page)" : p === "{pages}" ? "counter(pages)" : cssString(p))).join(" ");
+}
+
+/** A frame field on the quick sheet (D8): the page tokens as "–". */
+export const frameQuickText = (text: string): string => text.replace(/\{pages?\}/g, "–");
+
+/** The page rules Paged.js lays out with (A4 portrait until step 4's style): the margin boxes and the breaks. */
+export function pageCss(frame: DocumentFrame): string {
   const margin = "font-family:var(--font-plex-sans),sans-serif;font-size:7.5pt;color:#7C8794;";
   return `
 @page{size:A4 portrait;margin:${PAGE_MARGIN_MM}mm ${PAGE_MARGIN_MM}mm 20mm ${PAGE_MARGIN_MM}mm;
-@top-left{content:${cssString(frame.header)};${margin}vertical-align:bottom;padding-bottom:3mm;white-space:nowrap}
-@top-center{content:${cssString(frame.watermark)};${margin}color:#B23A0B;font-weight:600;vertical-align:bottom;padding-bottom:3mm}
-@bottom-left{content:${cssString(frame.footer)};${margin}vertical-align:top;padding-top:4mm}
-@bottom-right{content:${cssString(`${frame.page} `)} counter(page) ${cssString(` ${frame.of} `)} counter(pages);${margin}vertical-align:top;padding-top:4mm;text-align:right}}
-@page cover{@top-left{content:none}@top-center{content:none}@bottom-left{content:none}@bottom-right{content:none}}
+@top-left{content:${frameContent(frame.headerLeft)};${margin}vertical-align:bottom;padding-bottom:3mm;white-space:nowrap}
+@top-center{content:${frameContent(frame.watermark)};${margin}color:#B23A0B;font-weight:600;vertical-align:bottom;padding-bottom:3mm}
+@top-right{content:${frameContent(frame.headerRight)};${margin}vertical-align:bottom;padding-bottom:3mm;text-align:right}
+@bottom-left{content:${frameContent(frame.footerLeft)};${margin}vertical-align:top;padding-top:4mm}
+@bottom-right{content:${frameContent(frame.footerRight)};${margin}vertical-align:top;padding-top:4mm;text-align:right}}
+@page cover{@top-left{content:none}@top-center{content:none}@top-right{content:none}@bottom-left{content:none}@bottom-right{content:none}}
 .dcover{page:cover}
 section.dsheet{break-before:page}
 section.dsheet:first-of-type{break-before:auto}
 .dpb{break-before:page}
 tbody.dat,table.dt tr{break-inside:avoid}
-.dsheet h2,.dh3,.dsheet h4,.dsheet h5,.dmeta{break-after:avoid}
+.dsheet h2,.dsec h2,.dh3,.dsec h4,.dsec h5,.dmeta{break-after:avoid}
 .dtoc a::after{content:target-counter(attr(href), page)}
+`;
+}
+
+/** The document's whole CSS for Paged.js: its page rules and its look. */
+export const documentCss = (frame: DocumentFrame): string => pageCss(frame) + DOCUMENT_LOOK_CSS;
+
+/** How the document's content looks, on the pages and on the quick sheet alike (slice 26, P3). */
+export const DOCUMENT_LOOK_CSS = `
 
 .dpages,.pagedjs_page{--paper:#FFFFFF;--dink:#1B222B;--dink2:#4B5562;--dink3:#7C8794;--dline:#D9DEE4;--dacc:#3346C4;
   color:var(--dink);font:10pt/1.5 var(--font-plex-sans),sans-serif;color-scheme:light}
@@ -66,7 +89,21 @@ table.dt thead{display:table-header-group}
 .dtoc li a{display:flex;gap:3mm;color:inherit;text-decoration:none}
 .dtoc li a::after{margin-left:auto;color:var(--dink3);font-variant-numeric:tabular-nums}
 `;
-}
+
+/**
+ * The quick sheet (slice 26, F3, P3): the same content and look at the page's width, one sheet per page break with a
+ * faint line every page height, the watermark at the top, the footer fields' text after the last sheet (D8). Scoped to
+ * `.dquick`, so it never touches the laid-out pages.
+ */
+export const QUICK_SHEET_CSS = `
+.dquick{display:flex;flex-direction:column;align-items:center;gap:8mm;position:relative}
+.dquick .dsheet{box-sizing:border-box;width:210mm;min-height:297mm;padding:${PAGE_MARGIN_MM}mm;background:#fff;
+  background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(297mm - 1px),#C9D1DA calc(297mm - 1px),#C9D1DA 297mm);
+  box-shadow:0 1px 3px rgba(0,0,0,.12),0 10px 30px -18px rgba(0,0,0,.35)}
+.dquick .dsec+.dsec{margin-top:6mm}
+.dquick .dwm{position:sticky;top:0;align-self:flex-end;z-index:1;font:600 9pt var(--font-plex-sans),sans-serif;color:#B23A0B;margin-bottom:-8mm;padding:2mm 4mm}
+.dquick .dfoot{font:7.5pt var(--font-plex-sans),sans-serif;color:#7C8794;text-align:center}
+`;
 
 /**
  * The app's own CSS for the laid-out pages (not handed to Paged.js): the pages as sheets on the screen, and in print the

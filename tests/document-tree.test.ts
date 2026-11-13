@@ -18,6 +18,7 @@ import { CUBE_SECTION_TABLES, CUBE_SECTION_TYPE } from "@/modules/infocube/domai
 import { CUBE_DOC_WORDS } from "@/modules/infocube/domain/document-words";
 import { buildDocument, type DocumentTree } from "@/modules/infodocumenter/domain/document";
 import { LABELS } from "@/modules/infodocumenter/domain/labels";
+import { defaultStyle, upgradeSection } from "@/modules/infodocumenter/domain/style";
 import type { DocumentScope, DocumentSection, MappingFilter } from "@/modules/infodocumenter/domain/types";
 
 const WS = SEED_IDS.wsRetailDwh;
@@ -45,13 +46,15 @@ function doc(
   { db = demo(), scope = {}, mappings = "all" }: { db?: DevDb; scope?: Partial<DocumentScope>; mappings?: MappingFilter } = {},
 ): DocumentTree {
   const state = documentStateFor(snapshotOf(db));
-  const list: DocumentSection[] = sections.map((s) => ({ id: sid(), type: s.type, on: s.on ?? true, options: s.options }));
+  // slice 25's shape, read as the store reads it (Text's heading moves to the entry, slice 26's upgrade)
+  const list: DocumentSection[] = sections.map((s) => upgradeSection({ id: sid(), type: s.type, on: s.on ?? true, options: s.options }));
   return buildDocument({
     definition: {
       name: "Retail Co – data dictionary",
       author_id: SEED_IDS.userLukasz,
       scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings, ...scope },
       cover: { title: null, subtitle: "For the business", version: "1.0", status: "Draft for review", preparedBy: null },
+      style: defaultStyle(),
       sections: list,
     },
     state,
@@ -97,7 +100,13 @@ describe("the document (title page, contents, frame)", () => {
     expect(tree.contents.heading).toBe("Contents");
     expect(tree.contents.entries.map((e) => e.text)).toEqual(["Scope", "Source-to-target mapping"]);
     expect(tree.sections.map((s) => s.anchor)).toEqual(tree.contents.entries.map((e) => e.anchor));
-    expect(tree.frame).toEqual({ header: "InfoMate · Retail Co – data dictionary", footer: "Retail Co – DWH · Live model on 2026-11-12", watermark: "DRAFT · live model", page: "Page", of: "of" });
+    expect(tree.frame).toEqual({
+      headerLeft: "InfoMate · Retail Co – data dictionary",
+      headerRight: "",
+      footerLeft: "Retail Co – DWH · Live model on 2026-11-12",
+      footerRight: "Page {page} of {pages}",
+      watermark: "DRAFT · live model",
+    });
     expect(tree.skipped).toEqual([]);
   });
 
@@ -121,6 +130,7 @@ describe("the document (title page, contents, frame)", () => {
         author_id: SEED_IDS.userAnna,
         scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings: "all" },
         cover: { title: "Own title", subtitle: null, version: null, status: null, preparedBy: "Data office" },
+        style: defaultStyle(),
         sections: [],
       },
       state,
@@ -129,7 +139,7 @@ describe("the document (title page, contents, frame)", () => {
     });
     expect(tree.cover.title).toBe("Own title");
     expect(tree.cover.rows.map((r) => r.value)).toEqual(["Retail Co", "Retail Co – DWH", "Live model on 2026-11-12", "–", "–", "Data office"]);
-    expect(tree.frame.header).toBe("InfoMate · Own title");
+    expect(tree.frame.headerLeft).toBe("InfoMate · Own title");
   });
 });
 

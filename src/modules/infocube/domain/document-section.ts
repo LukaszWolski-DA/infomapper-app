@@ -204,6 +204,8 @@ export const CUBE_SECTION: DocumentSectionType<CubeSectionTable> = {
   ...CUBE_SECTION_KIND,
   module: "InfoCube",
   label: (language) => CUBE_DOC_WORDS[language].title,
+  // slice 26: the prototype's line without the star diagram and the canvases' figures (slice C)
+  description: "Facts with grain and type, dimensions and measures; dimensions with history; every dimensional attribute's feed.",
   // the form's check boxes (step 1's list of texts); the dimensions' definitions and the measures keep their defaults
   optionChecks: [
     { key: "facts", label: "Facts: type, grain, dimensions, measures" },

@@ -11,6 +11,7 @@ import { seedId } from "@/data/local/seed-model";
 import type { DocumentSectionKind } from "@/domain/document/sections";
 import type { Uuid } from "@/domain/ids";
 import { plainTextPair } from "@/domain/model/plain-text";
+import { defaultStyle } from "../domain/style";
 import { presetOf, presetSections } from "../domain/presets";
 import type { DocumentCover, DocumentDefinition, DocumentPreset, DocumentScope } from "../domain/types";
 
@@ -94,6 +95,8 @@ export function addDocumentsDemo(db: DevDb & { document_definition?: DocumentDef
       baseline_id: null,
       scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings: p.mappings, ...row.scope },
       cover: { ...EMPTY_COVER, ...row.cover },
+      // the workspace's language (Q8: a seeded document follows it), the preset's draft mark
+      style: defaultStyle({ watermark: preset !== "s2t" }),
       sections: presetSections(p, list, workspace, () => id(`document:${key}:section:${n++}`)),
     };
   };
