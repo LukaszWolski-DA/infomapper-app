@@ -71,7 +71,10 @@ test("S26-02: Exact always lays out real pages; Quick never does", async ({ page
   await signInAs(page, "Łukasz");
   await openEditor(page, formUrl((await storedDocument(SHARED))!.id));
 
+  // switching the mode lays out nothing again: the pages of the same document are shown
   await page.getByTestId("select-preview-mode").selectOption("exact");
+  await expect(preview(page)).toHaveAttribute("data-state", "done");
+  expect(await layouts(page)).toBe(1);
   await toggleDictionary(page);
   await expectLayouts(page, 2);
   await expect(page.getByTestId("note-stale")).toHaveCount(0);

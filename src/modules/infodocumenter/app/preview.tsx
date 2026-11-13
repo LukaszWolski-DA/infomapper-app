@@ -123,6 +123,8 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
   const source = useRef<HTMLDivElement>(null);
   const quickBox = useRef<HTMLDivElement>(null);
   const shownLayout = useRef<Layout | null>(null);
+  /** The tree the shown layout's pages were laid out from. */
+  const laidTree = useRef<DocumentTree | null>(null);
   const running = useRef<{ layout: Layout; stop: () => void } | null>(null);
   const lastMs = useRef<number | null>(null);
   const printAfter = useRef(false);
@@ -171,6 +173,12 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
       return;
     }
     setStale(null);
+    // a mode switched on the same document: its pages are laid out already
+    if (!forced && laidTree.current === tree && shownLayout.current) {
+      setShown("pages");
+      setBusy(false);
+      return;
+    }
     const from = source.current?.firstElementChild;
     const box = offscreen.current;
     if (!from || !box) return;
@@ -220,6 +228,7 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
       // the swap: the new pages in, the old ones (and their styles) out
       const old = shownLayout.current;
       shownLayout.current = layout;
+      laidTree.current = tree;
       pagesBox.current?.replaceChildren(host);
       destroy(old);
       setPages(host.querySelectorAll(".pagedjs_page").length);
