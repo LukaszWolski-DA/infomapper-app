@@ -726,3 +726,135 @@ All thirteen questions as proposed, with these additions:
 11. **Q3:** yes, Auto's threshold 1,000 ms; a running layout is stopped when a newer change arrives.
 12. **Q8:** yes, a new document stores the workspace's language; older and seeded ones follow the workspace (null).
 13. **F8:** yes, a full run in step 2.
+
+## Step 2: the editor and the preview (13 November 2026)
+
+### What was built
+
+- **The recipe** (F9 to F11, Q8):
+  - `style` (`DocumentStyle`), with its defaults (`STYLE_DEFAULTS`) and its save patch (`stylePatch`), in
+    `src/modules/infodocumenter/domain/style.ts`.
+  - Each section entry gets `heading` and `newPage`. Text's heading moved from its options to its entry.
+  - A new document stores the workspace's documentation language. Slice 25's recipes and the seeded demo documents have
+    `language: null` and follow the workspace.
+  - `upgradeDocument` is the module's `TableRules.upgrade` (pure, idempotent). The local file's format stays 17, and a
+    read writes nothing.
+  - The migration `20261113120000_document_style.sql` adds the column and extends `document_definition_recipe_ck`.
+- **The commands** (F12, D10, Q9):
+  - `updateDocument` takes the style and a section's heading and page break.
+  - `addDocumentSection` is refused for a type no module knows, for a module's type while the module is off, and past
+    50 sections.
+  - `removeDocumentSection` and `moveDocumentSection`.
+  - Each is a save with the row's version and a change event, outside undo, with slice 25's `editRefusal`.
+- **The editor** at `/w/{ws}/d/{id}` (`app/editor.tsx`) replaces slice 25's form (`form.tsx` removed). It has:
+  - the top bar;
+  - the left panel: Document, the sections with their switch, up, down and remove, and "+ Add section" with every
+    registered type (a module's type is disabled while its module is off);
+  - the preview;
+  - the right panel: for Document, the model state, scope, sharing, audience and cover; for a section, its heading,
+    "Start on a new page" and its options;
+  - the read-only bar with "Duplicate as my document".
+
+  The style's panel is step 4. This step stores and reads the style: the page frame's fields and the language.
+- **`onType`** on `useDraft`, `TextField` and `TextArea` (F1 a).
+  - It is called with the element's text on the element's own `input` event, and when the field writes its element
+    itself: a stored value taken, Escape, "Use this", a trim.
+  - Every other field is unchanged.
+- **The tree in the browser** (D7).
+  - The editor reads the snapshot once, when it opens (`documentSnapshotAction`).
+  - It builds the document state once per snapshot, and the tree on each change.
+  - The tree comes from the stored recipe with the text fields' drafts applied (`ui/drafts.ts`): 500 ms after the last
+    keystroke for typing, and when the save's page arrives for any other change.
+  - A change that draws the same recipe builds nothing.
+- **The preview** (`app/preview.tsx`; F2, F3, F7, D8):
+  - the modes Auto (1,000 ms), Exact pages and Quick preview, kept per tab for the session;
+  - "Pages out of date…" with "Update pages";
+  - a layout runs off screen and is swapped in when done, so the old pages (or the quick sheet) stay meanwhile;
+  - a newer change stops the running layout;
+  - the quick sheet (`DocumentHtml` with `quick`): one sheet per page break, the watermark, and the footer fields with
+    "–" for the page numbers;
+  - the zoom: Fit width (from a `ResizeObserver`), 75 %, 100 %;
+  - the sync: a click on a row scrolls the preview to the section and outlines it, a click in the preview selects its
+    section, and a double-click goes to the section's Heading (D9);
+  - Print / PDF lays out real pages first when the quick sheet shows.
+- **The page frame** from the style's fields (F9, D6):
+  - The tokens are `{org}`, `{title}`, `{client}`, `{workspace}`, `{version}`, `{status}`, `{state}`, `{date}` and
+    `{author}`; `{page}`, `{pages}` and `{pagelabel}` become the pages' counters.
+  - An empty field shows the grey example.
+  - The header's left part drops the page tokens.
+  - With the running header off, the header is empty.
+  - The watermark prints only while it is on.
+  - The defaults draw slice 25's frame (top left, top centre, bottom left, bottom right).
+
+### Where the build differs from step 1's plan, and what I assumed
+
+1. **The snapshot comes with a read when the editor opens, not in the page's props.**
+   - A save revalidates the page. In the props, the snapshot (2.2 MB on "Performance test") would come again with every
+     save; read once, it is sent once, as D7 says.
+   - The cost: model changes that others make while the editor is open reach the preview only after a reload.
+2. **Stopping a layout** (F7).
+   - Paged.js 0.4.3's `chunker.stop()` does not end a layout: its flow starts again from the break.
+   - Instead, the editor makes the stopped layout's next page fail (its `renderAsync`), which ends the flow, and destroys
+     the layout once the flow has ended.
+   - Paged.js also keeps a `ResizeObserver` on each page after a layout. Moving the pages into view or zooming them re-ran
+     its underflow check on an ended flow, which threw (page errors in the dev overlay). The editor disconnects these
+     observers when a layout is done.
+   - `/view` is unchanged.
+3. **"Who sees this document"** is the prototype's segmented choice (Private, Shared with the workspace), shown to every
+   member.
+   - For a member who may not share it is disabled, with "Only modelers, admins and owners share documents.".
+   - When only the author may make the document private, it shows slice 25's reason.
+   - Slice 25's check box is gone.
+4. **"Model levels" stays shown with InfoCube off**, as slice 25's form had it. The prototype shows it only while
+   InfoCube is on; I did not change it without a decision.
+5. **The skipped sections' note** is one line per module above the preview, "Skipped while {module} is off:
+   {sections}.", as the prototype has it. The document keeps slice 25's per-section notes in its contents.
+6. **Paper and orientation are not in the preview yet.** Step 4 brings their CSS and F7's "give way at once".
+
+### D7: the snapshot and the tree in the browser (reference figures, no bar)
+
+**The method.**
+- The machine: the laptop (Intel Core i7-8550U, 8 logical processors, 7.9 GB, Windows 11).
+- The app: the measurement build in headless Chromium 153, on the e2e data file reseeded by the fixtures.
+- Per document: one warm-up load of the editor, then 5 loads. Medians, with the fastest and the slowest in brackets.
+- The script is uncommitted: `scripts/s26-measure/S26-D7.spec.ts`, run as step 1's with
+  `--config scripts/s26-measure/playwright.config.ts S26-D7`.
+
+| Document | Pages | Snapshot received (decoded) | Document state | Tree | First layout |
+| --- | --- | --- | --- | --- | --- |
+| Performance test, dictionary | 42 | 131 KB (2.24 MB) | 3.3 ms (2.5–8.7) | 7.7 ms (5.3–13.5) | 2.72 s (2.64–4.89) |
+| Performance test, source-to-target | 69 | 131 KB (2.24 MB) | 4.1 ms (3.2–5.4) | 4.3 ms (3.9–5.0) | 3.09 s (2.91–3.30) |
+| Demo, data dictionary | 6 | 17 KB (193 KB) | 2.0 ms (1.2–2.3) | 1.5 ms (0.9–1.8) | 0.14 s (0.13–0.17) |
+| Demo, S2T with the Dimensional model | 9 | 17 KB (193 KB) | 1.4 ms (1.0–2.5) | 2.7 ms (1.8–3.5) | 0.29 s (0.27–0.33) |
+| Demo, Anna's dictionary | 6 | 17 KB (193 KB) | 1.4 ms (0.8–2.2) | 1.1 ms (0.6–4.3) | 0.13 s (0.12–0.14) |
+
+- "Received" is the network's count of the compressed answer; "decoded" is the answer's text.
+- **People in the snapshot** (`app/snapshot.ts`, `browserSnapshot`):
+  - each person's id and name only; e-mail and last sign-in are blanked;
+  - no member rows (roles);
+  - the organization's row: its name and versions (its password hash is in another table, never in a snapshot).
+
+  The measurement searched every answer for an e-mail address and found none. The rest of the snapshot is the
+  workspace's model, requirements, projects, the canvases' cards and the module rows, which the member already sees on
+  the canvas pages and the homes.
+- Building the tree is not the cost: it takes under 10 ms on "Performance test". The layout is the cost (Q3).
+
+### Earlier specs and tests changed in step 2
+
+| Spec or test | Why |
+| --- | --- |
+| `e2e/slice-25/S25-02` | The editor's "Who sees this document" (segmented, shown to everyone) replaces the check box `check-shared`; new documents open the editor (`page-document-editor`). The rights it checks are unchanged. |
+| `e2e/slice-25/S25-03` | The editor replaces the form; the sections are rows on the left (`editor-section`); a section's options are in the right panel once it is selected; Blank's Text has its heading on its entry (F10). |
+| `e2e/slice-25/S25-05` | S2T's "Group by" is in the right panel once the section is selected. |
+| `e2e/slice-25/S25-06` | The "off" tag is on the section's row on the left. |
+| `e2e/slice-25/S25-screens` | The editor's screenshot replaces the form's. |
+| `e2e/slice-25/helpers.ts` | `sharedChoice`, `sharedButton`, `expectShared` and `setShared` for the editor's choice. |
+| `tests/document-tree.test.ts`, `tests/document-html.test.ts`, `scripts/bench-documents.ts` | The recipe has `style`; entries have `heading` and `newPage` (slice 25's are read through `upgradeSection`); the frame has its four fields. |
+| `src/modules/infodocumenter/domain/documents.test.ts` | Entries have `heading` and `newPage`. |
+| `tests/infodocumenter-store.test.ts` | The recipe check with `style`; a slice 25 row read with the upgrade, the file unchanged. |
+
+- New in this step:
+  - `e2e/slice-26/`: S26-01 to S26-03, S26-screens, the helpers and the fixtures;
+  - `domain/editor.test.ts`;
+  - `ui/drafts.test.ts`.
+- `e2e/slice-26/` joins part 8 of the full run (the recut rule; `PART_STARTS` is unchanged).
