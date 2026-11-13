@@ -858,3 +858,35 @@ All thirteen questions as proposed, with these additions:
   - `domain/editor.test.ts`;
   - `ui/drafts.test.ts`.
 - `e2e/slice-26/` joins part 8 of the full run (the recut rule; `PART_STARTS` is unchanged).
+
+### The full run (F8: `useDraft` changed)
+
+- **The first full run failed:** https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/43388262282 on `1955445`,
+  with one failure in part 8, S26-02 "Exact always lays out real pages".
+  - The cause was in the application. Switching the preview's mode re-ran the layout effect, so choosing "Exact pages"
+    laid out the same pages again, and the test's layout count was off by one, depending on timing.
+  - Fix `2d7dda1`: a mode switched on the same document shows its pages without a new layout. The spec checks it.
+  - A single-file check passed 3 of 3: https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/43390860726.
+- **The full run on `2d7dda1` passed:** https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/43390880513.
+  - 773 passed, 0 failed, 0 flaky, 5 skipped, 0 expected failures.
+  - Wall-clock 14 min 15 s, from 08:08:24 to 08:22:39.
+
+  | Part | Time | Heap peak |
+  | --- | ---: | ---: |
+  | 1 | 6 min 20 s | 954 MB |
+  | 2 | 7 min 24 s | 1,396 MB |
+  | 3 | 9 min 6 s | 1,046 MB |
+  | 4 | 9 min 56 s | 1,207 MB |
+  | 5 | 11 min 29 s | 1,215 MB |
+  | 6 | 10 min 49 s | 1,199 MB |
+  | 7 | 8 min 27 s | 1,196 MB |
+  | 8 | 12 min 17 s | **2,088 MB** |
+
+  - Nothing restarted; part 8's peak is 33 % of the runner's threshold.
+- **Part 8's heap is past CLAUDE.md's 2 GB mark** ("move the cuts or add a part"), with slice 26's 12 specs in it. It is
+  also the longest part, 48 s ahead of part 5, under the recut rule's minute.
+  - A recut is shared infrastructure: it goes to a `chore/` branch, not this slice. The roadmap's follow-up already
+    names it.
+- **The element guard passed** on the measurement build (`S3B-15-elements` against `slice-08.json`): viewport 4,508 /
+  19,305 / 1,465 / 4,907, page totals 6,137 / 20,934 / 3,004 / 6,446. The editor is not a canvas page.
+
