@@ -1,0 +1,271 @@
+// The lines of one canvas, as plain data: mappings (with all their inputs, D-49) and relationships between the cards
+// on it, built on the server next to the cards. Which lines a selection emphasises is decided here too. Slice 10b
+// (D-62): relationships between source tables, a list of their own (`sources`). Slice 15c (C7): a module's lines between
+// two entity rows, a list of their own (`modules`), drawn from what the module says (a class, a colour, an end mark).
+
+import type { Uuid } from "@/domain/ids";
+import { checkMappingTypes } from "@/domain/model/type-check";
+import type { CardinalityMax, CardinalityMin, MappingKind, MappingStatus, WorkspaceModel } from "@/domain/types";
+import type { CardData, LabelNames } from "./card-data";
+import type { SelectionKey } from "./selection-key";
+
+export interface MapLineData {
+  /** The mapping id. */
+  id: Uuid;
+  status: MappingStatus;
+  kind: MappingKind;
+  /** A transform with a rule (the ƒ chip on a one-input line). */
+  ruled: boolean;
+  /** A type problem (D-01): orange line and a "!" chip. */
+  warn: boolean;
+  /**
+   * Inputs whose source card is on this canvas, in rule order; `gone`: the column is missing from source (slice 7a);
+   * `old`: it is retired as well (slice 7b, the segment's title “Retired: historical”).
+   */
+  inputs: { columnId: Uuid; cardId: Uuid; gone?: true; old?: true }[];
+  /** How many inputs the mapping has in all; more than one draws the ƒ node (D-49). */
+  inputCount: number;
+  attributeId: Uuid;
+  /** The entity card of the attribute. */
+  cardId: Uuid;
+  /** Working labels on the mapping (“CR-23, JIRA-481”): the line's tag and tooltip (slice 3a); null without. */
+  labels: string | null;
+  /** On a live canvas, a mapping that does not carry its label: drawn faded, by colour (D-25, slice 3b). */
+  faded?: boolean;
+}
+
+export interface RelLineData {
+  id: Uuid;
+  fromCardId: Uuid;
+  toCardId: Uuid;
+  label: string | null;
+  fromMin: CardinalityMin;
+  fromMax: CardinalityMax;
+  toMin: CardinalityMin;
+  toMax: CardinalityMax;
+  /**
+   * Parallel relationships between the same two entities, and loops on one card, are drawn 20 px apart (slice 15b,
+   * R-7): two 18 px pills never overlap.
+   */
+  offset: number;
+}
+
+/** The pill's text (slice 15b, RP-D, R-7; prototype): the roles "{from} / {to}", one role alone, else the verb phrase. */
+export const pillText = (r: { label: string | null; from_role: string | null; to_role: string | null }): string | null =>
+  [r.from_role, r.to_role].map((x) => x?.trim() ?? "").filter(Boolean).join(" / ") || r.label;
+
+/** A foreign key between two source tables (slice 10b, D-62): read-only, from an import; drawn between the table cards. */
+export interface SourceLineData {
+  /** The source relationship id. */
+  id: Uuid;
+  /** The card of the table with the key; the arrow is at the other end. */
+  fromCardId: Uuid;
+  /** The card of the referenced table (the same card for a key to itself: a loop, D-61). */
+  toCardId: Uuid;
+  /** Several keys between the same two tables are drawn 16 px apart (they have no pill; slice 15b's R7 keeps 16 px). */
+  offset: number;
+  /** The source no longer declares it (`missing_since`): drawn dashed. */
+  missing?: true;
+}
+
+/**
+ * A module's line from one or more entity rows to another entity row (slice 15c, C7; InfoCube's dimensional mapping):
+ * one path per input from its row to the target's row. InfoMapper draws it from this and knows nothing of its meaning;
+ * the module's CSS styles it by `cls`. Its selection is `{ t: "ext", kind, id }`.
+ */
+export interface ModuleLineData {
+  /** The kind of object it stands for (the selection's `kind`): `cube_mapping`. */
+  kind: string;
+  id: Uuid;
+  /** Inputs whose card is on this canvas, in their order. */
+  inputs: { rowId: Uuid; cardId: Uuid }[];
+  target: { rowId: Uuid; cardId: Uuid };
+  /** Classes on the line's group, after `lnk`: `cmap draft`. */
+  cls: string;
+  /** The stroke's colour (`--lc`). */
+  colour: string;
+  /** The mark at the target's end. */
+  endMark: "diamond";
+  /** A chip on the first input's path (`ƒ`); absent: none. */
+  chip?: string;
+}
+
+export interface CanvasLines {
+  mappings: MapLineData[];
+  relationships: RelLineData[];
+  /** Relationships between source tables (slice 10b); absent: none. Code that does not know them leaves them out. */
+  sources?: SourceLineData[];
+  /** The modules' lines between entity rows (slice 15c); absent: none. Code that does not know them leaves them out. */
+  modules?: ModuleLineData[];
+}
+
+/** Mapping lines need the attribute's card and at least one input card; relationships need both entity cards. */
+export function buildLines(
+  model: WorkspaceModel,
+  cards: readonly CardData[],
+  labelNames?: LabelNames,
+  /** On a live canvas: the mappings that carry its label (the others are faded, slice 3b). */
+  liveMappings: ReadonlySet<Uuid> | null = null,
+): CanvasLines {
+  const entityCard = new Map(cards.filter((c) => c.kind === "ent").map((c) => [c.targetId, c.id]));
+  const tableCard = new Map(cards.filter((c) => c.kind === "src").map((c) => [c.targetId, c.id]));
+  const attributeById = new Map(model.attributes.map((a) => [a.id, a]));
+  const columnById = new Map(model.sourceColumns.map((c) => [c.id, c]));
+  const inputsOf = new Map<Uuid, Uuid[]>();
+  for (const i of [...model.mappingInputs].sort((a, b) => a.sort_order - b.sort_order)) {
+    inputsOf.set(i.mapping_id, [...(inputsOf.get(i.mapping_id) ?? []), i.source_column_id]);
+  }
+
+  const mappings: MapLineData[] = [];
+  for (const m of model.mappings) {
+    const attribute = attributeById.get(m.attribute_id);
+    const cardId = attribute && entityCard.get(attribute.entity_id);
+    if (!attribute || !cardId) continue;
+    const columns = (inputsOf.get(m.id) ?? []).map((id) => columnById.get(id)).filter((c) => c !== undefined);
+    const inputs = columns.flatMap((c) => {
+      const source = tableCard.get(c.source_table_id);
+      return source ? [{ columnId: c.id, cardId: source, ...(c.missing_since ? { gone: true as const } : {}), ...(c.retired_since ? { old: true as const } : {}) }] : [];
+    });
+    if (!inputs.length) continue;
+    mappings.push({
+      id: m.id,
+      status: m.status,
+      kind: m.kind,
+      ruled: m.kind === "transform" && !!m.rule_expression?.trim(),
+      warn: !checkMappingTypes(m, attribute, columns.filter((c) => !c.retired_since)).ok,
+      inputs,
+      inputCount: columns.length,
+      attributeId: attribute.id,
+      cardId,
+      labels: labelNames?.get(`mapping:${m.id}`)?.join(", ") || null,
+      ...(liveMappings && !liveMappings.has(m.id) ? { faded: true } : {}),
+    });
+  }
+
+  const pairs = new Map<string, number>();
+  /** 20 px between parallel relationships and nested loops (slice 15b, R-7); source lines keep 16 (R7). */
+  const RELATIONSHIP_GAP = 20;
+  const relationships: RelLineData[] = [];
+  for (const r of model.relationships) {
+    const from = entityCard.get(r.from_entity_id), to = entityCard.get(r.to_entity_id);
+    if (!from || !to) continue;
+    const key = [from, to].sort().join("|");
+    const n = (pairs.get(key) ?? 0) + 1;
+    pairs.set(key, n);
+    relationships.push({
+      id: r.id,
+      fromCardId: from,
+      toCardId: to,
+      // the pill: the roles, else the verb phrase (slice 15b)
+      label: pillText(r),
+      fromMin: r.from_min,
+      fromMax: r.from_max,
+      toMin: r.to_min,
+      toMax: r.to_max,
+      offset: (n - 1) * RELATIONSHIP_GAP,
+    });
+  }
+
+  // relationships between source tables (slice 10b): both table cards on the canvas; the column pairs are not read
+  const sourcePairs = new Map<string, number>();
+  const sources: SourceLineData[] = [];
+  for (const r of model.sourceRelationships) {
+    const from = tableCard.get(r.source_table_id), to = tableCard.get(r.to_source_table_id);
+    if (!from || !to) continue;
+    const key = [from, to].sort().join("|");
+    const n = (sourcePairs.get(key) ?? 0) + 1;
+    sourcePairs.set(key, n);
+    sources.push({ id: r.id, fromCardId: from, toCardId: to, offset: (n - 1) * 16, ...(r.missing_since ? { missing: true as const } : {}) });
+  }
+  return { mappings, relationships, ...(sources.length ? { sources } : {}) };
+}
+
+/** What is selected on the canvas; a hovered row or line uses the same shape (slice 1b, C-10). */
+export type Selection =
+  | { t: "card"; id: Uuid }
+  /** Two or more cards (slice 2a): their keys, see `selection.ts`. */
+  | { t: "multi"; keys: readonly SelectionKey[] }
+  | { t: "row"; cardId: Uuid; id: Uuid }
+  | { t: "map"; id: Uuid }
+  | { t: "rel"; id: Uuid }
+  /** A frame (slice 2b): its name or an empty spot inside it was clicked. */
+  | { t: "frame"; id: Uuid }
+  /** A bundle of lines at a collapsed frame (slice 2c): its key, see `bundleLines`. */
+  | { t: "bundle"; id: string }
+  /** A working label (slice 3a): its panel, opened from a label chip or the project home. Nothing on the canvas is selected. */
+  | { t: "label"; id: Uuid }
+  /** A note on the canvas (slice 3a). */
+  | { t: "note"; id: Uuid }
+  /** A requirement (slice 4a): its panel. Nothing on the canvas is selected or emphasised. */
+  | { t: "req"; id: Uuid }
+  /**
+   * An element whose card is not on this canvas (slice 4a, the go-to links' fallback): its panel only; nothing on the
+   * canvas is selected or emphasised, the view does not move. A source system (slice 7a) has no card at all: it is
+   * always this kind.
+   */
+  | { t: "element"; kind: "entity" | "attribute" | "source_table" | "source_column" | "source_system"; id: Uuid }
+  /** A module's object (slice 15c, C8, F15): a dimensional mapping's line (`kind` "cube_mapping"). */
+  | { t: "ext"; kind: string; id: Uuid }
+  | null;
+
+export interface Related {
+  maps: Set<Uuid>;
+  rels: Set<Uuid>;
+  /** The modules' lines (slice 15c); absent: none. */
+  exts?: Set<Uuid>;
+}
+
+/**
+ * The lines a selection emphasises (prototype relatedOf); every other line fades. A row: its mappings. A line: itself.
+ * A selected card fades nothing: in the prototype that belongs to Focus mode, a later slice.
+ */
+export function relatedLines(sel: Selection, lines: CanvasLines): Related | null {
+  // a bundle's lines are known to the canvas, which emphasises them itself (slice 2c)
+  if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame" || sel.t === "bundle" || sel.t === "label" || sel.t === "note" || sel.t === "req" || sel.t === "element") return null;
+  const maps = new Set<Uuid>(), rels = new Set<Uuid>(), exts = new Set<Uuid>();
+  switch (sel.t) {
+    case "map":
+      maps.add(sel.id);
+      break;
+    case "rel":
+      rels.add(sel.id);
+      break;
+    case "ext":
+      exts.add(sel.id);
+      break;
+    case "row":
+      for (const m of lines.mappings) {
+        if (m.attributeId === sel.id || m.inputs.some((i) => i.columnId === sel.id)) maps.add(m.id);
+      }
+      // a module's lines both ways (slice 15c, prototype hoverRows)
+      for (const l of lines.modules ?? []) if (l.target.rowId === sel.id || l.inputs.some((i) => i.rowId === sel.id)) exts.add(l.id);
+      break;
+  }
+  return exts.size ? { maps, rels, exts } : { maps, rels };
+}
+
+/** The rows a hover marks: the hovered row and the rows at the other end of its mappings, or a mapping's rows. */
+export function hoverRows(hover: Selection, lines: CanvasLines): { cardId: string; rowId: string }[] {
+  if (!hover || (hover.t !== "row" && hover.t !== "map" && hover.t !== "ext")) return [];
+  const out = new Map<string, { cardId: string; rowId: string }>();
+  const add = (cardId: string, rowId: string) => out.set(`${cardId}|${rowId}`, { cardId, rowId });
+  if (hover.t === "row") add(hover.cardId, hover.id);
+  if (hover.t !== "ext") {
+    for (const m of lines.mappings) {
+      const hit = hover.t === "map" ? m.id === hover.id : m.attributeId === hover.id || m.inputs.some((i) => i.columnId === hover.id);
+      if (!hit) continue;
+      add(m.cardId, m.attributeId);
+      for (const i of m.inputs) add(i.cardId, i.columnId);
+    }
+  }
+  // a module's lines (slice 15c): a row lights them both ways, a line its rows
+  if (hover.t !== "map") {
+    for (const l of lines.modules ?? []) {
+      const hit = hover.t === "ext" ? l.id === hover.id : l.target.rowId === hover.id || l.inputs.some((i) => i.rowId === hover.id);
+      if (!hit) continue;
+      add(l.target.cardId, l.target.rowId);
+      for (const i of l.inputs) add(i.cardId, i.rowId);
+    }
+  }
+  return [...out.values()];
+}
