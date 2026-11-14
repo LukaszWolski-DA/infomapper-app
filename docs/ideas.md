@@ -746,6 +746,10 @@ adapter's caches) or Turbopack's and Next.js's (the module graph, compiled pages
 heap snapshot of the child before the threshold (for example `--heapsnapshot-near-heap-limit` or the inspector on a run
 of a few folders), read by retainers.
 
+**Looked into on 13 November 2026** (chore heap findings): React's development-only async tracking in the RSC server
+keeps every rendered request, not the app's structures (`docs/known-limitations.md`, "The development server keeps every
+rendered request").
+
 ## A Latin subset of IBM Plex under another family name (chore e2e reliability, step 4)
 
 Since the chore the app hosts IBM's complete WOFF2 files, so a first visit downloads 298 KB of fonts instead of the
@@ -996,6 +1000,7 @@ notation, keep-rows, numbering, banded rows, running header, draft mark, header 
 - **Paged.js** in `next.config.ts` (the alias) and the editor's two uses of its internals: check at each Paged.js or
   Next.js upgrade (`docs/known-limitations.md`).
 - S20-01 line 67: a fixed waitForTimeout(500) after the grain is cleared; wait for what the page shows instead (A race in a test)
+- Next.js upgrade: check whether a newer Next.js (its bundled React) stops the development server from keeping every rendered request (pendingOperations); a separate upgrade decision.
 
 ## Baselines: the design agreed for their slice (11 November 2026)
 

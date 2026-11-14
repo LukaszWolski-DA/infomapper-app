@@ -364,6 +364,11 @@ versions, change events in the same write, uniqueness and the “exactly one tar
     page) or with the label `full-e2e` on the pull request (it tests the branch's head commit). A push starts none; a
     second full run for the same branch cancels the first. A run with the input `parts` (e.g. `1 7`) is for trying the
     workflow and is **not a full run** (its summary says so).
+  - **Heap peaks** (chore heap findings, 13 November 2026): a full run's heap peaks include garbage not yet collected;
+    with a forced GC, slices 20 to 26 retain 4 to 8 MB a test (the 6 MB below holds). The retained growth is React's
+    development-only async tracking in the RSC server bundled with Next.js (`pendingOperations` keeps every rendered
+    request); production builds don't have it. Add a ninth part when part 8's peak in a full run reaches about 2 GB; do
+    not hunt an app leak for that growth unless a forced-GC measurement shows more than about 8 MB a test.
   - **The single-file check:** `gh workflow run e2e.yml --ref <branch> -f files="e2e/<folder>/<spec>.ts ..." -f
     rounds=3`: `rounds` jobs side by side, each with its own fresh dev server, each running the files once (paths under
     `e2e/` only, checked before a server starts).

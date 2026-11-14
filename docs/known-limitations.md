@@ -1001,6 +1001,15 @@ any test may be that one. The run's output and trace are in `.data/e2e-failures/
   1,577 MB, at least 52 % below the threshold. A larger heap was ruled out: the laptop already pages at a 2 GB heap.
   Why the heap grows is not looked into (`docs/ideas.md`).
 
+### The development server keeps every rendered request (looked into on 13 November 2026)
+
+With a forced GC after each test, slices 20 to 26 retain 4 to 8 MB a test on the e2e dev server (a full run's heap
+peaks also hold garbage not yet collected); the retained part is React's development-only async tracking in the RSC
+server bundled with Next.js 16.4.3 (`pendingOperations` in `react-server-dom-turbopack-server.node.development.js`),
+which keeps every rendered request with its debug info, not the app's code. Production builds don't have it, but a
+long `npm run dev` session grows the same way, about 1 MB a page view, until Next.js restarts its server at its memory
+threshold (`docs/ideas.md`, "Next.js upgrade").
+
 ### S4B2-06 flaked again after its fix (slice 10b)
 
 In slice 10b's closing full run (30 October 2026), S4B2-06 (`e2e/slice-04b2/S4B2-06.spec.ts`) failed once more under
