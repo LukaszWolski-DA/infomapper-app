@@ -718,3 +718,86 @@ this workspace." (a figure's canvas or frame of another workspace, or none).
 14. **Q3 (Auto):** the threshold stays 1,000 ms.
 
 The measuring files (`scripts/s27-measure/`) stay uncommitted until the closing.
+
+## Step 2: a figure (14 November 2026)
+
+### What was built
+
+- **The move (F1).** The canvas's pure drawing rules moved to `src/domain/canvas/`: `card-data.ts`, `geometry.ts`,
+  `text-fit.ts`, `line-data.ts`, `line-geometry.ts` (its geometry; React Flow's lookups stay in `src/canvas/line-geometry.ts`
+  as wrappers), `frame-data.ts`, `requirement-card-data.ts`, `trace-data.ts`, with the types `EntityRole`, `RowFeed`
+  (`module-marks.ts`) and `SelectionKey` (`selection-key.ts`). InfoCube's `cubeLines` moved to its domain part. The
+  canvas's files re-export them: no caller changed. `src/domain/canvas` is imported as `@/domain/canvas/…` (a relative
+  `../canvas` is refused by the layer rule, `eslint.config.mjs`'s note); `tests/layer-rules.test.ts` has a probe.
+- **The snapshot (F2).** `WorkspaceSnapshot` has the live canvases, frames, labels and label links (`workspaceSnapshotOf`,
+  so the local adapter's `snapshot` too); never notes. Measured on the editor's snapshot as the browser receives it
+  (`browserSnapshot`, JSON; reference figures, `scripts/s27-measure/snapshot-size.ts`):
+
+  | Data set | Before | After | Added | Canvases | Frames | Labels | Label links |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Performance test | 2,190.3 KB | 2,251.3 KB | +61.0 KB (+2.8 %) | 3 (1.4 KB) | 27 (14.0 KB) | 5 (1.7 KB) | 90 (43.9 KB) |
+  | Demo (Retail Co – DWH, full) | 186.6 KB | 191.7 KB | +5.0 KB (+2.7 %) | 3 (1.4 KB) | 0 | 2 (0.7 KB) | 6 (2.9 KB) |
+
+  People: still id and name only (`email` blank, `last_seen_at` null, no member rows); no person's e-mail anywhere in
+  either snapshot. The new rows carry people only as ids (`created_by`, `updated_by`), as every other row does.
+- **The figure** (`src/domain/document/figure.ts`, pure): the canvas's cards from `buildCards` (names or aliases as the
+  canvas shows them), its frames (collapsed ones as blocks, their lines bundled by `bundleLines`), relationships with
+  crow's foot or UML ends and their pills, mappings (`mapGeom`: the ƒ node, chips, status dashes), source keys,
+  InfoCube's dimensional mappings (through `DocumentContributions.figures`, AD-33) and the requirement cards with their
+  trace lines (D2), in the prototype's figure palette (`PAL`; black and white, F5). As on the canvas follows its hidden
+  relationship kinds, not the layer switch (D6); Adjusted takes the rows, the line kinds ("Dimensional" while the level
+  is drawn, D7) and the status marks; out of scope is left out (D3); no notes or label marks (C4). Words on a figure in
+  the document's language (D11). Every model text escaped.
+- **The page** (`src/domain/document/page.ts`): the papers and margins (18 mm, 20 mm at the bottom; the documents' CSS
+  reads them from here now), the figure's box, the six sizes and three orientations, the turn of "as large as fits", the
+  parts with their 16 px overlap, the editor's line (the prototype's `sumFig`; D4 as the prototype).
+- **The content tree** (`content.ts`): the kind `figure` (`DocFigure`: its SVG, faces, parts, words, the editor's line),
+  numbered in document order by `buildDocument` (F6), which also lists `figures` (number, caption, anchor, the editor's
+  line); a paragraph may be a `placeholder`. Shared node builder: `figure-node.ts` (`figureNodes`, `figureName`).
+- **In the pages and the quick sheet** (`document-html.tsx`, `ui/figure-images.ts`, `app/figure-fonts.ts`): each figure's
+  SVG once in a hidden holder; in the browser it becomes one blob URL with IBM Plex's unmodified files embedded for the
+  faces it uses (Q2), and each part's `<img>` shows its region (`#svgView(viewBox(…))`, Q3). The holders are taken out of
+  the copy Paged.js lays out; the pages count as done once their images are decoded (print waits for them). The fonts are
+  fetched once per page by their bundled URLs (`new URL(…, import.meta.url)`), so nothing new is served.
+- **The Figure section** (`figure`, after Model overview in "+ Add section"): its figures, or "Add a figure in the panel
+  on the right." in a dashed box; a new one starts on the same page (F7, `DocumentSectionKind.samePage`); heading
+  "Figures" / "Rysunki" / "Abbildungen". The figure editor (`app/figure-editor.tsx`): In the document, Move up, Move down,
+  Remove, the view, size, orientation, rows, line kinds, status marks, the caption (its draft kept, D-66), the line,
+  "Canvas or frame to add" (the projects' canvases in tab order, then the rest, each followed by its frames) and "Add
+  figure"; the whole list saved as one choice.
+- **The recipe (F8).** A figure: `{ id, on, canvasId, frameId, view, rows, lines, status, size, orientation, caption }`,
+  each with the prototype's default (`FIG0`), at most 50 per section ("A section holds at most 50 figures."). A figure
+  added, or changed to another canvas or frame, must be of this workspace ("That canvas is not in this workspace."; the
+  action reads the canvases and frames only for a save of figures). The style's `listOfFigures` (off) and `smallestPt`
+  (6) read with their defaults through `upgradeDocument`; no file format. The list of figures and the style's two
+  controls are drawn in step 3.
+- **The side panels** (item 6, Q7): `app/panel-handles.tsx` and `ui/panels-cookie.ts`: drag, ←/→ 16 px, Shift 64 px,
+  Home and a double-click to the default, bounds 200–480 and 280–560; a separator with `aria-valuenow`, `-valuemin`,
+  `-valuemax` and `aria-controls`; the widths in the cookie `im-doc-panels.{user}` (`250.330`), which the editor's page
+  reads, so the first paint has them; written to the element during a drag (no render per move); hidden up to 1,100 px.
+
+### Assumed (say if not)
+
+- A figure's caption is not drawn into the preview while it is typed (the Heading and Text are): the preview follows
+  when the caption is saved.
+- A frame's figure draws no requirement cards (the prototype's; only a whole canvas "As on the canvas" does).
+- The editor's reference figures with figures (S26-10, F9) are measured in step 3, with Diagrams' figures in the presets.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`, `npm test` (2,248 tests, 180 files) pass. New unit tests:
+  `tests/document-figures.test.ts`, `src/domain/document/page.test.ts`, `tests/document-figure-html.test.ts`.
+- Slice 27's specs: S27-01, S27-02 (2 tests), S27-07, S27-08 (2 tests) pass locally.
+- Slices 25 and 26: 46 passed, 8 skipped (the measuring specs). The thumbnails' and the moved code's canvas specs
+  (slices 1a, 1b, 2c, 4b-2, 10a, 10b, 12b): 141 passed.
+- **The element guard** on the measurement build (`S3B-15-elements` against `slice-08.json`): viewport 4,508 / 19,305 /
+  1,465 / 4,907, page totals 6,137 / 20,934 / 3,004 / 6,446: slice 26's counts exactly.
+- **The full run** (the move changes the canvas's layers; the snapshot the local adapter): workflow "E2E" run
+  43647381268 on `703ef4a`, 12 min 25 s wall-clock: 793 passed, 0 failed, 0 flaky, 12 skipped, no expected failures.
+
+  | Part | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Time | 8.6 min | 8.9 min | 10.5 min | 7.8 min | 9.3 min | 8.2 min | 8.3 min | 9.6 min |
+  | Heap peak | 1,365 MB | 1,419 MB | 927 MB | 1,214 MB | 1,521 MB | 1,277 MB | 1,433 MB | 1,258 MB |
+
+  No server restarted (the runner's threshold is 6,431 MB).
