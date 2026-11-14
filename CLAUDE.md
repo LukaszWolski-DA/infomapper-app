@@ -870,8 +870,9 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   run-to-run spread (up to 12 ms in slice 6a) is larger than what is measured.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - **The full run in eight parts** (chore e2e reliability, P2 B; seven since chore CI e2e; eight since chore e2e eight
-  parts): `npm run e2e` (`scripts/e2e.ts`) runs the folders in eight parts (`e2e/parts.ts`, `PART_STARTS`: from
-  `slice-02a`, `slice-03b`, `slice-04p`, `slice-07b`, `slice-10a`, `slice-13`, `slice-15d`; `tests/e2e-parts.test.ts`),
+  parts; recut by chore recut e2e parts): `npm run e2e` (`scripts/e2e.ts`) runs the folders in eight parts
+  (`e2e/parts.ts`, `PART_STARTS`: from `slice-02b`, `slice-04b1`, `slice-07a`, `slice-08`, `slice-11`, `slice-15a`,
+  `slice-20`; `tests/e2e-parts.test.ts`),
   each with its own fresh dev server, one
   after another locally and side by side in CI, and merges their blob reports into one result (`playwright-report/`);
   failure traces and the server's output (`server.log`, `scripts/e2e-server.ts`) are in `test-results/part-<n>/`.

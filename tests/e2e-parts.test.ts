@@ -3,29 +3,30 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { PART_COUNT, PART_STARTS, listedFiles, partFolders } from "../e2e/parts";
 
-// The full e2e run's parts (slice 14b, item 1, F18; seven since chore CI e2e; eight since chore e2e eight parts): every
+// The full e2e run's parts (slice 14b, item 1, F18; seven since chore CI e2e; eight since chore e2e eight parts; recut by
+// chore recut e2e parts): every
 // folder runs in exactly one part, in Playwright's order; `npm run e2e -- --list` lists each part's files as its run
 // finds them, the same files as one plain list of the whole e2e folder, and GitHub Actions runs exactly those (CI-02).
-const FOLDERS = ["fixes", "measure", "slice-00", "slice-01b", "slice-02a", "slice-03a", "slice-03b", "slice-04b2", "slice-04p", "slice-07a", "slice-07b", "slice-09", "slice-10a", "slice-12b", "slice-13", "slice-15c", "slice-15d", "slice-20"];
+const FOLDERS = ["fixes", "measure", "slice-00", "slice-02a", "slice-02b", "slice-04a", "slice-04b1", "slice-06b", "slice-07a", "slice-07c", "slice-08", "slice-10c", "slice-11", "slice-14b", "slice-15a", "slice-19", "slice-20", "slice-26"];
 
 describe("e2e parts", () => {
   it("has eight parts", () => {
     expect(PART_COUNT).toBe(8);
-    expect(PART_STARTS).toEqual(["slice-02a", "slice-03b", "slice-04p", "slice-07b", "slice-10a", "slice-13", "slice-15d"]);
+    expect(PART_STARTS).toEqual(["slice-02b", "slice-04b1", "slice-07a", "slice-08", "slice-11", "slice-15a", "slice-20"]);
   });
 
   it("puts every folder in exactly one part, in order", () => {
     const parts = Array.from({ length: PART_COUNT }, (_, i) => partFolders(i + 1, FOLDERS));
     expect(parts.flat()).toEqual(FOLDERS);
     expect(parts).toEqual([
-      ["fixes", "measure", "slice-00", "slice-01b"],
-      ["slice-02a", "slice-03a"],
-      ["slice-03b", "slice-04b2"],
-      ["slice-04p", "slice-07a"],
-      ["slice-07b", "slice-09"],
-      ["slice-10a", "slice-12b"],
-      ["slice-13", "slice-15c"],
-      ["slice-15d", "slice-20"],
+      ["fixes", "measure", "slice-00", "slice-02a"],
+      ["slice-02b", "slice-04a"],
+      ["slice-04b1", "slice-06b"],
+      ["slice-07a", "slice-07c"],
+      ["slice-08", "slice-10c"],
+      ["slice-11", "slice-14b"],
+      ["slice-15a", "slice-19"],
+      ["slice-20", "slice-26"],
     ]);
   });
 

@@ -989,11 +989,13 @@ notation, keep-rows, numbering, banded rows, running header, draft mark, header 
 - **The model checks' texts in Polish and German** (about 40 texts in the core, `CHECK_TEXTS` and the rules' `text()`,
   and InfoCube's checks), with the German words' review; until then a Polish or German document prints them in English
   (slice 26, D3).
-- **Part 8 of the full run:** its heap peaked at 2,088 MB in slice 26 (past CLAUDE.md's 2 GB); recut `PART_STARTS` on a
-  `chore/` branch after slice 26's merge.
+- **Part 8 of the full run:** its heap peaked at 2,088 MB in slice 26 (past CLAUDE.md's 2 GB); recut on
+  `chore/recut-e2e-parts` (`PART_STARTS`: `slice-02b`, `slice-04b1`, `slice-07a`, `slice-08`, `slice-11`, `slice-15a`,
+  `slice-20`), by the median folder times of the full runs 43496089437, 43485073406 and 43481776730.
 - **KB to format 17:** only on Łukasz's command, after the backup; then a dictionary of Kanton Basel.
 - **Paged.js** in `next.config.ts` (the alias) and the editor's two uses of its internals: check at each Paged.js or
   Next.js upgrade (`docs/known-limitations.md`).
+- S20-01 line 67: a fixed waitForTimeout(500) after the grain is cleared; wait for what the page shows instead (A race in a test)
 
 ## Baselines: the design agreed for their slice (11 November 2026)
 
