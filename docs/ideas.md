@@ -995,6 +995,7 @@ notation, keep-rows, numbering, banded rows, running header, draft mark, header 
 - **KB to format 17:** only on Łukasz's command, after the backup; then a dictionary of Kanton Basel.
 - **Paged.js** in `next.config.ts` (the alias) and the editor's two uses of its internals: check at each Paged.js or
   Next.js upgrade (`docs/known-limitations.md`).
+- S20-01 line 67: a fixed waitForTimeout(500) after the grain is cleared; wait for what the page shows instead (A race in a test)
 
 ## Baselines: the design agreed for their slice (11 November 2026)
 
