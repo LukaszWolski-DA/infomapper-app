@@ -107,6 +107,20 @@ export function createDocument(ctx: CommandContext, access: WorkspaceAccess, inp
 
 // ---- save ----
 
+/** Slice 27: a figure's canvas or frame of another workspace, or none. */
+export const FIGURE_CANVAS_REFUSAL = "That canvas is not in this workspace.";
+
+type FigureRef = { id: string; canvasId: string; frameId: string | null };
+const figuresOf = (options: Record<string, unknown>): FigureRef[] => (Array.isArray(options.figures) ? (options.figures as FigureRef[]) : []);
+/** The figures of a section's new options that are new, or show another canvas or frame than they did. */
+function figuresAdded(before: Record<string, unknown>, after: Record<string, unknown>): FigureRef[] {
+  const was = new Map(figuresOf(before).map((f) => [f.id, f]));
+  return figuresOf(after).filter((f) => {
+    const old = was.get(f.id);
+    return !old || old.canvasId !== f.canvasId || old.frameId !== f.frameId;
+  });
+}
+
 const updateInput = z
   .object({
     ...of,
@@ -134,6 +148,8 @@ export function updateDocument(
   doc: DocumentDefinition | null | undefined,
   input: unknown,
   kinds: Kinds,
+  /** Slice 27: the workspace's canvases and their frames; a figure added in this save must show one of them. */
+  canvases?: { readonly canvasIds: ReadonlySet<string>; readonly frameCanvas: ReadonlyMap<string, string> },
 ): CommandResult<{ document: DocumentDefinition }> {
   const refused = editRefusal(access, doc);
   if (refused) return fail(refused);
@@ -162,6 +178,9 @@ export function updateDocument(
       const refusal = sectionOptionsRefusal(kinds, { id: section.id, type: section.type, options: merged });
       if (refusal) return fail(refusal);
       options = kind!.options.parse(merged);
+      const added = figuresAdded(section.options, options);
+      if (added.some((f) => !canvases?.canvasIds.has(f.canvasId) || (f.frameId !== null && canvases.frameCanvas.get(f.frameId) !== f.canvasId)))
+        return fail(domainError("invalid", FIGURE_CANVAS_REFUSAL, { [`sections.${section.id}`]: "invalid" }));
     }
     const next = {
       ...section,
@@ -220,7 +239,7 @@ export function addDocumentSection(
     if (!kind) return domainError("invalid", SECTION_TEXTS.notInstalled);
     if (!kind.available(access.workspace)) return domainError("invalid", SECTION_TEXTS.off(kind.module ?? "Its module"));
     if (sections.length >= SECTIONS_MAX) return domainError("invalid", SECTION_TEXTS.tooMany);
-    return [...sections, newSection(id, kind.type, kind.defaults())];
+    return [...sections, newSection(id, kind.type, kind.defaults(), !kind.samePage)];
   });
   return r.ok ? { ...r, value: { ...r.value, sectionId: id } } : r;
 }

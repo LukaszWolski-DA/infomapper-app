@@ -11,14 +11,10 @@
 import type { DocumentFrame } from "../domain/document";
 import type { DocumentStyle } from "../domain/types";
 
-/** The papers in millimetres, portrait (the prototype's `PAPER`). */
-export const PAPER_MM: Readonly<Record<DocumentStyle["paper"], readonly [number, number]>> = { A4: [210, 297], A3: [297, 420] };
-
-/** A style's page in millimetres: its paper, turned for landscape. */
-export function pageSize(style: Pick<DocumentStyle, "paper" | "orientation">): { w: number; h: number } {
-  const [w, h] = PAPER_MM[style.paper];
-  return style.orientation === "landscape" ? { w: h, h: w } : { w, h };
-}
+// the papers, the page and the margins are InfoMapper's page geometry since slice 27 (Q1: the figures and the canvas's
+// outline of pages read it too)
+export { PAPER_MM, pageSize, PAGE_MARGIN_MM } from "@/domain/document/page";
+import { PAGE_BOTTOM_MM, PAGE_MARGIN_MM, pageSize } from "@/domain/document/page";
 
 /** The accent colours (the prototype's `ACC`); black and white overrides them. */
 export const ACCENT_COLOURS: Readonly<Record<DocumentStyle["accent"], string>> = { indigo: "#3346C4", teal: "#0B7A66", graphite: "#33404F", burgundy: "#8A2F3C" };
@@ -37,9 +33,6 @@ type LookStyle = typeof PLAIN;
 
 /** A CSS string literal: quotes, backslashes and line breaks escaped, so a name ends nowhere but at its own quote. */
 export const cssString = (text: string): string => `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n\f]+/g, " ")}"`;
-
-/** The page's margin in millimetres (the prototype's `MARG`). */
-export const PAGE_MARGIN_MM = 18;
 
 /**
  * A frame field as a CSS `content` value (slice 26): its text parts as escaped strings, `{page}` and `{pages}` as the
@@ -62,7 +55,7 @@ export function pageCss(frame: DocumentFrame, style: Pick<DocumentStyle, "paper"
   const margin = "font-family:var(--font-plex-sans),sans-serif;font-size:7.5pt;color:#7C8794;";
   const { h } = pageSize(style);
   return `
-@page{size:${style.paper} ${style.orientation};margin:${PAGE_MARGIN_MM}mm ${PAGE_MARGIN_MM}mm 20mm ${PAGE_MARGIN_MM}mm;
+@page{size:${style.paper} ${style.orientation};margin:${PAGE_MARGIN_MM}mm ${PAGE_MARGIN_MM}mm ${PAGE_BOTTOM_MM}mm ${PAGE_MARGIN_MM}mm;
 @top-left{content:${frameContent(frame.headerLeft)};${margin}vertical-align:bottom;padding-bottom:3mm;white-space:nowrap}
 @top-center{content:${frameContent(frame.watermark)};${margin}color:${style.colours === "mono" ? "#111111" : "#B23A0B"};font-weight:600;vertical-align:bottom;padding-bottom:3mm}
 @top-right{content:${frameContent(frame.headerRight)};${margin}vertical-align:bottom;padding-bottom:3mm;text-align:right}
@@ -146,6 +139,16 @@ export const DOCUMENT_LOOK_CSS = `
 .dwarn{color:#B23A0B}
 .dmono{font-family:var(--font-plex-mono),monospace;font-size:.94em}
 .dnote{color:var(--dink3);font-style:italic;border:1px dashed var(--dline);padding:3mm;border-radius:1.5mm}
+/* slice 27: figures (the prototype's .dfig, .dtile, .drot, .drotw, .dimg, .dph) */
+.dfig{margin:2mm 0 5mm;break-inside:avoid}
+.dfig figcaption{font-size:8.5pt;color:var(--dink2);margin-top:1.5mm}
+.dfig img.dimg{display:block;max-width:none}
+.dfig.dtile img.dimg{outline:.4px dashed var(--dline)}
+.drotw{overflow:hidden;position:relative}
+.drotw img{display:block;max-width:none!important}
+.dfig.drot figcaption{margin-top:2mm}
+.dfig-src{display:none!important}
+.dph{border:1px dashed var(--dline);padding:4mm;border-radius:1.5mm}
 table.dt{width:100%;border-collapse:collapse;font-size:8.5pt;margin:1mm 0 3mm}
 table.dt th{text-align:left;font-weight:600;color:var(--dink2);border-bottom:1.2px solid var(--dink2);padding:1.2mm 2mm 1.2mm 0;vertical-align:bottom}
 table.dt td{border-bottom:.6px solid var(--dline);padding:1.2mm 2mm 1.2mm 0;vertical-align:top}

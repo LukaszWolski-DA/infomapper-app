@@ -7,6 +7,7 @@
 // state is built here too, with those feeds, so InfoDocumenter never names a module or its tables.
 
 import { sectionKinds, type DocumentSectionKind, type DocumentSectionType } from "@/domain/document/sections";
+import { NO_FIGURE_CONTRIBUTIONS } from "@/domain/document/figure";
 import { documentStateOf, type DocumentContributions, type DocumentState } from "@/domain/document/state";
 import type { CheckInput } from "@/domain/model/checks";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
@@ -18,6 +19,7 @@ import {
   cubeCheckRowsOf,
   cubeDocumentFeeds,
   cubeDocumentRoles,
+  cubeFigureContributions,
   type CubeSectionTable,
 } from "@/modules/infocube/domain/document-section";
 import { cubeModuleChecks } from "./checks";
@@ -51,6 +53,8 @@ export function documentStateFor(snapshot: WorkspaceSnapshot<ModuleTable>): Docu
     dimensionalOn: on,
     entityRole: on ? cubeDocumentRoles(cube) : () => null,
     moduleChecks: (input: CheckInput) => cubeModuleChecks(on, on ? cubeCheckRowsOf(cube) : null, input),
+    // slice 27: InfoCube's roles, feeds and lines on figures, while it is on
+    figures: on ? cubeFigureContributions(cube) : NO_FIGURE_CONTRIBUTIONS,
   };
   return documentStateOf(snapshot, cubeDocumentFeeds(snapshot as WorkspaceSnapshot<(typeof CUBE_FEED_TABLES)[number]>), modules);
 }

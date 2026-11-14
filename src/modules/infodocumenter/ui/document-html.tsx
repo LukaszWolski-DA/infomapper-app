@@ -4,7 +4,7 @@
 // are the prototype's `DOC` ones (`document-css.ts`).
 
 import type { CSSProperties, ReactNode } from "react";
-import type { DocNode, DocRow, DocRun, DocRuns } from "@/domain/document/content";
+import type { DocFigure, DocNode, DocRow, DocRun, DocRuns } from "@/domain/document/content";
 import type { DocumentTree } from "../domain/document";
 import { frameQuickText } from "./document-css";
 
@@ -263,10 +263,12 @@ function Node({ node }: { node: DocNode }) {
       );
     case "paragraph":
       return (
-        <p>
+        <p className={node.placeholder ? "dmuted dph" : undefined}>
           <Runs runs={node.runs} />
         </p>
       );
+    case "figure":
+      return <Figure figure={node.figure} />;
     case "meta":
       return (
         <div className="dmeta">
@@ -285,6 +287,54 @@ function Node({ node }: { node: DocNode }) {
     case "pageBreak":
       return <div className="dpb" />;
   }
+}
+
+const mm = (v: number) => `${v.toFixed(1)}mm`;
+
+/**
+ * A figure (slice 27, F3, F10): its SVG once, in a hidden holder the page turns into one image source (`figure-images.ts`:
+ * a blob with IBM Plex embedded, Q2), and one `<img>` per part showing its own region of it; turned, the image is
+ * rotated inside a wrapper of the turned size. The SVG goes in as an attribute React escapes; the builder escaped its
+ * texts. "Figure {n}[{a}]. {caption}" under each part, "(part {i} of {n})" when cut; the first part has the anchor.
+ */
+function Figure({ figure: f }: { figure: DocFigure }) {
+  const n = f.parts.length;
+  return (
+    <>
+      <span hidden className="dfig-src" data-fig-src={f.key} data-svg={f.svg} data-faces={f.faces.join(" ")} />
+      {f.parts.map((p, i) => {
+        const view = n > 1 ? `${p.x},${p.y},${p.w},${p.h}` : undefined;
+        const img = (
+          // a figure is an SVG drawn for the document (its source set in the browser, `figure-images.ts`), never a photo to optimise
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            className="dimg"
+            alt={f.caption}
+            data-fig={f.key}
+            data-view={view}
+            data-testid="figure-image"
+            style={{ width: mm(p.wmm), height: mm(p.hmm), ...(f.rot ? { transform: `translateY(${mm(p.wmm)}) rotate(-90deg)`, transformOrigin: "0 0" } : {}) }}
+          />
+        );
+        return (
+          <figure key={i} className={`dfig${n > 1 ? " dtile" : ""}${f.rot ? " drot" : ""}`} id={i === 0 && f.number ? `fg-${f.number}` : undefined} data-testid="figure" data-figure={f.entryId}>
+            {f.rot ? (
+              <div className="drotw" style={{ width: mm(p.hmm), height: mm(p.wmm) }}>
+                {img}
+              </div>
+            ) : (
+              img
+            )}
+            <figcaption>
+              {f.word} {f.number || ""}
+              {n > 1 ? String.fromCharCode(97 + (i % 26)) : ""}. {f.caption}
+              {n > 1 && <span className="dmuted"> ({f.partTexts[i]})</span>}
+            </figcaption>
+          </figure>
+        );
+      })}
+    </>
+  );
 }
 
 export function Nodes({ nodes }: { nodes: readonly DocNode[] }) {

@@ -22,6 +22,8 @@ import { buildDocument } from "../domain/document";
 import { documentRights } from "../domain/rights";
 import type { DocumentDefinition } from "../domain/types";
 import { DocumentHtml } from "../ui/document-html";
+import { docPanelsCookieName, parseDocPanelsCookie } from "../ui/panels-cookie";
+import { cookies } from "next/headers";
 import { documentCss } from "../ui/document-css";
 import { areTestHooksOn } from "@/data/local/measure-mode";
 import { DocumentEditor, type EditorSectionType } from "./editor";
@@ -108,6 +110,8 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
           concepts={model.concepts.map((c) => ({ id: c.id, name: c.name }))}
           date={today()}
           testHooks={areTestHooksOn()}
+          userId={shell.user.id}
+          panels={parseDocPanelsCookie((await cookies()).get(docPanelsCookieName(shell.user.id))?.value)}
           dimensional={dimensionalLevelOn(access.workspace)}
           workspaceLanguage={access.workspace.doc_language}
           optionContext={{ dataVault: access.workspace.dv2_mode, hasNaming: !!access.workspace.naming_conventions?.trim(), classifications }}

@@ -186,8 +186,8 @@ describe("one snapshot of a workspace (F1)", () => {
 });
 
 describe("the registered section kinds (F8)", () => {
-  it("joins InfoDocumenter's sections and InfoCube's two, once each (slice 26: every section without figures)", () => {
-    expect([...DOCUMENT_SECTION_KINDS.keys()]).toEqual(["text", "overview", "dict", "s2t", "sources", "classreg", "reqs", "ready", "conv", "trace", "dq", CUBE_SECTION_TYPE, "cube.bus"]);
+  it("joins InfoDocumenter's sections and InfoCube's two, once each (slice 26: every section without figures; slice 27: Figure)", () => {
+    expect([...DOCUMENT_SECTION_KINDS.keys()]).toEqual(["text", "overview", "figure", "dict", "s2t", "sources", "classreg", "reqs", "ready", "conv", "trace", "dq", CUBE_SECTION_TYPE, "cube.bus"]);
     const cube = DOCUMENT_SECTION_KINDS.get(CUBE_SECTION_TYPE)!;
     expect(cube.presets).toEqual(["s2t"]);
     expect(cube.options.safeParse(cube.defaults()).success).toBe(true);

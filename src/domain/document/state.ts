@@ -8,6 +8,7 @@
 // (CLAUDE.md, slice 15d).
 
 import type { Uuid } from "../ids";
+import { NO_FIGURE_CONTRIBUTIONS, type FigureContributions } from "./figure";
 import type { CheckInput, ModuleChecks } from "../model/checks";
 import { classificationIndex, type ClassificationIndex } from "../model/classifications";
 import { countsAsMapped, derivationIndex, type DerivationIndex } from "../model/derivations";
@@ -28,10 +29,12 @@ export interface DocumentContributions {
   readonly entityRole: (entityId: Uuid, language: DocLanguage) => string | null;
   /** The modules' model checks (D-75) for an input, as the project home reads them. */
   readonly moduleChecks: (input: CheckInput) => ModuleChecks[];
+  /** Slice 27: what the modules draw on a figure: roles, rows' feeds, their lines. */
+  readonly figures: FigureContributions;
 }
 
-/** No module: no dimensional level, no role, no checks. */
-export const NO_CONTRIBUTIONS: DocumentContributions = { dimensionalOn: false, entityRole: () => null, moduleChecks: () => [] };
+/** No module: no dimensional level, no role, no checks, nothing on figures. */
+export const NO_CONTRIBUTIONS: DocumentContributions = { dimensionalOn: false, entityRole: () => null, moduleChecks: () => [], figures: NO_FIGURE_CONTRIBUTIONS };
 
 export interface DocumentState<T extends ModuleTable = ModuleTable> {
   readonly snapshot: WorkspaceSnapshot<T>;

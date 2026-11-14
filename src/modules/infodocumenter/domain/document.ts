@@ -65,6 +65,8 @@ export interface DocumentTree {
     readonly rows: readonly DocumentCoverRow[];
   };
   readonly contents: { readonly heading: string; readonly entries: readonly { readonly anchor: string; readonly text: string; readonly number: string | null }[] };
+  /** Slice 27: every figure in document order, for the list of figures (D10) and the editor's lines (F15). */
+  readonly figures: readonly DocumentFigureEntry[];
   /** The running header and footer (D3; slice 26's fields), the watermark on every page but the title page (D2). */
   readonly frame: DocumentFrame;
   /** The style the pages are laid out with (slice 26; its CSS comes with step 4). */
@@ -95,6 +97,8 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
   const author = snapshot.people.find((p) => p.id === definition.author_id)?.display_name ?? "";
   const modelState = t("live", { d: date });
 
+  const st = definition.style;
+  const page = { paper: st.paper, orientation: st.orientation, smallestPt: st.smallestPt, mono: st.colours === "mono" };
   const sections: DocumentTreeSection[] = [];
   const skipped: { id: Uuid; type: string; text: string }[] = [];
   for (const s of definition.sections) {
@@ -111,11 +115,15 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
     const heading = s.heading?.trim() || type.label(language);
     // the Compact template runs sections on (the prototype's)
     const newPage = s.newPage && definition.style.template !== "compact";
-    const nodes = type.build({ state, scope, options: s.options, language, notation: definition.style.notation, keepRows: definition.style.keepRows });
+    const nodes = type.build({ state, scope, options: s.options, language, notation: definition.style.notation, keepRows: definition.style.keepRows, page });
     const number = definition.style.numbers ? String(sections.length + 1) : null;
     sections.push({ id: s.id, type: s.type, anchor: `ds-${s.id}`, heading, newPage, number, nodes: number ? numbered(nodes, number) : nodes });
   }
 
+  // slice 27 (F6): the figures numbered in document order, whatever section drew them
+  const figures: DocumentFigureEntry[] = [];
+  const numberedSections = sections.map((sec) => ({ ...sec, nodes: numberFigures(sec.nodes, figures) }));
+  sections.splice(0, sections.length, ...numberedSections);
   return {
     language,
     cover: {
@@ -132,6 +140,7 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
       ],
     },
     contents: { heading: t("toc"), entries: sections.map((s) => ({ anchor: s.anchor, text: s.heading, number: s.number })) },
+    figures,
     frame: frameOf(definition.style, {
       org: organization,
       title,
@@ -163,6 +172,28 @@ function frameOf(style: DocumentStyle, values: Readonly<Record<string, string>>,
     footerRight: field(style.footer.right, FRAME_DEFAULTS.footerRight),
     watermark: style.watermark ? watermark : "",
   };
+}
+
+/** A figure as the list of figures and the editor read it: its number, caption, anchor, section and editor's line. */
+export interface DocumentFigureEntry {
+  readonly number: number;
+  readonly caption: string;
+  readonly anchor: string;
+  readonly key: string;
+  readonly entryId: string;
+  readonly summary: string;
+}
+
+/** The figures of a section's nodes numbered after those before (groups too), each listed once. */
+function numberFigures(nodes: readonly DocNode[], out: DocumentFigureEntry[]): DocNode[] {
+  return nodes.map((x): DocNode => {
+    if (x.kind === "group") return { ...x, nodes: numberFigures(x.nodes, out) };
+    if (x.kind !== "figure") return x;
+    const number = out.length + 1;
+    const f = x.figure;
+    out.push({ number, caption: f.caption, anchor: `fg-${number}`, key: f.key, entryId: f.entryId, summary: f.summary });
+    return { kind: "figure", figure: { ...f, number } };
+  });
 }
 
 /** A section's subsections (its level-2 headings, in groups too) numbered "{n}.1", "{n}.2" (the prototype's `h3.dh3`). */

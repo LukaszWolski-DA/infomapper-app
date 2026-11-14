@@ -67,8 +67,13 @@ export async function createDocumentAction(input: CreateDocumentInput): Promise<
 
 /** One field of the form (the name, the audience, a title page field, a scope part, a section's switch or options). */
 export async function updateDocumentAction(input: UpdateDocumentInput): Promise<ActionResult<Saved>> {
-  return documentCommand(input, (access, doc, _store, ctx) => {
-    const r = updateDocument(ctx, access, doc, input, DOCUMENT_SECTION_KINDS);
+  return documentCommand(input, async (access, doc, store, ctx) => {
+    // slice 27: a figure added must show a canvas (or a frame of it) of this workspace; read only for a figures' save
+    const options = (input as { section?: { options?: unknown } } | null)?.section?.options;
+    const figures = typeof options === "object" && options !== null && "figures" in options;
+    const [canvasRows, frameRows] = figures ? await Promise.all([store.canvases.list(access.workspace.id), store.frames.list(access.workspace.id)]) : [[], []];
+    const canvases = { canvasIds: new Set<string>(canvasRows.map((c) => c.id)), frameCanvas: new Map<string, string>(frameRows.map((f) => [f.id, f.canvas_id])) };
+    const r = updateDocument(ctx, access, doc, input, DOCUMENT_SECTION_KINDS, canvases);
     return r.ok ? { ...r, value: { version: r.value.document.version } } : r;
   });
 }

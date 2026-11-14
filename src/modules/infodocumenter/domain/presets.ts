@@ -74,7 +74,7 @@ export const PRESETS: readonly Preset[] = [
 ];
 
 /** A new section entry: on, the type's default heading, on a new page (slice 26, F10). */
-export const newSection = (id: Uuid, type: string, options: Record<string, unknown>): DocumentSection => ({ id, type, on: true, heading: null, newPage: true, options });
+export const newSection = (id: Uuid, type: string, options: Record<string, unknown>, newPage = true): DocumentSection => ({ id, type, on: true, heading: null, newPage, options });
 
 export const presetOf = (code: DocumentPreset): Preset => PRESETS.find((p) => p.code === code)!;
 
@@ -87,8 +87,8 @@ export function presetSections(preset: Preset, kinds: Iterable<DocumentSectionKi
   const all = [...kinds];
   const byType = new Map(all.map((k) => [k.type, k]));
   return preset.sections.flatMap((s) => {
-    if ("modules" in s) return all.filter((k) => k.presets.includes(preset.code) && k.available(workspace)).map((k) => newSection(newId(), k.type, k.defaults()));
+    if ("modules" in s) return all.filter((k) => k.presets.includes(preset.code) && k.available(workspace)).map((k) => newSection(newId(), k.type, k.defaults(), !k.samePage));
     const kind = byType.get(s.type);
-    return [newSection(newId(), s.type, { ...(kind?.defaults() ?? {}), ...structuredClone(s.options ?? {}) })];
+    return [newSection(newId(), s.type, { ...(kind?.defaults() ?? {}), ...structuredClone(s.options ?? {}) }, !kind?.samePage)];
   });
 }

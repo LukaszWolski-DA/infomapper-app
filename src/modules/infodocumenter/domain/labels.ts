@@ -177,6 +177,21 @@ const EN = {
   pr_should: "Should",
   pr_could: "Could",
   pr_wont: "Won't",
+  // slice 27: figures (the prototype's `LBL`; D11: the words on a figure in the document's language)
+  t_figs: "Figures",
+  fig: "Figure",
+  part: "part {i} of {n}",
+  figEmpty: "Nothing from this canvas is in the document's scope.",
+  figNoCanvas: "(canvas no longer exists)",
+  figNoFrame: "(frame no longer exists)",
+  figIn: "in",
+  figCollapsed: "collapsed",
+  figConcept: "Concept",
+  figSource: "Source system",
+  figFree: "Free area",
+  figMore: "and {n} more",
+  figRel1: "1 relationship",
+  figRelN: "{n} relationships",
 } as const;
 
 export type LabelKey = keyof typeof EN;
@@ -349,6 +364,20 @@ const PL: Labels = {
   pr_should: "Powinno",
   pr_could: "Może",
   pr_wont: "Nie teraz",
+  t_figs: "Rysunki",
+  fig: "Rysunek",
+  part: "część {i} z {n}",
+  figEmpty: "Nic z tej kanwy nie mieści się w zakresie dokumentu.",
+  figNoCanvas: "(kanwa już nie istnieje)",
+  figNoFrame: "(ramka już nie istnieje)",
+  figIn: "w",
+  figCollapsed: "zwinięta",
+  figConcept: "Koncept",
+  figSource: "System źródłowy",
+  figFree: "Wolny obszar",
+  figMore: "i {n} więcej",
+  figRel1: "1 relacja",
+  figRelN: "relacje: {n}",
 };
 
 /** German: for Łukasz's review (PRD section 7). */
@@ -519,6 +548,20 @@ const DE: Labels = {
   pr_should: "Sollte",
   pr_could: "Könnte",
   pr_wont: "Nicht jetzt",
+  t_figs: "Abbildungen",
+  fig: "Abbildung",
+  part: "Teil {i} von {n}",
+  figEmpty: "Nichts von dieser Arbeitsfläche liegt im Umfang des Dokuments.",
+  figNoCanvas: "(Arbeitsfläche existiert nicht mehr)",
+  figNoFrame: "(Rahmen existiert nicht mehr)",
+  figIn: "in",
+  figCollapsed: "eingeklappt",
+  figConcept: "Konzept",
+  figSource: "Quellsystem",
+  figFree: "Freier Bereich",
+  figMore: "und {n} weitere",
+  figRel1: "1 Beziehung",
+  figRelN: "{n} Beziehungen",
 };
 
 export const LABELS: Readonly<Record<DocLanguage, Labels>> = { en: EN, pl: PL, de: DE };

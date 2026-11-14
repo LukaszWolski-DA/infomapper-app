@@ -22,6 +22,8 @@ export interface DocumentSectionKind {
   readonly type: string;
   /** Whether it can be drawn in the workspace now (InfoCube's: while InfoCube is on); otherwise it is kept and skipped. */
   readonly available: (workspace: Workspace) => boolean;
+  /** Slice 27 (F7): a new entry starts on the same page (the Figure section, the prototype's `page: false`); default: a new page. */
+  readonly samePage?: boolean;
   /** The presets that end with it, when it is available as the document is made (step 1's D1). */
   readonly presets: readonly string[];
   /** A new section's options. */
@@ -58,6 +60,17 @@ export interface SectionBuildInput<T extends ModuleTable = ModuleTable> {
   readonly notation: "ie" | "uml";
   /** Slice 26, step 4: an entity's block with at most this many attributes stays on one page; 0: never. */
   readonly keepRows: number;
+  /** Slice 27: the page a figure is laid out on, the style's smallest names and its black and white (F5). */
+  readonly page: FigurePage;
+}
+
+/** What a section's figures read of the document's style (slice 27). */
+export interface FigurePage {
+  readonly paper: "A4" | "A3";
+  readonly orientation: "portrait" | "landscape";
+  /** The smallest attribute names in diagrams, in points (D1, D4: the warning and the turn). */
+  readonly smallestPt: number;
+  readonly mono: boolean;
 }
 
 export interface DocumentSectionType<T extends ModuleTable = ModuleTable> extends DocumentSectionKind {

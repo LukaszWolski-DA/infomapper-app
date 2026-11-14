@@ -6,6 +6,8 @@
 
 import { z } from "zod";
 import { LONG_TEXTS } from "@/domain/document/blocks";
+import { FIGURE_ROWS, FIGURE_VIEWS } from "@/domain/document/figure";
+import { FIGURE_ORIENTATIONS, FIGURE_SIZES } from "@/domain/document/page";
 import type { DocumentSectionKind } from "@/domain/document/sections";
 
 /** The longest Text body (F18: as plain text elsewhere). */
@@ -173,6 +175,51 @@ export const qualityOptions = z.object({ columns: subsetOf(QUALITY_COLUMNS), onl
 export type QualityOptions = z.output<typeof qualityOptions>;
 export const QUALITY_DEFAULTS: QualityOptions = { columns: ["key", "name", "rule", "onFailure", "owner", "appliesTo", "description"], onlyScope: true, longTexts: "row" };
 
+// ---- slice 27: figures (the prototype's `FIG0` and `figEditor`) ----
+
+/** The most figures a section holds (as the 50 sections, D10). */
+export const FIGURES_MAX = 50;
+export const FIGURES_REFUSAL = "A section holds at most 50 figures.";
+
+const figureLines = z.object({ rel: z.boolean(), map: z.boolean(), src: z.boolean(), cube: z.boolean() }).strict();
+/** One figure of a section (F8): a canvas or one of its frames, its view, size, orientation and caption. */
+export const figureEntry = z
+  .object({
+    id: z.string().min(1).max(64),
+    on: z.boolean().default(true),
+    canvasId: z.string().min(1).max(64),
+    frameId: z.string().min(1).max(64).nullable().default(null),
+    view: z.enum(FIGURE_VIEWS).default("canvas"),
+    rows: z.enum(FIGURE_ROWS).default("canvas"),
+    lines: figureLines.default({ rel: true, map: true, src: true, cube: true }),
+    status: z.boolean().default(true),
+    size: z.enum(FIGURE_SIZES).default("auto"),
+    orientation: z.enum(FIGURE_ORIENTATIONS).default("doc"),
+    caption: z.string().trim().max(HEADING_MAX, "This caption is too long.").default(""),
+  })
+  .strict();
+export type FigureEntry = z.output<typeof figureEntry>;
+const figureList = z.array(figureEntry).max(FIGURES_MAX, FIGURES_REFUSAL).refine((l) => new Set(l.map((f) => f.id)).size === l.length, "Each figure is listed once.");
+
+/** A new figure of a canvas or a frame, as the prototype's `FIG0`: as on the canvas, whole, as large as fits. */
+export const newFigure = (id: string, canvasId: string, frameId: string | null = null): FigureEntry => ({
+  id,
+  on: true,
+  canvasId,
+  frameId,
+  view: "canvas",
+  rows: "canvas",
+  lines: { rel: true, map: true, src: true, cube: true },
+  status: true,
+  size: "auto",
+  orientation: "doc",
+  caption: "",
+});
+
+export const figureOptions = z.object({ figures: figureList }).strict();
+export type FigureOptions = z.output<typeof figureOptions>;
+export const FIGURE_DEFAULTS: FigureOptions = { figures: [] };
+
 const always = () => true;
 const copy = <T extends object>(value: T) => () => structuredClone(value) as unknown as Record<string, unknown>;
 const asRecord = (schema: z.ZodType) => schema as unknown as z.ZodType<Record<string, unknown>>;
@@ -183,6 +230,8 @@ const own = (type: string, defaults: object, options: z.ZodType): DocumentSectio
 export const INFODOC_SECTION_KINDS: readonly DocumentSectionKind[] = [
   own("text", TEXT_DEFAULTS, textOptions),
   own("overview", OVERVIEW_DEFAULTS, overviewOptions),
+  // slice 27: one or more figures wherever the section stands; it starts on the same page (F7, the prototype's `page: false`)
+  { ...own("figure", FIGURE_DEFAULTS, figureOptions), samePage: true },
   own("dict", DICTIONARY_DEFAULTS, dictionaryOptions),
   own("s2t", S2T_DEFAULTS, s2tOptions),
   own("sources", SOURCES_DEFAULTS, sourcesOptions),

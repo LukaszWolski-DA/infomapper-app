@@ -16,7 +16,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useAction } from "@/app/_components/use-action";
 import { DOCUMENT_SECTION_TYPES, documentStateFor } from "@/app/_lib/document-sections";
 import { Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
@@ -26,6 +26,7 @@ import { useToast } from "@/ui/components/toast";
 import { DOCUMENT_TEXTS, NAME_REQUIRED, type UpdateDocumentInput } from "../domain/commands";
 import { buildDocument, type DocumentTree } from "../domain/document";
 import { RIGHTS_TEXTS } from "../domain/rights";
+import type { FigureEntry } from "../domain/sections";
 import type { DocumentDefinition, MappingFilter } from "../domain/types";
 import {
   addDocumentSectionAction,
@@ -37,6 +38,9 @@ import {
   updateDocumentAction,
 } from "./actions";
 import { nextDraft, withDrafts, type TextDraft } from "../ui/drafts";
+import type { DocPanelWidths } from "../ui/panels-cookie";
+import { FigureEditor, type FigureSource } from "./figure-editor";
+import { HANDLE_CSS, PanelHandles } from "./panel-handles";
 import { hasSpec, SectionOptions, type OptionContext } from "./section-options";
 import { StylePanel } from "./style-panel";
 import { DocumentPreview, LAYOUT_THRESHOLD_MS, PREVIEW_TEXTS, type PreviewHandle, type PreviewMode, type PreviewZoom } from "./preview";
@@ -81,7 +85,7 @@ export const EDITOR_TEXTS = {
 } as const;
 
 /** InfoDocumenter's own types by their names in the editor (a module's comes with its type). */
-const OWN_NAMES: Record<string, string> = { text: "Text", dict: "Data dictionary", s2t: "Source-to-target mapping" };
+const OWN_NAMES: Record<string, string> = { text: "Text", dict: "Data dictionary", s2t: "Source-to-target mapping", figure: "Figure" };
 export const sectionName = (type: string, label: string): string => OWN_NAMES[type] ?? label;
 
 const MAPPINGS: readonly (readonly [MappingFilter, string])[] = [
@@ -109,6 +113,9 @@ export interface EditorProps {
   dimensional: boolean;
   /** What the sections' options need from the workspace. */
   optionContext: OptionContext;
+  /** Slice 27: the person (their panels' cookie) and the widths the server read from it. */
+  userId: string;
+  panels: DocPanelWidths;
   /** The workspace's documentation language: what a document without its own follows (Q8). */
   workspaceLanguage: DocLanguage;
 }
@@ -132,7 +139,8 @@ const readMode = (): PreviewMode => {
 export const TYPING_PAUSE_MS = 500;
 
 export function DocumentEditor(props: EditorProps) {
-  const { workspaceId, document: doc, types, rights, archived, author, authorMember, projects, concepts, date, testHooks, dimensional, optionContext, workspaceLanguage } = props;
+  const { workspaceId, document: doc, types, rights, archived, author, authorMember, projects, concepts, date, testHooks, dimensional, optionContext, workspaceLanguage, userId, panels } = props;
+  const bodyRef = useRef<HTMLDivElement>(null);
   const { saveRow, run, pending } = useAction();
   const toast = useToast();
   const router = useRouter();
@@ -223,6 +231,19 @@ export function DocumentEditor(props: EditorProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the tree is built from the recipe drawn, timed (reference figure)
     setBuilt((before) => ({ tree, ms: performance.now() - started, n: (before?.n ?? 0) + 1 }));
   }, [state, drawn, date]);
+
+  // slice 27: the canvases and frames a figure may show (the projects' tab order, then the rest), and each figure's line
+  const figureSources = useMemo((): FigureSource[] => {
+    if (!snapshot) return [];
+    const order = new Map<string, number>();
+    snapshot.projectCanvases.forEach((l, i) => !order.has(l.canvas_id) && order.set(l.canvas_id, i));
+    const canvases = [...snapshot.canvases].sort((a, b) => (order.get(a.id) ?? Infinity) - (order.get(b.id) ?? Infinity) || a.name.localeCompare(b.name));
+    return canvases.flatMap((c) => [
+      { canvasId: c.id, frameId: null, name: c.name },
+      ...snapshot.frames.filter((f) => f.canvas_id === c.id).sort((a, b) => a.y - b.y || a.x - b.x).map((f) => ({ canvasId: c.id, frameId: f.id, name: f.name })),
+    ]);
+  }, [snapshot]);
+  const figureSummaries = useMemo(() => new Map((built?.tree.figures ?? []).map((f) => [f.entryId, f.summary])), [built]);
 
   // the notes on sections skipped while their module is off, one per module (the prototype's)
   const skipped = useMemo(() => {
@@ -361,9 +382,14 @@ export function DocumentEditor(props: EditorProps) {
         <div />
       )}
 
-      <div className="de-body grid min-h-0 grid-cols-[250px_minmax(0,1fr)_330px]">
+      <div
+        ref={bodyRef}
+        className="de-body grid min-h-0 grid-cols-[var(--dl,250px)_minmax(0,1fr)_var(--dr,330px)]"
+        style={{ "--dl": `${panels.left}px`, "--dr": `${panels.right}px` } as CSSProperties}
+      >
+        <PanelHandles body={bodyRef} userId={userId} initial={panels} />
         {/* the left: Document and the sections */}
-        <nav className="min-h-0 overflow-auto border-r border-im-line bg-im-surface p-2.5" data-testid="editor-left">
+        <nav id="editor-left" className="min-h-0 overflow-auto border-r border-im-line bg-im-surface p-2.5" data-testid="editor-left">
           <button
             type="button"
             data-testid="row-editor-document"
@@ -437,7 +463,7 @@ export function DocumentEditor(props: EditorProps) {
         <span hidden data-testid="text-build-ms" data-ms={built ? built.ms.toFixed(1) : undefined} data-builds={built?.n ?? 0} data-state-ms={state ? state.ms.toFixed(1) : undefined} />
 
         {/* the right: what is selected */}
-        <aside className="min-h-0 overflow-auto border-l border-im-line bg-im-surface px-4 pb-6" data-testid="editor-right">
+        <aside id="editor-right" className="min-h-0 overflow-auto border-l border-im-line bg-im-surface px-4 pb-6" data-testid="editor-right">
           {selectedSection ? (
             <SectionPanel
               key={selectedSection.id}
@@ -450,6 +476,7 @@ export function DocumentEditor(props: EditorProps) {
               }}
               typed={typed}
               context={optionContext}
+              figures={{ sources: figureSources, summaries: figureSummaries, dimensional: dimensional && doc.scope.dimensional }}
               compact={doc.style.template === "compact"}
               save={(patch) => save({ section: { id: selectedSection.id, ...patch } })}
             />
@@ -615,9 +642,12 @@ function SectionPanel({
   save,
   context,
   compact,
+  figures,
 }: {
   /** The Compact template runs sections on: "Start on a new page" is disabled (the prototype's). */
   compact: boolean;
+  /** Slice 27: what a section's figure editor offers and the tree's line per figure. */
+  figures: { sources: readonly FigureSource[]; summaries: ReadonlyMap<string, string>; dimensional: boolean };
   section: Recipe["sections"][number];
   type: EditorSectionType | null;
   readOnly: boolean;
@@ -645,6 +675,21 @@ function SectionPanel({
           onSave={(v) => opt({ body: v })}
         />
       </Field>
+    );
+  else if (s.type === "figure")
+    body = (
+      <FigureEditor
+        sectionId={s.id}
+        label="Figures"
+        hint="A canvas, or one frame of it."
+        stored={(o.figures as FigureEntry[] | undefined) ?? []}
+        sources={figures.sources}
+        summaries={figures.summaries}
+        dimensional={figures.dimensional}
+        readOnly={readOnly}
+        version={version}
+        save={(list) => opt({ figures: list })}
+      />
     );
   else if (hasSpec(s.type))
     body = <SectionOptions sectionId={s.id} type={s.type} options={o} readOnly={readOnly} version={version} context={context} typed={typed} save={opt} />;
@@ -838,6 +883,7 @@ const EDITOR_CSS = `
 .de-flash{animation:de-flash .9s ease-out}
 @keyframes de-flash{0%{box-shadow:0 0 0 3px var(--im-logical)}100%{box-shadow:0 0 0 0 transparent}}
 .de-wrap [role=group]{display:flex;flex-wrap:wrap}
+${HANDLE_CSS}
 @media (max-width:1100px){.de-body{grid-template-columns:220px minmax(0,1fr)!important}.de-body>aside{grid-column:1/-1;border-left:0;border-top:1px solid var(--im-line)}}
 @media (max-width:720px){.de-body{grid-template-columns:minmax(0,1fr)!important}}
 `;

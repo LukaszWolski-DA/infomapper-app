@@ -8,6 +8,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PAGES_SCREEN_CSS } from "../ui/document-css";
+import { FigureImages, imagesReady, removeHolders } from "../ui/figure-images";
+import { loadFigureFonts } from "./figure-fonts";
 
 export const LAYING_OUT = "Laying out pages…";
 export const pagesText = (n: number) => `${n} page${n === 1 ? "" : "s"}`;
@@ -33,11 +35,20 @@ export function PagedView({ sourceId, css, print }: { sourceId: string; css: str
     const target = host.current;
     if (!source || !target) return;
     const started = performance.now();
+    // slice 27: each figure one image source with IBM Plex embedded, its parts as regions of it (Q2, Q3)
+    const images = new FigureImages();
     (async () => {
-      const { Previewer } = (await import("pagedjs")) as unknown as { Previewer: new () => PagedPreviewer };
+      const [{ Previewer }, fonts] = await Promise.all([import("pagedjs") as unknown as Promise<{ Previewer: new () => PagedPreviewer }>, loadFigureFonts()]);
       if (gone) return;
+      images.setFonts(fonts);
+      const content = source.cloneNode(true) as Element;
+      images.attach(content);
+      removeHolders(content);
       previewer = new Previewer();
-      await previewer.preview(source.cloneNode(true), [{ "infodocumenter.css": css }], target);
+      await previewer.preview(content, [{ "infodocumenter.css": css }], target);
+      if (gone) return;
+      // the pages are ready once their figures are decoded (print draws them)
+      await imagesReady(target);
       if (gone) return;
       const pages = target.querySelectorAll(".pagedjs_page").length;
       setState({ kind: "done", pages, ms: Math.round(performance.now() - started) });
@@ -56,6 +67,7 @@ export function PagedView({ sourceId, css, print }: { sourceId: string; css: str
         // already gone with the page
       }
       target.replaceChildren();
+      images.dispose();
     };
   }, [sourceId, css, print]);
 

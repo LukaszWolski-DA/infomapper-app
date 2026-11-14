@@ -19,7 +19,10 @@ import { cubeIndex } from "./keys";
 import { cubeRequirementFeeds, mappingIndex, type MappingIndex } from "./mappings";
 import type { CubeEntity, CubeMappingStatus, InfoCubeTable } from "./types";
 import { unknownFit, unknownValueOf } from "./unknown-member";
-import { cubeTitle, historyLabel, type TypeContext } from "./view";
+import { cubeRowFeeds, cubeTitle, historyLabel, type TypeContext } from "./view";
+import { cubeLines } from "./lines";
+import type { FigureContributions } from "@/domain/document/figure";
+import type { EntityRole } from "@/domain/canvas/module-marks";
 
 /** The stored name of InfoCube's section. */
 export const CUBE_SECTION_TYPE = "cube.dim";
@@ -298,3 +301,37 @@ export const cubeCheckRowsOf = (snapshot: WorkspaceSnapshot<CubeSectionTable>): 
   cubeMappingInputs: snapshot.modules.cube_mapping_input,
   cubeAttributes: snapshot.modules.cube_attribute,
 });
+
+// ---- slice 27: what InfoCube draws on a figure (AD-33: InfoDocumenter draws it without knowing InfoCube) ----
+
+/**
+ * InfoCube's part of a figure: a dimensional card's role where a stereotype stands (its short title in the document's
+ * words, D11), a dimensional row's feeds (its dot) and the dimensional mappings between the cards drawn, both of the
+ * statuses the document shows. Pure, from the snapshot's rows.
+ */
+export function cubeFigureContributions(snapshot: WorkspaceSnapshot<CubeSectionTable>): FigureContributions {
+  const ix = cubeIndexOf(snapshot);
+  const context: TypeContext = { aggregates: ix.aggregates(), outriggers: ix.outriggers(), nameOf: ix.nameOf };
+  const rows = snapshot.modules;
+  const shownRows = (shown: (status: CubeMappingStatus) => boolean) => {
+    const cubeMappings = rows.cube_mapping.filter((m) => m.deleted_at === null && shown(m.status));
+    const ids = new Set(cubeMappings.map((m) => m.id));
+    return { cubeMappings, cubeMappingInputs: rows.cube_mapping_input.filter((i) => ids.has(i.mapping_id)) };
+  };
+  return {
+    roles: (language) => {
+      const out: Record<Uuid, EntityRole> = {};
+      for (const e of snapshot.model.entities) {
+        const c = ix.cubeOf(e.id);
+        if (!c) continue;
+        out[e.id] = { text: cubeTitle(c, context, CUBE_DOC_WORDS[language].titles).short, title: "", card: `dimn ${c.role}`, mark: "cube" };
+      }
+      return out;
+    },
+    rowFeeds: (shown) => {
+      const m = shownRows(shown);
+      return cubeRowFeeds(mappingIndex({ entities: snapshot.model.entities, attributes: snapshot.model.attributes, ...m }), snapshot.model.attributes);
+    },
+    lines: (model, cards, shown) => cubeLines(model, shownRows(shown), cards),
+  };
+}

@@ -12,6 +12,7 @@ import type { Uuid } from "@/domain/ids";
 import { checkMappingTypes, formatColumnType } from "@/domain/model/type-check";
 import type { Attribute, DocLanguage, Entity, Mapping, SourceColumn } from "@/domain/types";
 import { label, type LabelKey } from "./labels";
+import { buildFigureSection } from "./figures";
 import { buildReadiness } from "./readiness";
 import { buildConventions, buildOverview } from "./sections-model";
 import { buildQuality, buildRequirements, buildTrace } from "./sections-requirements";
@@ -360,6 +361,12 @@ const OWN: Record<string, Registration> = {
     label: titled("t_dq"),
     description: "Requirements of the kind data-quality rule: the rule, what happens when it fails, its owner and what it applies to.",
     build: buildQuality,
+  },
+  // slice 27
+  figure: {
+    label: titled("t_figs"),
+    description: "One or more figures of a canvas or a frame, placed wherever you put this section.",
+    build: buildFigureSection,
   },
 };
 

@@ -6,7 +6,7 @@
 import { CARD_W, CARD_W_MAX, CARD_W_MIN } from "./geometry";
 
 /** Width estimate of IBM Plex Sans at `px`, per character, rounded up (wide letters, capitals and digits count more). */
-function sansWidth(text: string, px: number): number {
+export function sansWidth(text: string, px: number): number {
   let em = 0;
   for (const ch of text) {
     if ("mwMW@".includes(ch)) em += 0.86;
@@ -18,7 +18,7 @@ function sansWidth(text: string, px: number): number {
 }
 
 /** IBM Plex Mono is 0.6 em per character. */
-const monoWidth = (text: string, px: number) => text.length * 0.6 * px;
+export const monoWidth = (text: string, px: number): number => text.length * 0.6 * px;
 
 const ROW_PAD = 22; // .row: 12 px left, 10 px right
 const GAP = 6;
