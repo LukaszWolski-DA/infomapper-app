@@ -20,6 +20,14 @@ export const HANDLE_TEXTS = {
 const VAR: Readonly<Record<DocPanel, string>> = { left: "--dl", right: "--dr" };
 const STEP = 16, BIG_STEP = 64;
 
+function writeCookie(userId: string, widths: DocPanelWidths) {
+  try {
+    document.cookie = `${docPanelsCookieName(userId)}=${formatDocPanelsCookie(widths)}; path=/; max-age=${DOC_PANELS_COOKIE_MAX_AGE}; samesite=lax`;
+  } catch {
+    // blocked cookies: the widths are simply not remembered
+  }
+}
+
 export function PanelHandles({ body, userId, initial }: { body: RefObject<HTMLDivElement | null>; userId: string; initial: DocPanelWidths }) {
   const widths = useRef<Record<DocPanel, number>>({ ...initial });
   const handles = useRef<Partial<Record<DocPanel, HTMLDivElement | null>>>({});
@@ -32,13 +40,7 @@ export function PanelHandles({ body, userId, initial }: { body: RefObject<HTMLDi
     body.current?.style.setProperty(VAR[side], `${w}px`);
     handles.current[side]?.setAttribute("aria-valuenow", String(w));
   };
-  const keep = () => {
-    try {
-      document.cookie = `${docPanelsCookieName(userId)}=${formatDocPanelsCookie(widths.current)}; path=/; max-age=${DOC_PANELS_COOKIE_MAX_AGE}; samesite=lax`;
-    } catch {
-      // blocked cookies: the widths are simply not remembered
-    }
-  };
+  const keep = () => writeCookie(userId, widths.current);
 
   const handle = (side: DocPanel) => {
     const { min, max, def } = DOC_PANEL_LIMITS[side];
