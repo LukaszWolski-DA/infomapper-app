@@ -687,3 +687,34 @@ this workspace." (a figure's canvas or frame of another workspace, or none).
 13. **Q6:** the page outline in the canvas's look (no format change), shown while InfoDocumenter is on through a new
     `ModuleView` flag, counting what a figure draws (not notes), moving on a drop; a full run in step 4?
 14. **Q3:** no change to Auto's 1,000 ms threshold (below)?
+
+### Łukasz's answers (14 November 2026)
+
+1. **F1:** yes. The canvas's pure code (`buildCards`, `buildLines`, the geometry) moves to `src/domain/canvas/`, the
+   canvas re-exporting it: one drawing rule for the canvas, the thumbnails and the figures. A full run in step 2.
+2. **F2:** yes. The document's snapshot gets the canvases, canvas items, frames, labels and label links; never notes.
+   Its new size is measured on "Performance test" and the demo (reference figures), and it still holds nothing about
+   people beyond id and name.
+3. **Q2:** IBM Plex's unmodified files embedded in each figure's SVG, only the faces and weights that figure uses; no
+   subset, no text as paths; a figure's text stays searchable in a PDF. **Inline SVG is out:** figures are `<img>`.
+   **Q3 (parts):** one blob per figure, each part showing its own region of it.
+4. **D1:** as the prototype: six sizes, the smallest names 5–8 pt.
+5. **D2:** requirement cards are drawn, with their trace lines; notes never (C4). A deliberate difference from the
+   prototype, to be written into D-82.
+6. **D3 / Q8:** objects out of scope are left out, as the prototype (no muted look).
+7. **D4:** as the prototype's code only (option a): a figure is never drawn larger.
+8. **D5:** the prototype's extra figure options, all in this slice.
+9. **Q7:** the panels' widths in a cookie the server reads (as slice 5a's side panels), and `aria-valuenow`,
+   `aria-valuemin` and `aria-valuemax` on the handles.
+10. **D6:** "As on the canvas" follows the hidden relationship kinds, not the layer switch. **D7:** "Dimensional" only
+    while InfoCube is on. **D8:** no figure-selected outline.
+11. **D9:** Diagrams' figures are stored when the section is made, one whole canvas each per canvas of the scope's
+    projects in tab order, and do not follow later scope changes.
+12. **D11:** "(canvas no longer exists)", "(frame no longer exists)", "in {concept}" and the roles in the document's
+    three languages.
+13. **Q6:** the page outline in the canvas's look, no change of the local file's format, shown while InfoDocumenter is
+    on through a `ModuleView` flag (step 4); it counts only what a figure draws (not notes), follows drops, and step 4
+    has a full run.
+14. **Q3 (Auto):** the threshold stays 1,000 ms.
+
+The measuring files (`scripts/s27-measure/`) stay uncommitted until the closing.
