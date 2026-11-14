@@ -108,7 +108,7 @@ describe("a figure of a canvas (slice 27)", () => {
     const notes = db.note.filter((x) => x.canvas_id === canvas.id && x.deleted_at === null);
     expect(notes.length).toBeGreaterThan(0);
     const d = drawn(inputOf(db), asCanvas(canvas.id));
-    for (const x of notes) expect(d.svg).not.toContain(x.body_text.slice(0, 20));
+    for (const x of notes) expect(d.svg).not.toContain((x.body_text ?? "").slice(0, 20) || "0000");
     expect(d.svg).not.toContain("foreignObject");
     for (const l of db.label.filter((x) => x.workspace_id === WS)) expect(d.svg).not.toContain(`>${l.name}<`);
   });
