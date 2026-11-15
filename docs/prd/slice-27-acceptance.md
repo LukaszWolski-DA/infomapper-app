@@ -1020,3 +1020,76 @@ images are decoded once per figure. The threshold stays 1,000 ms (your answer to
   No server restarted (threshold 6,431 MB). **Part 8's peak, 1,836 MB, is near the 2 GB at which CLAUDE.md says to add
   a ninth part** (it was 1,258 MB in step 2's run; slices 25 to 27's document specs are there). Not changed here: e2e
   parts are shared infrastructure, a `chore` of its own; the recut rule does not apply (part 7 is the longest).
+
+## Step 5: the closing (15 November 2026)
+
+Łukasz's answers to step 4 (15 November 2026): the style's hint as worded in step 4 (his example was not true); the
+outline changed only by those who may change the look, its settings forgotten when it is turned off, its labels scaling
+with the zoom, following a frame while dragged and a card only on drop: all accepted.
+
+### Decisions
+
+- **D-82** (new): InfoDocumenter: figures (slice 27), written from what the slice built. It **amends D-81**: the editor's
+  snapshot holds the canvases, frames, labels and label links (never notes; people still id and name only); the presets
+  have their Diagrams; figures are no longer later; the quick sheet shows no page numbers in the contents. D-81 is marked
+  "(Changed by D-82.)".
+- **AD-19**, a note (slice 27): the canvas's pure drawing rules live in `domain` (`src/domain/canvas/`), re-exported by
+  the canvas; `@/domain/canvas/…` inside the domain.
+- **AD-33**, a note (slice 27): the extension points the slice added (the sections' figure kit, a module's figure
+  contributions, a module's options as plain fields, the page outline offered through `ModuleView`).
+- **AD-32 is not amended:** the thumbnails keep their route and their own drawing; figures are built in the page from the
+  editor's snapshot (the editor) or the page's read (the document page), not fetched from a route, and the outline never
+  reaches a thumbnail. **AD-18** needs no note: the look was JSON already, and the recipe's JSON (slice 25's note) takes
+  the new options.
+
+The texts are quoted in full in the step's report for Łukasz's approval; D-82 says "Proposed on 15 November 2026 for
+Łukasz's approval" until he approves it.
+
+### Docs
+
+`docs/decisions.md` (D-82, the notes to AD-19 and AD-33, D-81 marked), `docs/data-model-v2.md` (`canvas.look`'s
+`pageOutline`, the recipe's `listOfFigures`, `smallestPt` and the sections' figure options), `docs/inventory-prototype-vs-
+app.md` (slice 27's prototype; figures, the star, the list of figures, the smallest names, the page outline and the side
+panels present; the deliberate differences), `README.md` (slice 27, its acceptance), `CLAUDE.md` (the status,
+`src/domain/canvas/` and its import rule, the figures' extension points, the page outline, the commands, slice 27's
+helpers), `docs/known-limitations.md` (InfoDocumenter, slices 25 to 27: a figure's fonts, never drawn larger, the outline's
+settings and following, part 8's heap), `docs/ideas.md` (InfoDocumenter: done in slice 27; "Later, noted": the canvas
+page's resizable side panels, the outline remembering its settings; the German words of slices 25 to 27 still awaiting
+Łukasz's review; part 8).
+
+### The measuring files
+
+Kept, committed: `scripts/bench-figures.ts` (on demand, `npx tsx scripts/bench-figures.ts`, as `bench-documents.ts`:
+the dictionary preset with Diagrams' figures, the figures' share of the tree, their SVGs' size; no bar). The browser's
+measurements were committed in steps 3 and 4 as specs skipped unless `MEASURE=1`: `e2e/slice-27/S27-10-figures.spec.ts`
+and `e2e/slice-27/S27-09-elements.spec.ts`. Deleted: the rest of `scripts/s27-measure/` (step 1's probes and drafts,
+the screenshot and preparation scripts of steps 2 to 4). Nothing stays uncommitted.
+
+### Manual acceptance (PRD section 6)
+
+**On the demo** (`npm run demo -- --reset`, http://127.0.0.1:3001; nothing of KB is read or written):
+1. Sign in as Łukasz. In Retail Co – DWH open Documentation, New document, "Data dictionary for the business": it has
+   Diagrams after Conventions, one figure per canvas of the workspace (the projects' canvases in tab order), adjusted
+   to keys and relationships. In the editor the right panel's handles resize the side panels; reload: the widths stay.
+2. Select Diagrams: the canvases' names stand before their figures, the legend under them; set Notation to UML (the
+   figures' ends and the legend change); untick a figure (it leaves, the next is renumbered).
+3. Add a Figure section ("+ Add section", Figure); add "Customer & orders" whole, then one of its frames (draw a frame
+   on the canvas first if it has none); for each, try the six sizes and the three orientations; type a caption and see
+   the preview follow about half a second after the last key.
+4. Style: List of figures on; Smallest attribute names 8 pt: the lines of figures with smaller names warn.
+5. Open "Order management – S2T for the ETL team": the Dimensional model shows a star per fact (Fact Orders, Fact
+   Sales) after the type and grain; set "Dimensions drawn per star, at most" and "Dimension cards in the star".
+6. Open the document page (`/view`): the list of figures after the contents, its page numbers the figures' pages;
+   print to PDF (Chrome, "Save as PDF"): the figures are sharp, their text is IBM Plex and can be searched and copied.
+7. A canvas: with nothing selected, Canvas look in the right panel, "Page outline for documentation": A4, Landscape,
+   7 pt: dashed pages behind the cards, page 1 labelled; drag a card past page 1: the outline grows on the drop; Off:
+   the outline goes. A thumbnail on the project home shows no outline.
+8. Settings: turn InfoDocumenter off: the canvas's control and outline go; turn it on again.
+
+**On KB (Kanton Basel), with Łukasz** (only Łukasz writes to KB, in the app; I read nothing of it):
+9. Back up `.data/dev-db.json` first (CLAUDE.md, "Łukasz's test model"). KB's file needs no format upgrade for slice 27.
+   If KB's organization has no InfoDocumenter licence or its workspace's switch is off, Łukasz grants and switches it on
+   himself (`npx tsx scripts/licence.ts grant "<organization>" infodoc`, then the settings).
+10. In Kanton Basel: a dictionary from the business preset (its Diagrams from KB's canvases), a whole canvas and a frame
+    in each size, the list of figures on, a PDF; a star diagram if KB has InfoCube's facts; the page outline on a KB
+    canvas in A4 and A3, portrait and landscape.

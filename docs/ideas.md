@@ -940,7 +940,7 @@ their relationships' other ends. Measure first with `scripts/bench-checks-browse
 - **Marks on relationship and mapping lines**; a switch to hide the marks; marks on collapsed frames' blocks.
 - **Source-side and Data Vault checks**; a dimension's unknown member (slice 19, decision 5b; done in slice 22, D-77).
 
-## InfoDocumenter: done in slices 25 and 26, and the plan (the roadmap of 12 November 2026, moved here at slice 26's close)
+## InfoDocumenter: done in slices 25 to 27, and the plan (the roadmap of 12 November 2026, moved here at slice 26's close)
 
 This is the one place for InfoDocumenter's plan (slice 26's roadmap file points here).
 
@@ -962,17 +962,22 @@ long texts under the row, after the table or as a column; the presets as the pro
 (language per document, templates with IBM Plex Serif, accent, black and white, A4 and A3, portrait and landscape,
 notation, keep-rows, numbering, banded rows, running header, draft mark, header and footer fields).
 
+**Done in slice 27 (C)** (D-82): figures of canvases and frames drawn from the model by the canvas's own rules (moved
+to `src/domain/canvas/`), as images with IBM Plex embedded, one blob per figure and parts as its regions; as on the
+canvas or adjusted (rows, line kinds, status marks), six sizes, three orientations, captions, never drawn larger, the
+smallest names' warning and the turn; requirement cards drawn, notes never; out of scope left out; the Diagrams section
+(made from the scope's canvases, the legend, its notation and warning size), the Figure section, Model overview's
+figures, the dictionary's concept frames, InfoCube's star diagram per fact; numbering and the list of figures; the
+presets' Diagrams; the editor's snapshot with canvases, frames, labels and label links; the page outline for
+documentation in a canvas's look; the editor's resizable side panels (a cookie, the separators' values).
+
 **Then (proposed order, to confirm):**
-1. **Slice C – figures:** canvases and frames as SVG from the canvas's geometry (never screenshots), the star diagram
-   drawn from the model, a figure as a reusable block (canvas or frame, 1:1 or fitted, size, orientation, caption), the
-   list of figures, the canvas's page outline, the smallest attribute names in diagrams; Paged.js's limits (inline SVG
-   split: figures as `<img>` SVG; mixed page sizes).
-2. **Baselines** (their own InfoMapper slice; the design is the entry below), then **documents from a baseline**, the
+1. **Baselines** (their own InfoMapper slice; the design is the entry below), then **documents from a baseline**, the
    section "changes since a baseline" and the sign-off preset.
-3. **Slice D – versions and links:** a version stores the generated file (where PDFs are made: browser or server),
+2. **Slice D – versions and links:** a version stores the generated file (where PDFs are made: browser or server),
    links for people outside the workspace (a new AD: access without a session, expiry, revoke), guests' restriction on
    versions and links (the export setting), logos (organization and client; needs file storage).
-4. **Slice E – Markdown export:** metadata instead of images (an AI agent or Mermaid draws the diagrams); one file or a
+3. **Slice E – Markdown export:** metadata instead of images (an AI agent or Mermaid draws the diagrams); one file or a
    set of files (open).
 
 **Later, noted:**
@@ -986,16 +991,24 @@ notation, keep-rows, numbering, banded rows, running header, draft mark, header 
 - Light markup in Text ("- " lists, **bold**, _italic_, as the prototype; slice 26 keeps D-80's plain text, D11).
 - A document's language back to "the workspace's" once one was chosen (slice 26, step 4: a choice in the select).
 - The editor's snapshot refreshed when others change the model, without a reload (slice 26, step 2).
+- **The canvas page's resizable side panels** (slice 27, C6: the editor's are done; the canvas page keeps slice 5a's
+  fixed widths).
+- The page outline remembering its paper, orientation and size while off (slice 27 stores it only while on, Q6).
 
 **Follow-ups outside the slices:**
-- **German words** (document labels, InfoCube's words, slice 26's new ones): Łukasz's review, then a small `fix/`
-  branch.
+- **German words of slices 25 to 27** (the document labels, InfoCube's document words, slice 26's new ones listed in
+  `docs/prd/slice-26-acceptance.md`, slice 27's in `docs/prd/slice-27-acceptance.md`, step 3: "Diagramme",
+  "Abbildungsverzeichnis", "Legende", the legend's lines, "Beziehung (UML-Multiplizitäten)", "Sternschema von {n}",
+  "{a} von {b} Dimensionen gezeigt; alle stehen in der Tabelle darunter", and step 2's words on a figure): still awaiting
+  Łukasz's review, then a small `fix/` branch.
 - **The model checks' texts in Polish and German** (about 40 texts in the core, `CHECK_TEXTS` and the rules' `text()`,
   and InfoCube's checks), with the German words' review; until then a Polish or German document prints them in English
   (slice 26, D3).
 - **Part 8 of the full run:** its heap peaked at 2,088 MB in slice 26 (past CLAUDE.md's 2 GB); recut on
   `chore/recut-e2e-parts` (`PART_STARTS`: `slice-02b`, `slice-04b1`, `slice-07a`, `slice-08`, `slice-11`, `slice-15a`,
-  `slice-20`), by the median folder times of the full runs 43496089437, 43485073406 and 43481776730.
+  `slice-20`), by the median folder times of the full runs 43496089437, 43485073406 and 43481776730. Slice 27: part 8
+  peaked at 1,836 MB in step 4's run (`docs/prd/slice-27-acceptance.md`); a ninth part goes on its own `chore/` branch
+  after slice 27's merge when a full run's part 8 comes near 2 GB.
 - **KB to format 17:** only on Łukasz's command, after the backup; then a dictionary of Kanton Basel.
 - **Paged.js** in `next.config.ts` (the alias) and the editor's two uses of its internals: check at each Paged.js or
   Next.js upgrade (`docs/known-limitations.md`).
