@@ -801,3 +801,131 @@ The measuring files (`scripts/s27-measure/`) stay uncommitted until the closing.
   | Heap peak | 1,365 MB | 1,419 MB | 927 MB | 1,214 MB | 1,521 MB | 1,277 MB | 1,433 MB | 1,258 MB |
 
   No server restarted (the runner's threshold is 6,431 MB).
+
+## Step 3: sections, the star and the list of figures (15 November 2026)
+
+Łukasz's answers to step 2's assumptions (15 November 2026): a frame's figure draws no requirement cards (as the
+prototype), and the editor's timings move to this step: accepted. **The caption refreshes the preview while it is
+typed**, as the Heading and Text do (D-81: about 500 ms after the last keystroke): done in this step.
+
+### What was built
+
+- **A section's figures, for every section** (`SectionBuildInput.figures`, `src/domain/document/figure-node.ts`,
+  `sectionFigures`): `list` draws a section's stored figures (Diagrams' own notation, its warning size, the canvases'
+  names before their figures), `placed` draws cards a section placed itself as a canvas in memory (the star). The kit
+  is made by `buildDocument` in the document's words (`documentFigures`, InfoDocumenter's `figures.ts`), so a module's
+  section draws figures without naming InfoDocumenter, and InfoDocumenter draws InfoCube's without naming InfoCube
+  (AD-33). It is made when a section first draws a figure: a document without figures reads nothing for them. The
+  figure entry and its schema moved to InfoMapper's domain (`src/domain/document/figure-entry.ts`), since InfoCube's
+  section holds figures too.
+- **Diagrams** (`diagrams`, after Model overview in "+ Add section"; "Diagrams" / "Diagramy" / "Diagramme"): its
+  figures that are on, each canvas's name as a numbered subsection before its first figure (the prototype's `h3`), the
+  legend under them ("Legend under the figures", on), "Notation" (Document's, Crow's foot, UML: its figures and its
+  legend's first line), "Warn when names are smaller than" (Document's ({pt} pt), 5 to 8 pt: the figures' lines, in
+  place of the style's); "Tick or add a figure in the panel on the right." while none is on. **Its figures are made with
+  the section** (D9): one whole canvas each, as on the canvas, per canvas of the document's scope (the chosen projects',
+  or every project's; the projects in the order they were made, each project's canvases in tab order, a shared canvas
+  once: `diagramCanvases`), by "+ Add section" (the action reads the projects and their links) and by New document;
+  later scope changes leave them. **The legend** is a node of the content tree (`legend`: its title, its marks and
+  words), drawn as small inline SVG samples by React (the prototype's `legend`): the relationship in the section's
+  notation ("Relationship (UML multiplicities)" with UML, step 1's proposal), the mappings by status, the ƒ rule, the
+  dimensional mapping while that level is drawn, the source key, the rows' dots; black and white with the style's.
+- **Model overview's figures** ("Figures (e.g. the logical data model)") and "Where the figures go": "Below the
+  section's content" (default) or "Right after the description".
+- **The Data dictionary's concept frame**: "Figure of the concept's frame at its start (from the first canvas that has
+  one)" under "Group by concept" (off by default): the first concept frame of the concept on the scope's canvases in
+  their order, as on the canvas, after the concept's heading.
+- **The star diagram** (InfoCube, `src/modules/infocube/domain/star.ts`, `starLayout`): per fact, after its type and
+  grain, before its Dimensions, of its dimensions in scope (each once, a role-playing dimension once with both role
+  pills); the prototype's rule (up to 6 left and right in turn, more above and below too; the fact 260 px with all its
+  rows, the dimensions 220 px with their keys or all attributes; columns 100 px from the fact and 30 px apart, rows
+  70 px and 40 px), the cards' heights the canvas's (`cardHeightFor`, F11). Drawn through `figures.placed`
+  (relationships with their pills, no status marks). Caption "Star schema of {fact}", and beyond "Dimensions drawn per
+  star, at most" (6, 8, 12 default, 16, 24) " ({a} of {b} dimensions shown; all are in the table below)", in the three
+  languages. The options: "Star diagram, drawn from the model (no canvas needed)", "Dimension cards in the star", "Size
+  of the star diagrams" (the six sizes and three orientations), the limit with its hint, each fact's line ("{fact}:
+  {line}"), and "Figures from canvases" at the section's start. **A module's options as plain fields** (`optionFields`,
+  `SectionOptionField`: check, segments, select, group label, hint, a figure editor, a placed figure's size and the
+  placed figures' lines, each with `when`), drawn by the editor's `ModuleOptions`; `optionChecks` reads as check boxes.
+- **Numbering and the list of figures** (F6, D10): figures numbered in document order whatever section drew them, each
+  key unique in the document (`{section}:{figure}`); with the style's "List of figures" (between Contents and Numbered
+  sections) and a figure drawn, "List of figures" on its own sheet after the contents, one line per figure with its
+  number, caption and page (the contents' `target-counter`), no page numbers on the quick sheet.
+- **The smallest names** in the Style panel: "Smallest attribute names in diagrams" 5, 6, 7, 8 pt with the prototype's
+  hint (D1); as D4 (a): a figure is never drawn larger, its line warns.
+- **The caption's draft** in the preview (`fig:{section}:{figure}`, `ui/drafts.ts`).
+- **The presets** (the figure sections slice 26 left out): the business dictionary gets **Diagrams** after Conventions,
+  adjusted (keys only, relationships only, no status marks); the ETL specification gets **Diagrams** after
+  Conventions, as on the canvas; their descriptions are the prototype's again ("…, with key-only diagrams. No technical
+  mapping detail."; "…; source tables; full diagrams with mapping lines."). Not here: the sign-off preset (with
+  baselines), its Overview figure "Logical data model" and Changes since a baseline. The demo's three documents get
+  their presets' Diagrams with the scope's canvases (the S2T: Order management's).
+- **Words** (D11): "(canvas no longer exists)", "(frame no longer exists)", "in {concept}" and the roles were in three
+  languages since step 2; step 3 adds "Diagrams", "List of figures", "Legend", the legend's lines, the star's caption
+  and note. **German for Łukasz's review:** "Diagramme", "Abbildungsverzeichnis", "Legende", the legend's lines
+  (`labels.ts`), "Sternschema von {n}", "{a} von {b} Dimensionen gezeigt; alle stehen in der Tabelle darunter"
+  (`document-words.ts`), "Beziehung (UML-Multiplizitäten)".
+- **A defect of slice 26 fixed here** (InfoDocumenter's own CSS, not shared infrastructure): on the editor's quick sheet
+  the contents showed "0" for every page number, since Paged.js rewrites the pages' `target-counter()` rule for the
+  whole document. The list of figures would show the same, so `quickSheetCss` now hides them there (D10: no page numbers
+  on the quick sheet, as the contents); S27-06 checks both.
+
+### Assumed (say if not)
+
+- **D4 (a) and S27-06.** The PRD's criterion "text never under the chosen size" is checked as your answer to D4 makes
+  it: a figure is never drawn larger; its line in the editor says " · smaller than {pt} pt: try one figure per frame, A3
+  paper, or the page outline on the canvas", and "as large as fits" turns a figure when that helps. The style's hint
+  stays the prototype's ("A canvas that would be smaller at page width is split into parts."), which is true of "Page
+  width, in parts" only.
+- **Diagrams' warning size** is read by the figures' lines only (the prototype stores it and reads nothing); the turn
+  of "as large as fits" follows the style's smallest names, as the prototype's.
+- **The scope's canvases** (D9, the concept frame): the projects in the order they were made; a canvas in no project
+  is not in a scope (as the document's scope, slice 25), so Diagrams never makes its figure; "Canvas or frame to add"
+  still offers it.
+- **A legend's page.** The legend is kept whole (the prototype's `break-inside: avoid`); after a figure that fills a
+  page it stands alone at the top of the next.
+- **The star's lines** run as on a canvas (`relGeom`): a dimension's relationship meets the fact on the side the
+  canvas's rule picks, so on the star the left dimensions' lines may reach the fact's top corner.
+
+### Reference figures (Q3, F9; no bar)
+
+The longest preset with Diagrams: the business dictionary, its Diagrams made from the scope's canvases as New document
+makes them (keys only, relationships only), every mapping shown; beside it the same document with Diagrams' figures
+taken out. **In the browser** (`e2e/slice-27/S27-10-figures.spec.ts`, measurement build, headless Chromium 153, 5 loads
+after a warm-up, medians):
+
+| Data set | Figures | Pages | Snapshot (decoded) | State | Tree | First layout | After a change, Auto shows |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Demo | 3 | 17 | 197,953 B | 1.1 ms | 7.9 ms | 393 ms | the pages |
+| Demo, no figures | 0 | 14 | 197,953 B | 1.6 ms | 3.6 ms | 297 ms | the pages |
+| Performance test | 3 | 41 | 2,305,438 B | 3.4 ms | 54.2 ms | 1,342 ms | the quick sheet |
+| Performance test, no figures | 0 | 39 | 2,305,438 B | 2.7 ms | 3.8 ms | 1,333 ms | the quick sheet |
+
+**In Node** (`scripts/s27-measure/bench-figures.ts`, 9 rounds after a warm-up, medians): Performance test (236 cards on
+3 canvases): the tree 29.4 ms with figures, 1.2 ms without (the figures 28.2 ms; their SVGs 96.3, 21.5 and 96.3 KB);
+the demo: 3.8 ms against 0.5 ms (3.3 ms; 8.5, 5.3 and 17.2 KB).
+
+**Auto's threshold behaves as in slice 26.** The demo's layout stays well under 1,000 ms with its figures (+96 ms for
+three figures), so Auto keeps laying out pages. "Performance test"'s dictionary was over the threshold before figures
+(1,333 ms), so Auto shows the quick sheet after a change with or without them; the figures add 9 ms there, as their
+images are decoded once per figure. The threshold stays 1,000 ms (your answer to Q3).
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`, `npm test` (2,263 tests, 181 files) pass. New unit tests:
+  `tests/document-figures-3.test.ts` (14), and one in `src/modules/infodocumenter/domain/documents.test.ts`.
+- Slice 27's specs: S27-01 to S27-08 pass locally (S27-03, S27-04 (2), S27-05 (2), S27-06 (2) new).
+- Slices 25 and 26, after the changes below: 53 passed and 8 skipped (the measuring specs) in one run with slice 27;
+  the six that failed on the presets' new Diagrams were changed and pass (15 passed).
+- **Earlier specs changed, with their reason** (the presets' Diagrams, the Dimensional model's line):
+  - `e2e/slice-25/S25-03`: the dictionary preset has Diagrams after Conventions (8 sections), the S2T's too;
+  - `e2e/slice-25/S25-06`: the S2T's sections with Diagrams;
+  - `e2e/slice-25/S25-07`: the contents list Diagrams (its page numbers still match);
+  - `e2e/slice-25/S25-08`: "Diagramy" and "Diagramme" in the Polish and German headings;
+  - `e2e/slice-26/S26-01`: the Dimensional model's line in "+ Add section" is the prototype's again;
+  - unit tests `tests/infodocumenter-store.test.ts` and `documents.test.ts`: the kinds' order and the presets.
+- **The element guard** on the measurement build (`S3B-15-elements` against `slice-08.json`): viewport 4,508 / 19,305 /
+  1,465 / 4,907, page totals 6,137 / 20,934 / 3,004 / 6,446: unchanged.
+- **No full run in this step:** it changes no shared infrastructure (no undo, save chain, canvas layer, table registry
+  or local adapter code; the demo's documents and the content tree are InfoDocumenter's and the document domain's).
+  Step 4 and the closing have theirs.
