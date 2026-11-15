@@ -259,6 +259,14 @@ describe("the presets' Diagrams (slice 27, step 3, D9)", () => {
     expect(diagramCanvases(projects, links, ["p2"])).toEqual(["c", "a"]);
     // a chosen project that is gone reads as no choice
     expect(diagramCanvases(projects, links, ["gone"])).toEqual(["a", "b", "c"]);
+    // step 4: with no project chosen, the canvases in no project follow, in the order they were made; never with a project chosen
+    const canvases = [
+      { id: "z", created_at: "2026-03-01" },
+      { id: "a", created_at: "2026-01-01" },
+      { id: "y", created_at: "2026-02-01" },
+    ];
+    expect(diagramCanvases(projects, links, [], canvases)).toEqual(["a", "b", "c", "y", "z"]);
+    expect(diagramCanvases(projects, links, ["p2"], canvases)).toEqual(["c", "a"]);
   });
 
   it("makes the dictionary's Diagrams keys-only with relationships, the specification's as on the canvas, one figure per canvas", () => {
