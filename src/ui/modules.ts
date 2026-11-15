@@ -116,6 +116,11 @@ export interface ModuleView {
    * `created_*` and `updated_*` (O8). InfoMapper never reads them.
    */
   data: Readonly<Record<string, unknown>>;
+  /**
+   * Slice 27, step 4 (Q6): "Page outline for documentation" in "Canvas look" and its outline on the canvas, while
+   * InfoDocumenter is on; the outline is the canvas's own look key, read by InfoMapper's canvas.
+   */
+  pageOutline?: boolean;
 }
 
 export const NO_MODULES: ModuleView = { roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, rowFeeds: {}, relationshipDeletes: {}, data: {} };

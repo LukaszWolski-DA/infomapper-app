@@ -12,7 +12,7 @@ import type { FigurePage, SectionBuildInput, SectionFigures, SectionScope } from
 import type { DocumentState } from "@/domain/document/state";
 import type { Uuid } from "@/domain/ids";
 import { byTabOrder } from "@/domain/model/workspace-model";
-import type { DocLanguage, ModuleTable, Project, ProjectCanvas } from "@/domain/types";
+import type { Canvas, DocLanguage, ModuleTable, Project, ProjectCanvas } from "@/domain/types";
 import { label } from "./labels";
 import { diagramsOptions, figureOptions } from "./sections";
 
@@ -114,15 +114,23 @@ export function legendNode(language: DocLanguage, notation: "ie" | "uml", mono: 
 
 /**
  * The scope's canvases for Diagrams' figures (D9): the chosen projects', or every live project's, each project's
- * canvases in its tab order, a canvas shared by two projects once; the projects in the order they were made.
+ * canvases in its tab order, a canvas shared by two projects once; the projects in the order they were made. Slice 27,
+ * step 4 (Łukasz): with no project chosen ("the whole model"), then the canvases in no project, in the order they were
+ * made (a canvas in no project has no tab).
  */
-export function diagramCanvases(projects: readonly Pick<Project, "id" | "created_at">[], links: readonly ProjectCanvas[], chosen: readonly Uuid[]): Uuid[] {
+export function diagramCanvases(
+  projects: readonly Pick<Project, "id" | "created_at">[],
+  links: readonly ProjectCanvas[],
+  chosen: readonly Uuid[],
+  canvases: readonly Pick<Canvas, "id" | "created_at">[] = [],
+): Uuid[] {
   const picked = new Set(chosen.filter((id) => projects.some((p) => p.id === id)));
   const out: Uuid[] = [];
   for (const p of [...projects].sort((a, b) => a.created_at.localeCompare(b.created_at))) {
     if (picked.size && !picked.has(p.id)) continue;
     for (const l of links.filter((x) => x.project_id === p.id).sort(byTabOrder)) if (!out.includes(l.canvas_id)) out.push(l.canvas_id);
   }
+  if (!picked.size) for (const c of [...canvases].sort((a, b) => a.created_at.localeCompare(b.created_at))) if (!out.includes(c.id)) out.push(c.id);
   return out;
 }
 
@@ -134,7 +142,7 @@ export function diagramFigures(canvasIds: readonly Uuid[], newId: () => Uuid, lo
 /** A concept's frame as a figure (the Dictionary's "Figure of the concept's frame at its start"): the first canvas of the scope's with one. */
 export function conceptFrameFigure(input: SectionBuildInput, conceptId: Uuid): DocNode[] {
   const { snapshot } = input.state;
-  const order = diagramCanvases(snapshot.projects, snapshot.projectCanvases, []).filter((id) => input.scope.canvasIds.has(id));
+  const order = diagramCanvases(snapshot.projects, snapshot.projectCanvases, [], snapshot.canvases).filter((id) => input.scope.canvasIds.has(id));
   for (const canvasId of order) {
     const frame = snapshot.frames.filter((f) => f.canvas_id === canvasId && f.kind === "concept" && f.concept_id === conceptId).sort((a, b) => a.y - b.y || a.x - b.x)[0];
     if (frame) return input.figures.list([{ ...newFigure(`cf:${conceptId}`, canvasId, frame.id) }]);

@@ -14,6 +14,8 @@ import {
   CANVAS_BACKGROUNDS,
   CANVAS_GRIDS,
   CANVAS_LAYERS,
+  OUTLINE_ORIENTATIONS,
+  OUTLINE_PAPERS,
   DEFAULT_CANVAS_LOOK,
   NAME_MODES,
   type Canvas,
@@ -436,6 +438,12 @@ const lookInput = z
     /** Relationship lines by kind (slice 16, item 3): true hides, false shows. */
     hideEntityRelationships: z.boolean().optional(),
     hideSourceRelationships: z.boolean().optional(),
+    /** Slice 27, step 4 (Q6): the page outline for documentation, or null for off. */
+    pageOutline: z
+      .object({ paper: z.enum(OUTLINE_PAPERS), orientation: z.enum(OUTLINE_ORIENTATIONS), pt: z.union([z.literal(6), z.literal(7), z.literal(8)]) })
+      .strict()
+      .nullable()
+      .optional(),
   })
   .strict();
 export type SetCanvasLookInput = z.input<typeof lookInput>;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { figureBox, figureLayout, figureSummary, MM_PER_PX, PART_OVERLAP } from "./page";
+import { figureBoxOf } from "./figure";
+import { figureBox, figureLayout, figureSummary, MM_PER_PX, outlineLabel, outlinePages, PART_OVERLAP, ROW_PT } from "./page";
 
 // Slice 27 (Q4, D1, D4): a figure's box on the page with the app's margins, its sizes, orientations and parts.
 
@@ -56,5 +57,38 @@ describe("a figure's layout", () => {
     const big = box(2000, 9000);
     const parts = figureLayout(big, [big], A4, "width", "doc", 6);
     expect(figureSummary([parts], 6)).toMatch(/^1 figure in \d+ parts · names [\d.]+ pt \(whole on one page: [\d.]+ pt\) · upright · smaller than 6 pt: try one figure per frame, A3 paper, or the page outline on the canvas$/);
+  });
+});
+
+describe("the page outline on the canvas (slice 27, step 4, Q6)", () => {
+  it("cuts the figure's box into pages of the figure's room at the scale of the smallest names, row by row", () => {
+    const spec = { paper: "A4", orientation: "landscape", pt: 7 } as const;
+    const room = figureBox({ paper: "A4", orientation: "landscape" }, true);
+    expect(room.rot).toBe(false);
+    const w = room.w / (MM_PER_PX * (7 / ROW_PT)), h = room.h / (MM_PER_PX * (7 / ROW_PT));
+    const one = outlinePages({ x: 10, y: 20, w: w - 1, h: h - 1 }, spec);
+    expect(one.pages).toEqual([{ n: 1, x: 10, y: 20, w, h }]);
+    const four = outlinePages({ x: 0, y: 0, w: w + 10, h: h + 10 }, spec);
+    expect([four.cols, four.rows]).toEqual([2, 2]);
+    expect(four.pages.map((p) => [p.n, p.x, p.y])).toEqual([
+      [1, 0, 0],
+      [2, w, 0],
+      [3, 0, h],
+      [4, w, h],
+    ]);
+    // a larger size of the names: smaller pages on the canvas
+    expect(outlinePages({ x: 0, y: 0, w: w - 1, h: h - 1 }, { ...spec, pt: 8 }).pages.length).toBeGreaterThan(1);
+  });
+
+  it("labels page 1 with the paper, orientation, size and whether the canvas fits; the others by number", () => {
+    const spec = { paper: "A3", orientation: "portrait", pt: 6 } as const;
+    expect(outlineLabel(spec, 1, 1)).toBe("A3 portrait at 6 pt · fits on one page");
+    expect(outlineLabel(spec, 1, 4)).toBe("A3 portrait at 6 pt · needs 4 pages: move cards into page 1 to keep it whole");
+    expect(outlineLabel(spec, 3, 4)).toBe("page 3");
+  });
+
+  it("takes a figure's box: what is drawn with a 20 px margin, none without anything drawn", () => {
+    expect(figureBoxOf([{ x: 100, y: 50, w: 256, h: 120 }, { x: 400, y: 300, w: 230, h: 94 }])).toEqual({ x: 80, y: 30, w: 570, h: 384 });
+    expect(figureBoxOf([])).toBeNull();
   });
 });

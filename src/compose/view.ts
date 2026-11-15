@@ -48,6 +48,13 @@ const creates = (actions: CreateActions): EntityCreate[] => [
  * content editor (the panel says beforehand who may not approve; the server checks again).
  */
 export async function moduleView(store: DataStore, workspace: Workspace, model: WorkspaceModel, actions: CreateActions, events: readonly ChangeEvent[] = []): Promise<ModuleView> {
+  const view = await cubeView(store, workspace, model, actions, events);
+  // slice 27, step 4 (Q6): InfoDocumenter's page outline on the canvas, while it is on
+  return workspace.infodoc ? { ...view, pageOutline: true } : view;
+}
+
+/** InfoCube's part of the page's view (slices 15a to 22). */
+async function cubeView(store: DataStore, workspace: Workspace, model: WorkspaceModel, actions: CreateActions, events: readonly ChangeEvent[]): Promise<ModuleView> {
   const hasDimensional = model.entities.some((e) => e.model_level === "dimensional");
   if (!workspace.infocube && !hasDimensional) return NO_MODULES;
   const [cube, measures, keys, cubeMappings, cubeMappingInputs, cubeAttributes] = hasDimensional

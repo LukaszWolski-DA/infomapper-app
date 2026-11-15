@@ -57,7 +57,8 @@ export const STYLE_TEXTS = {
   keepRowsHint: "A shorter entity moves whole to the next page instead of being cut. Headings always stay with what follows them.",
   // slice 27, step 3 (D1)
   smallestPt: "Smallest attribute names in diagrams",
-  smallestPtHint: "A canvas that would be smaller at page width is split into parts.",
+  // slice 27, step 4 (Łukasz): a hint that is true of D4 (a): the size never draws a figure larger
+  smallestPtHint: "A figure whose names come out smaller shows a warning in its line; “Whole, as large as fits” turns it on the page when that makes them larger.",
   switches: [
     ["cover", "Cover page"],
     ["contents", "Contents"],

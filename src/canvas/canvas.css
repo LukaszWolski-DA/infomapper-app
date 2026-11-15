@@ -357,6 +357,14 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
    `opacity` on them (AD-24): fills and borders are colours mixed in CSS. --iz (1 / zoom), set on .frame-layer only, keeps
    the label's size. */
 .im-canvas .frame-layer { position: absolute; left: 0; top: 0; z-index: -1; pointer-events: none }
+/* Slice 27, step 4 (Q6): the page outline for documentation (prototype #pgarea), behind the frames; one element per page,
+   its label a ::before. */
+.im-canvas .page-outline { position: absolute; left: 0; top: 0; z-index: -2; pointer-events: none }
+.im-canvas .page-outline .pg { position: absolute; box-sizing: border-box; border: 2px dashed color-mix(in srgb, var(--im-logical) 70%, transparent); border-radius: 2px }
+.im-canvas .page-outline .pg.more { border-color: color-mix(in srgb, var(--im-warn) 55%, transparent); border-width: 1.5px }
+.im-canvas .page-outline .pg.ok { border-color: color-mix(in srgb, var(--im-map) 75%, transparent) }
+.im-canvas .page-outline .pg::before { content: attr(data-label); position: absolute; left: -2px; bottom: 100%; margin-bottom: 4px; font: 500 13px var(--font-plex-sans), sans-serif; color: var(--im-ink-2); white-space: nowrap; background: var(--im-surface); padding: 1px 8px; border-radius: 6px; box-shadow: 0 0 0 1px var(--im-line) }
+.im-canvas .page-outline .pg.more::before { font-size: 12px; color: var(--im-ink-3) }
 .im-canvas .im-frame { position: absolute; border-radius: 16px; pointer-events: all; cursor: move; box-sizing: border-box;
   border: 1.5px solid color-mix(in srgb, var(--fc) 50%, transparent); background: color-mix(in srgb, var(--fc) 7%, transparent) }
 .im-canvas .im-frame.free { border-style: dashed }

@@ -15,7 +15,7 @@ import { CHECK_TEXTS, lineOf, type CheckRef, type IndexedItem } from "@/domain/m
 import { CanvasUiCtx } from "@/canvas/context";
 import { frameColor } from "@/canvas/frame-data";
 import { firstLine } from "@/canvas/note-data";
-import { LookControls, useCanvasLook } from "@/canvas/look";
+import { LookControls, PageOutlineControls, useCanvasLook } from "@/canvas/look";
 import { Actions, Fold, Hint, Kind, Li, LongList, smallButtonClass, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { NoteRow } from "./note-row";
@@ -185,6 +185,8 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
           <div className="mt-2">
             <LookControls part="grid" look={look.look} onChange={look.setLook} />
           </div>
+          {/* slice 27, step 4 (Q6): while InfoDocumenter is on */}
+          {look.outlines && <PageOutlineControls outline={look.look.pageOutline} onChange={look.setLook} />}
         </Fold>
       )}
     </div>

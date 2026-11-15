@@ -227,6 +227,7 @@ export default async function CanvasPage({
         version={canvas.version}
         editable={editable}
         save={saveCanvasLookAction.bind(null, ws)}
+        outlines={modules.pageOutline === true}
       >
       <ModulesProvider view={modules} model={model} requirements={requirements} requirementLinks={requirementLinks}>
       <PanelsProvider>

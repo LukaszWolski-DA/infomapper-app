@@ -139,7 +139,24 @@ type Palette = (typeof FIGURE_PALETTE)["colour" | "mono"];
 /** The figure's margin around what it draws, in canvas pixels (the prototype's `pad`). */
 export const FIGURE_PAD = 20;
 /** A frame's name strip above it (the prototype's 26 px). */
-const FRAME_NAME_H = 26;
+export const FRAME_NAME_H = 26;
+
+/**
+ * A figure's box around what it draws (cards, expanded frames with their name strip, blocks, requirement cards), with
+ * its margin; null when nothing is drawn. Slice 27, step 4: the canvas's page outline takes the same box (Q6: it counts
+ * what a figure "As on the canvas" draws, never notes).
+ */
+export function figureBoxOf(rects: readonly Rect[]): Rect | null {
+  if (!rects.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const r of rects) {
+    x0 = Math.min(x0, r.x);
+    y0 = Math.min(y0, r.y);
+    x1 = Math.max(x1, r.x + r.w);
+    y1 = Math.max(y1, r.y + r.h);
+  }
+  return { x: Math.floor(x0 - FIGURE_PAD), y: Math.floor(y0 - FIGURE_PAD), w: Math.ceil(x1 - x0 + 2 * FIGURE_PAD), h: Math.ceil(y1 - y0 + 2 * FIGURE_PAD) };
+}
 /** A frame's rounded corners (canvas.css `.frame`). */
 const FRAME_RX = 16;
 
@@ -392,16 +409,8 @@ export function figureDrawing(input: FigureInput, spec: FigureSpec): FigureDrawi
     faces.add("mono-500");
     cardSvg += requirementCardSvg(r, h, P);
   }
-  if (!rects.length) return { kind: "empty" };
-
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const r of rects) {
-    x0 = Math.min(x0, r.x);
-    y0 = Math.min(y0, r.y);
-    x1 = Math.max(x1, r.x + r.w);
-    y1 = Math.max(y1, r.y + r.h);
-  }
-  const box = { x: Math.floor(x0 - FIGURE_PAD), y: Math.floor(y0 - FIGURE_PAD), w: Math.ceil(x1 - x0 + 2 * FIGURE_PAD), h: Math.ceil(y1 - y0 + 2 * FIGURE_PAD) };
+  const box = figureBoxOf(rects);
+  if (!box) return { kind: "empty" };
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box.x} ${box.y} ${box.w} ${box.h}" width="${box.w}" height="${box.h}">` +
     `<style>${figureCss(P)}</style>` +

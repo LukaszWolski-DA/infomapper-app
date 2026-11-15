@@ -58,11 +58,12 @@ async function documentCommand<T>(
   return result;
 }
 
-/** Slice 27 (D9): the canvases of the chosen projects (every project's when none), in order, for Diagrams' figures. */
+/** Slice 27 (D9): the canvases of the chosen projects (every project's, then the rest, when none), in order, for Diagrams' figures. */
 async function scopeCanvases(store: DataStore, workspaceId: Uuid, chosen: readonly Uuid[]): Promise<Uuid[]> {
   const projects = await store.projects.list(workspaceId);
   const links = (await Promise.all(projects.map((p) => store.canvases.listLinksOfProject(workspaceId, p.id)))).flat();
-  return diagramCanvases(projects, links, chosen);
+  // with no project chosen, the canvases in no project too (step 4)
+  return diagramCanvases(projects, links, chosen, chosen.length ? [] : await store.canvases.list(workspaceId));
 }
 
 /** New document (D13): a private document from the preset; the page then opens its form. */

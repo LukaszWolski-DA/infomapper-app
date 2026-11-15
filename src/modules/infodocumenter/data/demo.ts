@@ -102,7 +102,7 @@ export function addDocumentsDemo(db: DevDb & { document_definition?: DocumentDef
       cover: { ...EMPTY_COVER, ...row.cover },
       // the workspace's language (Q8: a seeded document follows it), the preset's draft mark
       style: defaultStyle({ watermark: p.watermark }),
-      sections: presetSections(p, list, workspace, () => id(`document:${key}:section:${n++}`), diagramCanvases(projects, links, row.scope?.projects ?? [])),
+      sections: presetSections(p, list, workspace, () => id(`document:${key}:section:${n++}`), diagramCanvases(projects, links, row.scope?.projects ?? [], db.canvas.filter((c) => liveCanvases.has(c.id)))),
     };
   };
   documents.push(

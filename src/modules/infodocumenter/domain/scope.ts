@@ -27,7 +27,9 @@ export function sectionScopeOf(scope: DocumentScope, snapshot: WorkspaceSnapshot
   }
   if (concepts.size) entities = entities.filter((e) => concepts.has(e.concept_id));
   const entityIds = new Set(entities.map((e) => e.id));
-  return { entityIds, canvasIds: canvases, tableIds: sourceTablesInScope(snapshot, entityIds, canvases, { projects: projects.size > 0, concepts: concepts.size > 0, mappings: scope.mappings }), logical: scope.logical, dimensional: scope.dimensional, mappings: scope.mappings };
+  // slice 27, step 4: with no project chosen, every live canvas is in the scope (a canvas in no project too)
+  const canvasIds = projects.size ? canvases : new Set(snapshot.canvases.map((c) => c.id));
+  return { entityIds, canvasIds, tableIds: sourceTablesInScope(snapshot, entityIds, canvases, { projects: projects.size > 0, concepts: concepts.size > 0, mappings: scope.mappings }), logical: scope.logical, dimensional: scope.dimensional, mappings: scope.mappings };
 }
 
 /**

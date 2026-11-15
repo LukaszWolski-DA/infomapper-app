@@ -12,7 +12,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useToast } from "@/ui/components/toast";
 import { rowSaves } from "@/ui/row-saves";
-import { DEFAULT_CANVAS_LOOK, type CanvasLook } from "@/domain/types";
+import { DEFAULT_CANVAS_LOOK, OUTLINE_PAPERS, OUTLINE_PT, type CanvasLook, type PageOutline } from "@/domain/types";
 import { applyLookPatch, HIDDEN_RELATIONSHIP_KEYS, type CanvasLookPatch } from "@/domain/model/canvas-look";
 
 export type LookPatch = CanvasLookPatch;
@@ -31,6 +31,8 @@ export interface CanvasLookApi {
   editable: boolean;
   /** Editors: shown at once and saved. Others: only the layer mode and the hidden kinds, in this browser. */
   setLook: (patch: LookPatch) => void;
+  /** Slice 27, step 4 (Q6): the page outline is offered and drawn (a module's flag: InfoDocumenter on). */
+  outlines: boolean;
 }
 
 export const CanvasLookCtx = createContext<CanvasLookApi | null>(null);
@@ -54,8 +56,11 @@ export function CanvasLookProvider({
   version,
   editable,
   save,
+  outlines = false,
   children,
 }: {
+  /** Slice 27, step 4: the page outline is offered and drawn (`ModuleView.pageOutline`). */
+  outlines?: boolean;
   canvasId: string;
   /** The saved look, fresh with every page. */
   look: CanvasLook;
@@ -75,12 +80,16 @@ export function CanvasLookProvider({
   });
 
   // A fresh page brings the saved look; a change still on its way keeps what the user picked.
-  const { background, grid, layer, hideEntityRelationships, hideSourceRelationships } = server;
+  const { background, grid, layer, hideEntityRelationships, hideSourceRelationships, pageOutline } = server;
+  // the outline as one string: a fresh page's equal outline is no change
+  const outlineKey = pageOutline ? `${pageOutline.paper}|${pageOutline.orientation}|${pageOutline.pt}` : "";
   useEffect(() => {
     if (pending.current) return;
-    const stored = applyLookPatch({ background, grid, layer }, { hideEntityRelationships: !!hideEntityRelationships, hideSourceRelationships: !!hideSourceRelationships });
+    const [paper, orientation, pt] = outlineKey.split("|");
+    const outline = outlineKey ? { paper: paper as "A4", orientation: orientation as "portrait", pt: Number(pt) as 7 } : null;
+    const stored = applyLookPatch({ background, grid, layer }, { hideEntityRelationships: !!hideEntityRelationships, hideSourceRelationships: !!hideSourceRelationships, pageOutline: outline });
     setLookState((l) => (editable ? stored : applyLookPatch(stored, localPart(l))));
-  }, [background, grid, layer, hideEntityRelationships, hideSourceRelationships, editable]);
+  }, [background, grid, layer, hideEntityRelationships, hideSourceRelationships, outlineKey, editable]);
 
   const setLook = useCallback(
     (patch: LookPatch) => {
@@ -111,7 +120,7 @@ export function CanvasLookProvider({
     [editable, look, save, canvasId, toast],
   );
 
-  const api = useMemo(() => ({ canvasId, look, editable, setLook }), [canvasId, look, editable, setLook]);
+  const api = useMemo(() => ({ canvasId, look, editable, setLook, outlines }), [canvasId, look, editable, setLook, outlines]);
   return <CanvasLookCtx.Provider value={api}>{children}</CanvasLookCtx.Provider>;
 }
 
@@ -168,6 +177,49 @@ export function LookControls({
           {label}
         </button>
       ))}
+    </div>
+  );
+}
+
+const DEFAULT_OUTLINE: PageOutline = { paper: "A4", orientation: "portrait", pt: 7 };
+
+/**
+ * "Page outline for documentation" (slice 27, step 4, Q6; the prototype's `pageCtl`): Off, A4, A3; while on, Portrait,
+ * Landscape and 6, 7, 8 pt, with the hint. Shown in "Canvas look" while InfoDocumenter offers it; a change is the look's.
+ */
+export function PageOutlineControls({ outline, onChange }: { outline: PageOutline | undefined; onChange: (patch: LookPatch) => void }) {
+  const on = outline ?? null;
+  const set = (patch: Partial<PageOutline>) => onChange({ pageOutline: { ...(on ?? DEFAULT_OUTLINE), ...patch } });
+  const seg = (label: string, testId: string, items: readonly (readonly [string, string, boolean, () => void])[]) => (
+    <div className="flex rounded-[7px] bg-im-hover p-0.5" role="group" aria-label={label} data-testid={testId}>
+      {items.map(([key, text, pressed, pick]) => (
+        <button key={key} type="button" aria-pressed={pressed} data-value={key} onClick={pick} className={segClass}>
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+  return (
+    <div className="mt-2.5" data-testid="page-outline-controls">
+      <div className="mb-1.5 text-[12px] text-im-ink-2">Page outline for documentation</div>
+      {seg("Page outline for documentation", "group-page-outline", [
+        ["off", "Off", !on, () => onChange({ pageOutline: null })],
+        ...OUTLINE_PAPERS.map((p) => [p, p, on?.paper === p, () => set({ paper: p })] as const),
+      ])}
+      {on && (
+        <>
+          <div className="mt-1.5 grid gap-1.5">
+            {seg("Orientation", "group-page-outline-orientation", [
+              ["portrait", "Portrait", on.orientation === "portrait", () => set({ orientation: "portrait" })],
+              ["landscape", "Landscape", on.orientation === "landscape", () => set({ orientation: "landscape" })],
+            ])}
+            {seg("Smallest names", "group-page-outline-pt", OUTLINE_PT.map((pt) => [String(pt), `${pt} pt`, on.pt === pt, () => set({ pt })] as const))}
+          </div>
+          <div className="mt-1.5 text-[11.5px] text-im-ink-3" data-testid="text-page-outline-hint">
+            Keep the cards inside page 1 and this canvas prints whole, with attribute names at least {on.pt} pt.
+          </div>
+        </>
+      )}
     </div>
   );
 }

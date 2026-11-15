@@ -126,3 +126,41 @@ export function figureSummary(layouts: readonly FigureLayout[], smallestPt: numb
     (pt < smallestPt ? ` · smaller than ${smallestPt} pt: try one figure per frame, A3 paper, or the page outline on the canvas` : "")
   );
 }
+
+// ---- slice 27, step 4: the page outline on the canvas (Q6; the prototype's `pageArea`) ----
+
+/** The canvas's page outline as its look stores it: the paper, the page's orientation, the smallest names. */
+export interface OutlineSpec {
+  readonly paper: Paper;
+  readonly orientation: "portrait" | "landscape";
+  readonly pt: number;
+}
+
+/** One page of the outline, in canvas pixels; `n` from 1, row by row. */
+export interface OutlinePage extends Rect {
+  readonly n: number;
+}
+
+/**
+ * The pages a whole canvas takes at a paper, orientation and size of the attribute names: the figure's room on such a
+ * page (`figureBox`, upright) at the scale that draws the names at `pt`, laid from the figure's box's top left, row by
+ * row, as many as cover the box. Pure.
+ */
+export function outlinePages(box: Rect, spec: OutlineSpec): { pages: OutlinePage[]; cols: number; rows: number } {
+  const room = figureBox(spec, spec.orientation === "landscape");
+  const s = spec.pt / ROW_PT;
+  const w = room.w / (MM_PER_PX * s), h = room.h / (MM_PER_PX * s);
+  const cols = Math.max(1, Math.ceil(box.w / w - 0.001)), rows = Math.max(1, Math.ceil(box.h / h - 0.001));
+  const pages: OutlinePage[] = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) pages.push({ n: r * cols + c + 1, x: box.x + c * w, y: box.y + r * h, w, h });
+  return { pages, cols, rows };
+}
+
+/**
+ * A page's label on the canvas (the prototype's, the app's language): page 1 "{A4} {portrait} at {7} pt · fits on one
+ * page" or "… · needs {n} pages: move cards into page 1 to keep it whole"; the others "page {n}".
+ */
+export function outlineLabel(spec: OutlineSpec, n: number, total: number): string {
+  if (n > 1) return `page ${n}`;
+  return `${spec.paper} ${spec.orientation} at ${spec.pt} pt · ${total === 1 ? "fits on one page" : `needs ${total} pages: move cards into page 1 to keep it whole`}`;
+}

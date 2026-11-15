@@ -74,6 +74,7 @@ import { conceptQuestions, frameAt as smallestFrameAt } from "@/domain/model/fra
 import { ConceptQuestion, type CanvasQuestion } from "./ConceptQuestion";
 import { LIVE_ONE_AT_A_TIME } from "@/domain/model/live";
 import FrameLayer, { type FramePart } from "./FrameLayer";
+import PageOutline from "./PageOutline";
 import { useFrames, type CardPatch, type FrameWrites, type ReqMover } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
 import { CoverageLayer } from "./CoverageLayer";
@@ -351,7 +352,10 @@ export function ModelCanvas({
 }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
   const flashRowNow = ui.flashRow;
-  const look = useCanvasLook()?.look;
+  const lookApi = useCanvasLook();
+  const look = lookApi?.look;
+  // slice 27, step 4 (Q6): the page outline for documentation, while its module offers it
+  const pageOutline = lookApi?.outlines ? look?.pageOutline : undefined;
   const layer = look?.layer ?? "all";
   const grid = look?.grid ?? "dots";
   // Slice 16 (item 3, D-71): relationship lines hidden by kind, within the layers that show them
@@ -2507,6 +2511,7 @@ export function ModelCanvas({
           attributionPosition="bottom-left"
           aria-label="Model canvas"
         >
+          {pageOutline && <PageOutline outline={pageOutline} frames={frames} />}
           <FrameLayer
             frames={diagnosis.noFrames ? NO_FRAMES : frames}
             labels={!diagnosis.noLabels}
