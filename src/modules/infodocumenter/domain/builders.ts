@@ -12,6 +12,7 @@ import type { Uuid } from "@/domain/ids";
 import { checkMappingTypes, formatColumnType } from "@/domain/model/type-check";
 import type { Attribute, DocLanguage, Entity, Mapping, SourceColumn } from "@/domain/types";
 import { label, type LabelKey } from "./labels";
+import { buildDiagramsSection, buildFigureSection, conceptFrameFigure } from "./figures";
 import { buildReadiness } from "./readiness";
 import { buildConventions, buildOverview } from "./sections-model";
 import { buildQuality, buildRequirements, buildTrace } from "./sections-requirements";
@@ -130,7 +131,8 @@ const CARD_LINES: readonly DictionaryColumn[] = ["mappedFrom", "calculation", "r
  * longer definition leaves "→ note {n}" and comes in full at the section's end. The coverage line counts by the app's
  * rule whatever the mapping filter (Q-L3): any mapping or feed, any status, or through a calculation.
  */
-export function buildDictionary({ state, scope, options, language, keepRows }: SectionBuildInput): DocNode[] {
+export function buildDictionary(input: SectionBuildInput): DocNode[] {
+  const { state, scope, options, language, keepRows } = input;
   const o: DictionaryOptions = dictionaryOptions.parse(options);
   const t = wordsOf(language);
   const fed = fedRule(state);
@@ -209,7 +211,10 @@ export function buildDictionary({ state, scope, options, language, keepRows }: S
       if (o.conceptPage && !first) out.push({ kind: "pageBreak" });
       first = false;
       const c = state.concept.get(conceptId);
-      out.push({ kind: "heading", level: 2, text: c?.name ?? "?", ...(c ? { swatch: c.color } : {}) }, ...list.flatMap(entityNodes));
+      out.push({ kind: "heading", level: 2, text: c?.name ?? "?", ...(c ? { swatch: c.color } : {}) });
+      // slice 27 (D5): the concept's frame at the group's start, from the first canvas of the scope that has one
+      if (c && o.conceptFigures) out.push(...conceptFrameFigure(input, c.id));
+      out.push(...list.flatMap(entityNodes));
     }
   } else out.push(...entities.flatMap(entityNodes));
   if (moved.length)
@@ -360,6 +365,17 @@ const OWN: Record<string, Registration> = {
     label: titled("t_dq"),
     description: "Requirements of the kind data-quality rule: the rule, what happens when it fails, its owner and what it applies to.",
     build: buildQuality,
+  },
+  // slice 27
+  diagrams: {
+    label: titled("t_diagrams"),
+    description: "Figures of whole canvases or single frames, each with its own view, size and caption. Tick what goes into the document.",
+    build: buildDiagramsSection,
+  },
+  figure: {
+    label: titled("t_figs"),
+    description: "One or more figures of a canvas or a frame, placed wherever you put this section.",
+    build: buildFigureSection,
   },
 };
 

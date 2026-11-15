@@ -1225,7 +1225,14 @@ body.im-chgmode #lines .lnk.map.im-hit .s{stroke-width:2.6px}
 .de-badge.ro{background:var(--warn-soft);color:var(--warn)}
 .de-zoom select{height:26px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
 .de-ro{padding:8px 14px;background:var(--warn-soft);font-size:12.5px;display:flex;gap:10px;align-items:center}
-.de-body{display:grid;grid-template-columns:250px 1fr 330px;min-height:0}
+.de-body{display:grid;grid-template-columns:var(--dl,250px) 1fr var(--dr,330px);min-height:0;position:relative}
+.de-rz{position:absolute;top:0;bottom:0;width:8px;cursor:col-resize;z-index:6;touch-action:none}
+.de-rz.l{left:calc(var(--dl,250px) - 4px)}.de-rz.r{right:calc(var(--dr,330px) - 4px)}
+.de-rz::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent;transition:background .12s}
+.de-rz:hover::after,.de-rz:focus-visible::after,.de-rz.drag::after{background:var(--logical)}
+.de-rz:focus-visible{outline:none}
+.de-body.rzing{user-select:none;cursor:col-resize}
+@media (max-width:1100px){.de-rz{display:none}}
 .de-left,.de-right{overflow:auto;background:var(--surface);padding:12px}
 .de-left{border-right:1px solid var(--line)}
 .de-right{border-left:1px solid var(--line)}
@@ -8982,6 +8989,32 @@ window.__conv23 = () => CONV.conv();
    Diagrams are SVG drawn from the canvas's data with InfoMapper's own geometry (rowsOf, endOf, curve, relGeom …).
    ========================================================= */
 MODULES.docSections = [];
+/* ---------- InfoDocumenter editor: resizable side panels (slice 27, C6) ----------
+   Each side panel has a handle: drag, or arrow keys (16 px; Shift 64 px), within its bounds; a double-click (or Home)
+   gives the default back. The widths are this browser's own convenience, kept in localStorage. */
+const PANELS = (() => {
+  const B = {l:{def:250, min:200, max:480, v:"--dl"}, r:{def:330, min:280, max:560, v:"--dr"}}, KEY = "infodoc.panels";
+  let W = {}; try { W = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { W = {}; }
+  const clamp = (k, x) => Math.round(Math.max(B[k].min, Math.min(B[k].max, x)));
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(W)); } catch (e) {} };
+  const apply = () => { const b = document.getElementById("de-body"); if (!b) return; for (const k in B) W[k] ? b.style.setProperty(B[k].v, W[k] + "px") : b.style.removeProperty(B[k].v); };
+  const style = () => Object.keys(B).filter(k => W[k]).map(k => `${B[k].v}:${W[k]}px`).join(";");
+  const set = (k, x) => { W[k] = clamp(k, x); if (W[k] === B[k].def) delete W[k]; apply(); };
+  const width = k => W[k] || B[k].def;
+  let drag = null;
+  document.addEventListener("pointerdown", ev => { const h = ev.target.closest?.("[data-rz]"); if (!h || ev.button !== 0) return;
+    const b = document.getElementById("de-body"), k = h.dataset.rz; drag = {k, x0:ev.clientX, w0:width(k), h, b};
+    h.classList.add("drag"); b.classList.add("rzing"); h.setPointerCapture?.(ev.pointerId); ev.preventDefault(); });
+  document.addEventListener("pointermove", ev => { if (!drag) return; const dx = ev.clientX - drag.x0; set(drag.k, drag.w0 + (drag.k === "l" ? dx : -dx)); });
+  const end = () => { if (!drag) return; drag.h.classList.remove("drag"); drag.b.classList.remove("rzing"); drag = null; save(); };
+  document.addEventListener("pointerup", end); document.addEventListener("pointercancel", end);
+  document.addEventListener("dblclick", ev => { const h = ev.target.closest?.("[data-rz]"); if (!h) return; delete W[h.dataset.rz]; apply(); save(); });
+  window.addEventListener("keydown", ev => { const h = ev.target.closest?.("[data-rz]"); if (!h) return; const k = h.dataset.rz, st = ev.shiftKey ? 64 : 16;
+    const grow = {ArrowRight:k === "l" ? st : -st, ArrowLeft:k === "l" ? -st : st}[ev.key];
+    if (grow) { set(k, width(k) + grow); save(); ev.preventDefault(); ev.stopPropagation(); } else if (ev.key === "Home") { delete W[k]; apply(); save(); ev.preventDefault(); ev.stopPropagation(); } }, true);
+  return {style, width, _reset:() => { W = {}; save(); apply(); }};
+})();
+
 const DOC = (() => {
   const PT = 0.2646, MARG = 18;                       // mm per CSS px; page margin in mm
   const PAPER = {A4:[210, 297], A3:[297, 420]};
@@ -10094,7 +10127,7 @@ ${admin ? `<label class="btn sm">${w.clientLogo ? "Replace" : "Upload"}<input ty
 <span class="sp" style="flex:1"></span><span class="de-busy" id="de-busy" hidden>Laying out pages…</span><span class="de-zoom"><select data-de="pages" aria-label="Preview pages" title="Auto: real pages while they lay out quickly, otherwise the quick sheet until you update them. Exact: real pages after every change. Quick: one sheet per page break, at once."><option value="auto" ${(ST.pages || "auto") === "auto" && window.Paged ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Auto</option><option value="exact" ${ST.pages === "exact" ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Exact pages</option><option value="quick" ${ST.pages === "quick" || !window.Paged ? "selected" : ""}>Quick preview</option></select></span><span class="de-zoom"><select data-de="zoom" aria-label="Preview zoom"><option value="fit">Fit width</option><option value="0.75">75 %</option><option value="1">100 %</option></select></span>
 <button class="btn sm" data-de="print" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Print / PDF</button><button class="btn sm pri" data-de="gen" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Generate version</button></div>
 ${ro ? `<div class="de-ro">${esc(whyNot.edit(d))}${can.create() ? ` <button class="btn sm" data-de="dup">Duplicate as my document</button>` : ""}</div>` : ""}
-<div class="de-body"><div class="de-left" id="de-left"></div><div class="de-mid" id="de-mid"></div><div class="de-right" id="de-right"></div></div>`;
+<div class="de-body" id="de-body" style="${PANELS.style()}"><div class="de-left" id="de-left"></div><div class="de-mid" id="de-mid"></div><div class="de-right" id="de-right"></div><div class="de-rz l" data-rz="l" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Width of the sections panel" title="Drag to widen; double-click for the default width"></div><div class="de-rz r" data-rz="r" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Width of the options panel" title="Drag to widen; double-click for the default width"></div></div>`;
     box.querySelector('[data-de="zoom"]').value = String(ST.zoom);
     if (oldPrev) { const m = $("#de-mid"); oldPrev.forEach(n => m.appendChild(n)); m.scrollTop = oldTop; }
     drawLeft(); drawPreview(); drawRight();

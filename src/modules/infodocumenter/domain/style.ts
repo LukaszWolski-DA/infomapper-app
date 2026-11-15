@@ -3,6 +3,7 @@
 // adapter on load; no change to the local file's format, AD-33).
 
 import { z } from "zod";
+import { SMALLEST_PT } from "@/domain/document/page";
 import { DOC_LANGUAGES } from "@/domain/types";
 import type { DocumentFrameFields, DocumentSection, DocumentStyle } from "./types";
 
@@ -15,7 +16,8 @@ export const TEMPLATES = ["standard", "formal", "compact"] as const;
 export const ACCENTS = ["indigo", "teal", "graphite", "burgundy"] as const;
 export const KEEP_ROWS = [0, 10, 15, 25, 40] as const;
 
-/** The prototype's `newDef` without figures, logos and baselines; the language is the workspace's (null). */
+/** The prototype's `newDef` without logos and baselines; the language is the workspace's (null). Slice 27 adds the list of
+ * figures (off) and the smallest names (6 pt); a recipe stored before reads with them (`upgradeDocument`). */
 export const STYLE_DEFAULTS: DocumentStyle = {
   language: null,
   template: "standard",
@@ -25,8 +27,10 @@ export const STYLE_DEFAULTS: DocumentStyle = {
   orientation: "portrait",
   notation: "ie",
   keepRows: 15,
+  smallestPt: 6,
   cover: true,
   contents: true,
+  listOfFigures: false,
   numbers: true,
   banded: false,
   runningHeader: true,
@@ -56,8 +60,10 @@ export const stylePatch = z
     orientation: z.enum(["portrait", "landscape"]),
     notation: z.enum(["ie", "uml"]),
     keepRows: z.number().refine((n): n is DocumentStyle["keepRows"] => (KEEP_ROWS as readonly number[]).includes(n), "Choose one of the row counts."),
+    smallestPt: z.number().refine((n): n is DocumentStyle["smallestPt"] => (SMALLEST_PT as readonly number[]).includes(n), "Choose one of the sizes."),
     cover: z.boolean(),
     contents: z.boolean(),
+    listOfFigures: z.boolean(),
     numbers: z.boolean(),
     banded: z.boolean(),
     runningHeader: z.boolean(),

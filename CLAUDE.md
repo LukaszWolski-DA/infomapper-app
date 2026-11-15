@@ -73,6 +73,11 @@ left (add, remove up to 50, move, heading, switch), an adaptive preview built in
 (Auto under 1,000 ms, Exact pages, Quick preview with "Update pages"), the options on the right; every section of the
 prototype without figures (InfoCube's Bus matrix too); the dictionary's layouts and its facts and dimensions; and a style
 per document (its own language, templates with IBM Plex Serif, paper and orientation, header and footer fields).
+Slice 27 (D-82) draws figures: canvases and frames as SVG images drawn from the model by the canvas's own rules (moved to
+`src/domain/canvas/`), IBM Plex embedded, as on the canvas or adjusted, whole or in parts, upright or turned; the
+Diagrams and Figure sections, Model overview's figures, the dictionary's concept frames, InfoCube's star diagram per
+fact, numbering and the list of figures, the smallest names; the page outline for documentation in a canvas's look; the
+editor's resizable side panels (a cookie).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -144,6 +149,8 @@ If these disagree, stop and ask. Do not resolve a conflict silently.
 
 ```
 src/domain   pure TypeScript: types, commands, validation, business rules. No React, no Next.js, no database.
+             Since slice 27 also the canvas's pure drawing rules (`src/domain/canvas/`: cards, geometry, text widths,
+             lines and their routes, frames, requirement cards, traces), which `src/canvas` re-exports.
 src/data     repository interfaces and their adapters: a local JSON-file adapter now (AD-29), Supabase later.
              Only this layer touches stored data.
 src/app      Next.js App Router routes, server actions, route handlers, screens.
@@ -154,7 +161,8 @@ tests/       repository-level checks outside the layers (e.g. the layer rules). 
 
 Imports go one way: `app` → `canvas` → `ui` → `domain`; `app` and `canvas` may also skip a step (e.g. `canvas` → `domain`);
 `app` → `data` → `domain`. `ui` never imports from `canvas`. `domain` imports nothing from the other layers.
-`npm run lint` enforces this (`eslint.config.mjs`).
+`npm run lint` enforces this (`eslint.config.mjs`). Code in `src/domain` imports `src/domain/canvas` as
+`@/domain/canvas/…`: the layer rule reads a relative `../canvas` as the canvas layer and refuses it (slice 27, AD-19's note).
 
 **Modules (AD-33, slice 15a).** A module's code is in `src/modules/<module>/` in the same five parts (`domain`, `data`,
 `ui`, `canvas`, `app`), each under its layer's rules; a module part may import InfoMapper's layers, **InfoMapper's layers
@@ -282,6 +290,38 @@ list up to date in each sub-slice):
     shared pieces are `parts.ts`. InfoCube's Bus matrix is `CUBE_BUS_SECTION`.
   - **The recipe:** `style` and each entry's `heading` and `newPage` (`domain/style.ts`, `upgradeDocument` as the
     table's row upgrade, no file format); the commands add, remove (at most 50) and move a section.
+  **Slice 27 (D-82): figures.**
+  - **The drawing:** `figureDrawing` (`src/domain/document/figure.ts`, pure: the snapshot's canvases, frames, cards,
+    labels and label links, never notes) draws an SVG with the canvas's rules from `src/domain/canvas/`; its box is
+    `figureBoxOf`. The page geometry (papers, margins, a figure's room, sizes, orientations, parts, the editor's line, the
+    page outline's pages) is `src/domain/document/page.ts`. The content tree's kinds `figure` (`DocFigure`) and `legend`;
+    `figure-node.ts` turns a drawing into nodes (`figureNodes`) and makes a section's kit (`sectionFigures`).
+  - **What a section draws figures with:** `SectionBuildInput.figures` (`SectionFigures`): `list(entries, { notation,
+    warnPt, canvasHeadings })` for a section's stored figures (`FigureEntry`, `src/domain/document/figure-entry.ts`,
+    shared with a module's options) and `placed(...)` for cards a section placed itself (InfoCube's star,
+    `src/modules/infocube/domain/star.ts`). InfoDocumenter makes the kit in the document's words (`documentFigures`,
+    `figures.ts`), lazily: a document without figures reads nothing for them. `SectionScope.canvasIds`: the scope's
+    canvases (every live canvas with no project ticked).
+  - **What a module gives a figure:** `DocumentContributions.figures` (`FigureContributions`: roles in a language, row
+    feeds, lines; InfoCube's `cubeFigureContributions`). **A module's options as plain fields:** `optionFields`
+    (`SectionOptionField`: check, seg, select, label, hint, `figures`, `figureSize`, `figureLines`, each with `when`),
+    drawn by the editor's `ModuleOptions`; `optionChecks` still reads as check boxes.
+  - Figures are numbered by `buildDocument` (keys `{section}:{figure}`), which lists them (`tree.figures`) and gives the
+    list of figures' heading (`tree.listOfFigures`). Diagrams' figures are made with the section from the scope's
+    canvases (`diagramCanvases`: the projects in the order made, each in tab order, then with no project ticked the
+    canvases in no project), by New document, "+ Add section" and the demo.
+  - **In the pages:** each figure's SVG once in a hidden holder; the page makes one blob per figure with IBM Plex's
+    unmodified files embedded for the faces it uses (`ui/figure-images.ts`, `app/figure-fonts.ts`), and each part's
+    `<img>` shows its region (`#svgView(viewBox(…))`). The editor's figure editor is `app/figure-editor.tsx`; a caption's
+    draft reaches the preview as `fig:{section}:{figure}` (`ui/drafts.ts`). The editor's side panels:
+    `app/panel-handles.tsx`, the widths in the cookie `im-doc-panels.{user}` (`ui/panels-cookie.ts`).
+- **The page outline on the canvas** (slice 27, D-82): `ModuleView.pageOutline` (a module offers it; InfoDocumenter
+  while it is on, `moduleView`), handed to `CanvasLookProvider` (`outlines`); the key is the canvas's look
+  (`CanvasLook.pageOutline`, present only while on; `applyLookPatch`, `sameOutline`), its control `PageOutlineControls`
+  (`src/canvas/look.tsx`) under Canvas look, its layer `src/canvas/PageOutline.tsx` behind the frames: mounted only while
+  on (no element off), the pages from `outlinePages`, the box from React Flow's store by `figureBoxOf` (never notes),
+  kept while a card is dragged. **A later layer that reads the cards' places** reads them the same way, never by
+  re-rendering `ModelCanvas`.
 - **InfoDocumenter's editor** (slice 26): `app/editor.tsx` (the panels), `app/preview.tsx` (the modes; a layout off
   screen, swapped in when done; a newer change stops a running layout by failing its next page; finished pages stop
   watching their size; known limitations), `app/section-options.tsx` (each type's options from one spec),
@@ -518,6 +558,9 @@ SCREENS=<folder> npx playwright test e2e/slice-23/S23-screens.spec.ts           
 SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts                     # slice 22: the unknown member's section (a value, a value that does not fit, off), Fact Sales' Dimensions; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
 npx tsx scripts/bench-documents.ts                            # slice 25: a whole document's content tree (snapshot, state, tree) on Performance test and the demo (reference figure, no bar)
+npx tsx scripts/bench-figures.ts                              # slice 27: the dictionary preset with Diagrams' figures, the figures' share of the tree, their SVGs' size (reference figure, no bar)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-27/S27-10-figures.spec.ts  # slice 27: the editor with figures: snapshot, state, tree, first layout, what Auto shows after a change (reference figures)
+MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-27/S27-09-elements.spec.ts  # slice 27: the element guard's views with InfoDocumenter on, the page outline off (the baseline's counts) and on
 npx tsx scripts/bench-checks.ts                               # slice 20: the model checks (marks and counts, the home with its lines; bar 50 ms in Node), synthetic, Performance test, demo
 npx tsx scripts/bench-checks-browser.ts                       # slice 20: the same in headless Chromium, with the split (the marks: reference 25 ms, not a gate)
 npx tsx scripts/count-checks.ts <copy of a backup>             # slice 20: a read-only count of the check lines per workspace and project (counts only, never .data/dev-db.json)
@@ -786,6 +829,16 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     several sections' laid-out text (`sectionsText`; `sectionText` ignores a heading's number).
   The editor shows the quick sheet in Auto after a slow layout: a spec that needs real pages after each change selects
   "Exact pages" (S26-07).
+
+  Slice 27's fixtures are slice 26's (`seed` "docs", "plain" or "full"; S27-05 uses "full", the star). Its helpers do the
+  following:
+  - name the demo's canvases (`canvasId`) and put a frame around a canvas's first entity card (`frameAroundFirstEntity`);
+    write a document whose one section is a Figure section with these figures (`figuresOnly`, `newFigure`);
+  - read the figures in the pages and on the quick sheet (`pageFigures`, `quickFigures`), each image's source, region,
+    size and caption (`figureImages`) and the SVG an image shows (`svgOf`); the figure editor's entries
+    (`figureEntries`, `expectStoredFigures`).
+  A figure's image is a blob of the page: read its SVG in the page (`svgOf`), never from a file. The page outline's
+  layer has no size of its own: wait for it `attached`, not visible (S27-09).
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,

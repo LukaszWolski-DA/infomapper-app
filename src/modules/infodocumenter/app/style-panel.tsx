@@ -6,6 +6,7 @@
 // four header and footer fields with their tokens (D6). Each choice saves its part of the style on the save chain
 // (`useChoice`); each field keeps its draft (D-66) and feeds the preview as it is typed (`onType`).
 
+import { SMALLEST_PT } from "@/domain/document/page";
 import type { ReactNode } from "react";
 import type { useAction } from "@/app/_components/use-action";
 import { Seg, TextField, useChoice } from "@/app/_panels/fields";
@@ -54,9 +55,15 @@ export const STYLE_TEXTS = {
   keepRows: "Keep a table on one page up to",
   keepRowsChoices: { 0: "Never: break anywhere", 10: "10 rows", 15: "15 rows", 25: "25 rows", 40: "40 rows" } as Record<number, string>,
   keepRowsHint: "A shorter entity moves whole to the next page instead of being cut. Headings always stay with what follows them.",
+  // slice 27, step 3 (D1)
+  smallestPt: "Smallest attribute names in diagrams",
+  // slice 27, step 4 (Łukasz): a hint that is true of D4 (a): the size never draws a figure larger
+  smallestPtHint: "A figure whose names come out smaller shows a warning in its line; “Whole, as large as fits” turns it on the page when that makes them larger.",
   switches: [
     ["cover", "Cover page"],
     ["contents", "Contents"],
+    // slice 27, step 3 (D10)
+    ["listOfFigures", "List of figures"],
     ["numbers", "Numbered sections and subsections"],
     ["banded", "Banded table rows"],
     ["runningHeader", "Running header"],
@@ -152,6 +159,19 @@ export function StylePanel({
               {KEEP_ROWS.map((n) => (
                 <option key={n} value={n}>
                   {T.keepRowsChoices[n]}
+                </option>
+              ))}
+            </select>
+          )}
+        </Choice>
+      </Field>
+      <Field label={T.smallestPt} hint={T.smallestPtHint}>
+        <Choice stored={style.smallestPt} save={(v) => save({ smallestPt: v })}>
+          {(value, pick) => (
+            <select data-testid="select-style-smallestPt" value={value} disabled={readOnly} onChange={(e) => pick(Number(e.currentTarget.value) as DocumentStyle["smallestPt"])} className={selectClass}>
+              {SMALLEST_PT.map((n) => (
+                <option key={n} value={n}>
+                  {n} pt
                 </option>
               ))}
             </select>

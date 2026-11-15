@@ -38,8 +38,9 @@ const noStorage = {
   message: "src/domain does not touch storage; use src/data (AD-19).",
 };
 const noOtherLayers = {
-  // Climbing out with ../ or using the @/ alias to reach another layer. (So src/domain must not have
-  // folders or files of its own named data, app, ui or canvas; ./canvas within a folder is fine.)
+  // Climbing out with ../ or using the @/ alias to reach another layer. (So a relative import of src/domain's own
+  // folder `canvas` (slice 27, F1: the canvas's pure drawing rules) is refused: import it as `@/domain/canvas/…`.
+  // src/domain has no other folder or file named data, app, ui or canvas; ./canvas within a folder is fine.)
   regex: "^(@/|(\\.\\./)+)(data|app|ui|canvas|modules|compose)(/|$)",
   message: "src/domain imports nothing from the other layers (AD-19).",
 };

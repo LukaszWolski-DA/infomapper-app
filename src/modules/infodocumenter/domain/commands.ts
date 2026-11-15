@@ -11,7 +11,9 @@ import type { DocumentSectionKind } from "@/domain/document/sections";
 import { sectionOptionsRefusal } from "@/domain/document/sections";
 import { domainError, notFound, type DomainError } from "@/domain/errors";
 import type { WorkspaceAccess } from "@/domain/permissions";
+import type { Uuid } from "@/domain/ids";
 import { parseInput, uuidSchema, versionSchema } from "@/domain/validation";
+import { diagramFigures } from "./figures";
 import { newSection, presetOf, presetSections } from "./presets";
 import { headingSchema } from "./sections";
 import { defaultStyle, patchedStyle, SECTIONS_MAX, stylePatch } from "./style";
@@ -78,7 +80,14 @@ const EMPTY_COVER: DocumentCover = { title: null, subtitle: null, version: null,
  * A new private document of the person's from a preset (D1, D13): named by the preset's label, the live model, the whole
  * model in scope, both levels, the preset's mappings, its sections, then the available modules' that end it.
  */
-export function createDocument(ctx: CommandContext, access: WorkspaceAccess, input: unknown, kinds: Kinds): CommandResult<{ document: DocumentDefinition }> {
+export function createDocument(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  input: unknown,
+  kinds: Kinds,
+  /** Slice 27 (D9): the scope's canvases in order (`diagramCanvases`), for Diagrams' figures. */
+  canvasIds: readonly Uuid[] = [],
+): CommandResult<{ document: DocumentDefinition }> {
   const refused = createRefusal(access);
   if (refused) return fail(refused);
   const parsed = parseInput(createInput, input);
@@ -100,12 +109,26 @@ export function createDocument(ctx: CommandContext, access: WorkspaceAccess, inp
     cover: { ...EMPTY_COVER },
     // a new document takes the workspace's documentation language (Q8) and its preset's draft mark
     style: defaultStyle({ language: access.workspace.doc_language, watermark: preset.watermark }),
-    sections: presetSections(preset, kinds.values(), access.workspace, ctx.newId),
+    sections: presetSections(preset, kinds.values(), access.workspace, ctx.newId, canvasIds),
   };
   return { ok: true, value: { document: row }, writeSet: buildWriteSet(ctx, access.workspace.id, [{ kind: "insert", table: "document_definition", row }]) };
 }
 
 // ---- save ----
+
+/** Slice 27: a figure's canvas or frame of another workspace, or none. */
+export const FIGURE_CANVAS_REFUSAL = "That canvas is not in this workspace.";
+
+type FigureRef = { id: string; canvasId: string; frameId: string | null };
+const figuresOf = (options: Record<string, unknown>): FigureRef[] => (Array.isArray(options.figures) ? (options.figures as FigureRef[]) : []);
+/** The figures of a section's new options that are new, or show another canvas or frame than they did. */
+function figuresAdded(before: Record<string, unknown>, after: Record<string, unknown>): FigureRef[] {
+  const was = new Map(figuresOf(before).map((f) => [f.id, f]));
+  return figuresOf(after).filter((f) => {
+    const old = was.get(f.id);
+    return !old || old.canvasId !== f.canvasId || old.frameId !== f.frameId;
+  });
+}
 
 const updateInput = z
   .object({
@@ -134,6 +157,8 @@ export function updateDocument(
   doc: DocumentDefinition | null | undefined,
   input: unknown,
   kinds: Kinds,
+  /** Slice 27: the workspace's canvases and their frames; a figure added in this save must show one of them. */
+  canvases?: { readonly canvasIds: ReadonlySet<string>; readonly frameCanvas: ReadonlyMap<string, string> },
 ): CommandResult<{ document: DocumentDefinition }> {
   const refused = editRefusal(access, doc);
   if (refused) return fail(refused);
@@ -162,6 +187,9 @@ export function updateDocument(
       const refusal = sectionOptionsRefusal(kinds, { id: section.id, type: section.type, options: merged });
       if (refusal) return fail(refusal);
       options = kind!.options.parse(merged);
+      const added = figuresAdded(section.options, options);
+      if (added.some((f) => !canvases?.canvasIds.has(f.canvasId) || (f.frameId !== null && canvases.frameCanvas.get(f.frameId) !== f.canvasId)))
+        return fail(domainError("invalid", FIGURE_CANVAS_REFUSAL, { [`sections.${section.id}`]: "invalid" }));
     }
     const next = {
       ...section,
@@ -211,6 +239,8 @@ export function addDocumentSection(
   doc: DocumentDefinition | null | undefined,
   input: unknown,
   kinds: ReadonlyMap<string, DocumentSectionKind & { readonly module?: string | null }>,
+  /** Slice 27 (D9): the document's scope's canvases in order (`diagramCanvases`), for a new Diagrams' figures. */
+  canvasIds: readonly Uuid[] = [],
 ): CommandResult<{ document: DocumentDefinition; sectionId: string }> {
   const parsed = parseInput(addInput, input);
   if (!parsed.ok) return fail(parsed.error);
@@ -220,7 +250,9 @@ export function addDocumentSection(
     if (!kind) return domainError("invalid", SECTION_TEXTS.notInstalled);
     if (!kind.available(access.workspace)) return domainError("invalid", SECTION_TEXTS.off(kind.module ?? "Its module"));
     if (sections.length >= SECTIONS_MAX) return domainError("invalid", SECTION_TEXTS.tooMany);
-    return [...sections, newSection(id, kind.type, kind.defaults())];
+    const options = kind.defaults();
+    if (kind.type === "diagrams") options.figures = diagramFigures(canvasIds, ctx.newId);
+    return [...sections, newSection(id, kind.type, options, !kind.samePage)];
   });
   return r.ok ? { ...r, value: { ...r.value, sectionId: id } } : r;
 }

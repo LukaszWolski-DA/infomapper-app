@@ -6,9 +6,13 @@
 import type { Uuid } from "../ids";
 import type {
   AppUser,
+  Canvas,
   CanvasItem,
   ChangeEvent,
   CoreWritableRows,
+  Frame,
+  Label,
+  LabelLink,
   LostOriginal,
   ModuleTable,
   Organization,
@@ -131,6 +135,14 @@ export interface WorkspaceSnapshot<T extends ModuleTable = never> {
   readonly projects: readonly Project[];
   readonly projectCanvases: readonly ProjectCanvas[];
   readonly canvasItems: readonly CanvasItem[];
+  /**
+   * Slice 27 (F2): the live canvases (their name, look and names), their live frames, and the live labels with their
+   * live links (a live label canvas's membership, the `labeled` filter): what a figure draws. Never notes (C4).
+   */
+  readonly canvases: readonly Canvas[];
+  readonly frames: readonly Frame[];
+  readonly labels: readonly Label[];
+  readonly labelLinks: readonly LabelLink[];
   readonly members: readonly WorkspaceMember[];
   readonly people: readonly AppUser[];
   readonly modules: ModuleRowsOf<T>;
@@ -159,6 +171,10 @@ export function workspaceSnapshotOf<T extends ModuleTable>(
     projects: ofWorkspace(rows.project, workspaceId),
     projectCanvases: liveProjectCanvasesOf(rows, workspaceId).sort(byTabOrder),
     canvasItems: ofWorkspace(rows.canvas_item, workspaceId),
+    canvases: ofWorkspace(rows.canvas, workspaceId),
+    frames: ofWorkspace(rows.frame, workspaceId),
+    labels: ofWorkspace(rows.label, workspaceId),
+    labelLinks: ofWorkspace(rows.label_link, workspaceId),
     members: rows.workspace_member.filter((m) => m.workspace_id === workspaceId),
     people: workspacePeopleOf(rows, workspaceId),
     modules: moduleRows,

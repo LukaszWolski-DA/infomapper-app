@@ -25,6 +25,16 @@ describe("layer rules", () => {
     expect(await lintDomainFile('import "react";\n')).toContain("no-restricted-imports");
     expect(await lintDomainFile('import "next/server";\n')).toContain("no-restricted-imports");
   });
+
+  it("keeps the canvas's drawing rules in src/domain/canvas pure (slice 27, F1)", async () => {
+    const at = "src/domain/canvas/__layer_probe__.ts";
+    expect(await lintFile(at, 'import { HEAD_H } from "./geometry";\nexport const x = HEAD_H;\n')).toEqual([]);
+    expect(await lintFile(at, 'import "@/canvas/selection";\n')).toEqual(expect.arrayContaining(["no-restricted-imports", "boundaries/dependencies"]));
+    expect(await lintFile(at, 'import "@/ui/modules";\n')).toEqual(expect.arrayContaining(["no-restricted-imports", "boundaries/dependencies"]));
+    // a document section imports it by the alias; climbing to it is refused (the rule's own folder name)
+    expect(await lintFile("src/domain/document/__probe__.ts", 'import { HEAD_H } from "@/domain/canvas/geometry";\nexport const x = HEAD_H;\n')).toEqual([]);
+    expect(await lintFile("src/modules/infodocumenter/domain/__probe__.ts", 'import { HEAD_H } from "@/domain/canvas/geometry";\nexport const x = HEAD_H;\n')).toEqual([]);
+  });
 }, 60_000);
 
 describe("module boundary (slice 15a, S15-01)", () => {

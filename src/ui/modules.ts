@@ -5,41 +5,8 @@
 
 import type { Uuid } from "@/domain/ids";
 
-/**
- * A dimensional entity's role (D-67), where a logical entity's stereotype stands: its text, its tooltip, the card's
- * classes (the module's CSS draws the mark and a fact's edge) and the mark's class in the header.
- */
-export interface EntityRole {
-  text: string;
-  title: string;
-  /** Classes on the card (`dimn fact`). */
-  card: string;
-  /** Classes on the header's first span (`cube`): the mark before the text. */
-  mark: string;
-  /**
-   * What the coverage bar counts on this card, when the module counts its rows (slice 15c, P17): "fed from the logical
-   * model" ("{n} of {m} attributes fed from the logical model"); absent: InfoMapper's "mapped".
-   */
-  coverage?: string;
-  /**
-   * Slice 15c (P17, F19, C10): the Overview's word after "{n} of {m}" ("fed") and its tooltip ("Attributes fed from the
-   * logical model"); the entity panel's attribute list's title ("Attributes and their logical feed") and the text of a
-   * row without a feed ("no feed"). The counts are `ModuleView.rowFeeds`'.
-   */
-  feed?: { word: string; title: string; list: string; none: string };
-}
-
-/**
- * A row's state when a module counts it (slice 15c, C12): how many of the module's lines reach it (its dot, the
- * coverage bar, the Mapped / Not mapped filter) and the dot's tooltip ("from Customer.segment_code", "Not fed from the
- * logical model").
- */
-export interface RowFeed {
-  n: number;
-  title: string;
-  /** The entity panel's list (slice 15c, C10): what feeds the row ("Customer.segment_code", "ƒ 3 attributes"); empty without. */
-  list: string;
-}
+export type { EntityRole, RowFeed } from "@/domain/canvas/module-marks";
+import type { EntityRole, RowFeed } from "@/domain/canvas/module-marks";
 
 /** One group of a module's tab: its entities by concept, each with its own right-side text (`grain set`, `SCD 1`). */
 export interface ModuleTabSection {
@@ -149,6 +116,11 @@ export interface ModuleView {
    * `created_*` and `updated_*` (O8). InfoMapper never reads them.
    */
   data: Readonly<Record<string, unknown>>;
+  /**
+   * Slice 27, step 4 (Q6): "Page outline for documentation" in "Canvas look" and its outline on the canvas, while
+   * InfoDocumenter is on; the outline is the canvas's own look key, read by InfoMapper's canvas.
+   */
+  pageOutline?: boolean;
 }
 
 export const NO_MODULES: ModuleView = { roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, rowFeeds: {}, relationshipDeletes: {}, data: {} };

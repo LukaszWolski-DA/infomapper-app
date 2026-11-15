@@ -18,6 +18,8 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import type { DocumentTree } from "../domain/document";
 import { DOCUMENT_LOOK_CSS, documentCss, PAGES_SCREEN_CSS, pageSize, quickSheetCss, styleCss } from "../ui/document-css";
 import { DocumentHtml } from "../ui/document-html";
+import { FigureImages, imagesReady, removeHolders } from "../ui/figure-images";
+import { loadFigureFonts } from "./figure-fonts";
 import { LAYING_OUT, LAYOUT_FAILED, pagesText } from "./paged-view";
 
 export type PreviewMode = "auto" | "exact" | "quick";
@@ -151,6 +153,9 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
   const [width, setWidth] = useState(0);
   /** The look the shown pages were laid out with. */
   const shownLook = useRef<string | null>(null);
+  /** Slice 27: the figures' image sources, one blob per figure with IBM Plex embedded (Q2, Q3). */
+  const images = useRef<FigureImages | null>(null);
+  images.current ??= new FigureImages();
 
   // "Fit width" from the middle's width, reported after the browser's layout
   useEffect(() => {
@@ -211,13 +216,16 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
     setBusy(true);
     setFailed(false);
     const css = documentCss(tree.frame, tree.style);
-    const content = from.cloneNode(true);
+    const content = from.cloneNode(true) as Element;
     (async () => {
-      const { Previewer } = await loadPaged();
+      const [{ Previewer }, fonts] = await Promise.all([loadPaged(), loadFigureFonts()]);
       if (stopped) {
         host.remove();
         return;
       }
+      images.current!.setFonts(fonts);
+      images.current!.attach(content);
+      removeHolders(content);
       const previewer = new Previewer();
       const layout: Layout = { previewer, host };
       running.current = {
@@ -243,6 +251,11 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
         destroy(layout);
         return;
       }
+      await imagesReady(host);
+      if (stopped) {
+        destroy(layout);
+        return;
+      }
       const ms = Math.round(performance.now() - started);
       quiet(layout);
       running.current = null;
@@ -254,6 +267,8 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
       shownLook.current = look;
       pagesBox.current?.replaceChildren(host);
       destroy(old);
+      // the figures no longer shown give their sources back
+      images.current!.retain([source.current, quickBox.current]);
       setPages(host.querySelectorAll(".pagedjs_page").length);
       setLastShownMs(ms);
       setLayouts((n) => n + 1);
@@ -279,15 +294,30 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tree, mode, trigger]);
 
-  // leaving the editor: every layout and its styles go
+  // leaving the editor: every layout and its styles go, and the figures' sources
   useEffect(
     () => () => {
       stopRunning();
       destroy(shownLayout.current);
       shownLayout.current = null;
+      images.current?.dispose();
     },
     [],
   );
+
+  // the quick sheet's figures (slice 27): their sources once the fonts are in (a DOM write after the commit)
+  useEffect(() => {
+    if (shown !== "quick" || !tree) return;
+    let gone = false;
+    void loadFigureFonts().then((fonts) => {
+      if (gone || !quickBox.current) return;
+      images.current!.setFonts(fonts);
+      images.current!.attach(quickBox.current);
+    });
+    return () => {
+      gone = true;
+    };
+  }, [shown, tree]);
 
   const status = busy ? LAYING_OUT : failed ? LAYOUT_FAILED : shown === "pages" ? pagesText(pages) : "";
   useEffect(() => onStatus(status), [status, onStatus]);

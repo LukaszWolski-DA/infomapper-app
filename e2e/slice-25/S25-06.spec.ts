@@ -19,8 +19,8 @@ async function openView(page: Page) {
 }
 
 test("S25-06: facts with grain, dimensions with role, key and no-match value, measures, unknown member and feeds", async ({ page }) => {
-  // slice 26 (D2): the preset's Dimensional model in its place; this spec reads the S2T and it alone
-  expect((await storedDocument(S2T))!.sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", "cube.dim", "dq"]);
+  // slice 26 (D2): the preset's Dimensional model in its place; this spec reads the S2T and it alone (slice 27: with Diagrams)
+  expect((await storedDocument(S2T))!.sections.map((s) => s.type)).toEqual(["conv", "diagrams", "s2t", "sources", "cube.dim", "dq"]);
   await signInAs(page, "Łukasz");
   await openView(page);
   await expect(page.getByTestId("document-host").locator(".dtoc li")).toHaveText([/^Source-to-target mapping/, /^Dimensional model/]);

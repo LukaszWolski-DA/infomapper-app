@@ -186,6 +186,8 @@ export async function setCanvasLookAction(input: { workspaceId: string; canvasId
         layer: input?.layer,
         hideEntityRelationships: input?.hideEntityRelationships,
         hideSourceRelationships: input?.hideSourceRelationships,
+        // slice 27, step 4: the page outline for documentation
+        pageOutline: input?.pageOutline,
       });
       return result.ok ? { ...result, value: { version: result.value.canvas.version } } : result;
     }),

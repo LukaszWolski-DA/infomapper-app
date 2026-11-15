@@ -15,7 +15,8 @@ import type { CardData } from "./card-data";
 import type { Rect } from "./geometry";
 import type { Selection } from "./line-data";
 
-export type SelectionKey = `entity:${string}` | `source:${string}` | `frame:${string}` | `note:${string}` | `req:${string}`;
+import type { SelectionKey } from "@/domain/canvas/selection-key";
+export type { SelectionKey };
 
 export const cardKey = (card: Pick<CardData, "kind" | "targetId">): SelectionKey =>
   card.kind === "ent" ? `entity:${card.targetId}` : `source:${card.targetId}`;

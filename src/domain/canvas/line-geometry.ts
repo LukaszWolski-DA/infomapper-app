@@ -1,0 +1,320 @@
+// Line geometry, independent of how lines are drawn (slice 2p, item 4): where a mapping line runs, from the cards'
+// positions and the rows in the card data (AD-24 rule 2). Used by the canvas's SVG line layer (with React Flow's store,
+// `src/canvas/line-geometry.ts`) and, since slice 27 (F1), by the documents' figures (with stored positions);
+// relationship geometry is `relGeom` in geometry.ts. Slice 2c: bundled lines for collapsed frames.
+
+import type { CanvasLayer } from "@/domain/types";
+import { BLOCK } from "@/domain/model/frames";
+import { cardRect, cardWidth, clamp, curve, fNode, HEAD_H, relGeom, rowEnd, type End, type Placed, type Pt, type Rect } from "./geometry";
+import type { CanvasLines, MapLineData, ModuleLineData, RelLineData, SourceLineData } from "./line-data";
+
+/** A drawn card by its id (null when it is not drawn): React Flow's node on the canvas, the stored item on a figure. */
+export type PlacedLookup = (cardId: string) => Placed | null;
+
+export interface MapGeom {
+  /** Input curves (to the attribute, or to the ƒ node of a combined mapping) and the ƒ node's line on. */
+  paths: string[];
+  /**
+   * Per path: drawn as from a column missing from source (slice 7a, item 34, F29): an input curve whose column is
+   * missing, the ƒ node's line when every input is. Left out where nothing is missing.
+   */
+  gone?: boolean[];
+  /** Per path: from a retired column (slice 7b): titled “Retired: historical”. Left out where nothing is retired. */
+  old?: boolean[];
+  dots: [number, number][];
+  chip: { x: number; y: number; text: string } | null;
+  part: boolean;
+  /** Where the tag of a labeled mapping goes: a quarter along the (first input's) curve (slice 3a). */
+  tag: { x: number; y: number };
+  /** The line's middle, where a requirement's trace line ends (slice 4b-2): its curve's middle, or the ƒ node. */
+  mid: Pt;
+}
+
+export function mapGeom(line: MapLineData, placed: PlacedLookup): MapGeom | null {
+  const target = placed(line.cardId);
+  if (!target) return null;
+  const attr = rowEnd(target, line.attributeId);
+  const inputs: End[] = [];
+  const gone: boolean[] = [];
+  const old: boolean[] = [];
+  for (const i of line.inputs) {
+    const p = placed(i.cardId);
+    if (p) {
+      inputs.push(rowEnd(p, i.columnId));
+      gone.push(!!i.gone);
+      old.push(!!i.old);
+    }
+  }
+  if (!inputs.length) return null;
+  const anyGone = gone.some(Boolean);
+  const anyOld = old.some(Boolean);
+  const part = attr.hidden || inputs.some((e) => e.hidden);
+  if (line.inputCount > 1) {
+    const f = fNode(attr, inputs);
+    const curves = inputs.map((e) => curve(e, f.end));
+    return {
+      paths: [...curves.map((c) => c.d), f.out],
+      ...(anyGone ? { gone: [...gone, gone.every(Boolean)] } : {}),
+      ...(anyOld ? { old: [...old, old.every(Boolean)] } : {}),
+      dots: [...curves.map((c) => [c.p0.x, c.p0.y] as [number, number]), [f.to.x, f.to.y]],
+      chip: { x: f.node.x, y: f.node.y, text: "ƒ" },
+      part,
+      tag: curves[0]!.q,
+      mid: f.node,
+    };
+  }
+  const g = curve(inputs[0]!, attr);
+  const text = line.warn ? "!" : line.ruled ? "ƒ" : "";
+  return {
+    paths: [g.d],
+    ...(anyGone ? { gone } : {}),
+    ...(anyOld ? { old } : {}),
+    dots: [
+      [g.p0.x, g.p0.y],
+      [g.p3.x, g.p3.y],
+    ],
+    chip: text ? { x: g.mid.x, y: g.mid.y, text } : null,
+    part,
+    tag: g.q,
+    mid: g.mid,
+  };
+}
+
+/** Where a module's line runs (slice 15c, C7; prototype `renderLines`' InfoCube part): one curve per drawn input. */
+export interface ModuleGeom {
+  /** One curve per input, from its row to the target's row. */
+  paths: string[];
+  /** Each curve's start (the dots) and end (the diamonds). */
+  starts: Pt[];
+  ends: Pt[];
+  /** The chip on the first curve's middle; null without. */
+  chip: { x: number; y: number; text: string } | null;
+  /** An end at a header's middle: a collapsed card or a hidden row. */
+  part: boolean;
+}
+
+export function moduleGeom(line: ModuleLineData, placed: PlacedLookup): ModuleGeom | null {
+  const target = placed(line.target.cardId);
+  if (!target) return null;
+  const z = rowEnd(target, line.target.rowId);
+  const paths: string[] = [], starts: Pt[] = [], ends: Pt[] = [];
+  let chip: ModuleGeom["chip"] = null;
+  let part = z.hidden;
+  for (const i of line.inputs) {
+    const p = placed(i.cardId);
+    if (!p) continue;
+    const a = rowEnd(p, i.rowId);
+    part ||= a.hidden;
+    const g = curve(a, z);
+    if (!paths.length && line.chip) chip = { x: g.mid.x, y: g.mid.y, text: line.chip };
+    paths.push(g.d);
+    starts.push({ x: g.p0.x, y: g.p0.y });
+    ends.push({ x: g.p3.x, y: g.p3.y });
+  }
+  return paths.length ? { paths, starts, ends, chip, part } : null;
+}
+
+// ---- bundled lines (slice 2c, D-07; prototype “Semantic zoom”, endOf) ----
+// Every mapping or relationship with an end in a collapsed frame is grouped per pair of ends, where an end is the
+// collapsed frame (its block), or a row (mappings: the attribute, or one input column) or an entity card
+// (relationships). Lines with both ends in the same collapsed frame are left out. Mapping bundles are directed (from
+// the source end to the attribute end); relationship bundles are not. A mapping with several inputs (D-49) gives one
+// pair per input, so it can be in more than one bundle (once in each). Bundles are computed, never stored.
+
+/** One end of a bundled line: a collapsed frame, or a row of a card (mappings), or an entity card (relationships). */
+export type BundleEnd = { key: `f:${string}`; frameId: string } | { key: `r:${string}`; cardId: string; rowId: string } | { key: `e:${string}`; cardId: string };
+
+export interface Bundle {
+  /** Stable while the same ends are bundled: `m|{from}|{to}` or `r|{end}|{end}` (ends sorted). */
+  key: string;
+  t: "map" | "rel";
+  a: BundleEnd;
+  z: BundleEnd;
+  /** The mappings or relationships in it, each once, in the order of the canvas's lines. */
+  ids: string[];
+}
+
+export interface BundledLines {
+  /** Lines that touch no collapsed frame, drawn as before. */
+  mappings: MapLineData[];
+  relationships: RelLineData[];
+  /** Relationships between source tables with both cards drawn (slice 10b): never bundled, never counted (D-62). */
+  sources?: SourceLineData[];
+  /** The modules' lines with every card drawn (slice 15c, X6): never bundled, never counted. */
+  modules?: ModuleLineData[];
+  bundles: Bundle[];
+}
+
+/**
+ * Groups the canvas's lines for its collapsed frames. `collapsedFrameOf` names the collapsed frame a card is hidden in
+ * (null: the card is drawn). The layer mode (D-22) applies to bundles as to lines.
+ */
+export function bundleLines(lines: CanvasLines, collapsedFrameOf: (cardId: string) => string | null, layer: CanvasLayer = "all"): BundledLines {
+  const bundles = new Map<string, Bundle>();
+  const add = (t: Bundle["t"], key: string, a: BundleEnd, z: BundleEnd, id: string) => {
+    const b = bundles.get(key) ?? bundles.set(key, { key, t, a, z, ids: [] }).get(key)!;
+    if (!b.ids.includes(id)) b.ids.push(id);
+  };
+  const frameEnd = (frameId: string): BundleEnd => ({ key: `f:${frameId}`, frameId });
+
+  const mappings: MapLineData[] = [];
+  if (layer !== "relationships") {
+    for (const m of lines.mappings) {
+      const targetFrame = collapsedFrameOf(m.cardId);
+      const inputFrames = m.inputs.map((i) => collapsedFrameOf(i.cardId));
+      if (!targetFrame && inputFrames.every((f) => !f)) {
+        mappings.push(m);
+        continue;
+      }
+      const z: BundleEnd = targetFrame ? frameEnd(targetFrame) : { key: `r:${m.attributeId}`, cardId: m.cardId, rowId: m.attributeId };
+      m.inputs.forEach((i, n) => {
+        const f = inputFrames[n];
+        if (f && f === targetFrame) return; // both ends in the same collapsed frame
+        const a: BundleEnd = f ? frameEnd(f) : { key: `r:${i.columnId}`, cardId: i.cardId, rowId: i.columnId };
+        add("map", `m|${a.key}|${z.key}`, a, z, m.id);
+      });
+    }
+  }
+
+  const relationships: RelLineData[] = [];
+  if (layer !== "mappings") {
+    for (const r of lines.relationships) {
+      const fa = collapsedFrameOf(r.fromCardId), fz = collapsedFrameOf(r.toCardId);
+      if (!fa && !fz) {
+        relationships.push(r);
+        continue;
+      }
+      if (fa && fa === fz) continue;
+      const ends = [fa ? frameEnd(fa) : { key: `e:${r.fromCardId}` as const, cardId: r.fromCardId }, fz ? frameEnd(fz) : { key: `e:${r.toCardId}` as const, cardId: r.toCardId }].sort((x, y) =>
+        x.key.localeCompare(y.key),
+      );
+      add("rel", `r|${ends[0]!.key}|${ends[1]!.key}`, ends[0]!, ends[1]!, r.id);
+    }
+  }
+  // relationships between source tables (slice 10b, D-62): left out when either card is in a collapsed frame
+  const sources = layer === "mappings" ? [] : (lines.sources ?? []).filter((r) => !collapsedFrameOf(r.fromCardId) && !collapsedFrameOf(r.toCardId));
+  // the modules' lines (slice 15c, X6; prototype): left out when any of their cards is in a collapsed frame
+  const modules =
+    layer === "relationships" ? [] : (lines.modules ?? []).filter((l) => !collapsedFrameOf(l.target.cardId) && l.inputs.every((i) => !collapsedFrameOf(i.cardId)));
+  return { mappings, relationships, ...(sources.length ? { sources } : {}), ...(modules.length ? { modules } : {}), bundles: [...bundles.values()] };
+}
+
+/** A bundle's stroke grows with its count (prototype: 1.6 + 1.3 · log2 n, at most 4 more). */
+export const bundleWidth = (n: number): number => 1.6 + Math.min(4, Math.log2(n) * 1.3);
+
+/** How a mapping bundle is drawn: as draft when all its mappings are drafts, in the warning colour when any has a type problem. */
+export function bundleLook(bundle: Bundle, mappings: ReadonlyMap<string, Pick<MapLineData, "status" | "warn">>): { draft: boolean; warn: boolean } {
+  const ms = bundle.ids.map((id) => mappings.get(id)).filter((m) => m !== undefined);
+  return { draft: ms.length > 0 && ms.every((m) => m.status === "draft"), warn: ms.some((m) => m.warn) };
+}
+
+/** A line's end at a collapsed frame's block: the middle of its facing side (curve() picks the side). */
+export const blockEnd = (block: Rect): End => ({ x: block.x, w: block.w, y: block.y + block.h / 2, cx: block.x + block.w / 2, hidden: false });
+
+/** A drawn bundle (slice 2c, prototype “Semantic zoom”): a group of one mapping keeps its identity (status, chip,
+ * selection); two or more mappings are one line with a count; relationships are one line with “N relationship(s)”. */
+export type BundleGeom =
+  | { kind: "single"; line: MapLineData; geom: MapGeom }
+  | { kind: "map"; d: string; mid: Pt; count: number; width: number; draft: boolean; warn: boolean }
+  | { kind: "rel"; d: string; mid: Pt; label: string; width: number };
+
+/**
+ * Where a bundle runs. `placed` gives a drawn card (null when it is not drawn), `blocks` the block of each collapsed
+ * frame, `maps` the canvas's mapping lines (for a group of one and the look). Null when an end is not on the canvas.
+ */
+export function bundleGeom(
+  b: Bundle,
+  placed: (cardId: string) => Placed | null,
+  blocks: ReadonlyMap<string, Rect>,
+  maps: ReadonlyMap<string, MapLineData>,
+): BundleGeom | null {
+  const n = b.ids.length;
+  if (b.t === "rel") {
+    const rect = (e: BundleEnd): Rect | null => {
+      if ("frameId" in e) return blocks.get(e.frameId) ?? null;
+      const p = placed(e.cardId);
+      return p ? cardRect(p) : null;
+    };
+    const A = rect(b.a), B = rect(b.z);
+    if (!A || !B) return null;
+    const g = relGeom(A, B, 0);
+    return { kind: "rel", d: g.d, mid: g.mid, label: `${n} relationship${n === 1 ? "" : "s"}`, width: bundleWidth(n) };
+  }
+  const end = (e: BundleEnd): End | null => {
+    if ("frameId" in e) {
+      const r = blocks.get(e.frameId);
+      return r ? blockEnd(r) : null;
+    }
+    const p = placed(e.cardId);
+    return p && "rowId" in e ? rowEnd(p, e.rowId) : null;
+  };
+  const a = end(b.a), z = end(b.z);
+  if (!a || !z) return null;
+  const g = curve(a, z);
+  if (n === 1) {
+    const line = maps.get(b.ids[0]!);
+    if (!line) return null;
+    // no ƒ node with an end collapsed (Łukasz, step 1 answer 3); a transform keeps its ƒ chip (answer 2)
+    const text = line.warn ? "!" : line.ruled || line.inputCount > 1 ? "ƒ" : "";
+    return {
+      kind: "single",
+      line,
+      geom: {
+        paths: [g.d],
+        dots: [
+          [g.p0.x, g.p0.y],
+          [g.p3.x, g.p3.y],
+        ],
+        chip: text ? { x: g.mid.x, y: g.mid.y, text } : null,
+        part: a.hidden || z.hidden,
+        tag: g.q,
+        mid: g.mid,
+      },
+    };
+  }
+  return { kind: "map", d: g.d, mid: g.mid, count: n, width: bundleWidth(n), ...bundleLook(b, maps) };
+}
+
+// ---- trace lines (slice 4b-2, PRD items 8–9; prototype reqTraces) ----
+
+/** Where a trace line meets an element: the side of its rectangle nearer to the requirement card. */
+export const nearerSide = (from: Rect, to: Rect): number => (from.x + from.w / 2 < to.x + to.w / 2 ? to.x : to.x + to.w);
+
+/** The point of a rectangle nearest to a point (a trace line starts there on the requirement card; prototype clamp). */
+export const nearestOn = (r: Rect, p: Pt): Pt => ({ x: clamp(p.x, r.x, r.x + r.w), y: clamp(p.y, r.y, r.y + r.h) });
+
+/** The height of a member's row in a collapsed frame's block; past the sixth member, the “and N more” row. */
+export const blockRowY = (block: Pick<Rect, "y">, index: number): number => block.y + HEAD_H + BLOCK.bodyPad + (Math.min(index, BLOCK.maxRows) + 0.5) * BLOCK.rowHeight;
+
+/** Where an element's card is for a trace line: drawn (placed), or hidden in a collapsed frame (its block and its row). */
+export type TraceCardPlace = { placed: Placed } | { block: Rect; index: number } | null;
+
+/**
+ * A trace line's two ends, from data (AD-24 rule 2): to an entity or table at the nearer side of its card at the
+ * header's middle; to an attribute or column at its row (a hidden row: the header's middle, as mapping lines do); to a
+ * mapping at its line's middle (`mapMid`); a card hidden in a collapsed frame at its member row in the block. It starts
+ * at the requirement card's point nearest to that end. Null when either end is not on the canvas.
+ */
+export function traceGeom(
+  req: Rect | null,
+  target: { t: "card"; cardId: string } | { t: "row"; cardId: string; rowId: string } | { t: "map"; mappingId: string },
+  placeOf: (cardId: string) => TraceCardPlace,
+  mapMid: (mappingId: string) => Pt | null,
+): { x1: number; y1: number; x2: number; y2: number } | null {
+  if (!req) return null;
+  let end: Pt | null = null;
+  if (target.t === "map") end = mapMid(target.mappingId);
+  else {
+    const place = placeOf(target.cardId);
+    if (!place) return null;
+    if ("block" in place) end = { x: nearerSide(req, place.block), y: blockRowY(place.block, place.index) };
+    else {
+      const p = place.placed;
+      const r = { x: p.x, y: p.y, w: cardWidth(p.card), h: 0 };
+      end = { x: nearerSide(req, r), y: target.t === "row" ? rowEnd(p, target.rowId).y : p.y + HEAD_H / 2 };
+    }
+  }
+  if (!end) return null;
+  const start = nearestOn(req, end);
+  return { x1: start.x, y1: start.y, x2: end.x, y2: end.y };
+}

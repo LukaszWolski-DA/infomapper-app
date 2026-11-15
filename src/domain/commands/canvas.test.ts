@@ -358,6 +358,27 @@ describe("relationship lines by kind in the look (slice 16, item 3, D-71)", () =
     expect(setCanvasLook(makeCtx(), access("reviewer"), { canvas: canvas() }, { canvasId: canvas1, expectedVersion: canvas().version, hideSourceRelationships: true })).toMatchObject({ ok: false, error: { code: "forbidden" } });
   });
 
+  it("keeps the page outline as a look key, present only while on (slice 27, step 4, Q6)", () => {
+    const outline = { paper: "A4", orientation: "landscape", pt: 7 } as const;
+    const on = setCanvasLook(makeCtx(), access("modeler"), { canvas: canvas() }, { canvasId: canvas1, expectedVersion: canvas().version, pageOutline: outline });
+    if (!on.ok) throw new Error(on.error.message);
+    expect(on.value.canvas.look).toEqual({ background: "grey", grid: "dots", layer: "all", pageOutline: outline });
+    expect(isUndoable(on.writeSet.events)).toBe(false);
+    // another look key keeps it; the same outline is nothing to change
+    const grid = setCanvasLook(makeCtx(), access("modeler"), { canvas: on.value.canvas }, { canvasId: canvas1, expectedVersion: on.value.canvas.version, grid: "lines" });
+    if (!grid.ok) throw new Error(grid.error.message);
+    expect(grid.value.canvas.look.pageOutline).toEqual(outline);
+    expect(setCanvasLook(makeCtx(), access("modeler"), { canvas: on.value.canvas }, { canvasId: canvas1, expectedVersion: on.value.canvas.version, pageOutline: { ...outline } })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    // off: the key goes
+    const off = setCanvasLook(makeCtx(), access("modeler"), { canvas: on.value.canvas }, { canvasId: canvas1, expectedVersion: on.value.canvas.version, pageOutline: null });
+    if (!off.ok) throw new Error(off.error.message);
+    expect(off.value.canvas.look).toEqual({ background: "grey", grid: "dots", layer: "all" });
+    // only the prototype's papers, orientations and sizes; readers and reviewers may not change it
+    for (const bad of [{ ...outline, paper: "A5" }, { ...outline, pt: 5 }, { ...outline, orientation: "square" }, { ...outline, extra: 1 }])
+      expect(setCanvasLook(makeCtx(), access("modeler"), { canvas: canvas() }, { canvasId: canvas1, expectedVersion: canvas().version, pageOutline: bad })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    expect(setCanvasLook(makeCtx(), access("reviewer"), { canvas: canvas() }, { canvasId: canvas1, expectedVersion: canvas().version, pageOutline: outline })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+  });
+
   it("“Use this look on all canvases” copies background and grid, never the hidden kinds (P8)", () => {
     const canvases = [
       canvas(canvas1, { look: { background: "warm", grid: "lines", layer: "all", hideEntityRelationships: true } }),

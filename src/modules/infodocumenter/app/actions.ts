@@ -16,6 +16,7 @@ import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type { ModuleTable } from "@/domain/types";
+import { diagramCanvases } from "../domain/figures";
 import { openRefusal } from "../domain/rights";
 import { browserSnapshot } from "./snapshot";
 import {
@@ -57,18 +58,31 @@ async function documentCommand<T>(
   return result;
 }
 
+/** Slice 27 (D9): the canvases of the chosen projects (every project's, then the rest, when none), in order, for Diagrams' figures. */
+async function scopeCanvases(store: DataStore, workspaceId: Uuid, chosen: readonly Uuid[]): Promise<Uuid[]> {
+  const projects = await store.projects.list(workspaceId);
+  const links = (await Promise.all(projects.map((p) => store.canvases.listLinksOfProject(workspaceId, p.id)))).flat();
+  // with no project chosen, the canvases in no project too (step 4)
+  return diagramCanvases(projects, links, chosen, chosen.length ? [] : await store.canvases.list(workspaceId));
+}
+
 /** New document (D13): a private document from the preset; the page then opens its form. */
 export async function createDocumentAction(input: CreateDocumentInput): Promise<ActionResult<{ documentId: Uuid; href: string }>> {
-  return documentCommand(input, (access, _doc, _store, ctx) => {
-    const r = createDocument(ctx, access, input, DOCUMENT_SECTION_KINDS);
+  return documentCommand(input, async (access, _doc, store, ctx) => {
+    const r = createDocument(ctx, access, input, DOCUMENT_SECTION_KINDS, await scopeCanvases(store, access.workspace.id, []));
     return r.ok ? { ...r, value: { documentId: r.value.document.id, href: documentHref(access.workspace.id, r.value.document.id) } } : r;
   });
 }
 
 /** One field of the form (the name, the audience, a title page field, a scope part, a section's switch or options). */
 export async function updateDocumentAction(input: UpdateDocumentInput): Promise<ActionResult<Saved>> {
-  return documentCommand(input, (access, doc, _store, ctx) => {
-    const r = updateDocument(ctx, access, doc, input, DOCUMENT_SECTION_KINDS);
+  return documentCommand(input, async (access, doc, store, ctx) => {
+    // slice 27: a figure added must show a canvas (or a frame of it) of this workspace; read only for a figures' save
+    const options = (input as { section?: { options?: unknown } } | null)?.section?.options;
+    const figures = typeof options === "object" && options !== null && "figures" in options;
+    const [canvasRows, frameRows] = figures ? await Promise.all([store.canvases.list(access.workspace.id), store.frames.list(access.workspace.id)]) : [[], []];
+    const canvases = { canvasIds: new Set<string>(canvasRows.map((c) => c.id)), frameCanvas: new Map<string, string>(frameRows.map((f) => [f.id, f.canvas_id])) };
+    const r = updateDocument(ctx, access, doc, input, DOCUMENT_SECTION_KINDS, canvases);
     return r.ok ? { ...r, value: { version: r.value.document.version } } : r;
   });
 }
@@ -104,8 +118,11 @@ export async function deleteDocumentAction(input: DeleteDocumentInput): Promise<
 
 /** "+ Add section": a registered type at the end; the answer names the new section, which the editor selects. */
 export async function addDocumentSectionAction(input: AddDocumentSectionInput): Promise<ActionResult<Saved<{ sectionId: Uuid }>>> {
-  return documentCommand(input, (access, doc, _store, ctx) => {
-    const r = addDocumentSection(ctx, access, doc, input, DOCUMENT_SECTION_TYPES);
+  return documentCommand(input, async (access, doc, store, ctx) => {
+    // slice 27 (D9): a new Diagrams gets one figure per canvas of the document's scope
+    const diagrams = (input as { type?: unknown } | null)?.type === "diagrams";
+    const canvasIds = diagrams && doc ? await scopeCanvases(store, access.workspace.id, doc.scope.projects) : [];
+    const r = addDocumentSection(ctx, access, doc, input, DOCUMENT_SECTION_TYPES, canvasIds);
     return r.ok ? { ...r, value: { version: r.value.document.version, sectionId: r.value.sectionId } } : r;
   });
 }

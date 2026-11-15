@@ -10,6 +10,7 @@ import type { DocumentSectionType } from "@/domain/document/sections";
 import type { DocumentState } from "@/domain/document/state";
 import type { Uuid } from "@/domain/ids";
 import type { DocLanguage, ModuleTable } from "@/domain/types";
+import { documentFigures } from "./figures";
 import { label, type LabelKey } from "./labels";
 import { sectionScopeOf } from "./scope";
 import type { DocumentDefinition, DocumentStyle } from "./types";
@@ -65,6 +66,10 @@ export interface DocumentTree {
     readonly rows: readonly DocumentCoverRow[];
   };
   readonly contents: { readonly heading: string; readonly entries: readonly { readonly anchor: string; readonly text: string; readonly number: string | null }[] };
+  /** Slice 27: every figure in document order, for the list of figures (D10) and the editor's lines (F15). */
+  readonly figures: readonly DocumentFigureEntry[];
+  /** Slice 27, step 3 (D10): the list of figures' heading, while the style lists them and a figure is drawn; else null. */
+  readonly listOfFigures: { readonly heading: string } | null;
   /** The running header and footer (D3; slice 26's fields), the watermark on every page but the title page (D2). */
   readonly frame: DocumentFrame;
   /** The style the pages are laid out with (slice 26; its CSS comes with step 4). */
@@ -95,6 +100,10 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
   const author = snapshot.people.find((p) => p.id === definition.author_id)?.display_name ?? "";
   const modelState = t("live", { d: date });
 
+  const st = definition.style;
+  const page = { paper: st.paper, orientation: st.orientation, smallestPt: st.smallestPt, mono: st.colours === "mono" };
+  // slice 27: how every section draws figures, in the document's words (a module's section too)
+  const figures = documentFigures({ state, scope, language, notation: st.notation, page });
   const sections: DocumentTreeSection[] = [];
   const skipped: { id: Uuid; type: string; text: string }[] = [];
   for (const s of definition.sections) {
@@ -111,11 +120,15 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
     const heading = s.heading?.trim() || type.label(language);
     // the Compact template runs sections on (the prototype's)
     const newPage = s.newPage && definition.style.template !== "compact";
-    const nodes = type.build({ state, scope, options: s.options, language, notation: definition.style.notation, keepRows: definition.style.keepRows });
+    const nodes = type.build({ state, scope, options: s.options, language, notation: definition.style.notation, keepRows: definition.style.keepRows, page, figures });
     const number = definition.style.numbers ? String(sections.length + 1) : null;
     sections.push({ id: s.id, type: s.type, anchor: `ds-${s.id}`, heading, newPage, number, nodes: number ? numbered(nodes, number) : nodes });
   }
 
+  // slice 27 (F6): the figures numbered in document order, whatever section drew them
+  const list: DocumentFigureEntry[] = [];
+  const numberedSections = sections.map((sec) => ({ ...sec, nodes: numberFigures(sec.nodes, list, sec.id) }));
+  sections.splice(0, sections.length, ...numberedSections);
   return {
     language,
     cover: {
@@ -132,6 +145,9 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
       ],
     },
     contents: { heading: t("toc"), entries: sections.map((s) => ({ anchor: s.anchor, text: s.heading, number: s.number })) },
+    figures: list,
+    // slice 27 (D10): the list of figures after the contents, while the style's switch is on and a figure is drawn
+    listOfFigures: st.listOfFigures && list.length ? { heading: t("lof") } : null,
     frame: frameOf(definition.style, {
       org: organization,
       title,
@@ -163,6 +179,36 @@ function frameOf(style: DocumentStyle, values: Readonly<Record<string, string>>,
     footerRight: field(style.footer.right, FRAME_DEFAULTS.footerRight),
     watermark: style.watermark ? watermark : "",
   };
+}
+
+/** A figure as the list of figures and the editor read it: its number, caption, anchor, section and editor's line. */
+export interface DocumentFigureEntry {
+  readonly number: number;
+  readonly caption: string;
+  readonly anchor: string;
+  readonly key: string;
+  readonly entryId: string;
+  /** The section that drew it. */
+  readonly sectionId: Uuid;
+  readonly summary: string;
+  /** A placed figure's name before its line in the editor (the star's fact). */
+  readonly label?: string;
+}
+
+/**
+ * The figures of a section's nodes numbered after those before (groups too), each listed once; a figure's key made
+ * unique in the document (`{section id}:{figure id}`).
+ */
+function numberFigures(nodes: readonly DocNode[], out: DocumentFigureEntry[], sectionId: Uuid): DocNode[] {
+  return nodes.map((x): DocNode => {
+    if (x.kind === "group") return { ...x, nodes: numberFigures(x.nodes, out, sectionId) };
+    if (x.kind !== "figure") return x;
+    const number = out.length + 1;
+    const f = x.figure;
+    const key = `${sectionId}:${f.key}`;
+    out.push({ number, caption: f.caption, anchor: `fg-${number}`, key, entryId: f.entryId, sectionId, summary: f.summary, ...(f.label ? { label: f.label } : {}) });
+    return { kind: "figure", figure: { ...f, key, number } };
+  });
 }
 
 /** A section's subsections (its level-2 headings, in groups too) numbered "{n}.1", "{n}.2" (the prototype's `h3.dh3`). */

@@ -79,8 +79,12 @@ export interface DocumentStyle {
   orientation: "portrait" | "landscape";
   notation: "ie" | "uml";
   keepRows: 0 | 10 | 15 | 25 | 40;
+  /** Slice 27: the smallest attribute names in diagrams, in points (D1). */
+  smallestPt: 5 | 6 | 7 | 8;
   cover: boolean;
   contents: boolean;
+  /** Slice 27: the list of figures after the contents (D10). */
+  listOfFigures: boolean;
   numbers: boolean;
   banded: boolean;
   runningHeader: boolean;

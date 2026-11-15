@@ -1473,7 +1473,7 @@ page. A change made by someone else shows with the next fresh page, as the rest 
 As model consistency, the home computes its model checks when it loads. "Show all" reads its group again from the model
 as it stands, so a change made meanwhile may show there before the rest of the section.
 
-## InfoDocumenter (slices 25 and 26)
+## InfoDocumenter (slices 25 to 27)
 
 ### Module switches and licences are positional arguments
 
@@ -1526,11 +1526,13 @@ Model readiness prints the model checks' groups and lines (D-75, the core's `CHE
 InfoCube's) in English in Polish and German documents; the section's own words are translated (slice 26, D3). Their
 three languages are a follow-up in `docs/ideas.md`.
 
-### Part 8 of the full run is past 2 GB
+### Part 8 of the full run nears 2 GB again
 
 Slice 26's specs joined part 8 (the recut rule). Its heap peaked at 2,088 MB in slice 26's step 2 run (CLAUDE.md:
-"when a part's heap comes near 2 GB, move the cuts or add a part"). The recut goes on a `chore/` branch after slice
-26's merge.
+"when a part's heap comes near 2 GB, move the cuts or add a part"); `chore/recut-e2e-parts` recut the parts after slice
+26's merge. Slice 27's specs joined the last part, and its peak rose from 1,258 MB (slice 27's step 2 run) to 1,836 MB
+(step 4's run, 43696491179); the closing's run is in `docs/prd/slice-27-acceptance.md`. A ninth part goes on its own
+`chore/` branch after slice 27's merge when a full run's part 8 comes near 2 GB.
 
 ### German document labels and InfoCube's German words await review
 
@@ -1551,6 +1553,31 @@ prints no definitions under its rows. The documents' demo (`addDocumentsDemoData
 A person removed from a workspace keeps their documents: their private ones are seen by nobody until they are a member
 again, and their shared ones stay shared (nobody but the author makes a document private, F17 a). No page lists or
 deletes another person's private documents.
+
+### A figure carries its fonts (slice 27)
+
+An SVG shown as an image sees none of the page's fonts, so each figure embeds IBM Plex's unmodified files for the faces
+it uses (D-82): Sans Regular and SemiBold always (130 KB), Sans Medium with relationship pills or UML (67 KB more), Mono
+Regular and Medium with source tables or calculations (100 KB more), so 130 to 297 KB a figure, about a third more as
+base64, in one blob per figure however many parts it has. The pages fetch the files once per page; a printed PDF holds
+them as fonts (its text stays searchable). A document of many figures holds that much per figure in memory while it is
+open.
+
+### A figure is never drawn larger (slice 27)
+
+A figure "as large as fits" is drawn at the scale that fits its page, never above 100 % (D-82, D4 a): a large canvas
+whole on one page has very small names (the demo's "Sales star", turned on an A4 page, has 4.5 pt names). The style's "Smallest attribute
+names in diagrams" does not enlarge it: the figure's line in the editor warns (" · smaller than {pt} pt: try one figure
+per frame, A3 paper, or the page outline on the canvas"), and "as large as fits" turns it on the page when that makes
+the names clearly larger. Ways out: a size "in parts", a figure of one frame, A3 paper, or arranging the canvas inside
+the page outline's page 1.
+
+### The page outline forgets its settings (slice 27)
+
+The canvas's page outline is stored only while it is on (D-82, Q6): turned off, it forgets its paper, orientation and
+size, and turned on again it starts at A4 portrait, 7 pt. It follows a card when the card is dropped, not while it is
+dragged; a frame's drag moves the frame and its cards without React Flow's drag flag, so the outline follows a frame
+while it moves. Its labels scale with the zoom (13 px on the canvas, as the prototype's).
 
 ### Change events hold the whole recipe
 

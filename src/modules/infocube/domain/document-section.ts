@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { EMPTY, marksStatus, mono, muted, relationshipsBlock, statusShown, strong, text, typeRuns, warn } from "@/domain/document/blocks";
 import type { DocNode, DocRow, DocRun, DocRuns } from "@/domain/document/content";
-import type { DocumentSectionKind, DocumentSectionType, SectionBuildInput } from "@/domain/document/sections";
+import type { DocumentSectionKind, DocumentSectionType, SectionBuildInput, SectionOptionField } from "@/domain/document/sections";
 import type { Uuid } from "@/domain/ids";
 import type { AttributeFeeds } from "@/domain/model/requirements";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
@@ -19,7 +19,13 @@ import { cubeIndex } from "./keys";
 import { cubeRequirementFeeds, mappingIndex, type MappingIndex } from "./mappings";
 import type { CubeEntity, CubeMappingStatus, InfoCubeTable } from "./types";
 import { unknownFit, unknownValueOf } from "./unknown-member";
-import { cubeTitle, historyLabel, type TypeContext } from "./view";
+import { cubeRowFeeds, cubeTitle, historyLabel, type TypeContext } from "./view";
+import { cubeLines } from "./lines";
+import { STAR_MAX, STAR_ROWS, starLayout } from "./star";
+import { figureList } from "@/domain/document/figure-entry";
+import { FIGURE_ORIENTATIONS, FIGURE_SIZES } from "@/domain/document/page";
+import type { FigureContributions } from "@/domain/document/figure";
+import type { EntityRole } from "@/domain/canvas/module-marks";
 
 /** The stored name of InfoCube's section. */
 export const CUBE_SECTION_TYPE = "cube.dim";
@@ -38,18 +44,46 @@ export const cubeSectionOptions = z
     relationships: z.boolean(),
     /** Every dimensional attribute with its feed from the logical model. */
     feeds: z.boolean(),
+    // slice 27, step 3 (D5): each fact's star diagram and the section's figures from canvases; defaults for older recipes
+    /** "Star diagram, drawn from the model (no canvas needed)". */
+    star: z.boolean().default(true),
+    /** "Dimension cards in the star": keys only, or all attributes. */
+    starRows: z.enum(STAR_ROWS).default("keys"),
+    /** "Size of the star diagrams". */
+    starSize: z.enum(FIGURE_SIZES).default("auto"),
+    starOrientation: z.enum(FIGURE_ORIENTATIONS).default("doc"),
+    /** "Dimensions drawn per star, at most". */
+    starMax: z
+      .number()
+      .refine((n) => (STAR_MAX as readonly number[]).includes(n), "Choose one of the counts.")
+      .default(12),
+    /** "Figures from canvases", at the section's start. */
+    figures: figureList.default([]),
   })
   .strict();
 export type CubeSectionOptions = z.output<typeof cubeSectionOptions>;
 
-export const CUBE_SECTION_DEFAULTS: CubeSectionOptions = { facts: true, dimensions: true, dimensionDefinitions: true, measures: true, relationships: true, feeds: true };
+export const CUBE_SECTION_DEFAULTS: CubeSectionOptions = {
+  facts: true,
+  dimensions: true,
+  dimensionDefinitions: true,
+  measures: true,
+  relationships: true,
+  feeds: true,
+  star: true,
+  starRows: "keys",
+  starSize: "auto",
+  starOrientation: "doc",
+  starMax: 12,
+  figures: [],
+};
 
 /** Available while InfoCube is on; it ends the source-to-target preset (step 1's D1). */
 export const CUBE_SECTION_KIND: DocumentSectionKind = {
   type: CUBE_SECTION_TYPE,
   available: (workspace) => workspace.infocube,
   presets: ["s2t"],
-  defaults: () => ({ ...CUBE_SECTION_DEFAULTS }),
+  defaults: () => structuredClone(CUBE_SECTION_DEFAULTS) as unknown as Record<string, unknown>,
   options: cubeSectionOptions as unknown as z.ZodType<Record<string, unknown>>,
 };
 
@@ -91,7 +125,7 @@ const lines = (parts: readonly DocRuns[]): DocRuns => parts.flatMap((runs, i) =>
  * under the row, its measures with additivity. A dimension: its history, its unknown member's values (or that it has
  * none) and its relationships. Each with its attributes' feeds from the logical model, in the document's language.
  */
-export function buildCubeSection({ state, scope, options, language }: SectionBuildInput<CubeSectionTable>): DocNode[] {
+export function buildCubeSection({ state, scope, options, language, figures }: SectionBuildInput<CubeSectionTable>): DocNode[] {
   const o = cubeSectionOptions.parse(options);
   const w = CUBE_DOC_WORDS[language];
   const { snapshot } = state;
@@ -135,11 +169,28 @@ export function buildCubeSection({ state, scope, options, language }: SectionBui
   };
 
   const definitionOf = (id: Uuid) => model.entities.find((x) => x.id === id)?.definition_text ?? null;
+  const inScope = new Set(entities.map((e) => e.id));
+  const starOf = (e: Entity, dimensionIds: readonly Uuid[]): DocNode[] => {
+    const star = starLayout(e.id, dimensionIds, ix.attributesOf, o.starRows, o.starMax);
+    if (!star) return [];
+    return figures.placed({
+      key: `star:${e.id}`,
+      label: e.name,
+      items: star.cards,
+      lines: { rel: true, map: false, src: false, cube: false },
+      status: false,
+      size: o.starSize,
+      orientation: o.starOrientation,
+      caption: w.star(e.name) + (star.all > star.shown ? ` (${w.starPart(star.shown, star.all)})` : ""),
+    });
+  };
 
   const fact = (e: Entity, c: CubeEntity): DocNode[] => {
     const type = [w.factTypes[c.fact_type ?? "transaction"], c.is_factless ? w.factless : ""].filter(Boolean).join(" · ");
     const out: DocNode[] = [table([w.ftype, w.grain], [{ cells: [[text(type)], [text(c.grain?.trim() || "–")]] }])];
     const keys = ix.factKeys(e.id);
+    // slice 27 (Q5): the star diagram, of its dimensions in scope, after the type and grain
+    if (o.star) out.push(...starOf(e, keys.map((k) => k.dimensionId).filter((id) => inScope.has(id))));
     if (keys.length) {
       const noMatch = (dimensionId: Uuid): DocRuns => {
         if (!ix.unknownOn(dimensionId)) return [text("–")];
@@ -195,11 +246,49 @@ export function buildCubeSection({ state, scope, options, language }: SectionBui
 
   const facts = entities.filter((e) => ix.roleOf(e.id) === "fact");
   const dimensions = entities.filter((e) => ix.roleOf(e.id) === "dimension");
-  const out: DocNode[] = [];
+  // slice 27: the figures from canvases at the section's start (the prototype's `figList` there)
+  const out: DocNode[] = figures.list(o.figures);
   if (o.facts && facts.length) out.push({ kind: "heading", level: 2, text: w.facts }, ...facts.flatMap(one));
   if (o.dimensions && dimensions.length) out.push({ kind: "heading", level: 2, text: w.dims }, ...dimensions.flatMap(one));
   return out.length ? out : [{ kind: "paragraph", runs: [muted(w.noDims)] }];
 }
+
+const STAR_ON = [
+  { key: "facts", is: true },
+  { key: "star", is: true },
+] as const;
+
+/** The Dimensional model's options as the editor draws them (slice 27, step 3: the prototype's order). */
+export const CUBE_OPTION_FIELDS: readonly SectionOptionField[] = [
+  { kind: "label", text: "Content" },
+  { kind: "check", key: "facts", label: "Facts: type, grain, dimensions, measures" },
+  { kind: "check", key: "dimensions", label: "Dimensions: history and attributes" },
+  { kind: "label", text: "For each fact", when: [{ key: "facts", is: true }] },
+  { kind: "check", key: "star", label: "Star diagram, drawn from the model (no canvas needed)", when: [{ key: "facts", is: true }] },
+  {
+    kind: "seg",
+    key: "starRows",
+    label: "Dimension cards in the star",
+    items: [
+      ["keys", "Keys only"],
+      ["all", "All attributes"],
+    ],
+    when: STAR_ON,
+  },
+  { kind: "figureSize", size: "starSize", orientation: "starOrientation", label: "Size of the star diagrams", when: STAR_ON },
+  {
+    kind: "select",
+    key: "starMax",
+    label: "Dimensions drawn per star, at most",
+    items: STAR_MAX.map((n) => [n, String(n)] as const),
+    hint: "Up to 6 dimensions stand left and right of the fact; more go above and below too. Beyond the limit the figure says how many are shown; the fact's table lists them all.",
+    when: STAR_ON,
+  },
+  { kind: "figureLines", when: STAR_ON },
+  { kind: "check", key: "relationships", label: "Relationships of each dimension" },
+  { kind: "check", key: "feeds", label: "Attributes with their feed from the logical model" },
+  { kind: "figures", key: "figures", label: "Figures from canvases", hint: "Shown at the start of the section, e.g. a star you arranged on a canvas." },
+];
 
 /** The section type: its kind, its words and its builder, registered by the composition root (`src/compose/documents.ts`). */
 export const CUBE_SECTION: DocumentSectionType<CubeSectionTable> = {
@@ -207,14 +296,10 @@ export const CUBE_SECTION: DocumentSectionType<CubeSectionTable> = {
   module: "InfoCube",
   label: (language) => CUBE_DOC_WORDS[language].title,
   // slice 26: the prototype's line without the star diagram and the canvases' figures (slice C)
-  description: "Facts with grain and type, dimensions and measures; dimensions with history; every dimensional attribute's feed.",
-  // the form's check boxes (step 1's list of texts); the dimensions' definitions and the measures keep their defaults
-  optionChecks: [
-    { key: "facts", label: "Facts: type, grain, dimensions, measures" },
-    { key: "dimensions", label: "Dimensions: history and attributes" },
-    { key: "relationships", label: "Relationships of each dimension" },
-    { key: "feeds", label: "Attributes with their feed from the logical model" },
-  ],
+  // slice 27: the prototype's line with the star diagram and the canvases' figures
+  description: "Facts with grain, type, a star diagram, dimensions and measures; dimensions with history; every dimensional attribute's feed; figures from canvases.",
+  // the form's fields in the prototype's order (slice 27, step 3); the dimensions' definitions and the measures keep their defaults
+  optionFields: CUBE_OPTION_FIELDS,
   tables: CUBE_SECTION_TABLES,
   build: buildCubeSection,
 };
@@ -298,3 +383,37 @@ export const cubeCheckRowsOf = (snapshot: WorkspaceSnapshot<CubeSectionTable>): 
   cubeMappingInputs: snapshot.modules.cube_mapping_input,
   cubeAttributes: snapshot.modules.cube_attribute,
 });
+
+// ---- slice 27: what InfoCube draws on a figure (AD-33: InfoDocumenter draws it without knowing InfoCube) ----
+
+/**
+ * InfoCube's part of a figure: a dimensional card's role where a stereotype stands (its short title in the document's
+ * words, D11), a dimensional row's feeds (its dot) and the dimensional mappings between the cards drawn, both of the
+ * statuses the document shows. Pure, from the snapshot's rows.
+ */
+export function cubeFigureContributions(snapshot: WorkspaceSnapshot<CubeSectionTable>): FigureContributions {
+  const ix = cubeIndexOf(snapshot);
+  const context: TypeContext = { aggregates: ix.aggregates(), outriggers: ix.outriggers(), nameOf: ix.nameOf };
+  const rows = snapshot.modules;
+  const shownRows = (shown: (status: CubeMappingStatus) => boolean) => {
+    const cubeMappings = rows.cube_mapping.filter((m) => m.deleted_at === null && shown(m.status));
+    const ids = new Set(cubeMappings.map((m) => m.id));
+    return { cubeMappings, cubeMappingInputs: rows.cube_mapping_input.filter((i) => ids.has(i.mapping_id)) };
+  };
+  return {
+    roles: (language) => {
+      const out: Record<Uuid, EntityRole> = {};
+      for (const e of snapshot.model.entities) {
+        const c = ix.cubeOf(e.id);
+        if (!c) continue;
+        out[e.id] = { text: cubeTitle(c, context, CUBE_DOC_WORDS[language].titles).short, title: "", card: `dimn ${c.role}`, mark: "cube" };
+      }
+      return out;
+    },
+    rowFeeds: (shown) => {
+      const m = shownRows(shown);
+      return cubeRowFeeds(mappingIndex({ entities: snapshot.model.entities, attributes: snapshot.model.attributes, ...m }), snapshot.model.attributes);
+    },
+    lines: (model, cards, shown) => cubeLines(model, shownRows(shown), cards),
+  };
+}

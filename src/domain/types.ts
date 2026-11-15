@@ -549,6 +549,21 @@ export interface CanvasLook {
    */
   hideEntityRelationships?: true;
   hideSourceRelationships?: true;
+  /**
+   * Slice 27, step 4 (Q6): the page outline for documentation, present only while it is on, so an older look and the
+   * column's SQL default read as off (no file format).
+   */
+  pageOutline?: PageOutline;
+}
+
+/** "Page outline for documentation" (the prototype's `d.page`): the paper, its orientation and the smallest names. */
+export const OUTLINE_PAPERS = ["A4", "A3"] as const;
+export const OUTLINE_ORIENTATIONS = ["portrait", "landscape"] as const;
+export const OUTLINE_PT = [6, 7, 8] as const;
+export interface PageOutline {
+  paper: (typeof OUTLINE_PAPERS)[number];
+  orientation: (typeof OUTLINE_ORIENTATIONS)[number];
+  pt: (typeof OUTLINE_PT)[number];
 }
 
 export const DEFAULT_CANVAS_LOOK: CanvasLook = { background: "grey", grid: "dots", layer: "all" };

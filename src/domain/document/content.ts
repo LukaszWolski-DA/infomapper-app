@@ -59,7 +59,8 @@ export interface DocRow {
 export type DocNode =
   /** Level 1 is a section's heading, numbered and listed in the contents; levels 2 to 4 are within a section. */
   | { readonly kind: "heading"; readonly level: 1 | 2 | 3 | 4; readonly text: string; readonly anchor?: string; /** Slice 26: a concept's colour before it. */ readonly swatch?: string; /** Slice 26: its number ("2.3") when the document numbers its sections. */ readonly number?: string }
-  | { readonly kind: "paragraph"; readonly runs: DocRuns }
+  /** Slice 27: `placeholder`, a section's hint while it has nothing to show ("Add a figure in the panel on the right."), drawn in a dashed box. */
+  | { readonly kind: "paragraph"; readonly runs: DocRuns; readonly placeholder?: true }
   /** One line of parts joined by the renderer (" · "), e.g. a stereotype and a coverage line above a table. */
   | { readonly kind: "meta"; readonly parts: readonly DocRuns[] }
   | {
@@ -92,8 +93,56 @@ export type DocNode =
    * page when `keep` (step 4: up to the style's rows); `mark` gives its heading the concept's colour on the left.
    */
   | { readonly kind: "group"; readonly nodes: readonly DocNode[]; readonly keep?: boolean; readonly mark?: string }
+  /**
+   * Slice 27 (F3): a figure, drawn from the model as an SVG (`figure.ts`) and placed as an image, whole or in parts
+   * (`page.ts`). Numbered in document order by `buildDocument` (F6); its first part carries the anchor `fg-{number}`.
+   */
+  | { readonly kind: "figure"; readonly figure: DocFigure }
+  /**
+   * Slice 27, step 3: the legend under Diagrams' figures (the prototype's `legend`): its title and one line per mark,
+   * each a drawn sample (`LegendMark`) and its words; `mono` for black and white.
+   */
+  | { readonly kind: "legend"; readonly title: string; readonly mono: boolean; readonly items: readonly { readonly mark: LegendMark; readonly text: string }[] }
   /** A line about the document itself: a section skipped while its module is off, or unknown. */
   | { readonly kind: "note"; readonly text: string }
   | { readonly kind: "pageBreak" };
 
 export type DocNodeKind = DocNode["kind"];
+
+/** A legend's sample: a relationship in crow's foot or UML, mappings by status, the ƒ rule, a dimensional mapping, a source key, the row's dots. */
+export type LegendMark = "rel-ie" | "rel-uml" | "map-ok" | "map-review" | "map-draft" | "map-warn" | "map-rule" | "cube" | "src" | "dots";
+
+/** One part of a figure: its region of the SVG (canvas pixels) and its size on the page (millimetres). */
+export interface DocFigurePart {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+  readonly wmm: number;
+  readonly hmm: number;
+}
+
+/** A figure in the content tree (slice 27, F3): plain data; the SVG text is escaped by its builder. */
+export interface DocFigure {
+  /** Unique in the document: `{section id}:{figure id}` (one image source per figure). */
+  readonly key: string;
+  /** The figure's id in its section's options (the editor's line under it). */
+  readonly entryId: string;
+  /** "Figure {number}"; 0 until `buildDocument` numbers the document's figures. */
+  readonly number: number;
+  /** "Figure" in the document's language, and the caption after the number. */
+  readonly word: string;
+  readonly caption: string;
+  readonly svg: string;
+  /** IBM Plex's faces the SVG uses (`FigureFace`): the page embeds those files (Q2). */
+  readonly faces: readonly string[];
+  /** Turned −90° on a portrait page ("Landscape, turned"). */
+  readonly rot: boolean;
+  readonly parts: readonly DocFigurePart[];
+  /** Each part's "part {i} of {n}" in the document's language; empty for a whole figure. */
+  readonly partTexts: readonly string[];
+  /** The editor's line (the prototype's `sumFig`), in the app's language. */
+  readonly summary: string;
+  /** Slice 27, step 3: a placed figure's name before its line in the editor ("Fact Sales"); a stored figure has none. */
+  readonly label?: string;
+}

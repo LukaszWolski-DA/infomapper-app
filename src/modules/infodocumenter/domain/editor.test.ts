@@ -140,7 +140,7 @@ describe("the page frame's fields (F9, D6, D8)", () => {
 
   it("drops the page tokens from the header's left part, empties the header without a running header, and the mark when off", async () => {
     const { buildDocument } = await import("./document");
-    const state = { snapshot: { workspace: { name: "W", client_name: null, doc_language: "en" }, organization: { name: "Org" }, people: [], model: { concepts: [], entities: [], attributes: [], sourceTables: [], sourceColumns: [], mappings: [], mappingInputs: [] }, projects: [], projectCanvases: [], canvasItems: [] } };
+    const state = { snapshot: { workspace: { name: "W", client_name: null, doc_language: "en" }, organization: { name: "Org" }, people: [], model: { concepts: [], entities: [], attributes: [], sourceTables: [], sourceColumns: [], mappings: [], mappingInputs: [] }, projects: [], projectCanvases: [], canvases: [], canvasItems: [] } };
     const tree = (style = defaultStyle()) =>
       buildDocument({
         definition: { name: "Doc", author_id: ME, scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings: "all" }, cover: { title: null, subtitle: null, version: null, status: null, preparedBy: null }, style, sections: [] },
