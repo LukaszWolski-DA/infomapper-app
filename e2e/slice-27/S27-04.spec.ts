@@ -26,20 +26,39 @@ import {
 
 const DOC = DEMO_DOCUMENT_NAMES.shared;
 const host = (page: Page) => page.getByTestId("document-host");
-/** The scope's canvases (every live project's), the projects in the order they were made, each in its tab order. */
+/**
+ * The scope's canvases with no project ticked: every live project's (the projects in the order they were made, each
+ * in its tab order), then the canvases in no project in the order they were made (step 4).
+ */
 async function scopeCanvases(): Promise<string[]> {
   const db = await readDb(E2E_DB);
-  const live = new Set(db.canvas.filter((c) => c.deleted_at === null).map((c) => c.id));
+  const live = db.canvas.filter((c) => c.workspace_id === RETAIL && c.deleted_at === null);
+  const ids = new Set(live.map((c) => c.id));
   const out: string[] = [];
   for (const p of db.project.filter((x) => x.workspace_id === RETAIL && x.deleted_at === null).sort((a, b) => a.created_at.localeCompare(b.created_at)))
-    for (const l of db.project_canvas.filter((x) => x.project_id === p.id && live.has(x.canvas_id)).sort((a, b) => a.sort_order - b.sort_order || a.added_at.localeCompare(b.added_at)))
+    for (const l of db.project_canvas.filter((x) => x.project_id === p.id && ids.has(x.canvas_id)).sort((a, b) => a.sort_order - b.sort_order || a.added_at.localeCompare(b.added_at)))
       if (!out.includes(l.canvas_id)) out.push(l.canvas_id);
+  for (const c of [...live].sort((a, b) => a.created_at.localeCompare(b.created_at))) if (!out.includes(c.id)) out.push(c.id);
   return out;
+}
+/** Test data: a canvas in no project, with one card of "Customer & orders" (made after the others). */
+async function canvasInNoProject(name: string): Promise<string> {
+  const id = "01a0f9e9-0000-7000-8000-0000000c0a57";
+  await changeDb((db) => {
+    const source = db.canvas.find((c) => c.name === "Customer & orders" && c.workspace_id === RETAIL && c.deleted_at === null)!;
+    const now = new Date().toISOString();
+    db.canvas.push({ ...source, id, name, created_at: now, updated_at: now, version: 1 });
+    const item = db.canvas_item.find((i) => i.canvas_id === source.id && i.entity_id && i.deleted_at === null)!;
+    db.canvas_item.push({ ...item, id: "01a0f9e9-0000-7000-8000-0000000c0a58", canvas_id: id, frame_id: null, created_at: now, updated_at: now, version: 1 });
+  });
+  return id;
 }
 const canvasName = async (id: string) => (await readDb(E2E_DB)).canvas.find((c) => c.id === id)!.name;
 
 test("S27-04: Diagrams is made with the scope's canvases; their names, the legend, the notation; a figure unticked is left out", async ({ page }) => {
   await setSections(DOC, [{ type: "text", options: { body: "Before the diagrams." } }]);
+  // step 4 (Łukasz): with no project ticked, a canvas in no project comes after the projects' canvases
+  const loose = await canvasInNoProject("Loose canvas");
   const id = (await storedDocument(DOC))!.id;
   await signInAs(page, "Łukasz");
   await openEditor(page, formUrl(id));
@@ -55,6 +74,7 @@ test("S27-04: Diagrams is made with the scope's canvases; their names, the legen
   const section = (await storedDocument(DOC))!.sections.find((s) => s.type === "diagrams")!;
   const figures = section.options.figures as { canvasId: string; frameId: string | null; view: string; size: string; on: boolean }[];
   expect(figures.map((f) => f.canvasId)).toEqual(canvases);
+  expect(canvases.at(-1)).toBe(loose);
   expect(figures.every((f) => f.frameId === null && f.view === "canvas" && f.size === "auto" && f.on)).toBe(true);
   await expect(page.getByTestId("figure-entry")).toHaveCount(canvases.length);
 

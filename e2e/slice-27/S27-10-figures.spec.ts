@@ -63,7 +63,7 @@ async function dictionaryWithDiagrams(ws: string, figures: boolean): Promise<str
   await updateDocumentAs(SEED_IDS.userLukasz, document.name, { scope: { mappings: "all" } }, ws);
   const db = await readDb(E2E_DB);
   const s = workspaceSnapshotOf(db as unknown as StoredRows, ws, {} as never)!;
-  const canvases = diagramCanvases(s.projects, s.projectCanvases, []);
+  const canvases = diagramCanvases(s.projects, s.projectCanvases, [], s.canvases);
   let n = 0;
   await changeDb((d) => {
     const doc = (d as unknown as { document_definition: { id: string; sections: { type: string; options: Record<string, unknown> }[] }[] }).document_definition.find((x) => x.id === document.id)!;
