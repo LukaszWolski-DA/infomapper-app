@@ -8,6 +8,7 @@
 import { useMemo, type ReactNode } from "react";
 import type { useAction } from "@/app/_components/use-action";
 import { Seg, TextArea, useChoice } from "@/app/_panels/fields";
+import type { SectionOptionField } from "@/domain/document/sections";
 import {
   DEFINITION_WIDTHS,
   DICTIONARY_COLUMNS,
@@ -24,6 +25,8 @@ type Answer = ReturnType<ReturnType<typeof useAction>["saveRow"]>;
 
 /** What the options need from the workspace (the server reads it with the page). */
 export interface OptionContext {
+  /** Slice 27: the document's smallest names in diagrams (Diagrams' "Document's ({pt} pt)"). */
+  smallestPt?: number;
   /** Data Vault 2.0 mode: the Data Vault reading and its classifications. */
   dataVault: boolean;
   /** Whether the workspace has naming conventions (the hint says so when not). */
@@ -39,7 +42,9 @@ type Field =
   | { kind: "seg"; key: string; label: string; items: Pairs; hints?: Readonly<Record<string, string>> }
   | { kind: "select"; key: string; label: string; items: readonly (readonly [number, string])[]; hint?: string }
   | { kind: "text"; key: string; label: string; placeholder: string; hint: string }
-  | { kind: "hint"; text: string };
+  | { kind: "hint"; text: string }
+  /** Slice 27: a section's figure editor (`FigureEditor`, drawn by the editor). */
+  | { kind: "figures"; key: string; label: string; hint?: string };
 type Spec = (o: Record<string, unknown>, cx: OptionContext) => readonly (Field | false)[];
 
 const pairs = <K extends string>(keys: readonly K[], labels: Record<K, string>): Pairs => keys.map((k) => [k, labels[k]] as const);
@@ -110,6 +115,16 @@ export const OPTION_TEXTS = {
 
 const SPECS: Record<string, Spec> = {
   overview: () => [
+    { kind: "figures", key: "figures", label: "Figures (e.g. the logical data model)" },
+    {
+      kind: "seg",
+      key: "figuresAt",
+      label: "Where the figures go",
+      items: [
+        ["end", "Below the section's content"],
+        ["start", "Right after the description"],
+      ],
+    },
     { kind: "check", key: "stats", label: "Counts of entities, tables, mappings and requirements" },
     { kind: "check", key: "concepts", label: "Concepts with their entities" },
   ],
@@ -145,6 +160,33 @@ const SPECS: Record<string, Spec> = {
     { kind: "checks", key: "entity", label: "Above each entity's table", items: pairs(DICTIONARY_ENTITY_FIELDS, OPTION_TEXTS.entityFields) },
     { kind: "check", key: "byConcept", label: "Group by concept" },
     o.byConcept !== false && { kind: "check", key: "conceptPage", label: "Each concept on a new page" },
+    o.byConcept !== false && { kind: "check", key: "conceptFigures", label: "Figure of the concept's frame at its start (from the first canvas that has one)" },
+  ],
+  // slice 27, step 3 (D5): the figures, the legend, the notation and the size its figures warn under
+  diagrams: (_o, cx) => [
+    {
+      kind: "figures",
+      key: "figures",
+      label: "Figures",
+      hint: "Untick a figure to leave it out; add a canvas or one of its frames below. Size: a figure is never cut unless you choose a size “in parts”.",
+    },
+    { kind: "check", key: "legend", label: "Legend under the figures" },
+    {
+      kind: "seg",
+      key: "notation",
+      label: "Notation",
+      items: [
+        ["doc", "Document's"],
+        ["ie", "Crow's foot"],
+        ["uml", "UML"],
+      ],
+    },
+    {
+      kind: "select",
+      key: "warnPt",
+      label: "Warn when names are smaller than",
+      items: [[0, `Document's (${cx.smallestPt ?? 6} pt)`], [5, "5 pt"], [6, "6 pt"], [7, "7 pt"], [8, "8 pt"]],
+    },
   ],
   s2t: () => [
     { kind: "checks", key: "columns", label: "Columns", items: pairs(S2T_COLUMNS, OPTION_TEXTS.s2tColumns), hint: COLUMNS_HINT },
@@ -250,8 +292,10 @@ export function SectionOptions(props: {
   context: OptionContext;
   typed: (key: string) => (text: string) => void;
   save: (patch: Record<string, unknown>) => Answer;
+  /** Slice 27: a figure editor for an options key, with its label and hint. */
+  figureEditor: (key: string, label: string, hint?: string) => ReactNode;
 }) {
-  const { sectionId, type, options: o, readOnly, version, context, typed, save } = props;
+  const { sectionId, type, options: o, readOnly, version, context, typed, save, figureEditor } = props;
   const fields = (SPECS[type]?.(o, context) ?? []).filter((f): f is Field => !!f);
   return (
     <div data-testid="section-options">
@@ -328,6 +372,128 @@ export function SectionOptions(props: {
                 {f.text}
               </p>
             );
+          case "figures":
+            return <div key={`${id}-${i}`}>{figureEditor(f.key, f.label, f.hint)}</div>;
+        }
+      })}
+    </div>
+  );
+}
+
+/** The sizes and orientations a placed figure is drawn at (the figure editor's, `FIGURE_TEXTS`). */
+export interface PlacedSizeTexts {
+  sizes: readonly (readonly [string, string])[];
+  orientations: readonly (readonly [string, string])[];
+}
+
+/**
+ * A module's options from its plain fields (slice 27, step 3, `SectionOptionField`): check boxes, segments, selects,
+ * group labels, hints, a figure editor, a placed figure's size and orientation and the section's placed figures' lines
+ * ("Fact Sales: 1 figure · names 7.4 pt · upright"); each field shown while its `when` holds.
+ */
+export function ModuleOptions(props: {
+  type: string;
+  fields: readonly SectionOptionField[];
+  options: Record<string, unknown>;
+  readOnly: boolean;
+  save: (patch: Record<string, unknown>) => Answer;
+  figureEditor: (key: string, label: string, hint?: string) => ReactNode;
+  placedLines: readonly { label: string; summary: string }[];
+  sizeTexts: PlacedSizeTexts;
+}) {
+  const { type, fields, options: o, readOnly, save, figureEditor, placedLines, sizeTexts } = props;
+  const shown = fields.filter((f) => (f.when ?? []).every((w) => o[w.key] === w.is));
+  return (
+    <div data-testid="section-options">
+      {shown.map((f, i) => {
+        switch (f.kind) {
+          case "check":
+            return <Check key={i} testId={`check-${type}-${f.key}`} label={f.label} stored={!!o[f.key]} disabled={readOnly} onSave={(v) => save({ [f.key]: v })} />;
+          case "label":
+            return (
+              <div key={i} className="mb-1 mt-3 text-[11.5px] text-im-ink-3">
+                {f.text}
+              </div>
+            );
+          case "hint":
+            return (
+              <p key={i} className="m-0 mt-1 text-[11.5px] text-im-ink-3">
+                {f.text}
+              </p>
+            );
+          case "seg":
+            return (
+              <Field key={i} label={f.label}>
+                <Choice stored={String(o[f.key])} save={(v) => save({ [f.key]: v })}>
+                  {(value, pick) => <Seg testId={`seg-${type}-${f.key}`} value={value} options={f.items} disabled={readOnly} onChange={pick} />}
+                </Choice>
+              </Field>
+            );
+          case "select":
+            return (
+              <Field key={i} label={f.label} hint={f.hint}>
+                <Choice stored={Number(o[f.key])} save={(v) => save({ [f.key]: v })}>
+                  {(value, pick) => (
+                    <select
+                      data-testid={`select-${type}-${f.key}`}
+                      value={value}
+                      disabled={readOnly}
+                      onChange={(e) => pick(Number(e.currentTarget.value))}
+                      className="h-8 w-full rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
+                    >
+                      {f.items.map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </Choice>
+              </Field>
+            );
+          case "figureSize":
+            return (
+              <Field key={i} label={f.label}>
+                <div className="flex gap-1.5">
+                  {(
+                    [
+                      [f.size, sizeTexts.sizes],
+                      [f.orientation, sizeTexts.orientations],
+                    ] as const
+                  ).map(([key, items]) => (
+                    <Choice key={key} stored={String(o[key])} save={(v) => save({ [key]: v })}>
+                      {(value, pick) => (
+                        <select
+                          data-testid={`select-${type}-${key}`}
+                          value={value}
+                          disabled={readOnly}
+                          onChange={(e) => pick(e.currentTarget.value)}
+                          className="h-8 min-w-0 flex-1 rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
+                        >
+                          {items.map(([v, l]) => (
+                            <option key={v} value={v}>
+                              {l}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </Choice>
+                  ))}
+                </div>
+              </Field>
+            );
+          case "figureLines":
+            return (
+              <div key={i} data-testid="placed-figure-lines">
+                {placedLines.map((l, k) => (
+                  <div key={k} className="mt-1 text-[11.5px] text-im-ink-3" data-testid="text-placed-figure">
+                    <b>{l.label}</b>: {l.summary}
+                  </div>
+                ))}
+              </div>
+            );
+          case "figures":
+            return <div key={i}>{figureEditor(f.key, f.label, f.hint)}</div>;
         }
       })}
     </div>

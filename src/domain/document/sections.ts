@@ -10,8 +10,11 @@
 import type { z } from "zod";
 import type { Uuid } from "../ids";
 import { domainError, type DomainError } from "../errors";
-import type { DocLanguage, ModuleTable, Workspace } from "../types";
+import type { DocLanguage, ModuleTable, RowFilter, Workspace } from "../types";
 import type { DocNode } from "./content";
+import type { FigureLines } from "./figure";
+import type { FigureEntry } from "./figure-entry";
+import type { FigureOrientation, FigureSize } from "./page";
 import type { DocumentState } from "./state";
 
 /** A section type's stored name: lower case, digits, `_` and one optional `.` after a module's prefix (`cube.dim`). */
@@ -45,6 +48,8 @@ export interface SectionScope {
    * neither a project nor a concept chosen, every live table.
    */
   readonly tableIds: ReadonlySet<Uuid>;
+  /** Slice 27, step 3: the scope's canvases (the chosen projects', or every live project's). */
+  readonly canvasIds: ReadonlySet<Uuid>;
   readonly logical: boolean;
   readonly dimensional: boolean;
   readonly mappings: "all" | "notdraft" | "approved";
@@ -62,7 +67,63 @@ export interface SectionBuildInput<T extends ModuleTable = ModuleTable> {
   readonly keepRows: number;
   /** Slice 27: the page a figure is laid out on, the style's smallest names and its black and white (F5). */
   readonly page: FigurePage;
+  /**
+   * Slice 27, step 3: how a section draws figures in the document's words (InfoDocumenter's), so a module's section
+   * (InfoCube's star diagram and "Figures from canvases") draws them without naming InfoDocumenter.
+   */
+  readonly figures: SectionFigures;
 }
+
+/** A section's figures as nodes (`figure-node.ts`, `sectionFigures`). */
+export interface SectionFigures {
+  /**
+   * The figures that are on, one after another. `notation` and `warnPt`: Diagrams' own; `canvasHeadings`: the canvas's
+   * name as a subsection before its first figure (Diagrams').
+   */
+  list(entries: readonly FigureEntry[], o?: { readonly notation?: "ie" | "uml"; readonly warnPt?: number; readonly canvasHeadings?: boolean }): DocNode[];
+  /** A figure of cards placed in memory, drawn as a canvas of its own (InfoCube's star diagram). */
+  placed(figure: PlacedFigure): DocNode[];
+}
+
+/** A figure of cards placed by a section (no stored canvas): its cards, what it draws, its size and caption. */
+export interface PlacedFigure {
+  /** Unique in the section (the star's fact). */
+  readonly key: string;
+  /** The editor's line under the section's options starts with it ("Fact Sales: 1 figure · …"). */
+  readonly label: string;
+  /** Its cards as canvas items: entity cards with their place, width and row filter. */
+  readonly items: readonly PlacedCard[];
+  readonly lines: FigureLines;
+  readonly status: boolean;
+  readonly size: FigureSize;
+  readonly orientation: FigureOrientation;
+  readonly caption: string;
+}
+
+export interface PlacedCard {
+  readonly entityId: Uuid;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly rowFilter: RowFilter;
+}
+
+/**
+ * Slice 27, step 3: a module's options as the editor draws them (plain data, the app draws the fields): check boxes,
+ * segments, selects, a label over a group, a hint, a figure editor (`figures`), the size and orientation of a placed
+ * figure (`figureSize`) and the lines of the section's placed figures (`figureLines`). `when`: shown only while each
+ * key has its value.
+ */
+export type SectionOptionField = (
+  | { readonly kind: "check"; readonly key: string; readonly label: string }
+  | { readonly kind: "seg"; readonly key: string; readonly label: string; readonly items: readonly (readonly [string, string])[] }
+  | { readonly kind: "select"; readonly key: string; readonly label: string; readonly items: readonly (readonly [number, string])[]; readonly hint?: string }
+  | { readonly kind: "label"; readonly text: string }
+  | { readonly kind: "hint"; readonly text: string }
+  | { readonly kind: "figures"; readonly key: string; readonly label: string; readonly hint?: string }
+  | { readonly kind: "figureSize"; readonly size: string; readonly orientation: string; readonly label: string }
+  | { readonly kind: "figureLines" }
+) & { readonly when?: readonly { readonly key: string; readonly is: boolean | string | number }[] };
 
 /** What a section's figures read of the document's style (slice 27). */
 export interface FigurePage {
@@ -87,6 +148,8 @@ export interface DocumentSectionType<T extends ModuleTable = ModuleTable> extend
    * in the app's language; the form changes these keys only. InfoDocumenter's own sections draw their own fields.
    */
   readonly optionChecks?: readonly { readonly key: string; readonly label: string }[];
+  /** Slice 27, step 3: a module's options as the form draws them, in place of `optionChecks` (plain data). */
+  readonly optionFields?: readonly SectionOptionField[];
   /** The module tables its builder reads from the snapshot. */
   readonly tables: readonly T[];
   /** Pure: the section's nodes after its heading, from the model state alone (never a store). */

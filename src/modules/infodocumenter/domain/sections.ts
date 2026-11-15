@@ -6,8 +6,7 @@
 
 import { z } from "zod";
 import { LONG_TEXTS } from "@/domain/document/blocks";
-import { FIGURE_ROWS, FIGURE_VIEWS } from "@/domain/document/figure";
-import { FIGURE_ORIENTATIONS, FIGURE_SIZES } from "@/domain/document/page";
+import { figureList } from "@/domain/document/figure-entry";
 import type { DocumentSectionKind } from "@/domain/document/sections";
 
 /** The longest Text body (F18: as plain text elsewhere). */
@@ -66,6 +65,8 @@ export const dictionaryOptions = z
     longDefinitions: oneOfNumbers(LONG_DEFINITIONS, "Choose one of the lengths.").default(0),
     byConcept: z.boolean().default(true),
     conceptPage: z.boolean().default(false),
+    /** Slice 27 (D5): the concept's frame as a figure at its group's start, from the first canvas of the scope that has one. */
+    conceptFigures: z.boolean().default(false),
   })
   .strict();
 export type DictionaryOptions = z.output<typeof dictionaryOptions>;
@@ -86,6 +87,7 @@ export const DICTIONARY_DEFAULTS: DictionaryOptions = {
   longDefinitions: 0,
   byConcept: true,
   conceptPage: false,
+  conceptFigures: false,
 };
 export const S2T_DEFAULTS: S2TOptions = {
   columns: ["target", "targetType", "system", "sourceColumn", "sourceType", "rule", "status"],
@@ -96,9 +98,13 @@ export const S2T_DEFAULTS: S2TOptions = {
 
 // ---- slice 26: the other sections (the prototype's options without figures) ----
 
-export const overviewOptions = z.object({ stats: z.boolean(), concepts: z.boolean() }).strict();
+/** Slice 27 (D5): Model overview's figures, "Below the section's content" or "Right after the description". */
+export const OVERVIEW_FIGURES_AT = ["end", "start"] as const;
+export const overviewOptions = z
+  .object({ stats: z.boolean(), concepts: z.boolean(), figures: figureList.default([]), figuresAt: z.enum(OVERVIEW_FIGURES_AT).default("end") })
+  .strict();
 export type OverviewOptions = z.output<typeof overviewOptions>;
-export const OVERVIEW_DEFAULTS: OverviewOptions = { stats: true, concepts: true };
+export const OVERVIEW_DEFAULTS: OverviewOptions = { stats: true, concepts: true, figures: [], figuresAt: "end" };
 
 /** Readiness's checks, in the prototype's order; `modelChecks`: the model's own checks (D-75). */
 export const READINESS_CHECKS = ["entityDefinitions", "attributeDefinitions", "weakDefinitions", "notFed", "typeProblems", "notApproved", "requirements", "modelChecks"] as const;
@@ -175,50 +181,33 @@ export const qualityOptions = z.object({ columns: subsetOf(QUALITY_COLUMNS), onl
 export type QualityOptions = z.output<typeof qualityOptions>;
 export const QUALITY_DEFAULTS: QualityOptions = { columns: ["key", "name", "rule", "onFailure", "owner", "appliesTo", "description"], onlyScope: true, longTexts: "row" };
 
-// ---- slice 27: figures (the prototype's `FIG0` and `figEditor`) ----
+// ---- slice 27: figures (the prototype's `FIG0` and `figEditor`; the entry is InfoMapper's, `figure-entry.ts`) ----
 
-/** The most figures a section holds (as the 50 sections, D10). */
-export const FIGURES_MAX = 50;
-export const FIGURES_REFUSAL = "A section holds at most 50 figures.";
-
-const figureLines = z.object({ rel: z.boolean(), map: z.boolean(), src: z.boolean(), cube: z.boolean() }).strict();
-/** One figure of a section (F8): a canvas or one of its frames, its view, size, orientation and caption. */
-export const figureEntry = z
-  .object({
-    id: z.string().min(1).max(64),
-    on: z.boolean().default(true),
-    canvasId: z.string().min(1).max(64),
-    frameId: z.string().min(1).max(64).nullable().default(null),
-    view: z.enum(FIGURE_VIEWS).default("canvas"),
-    rows: z.enum(FIGURE_ROWS).default("canvas"),
-    lines: figureLines.default({ rel: true, map: true, src: true, cube: true }),
-    status: z.boolean().default(true),
-    size: z.enum(FIGURE_SIZES).default("auto"),
-    orientation: z.enum(FIGURE_ORIENTATIONS).default("doc"),
-    caption: z.string().trim().max(HEADING_MAX, "This caption is too long.").default(""),
-  })
-  .strict();
-export type FigureEntry = z.output<typeof figureEntry>;
-const figureList = z.array(figureEntry).max(FIGURES_MAX, FIGURES_REFUSAL).refine((l) => new Set(l.map((f) => f.id)).size === l.length, "Each figure is listed once.");
-
-/** A new figure of a canvas or a frame, as the prototype's `FIG0`: as on the canvas, whole, as large as fits. */
-export const newFigure = (id: string, canvasId: string, frameId: string | null = null): FigureEntry => ({
-  id,
-  on: true,
-  canvasId,
-  frameId,
-  view: "canvas",
-  rows: "canvas",
-  lines: { rel: true, map: true, src: true, cube: true },
-  status: true,
-  size: "auto",
-  orientation: "doc",
-  caption: "",
-});
+export { FIGURES_MAX, FIGURES_REFUSAL, figureEntry, newFigure, type FigureEntry } from "@/domain/document/figure-entry";
 
 export const figureOptions = z.object({ figures: figureList }).strict();
 export type FigureOptions = z.output<typeof figureOptions>;
 export const FIGURE_DEFAULTS: FigureOptions = { figures: [] };
+
+/** Diagrams' notation (D5): the document's, or its own for its figures. */
+export const DIAGRAM_NOTATIONS = ["doc", "ie", "uml"] as const;
+/** "Warn when names are smaller than" (D5): the document's smallest names (0), or a size of its own. */
+export const DIAGRAM_WARN_PT = [0, 5, 6, 7, 8] as const;
+/**
+ * Diagrams (the prototype's `diagrams`): its figures, made when the section is made (D9: one whole canvas each per
+ * canvas of the scope's projects, in tab order) and its own since; the legend under them, its notation and the size
+ * its figures' lines warn under.
+ */
+export const diagramsOptions = z
+  .object({
+    figures: figureList.default([]),
+    legend: z.boolean().default(true),
+    notation: z.enum(DIAGRAM_NOTATIONS).default("doc"),
+    warnPt: oneOfNumbers(DIAGRAM_WARN_PT, "Choose one of the sizes.").default(0),
+  })
+  .strict();
+export type DiagramsOptions = z.output<typeof diagramsOptions>;
+export const DIAGRAMS_DEFAULTS: DiagramsOptions = { figures: [], legend: true, notation: "doc", warnPt: 0 };
 
 const always = () => true;
 const copy = <T extends object>(value: T) => () => structuredClone(value) as unknown as Record<string, unknown>;
@@ -230,6 +219,8 @@ const own = (type: string, defaults: object, options: z.ZodType): DocumentSectio
 export const INFODOC_SECTION_KINDS: readonly DocumentSectionKind[] = [
   own("text", TEXT_DEFAULTS, textOptions),
   own("overview", OVERVIEW_DEFAULTS, overviewOptions),
+  // slice 27: figures of whole canvases or single frames (D9: made with the section)
+  own("diagrams", DIAGRAMS_DEFAULTS, diagramsOptions),
   // slice 27: one or more figures wherever the section stands; it starts on the same page (F7, the prototype's `page: false`)
   { ...own("figure", FIGURE_DEFAULTS, figureOptions), samePage: true },
   own("dict", DICTIONARY_DEFAULTS, dictionaryOptions),

@@ -192,6 +192,20 @@ const EN = {
   figMore: "and {n} more",
   figRel1: "1 relationship",
   figRelN: "{n} relationships",
+  // slice 27, step 3: Diagrams, the list of figures and the legend (the prototype's `LBL`; `lg_relUml` is new, step 1)
+  t_diagrams: "Diagrams",
+  lof: "List of figures",
+  legend: "Legend",
+  lg_rel: "Relationship (crow's foot: many; bar: one; circle: optional)",
+  lg_relUml: "Relationship (UML multiplicities)",
+  lg_ok: "Mapping, approved",
+  lg_rev: "Mapping, in review",
+  lg_dr: "Mapping, draft",
+  lg_warn: "Mapping with a type problem",
+  lg_f: "ƒ transformation rule",
+  lg_cube: "Dimensional mapping (logical → fact or dimension)",
+  lg_src: "Foreign key between source tables",
+  lg_dot: "Row fed (filled) or not (ring)",
 } as const;
 
 export type LabelKey = keyof typeof EN;
@@ -378,6 +392,19 @@ const PL: Labels = {
   figMore: "i {n} więcej",
   figRel1: "1 relacja",
   figRelN: "relacje: {n}",
+  t_diagrams: "Diagramy",
+  lof: "Spis rysunków",
+  legend: "Legenda",
+  lg_rel: "Relacja (kurza łapka: wiele; kreska: jeden; kółko: opcjonalnie)",
+  lg_relUml: "Relacja (krotności UML)",
+  lg_ok: "Mapowanie zatwierdzone",
+  lg_rev: "Mapowanie w przeglądzie",
+  lg_dr: "Mapowanie robocze (szkic)",
+  lg_warn: "Mapowanie z niezgodnością typów",
+  lg_f: "ƒ reguła transformacji",
+  lg_cube: "Mapowanie wymiarowe (logiczny → fakt lub wymiar)",
+  lg_src: "Klucz obcy między tabelami źródłowymi",
+  lg_dot: "Wiersz zasilony (pełny) lub nie (pusty)",
 };
 
 /** German: for Łukasz's review (PRD section 7). */
@@ -562,6 +589,19 @@ const DE: Labels = {
   figMore: "und {n} weitere",
   figRel1: "1 Beziehung",
   figRelN: "{n} Beziehungen",
+  t_diagrams: "Diagramme",
+  lof: "Abbildungsverzeichnis",
+  legend: "Legende",
+  lg_rel: "Beziehung (Krähenfuß: viele; Strich: eins; Kreis: optional)",
+  lg_relUml: "Beziehung (UML-Multiplizitäten)",
+  lg_ok: "Mapping, freigegeben",
+  lg_rev: "Mapping, in Prüfung",
+  lg_dr: "Mapping, Entwurf",
+  lg_warn: "Mapping mit Typproblem",
+  lg_f: "ƒ Transformationsregel",
+  lg_cube: "Dimensionales Mapping (logisch → Fakt oder Dimension)",
+  lg_src: "Fremdschlüssel zwischen Quelltabellen",
+  lg_dot: "Zeile befüllt (voll) oder nicht (Ring)",
 };
 
 export const LABELS: Readonly<Record<DocLanguage, Labels>> = { en: EN, pl: PL, de: DE };

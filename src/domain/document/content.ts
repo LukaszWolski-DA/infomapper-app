@@ -98,11 +98,19 @@ export type DocNode =
    * (`page.ts`). Numbered in document order by `buildDocument` (F6); its first part carries the anchor `fg-{number}`.
    */
   | { readonly kind: "figure"; readonly figure: DocFigure }
+  /**
+   * Slice 27, step 3: the legend under Diagrams' figures (the prototype's `legend`): its title and one line per mark,
+   * each a drawn sample (`LegendMark`) and its words; `mono` for black and white.
+   */
+  | { readonly kind: "legend"; readonly title: string; readonly mono: boolean; readonly items: readonly { readonly mark: LegendMark; readonly text: string }[] }
   /** A line about the document itself: a section skipped while its module is off, or unknown. */
   | { readonly kind: "note"; readonly text: string }
   | { readonly kind: "pageBreak" };
 
 export type DocNodeKind = DocNode["kind"];
+
+/** A legend's sample: a relationship in crow's foot or UML, mappings by status, the ƒ rule, a dimensional mapping, a source key, the row's dots. */
+export type LegendMark = "rel-ie" | "rel-uml" | "map-ok" | "map-review" | "map-draft" | "map-warn" | "map-rule" | "cube" | "src" | "dots";
 
 /** One part of a figure: its region of the SVG (canvas pixels) and its size on the page (millimetres). */
 export interface DocFigurePart {
@@ -135,4 +143,6 @@ export interface DocFigure {
   readonly partTexts: readonly string[];
   /** The editor's line (the prototype's `sumFig`), in the app's language. */
   readonly summary: string;
+  /** Slice 27, step 3: a placed figure's name before its line in the editor ("Fact Sales"); a stored figure has none. */
+  readonly label?: string;
 }

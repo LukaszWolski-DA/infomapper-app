@@ -27,7 +27,7 @@ export function sectionScopeOf(scope: DocumentScope, snapshot: WorkspaceSnapshot
   }
   if (concepts.size) entities = entities.filter((e) => concepts.has(e.concept_id));
   const entityIds = new Set(entities.map((e) => e.id));
-  return { entityIds, tableIds: sourceTablesInScope(snapshot, entityIds, canvases, { projects: projects.size > 0, concepts: concepts.size > 0, mappings: scope.mappings }), logical: scope.logical, dimensional: scope.dimensional, mappings: scope.mappings };
+  return { entityIds, canvasIds: canvases, tableIds: sourceTablesInScope(snapshot, entityIds, canvases, { projects: projects.size > 0, concepts: concepts.size > 0, mappings: scope.mappings }), logical: scope.logical, dimensional: scope.dimensional, mappings: scope.mappings };
 }
 
 /**

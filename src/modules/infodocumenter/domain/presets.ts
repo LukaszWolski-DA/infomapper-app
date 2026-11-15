@@ -5,10 +5,15 @@
 import type { DocumentSectionKind } from "@/domain/document/sections";
 import type { Uuid } from "@/domain/ids";
 import type { Workspace } from "@/domain/types";
+import type { FigureLook } from "@/domain/document/figure-entry";
+import { diagramFigures } from "./figures";
 import type { DocumentPreset, DocumentSection, MappingFilter } from "./types";
 
-/** A preset's section: an own type with its options over the type's defaults, or where the modules' sections go. */
-export type PresetSection = { readonly type: string; readonly options?: Readonly<Record<string, unknown>> } | { readonly modules: true };
+/**
+ * A preset's section: an own type with its options over the type's defaults, or where the modules' sections go.
+ * Slice 27 (D9): Diagrams' `figures`, the look of the figures it is made with (one whole canvas each of the scope's).
+ */
+export type PresetSection = { readonly type: string; readonly options?: Readonly<Record<string, unknown>>; readonly figures?: Partial<FigureLook> } | { readonly modules: true };
 
 export interface Preset {
   readonly code: DocumentPreset;
@@ -26,14 +31,15 @@ const INTRODUCTION =
   "This document describes the data the warehouse will hold, in business terms. Definitions come from the model; ask the data owner listed for each requirement about anything unclear.";
 
 /**
- * Slice 26 (D2 as Łukasz answered): the prototype's presets without Diagrams, Figure and Changes since a baseline; the
- * sign-off preset comes with baselines. The descriptions are the prototype's without the diagrams.
+ * Slice 26 (D2 as Łukasz answered): the prototype's presets without Changes since a baseline; the sign-off preset comes
+ * with baselines. Slice 27, step 3: their Diagrams (the business dictionary's adjusted to keys and relationships only,
+ * the ETL specification's as on the canvas) and the prototype's descriptions with them.
  */
 export const PRESETS: readonly Preset[] = [
   {
     code: "dictionary",
     label: "Data dictionary for the business",
-    description: "Definitions, personal data and requirements. No technical mapping detail.",
+    description: "Definitions, personal data and requirements, with key-only diagrams. No technical mapping detail.",
     audience: "Business",
     mappings: "approved",
     watermark: true,
@@ -41,6 +47,7 @@ export const PRESETS: readonly Preset[] = [
       { type: "text", options: { body: INTRODUCTION } },
       { type: "overview" },
       { type: "conv", options: { statuses: false, types: false, marks: true } },
+      { type: "diagrams", figures: { view: "custom", rows: "keys", lines: { rel: true, map: false, src: false, cube: false }, status: false } },
       { type: "dict", options: { columns: ["attribute", "type", "pii", "definition"], entity: ["definition"] } },
       { type: "reqs", options: { columns: ["key", "name", "kind", "coverage"] } },
       { type: "dq", options: { columns: ["key", "name", "appliesTo", "description"] } },
@@ -50,12 +57,13 @@ export const PRESETS: readonly Preset[] = [
   {
     code: "s2t",
     label: "Source-to-target specification for ETL",
-    description: "Every mapping with rules, types and status; source tables.",
+    description: "Every mapping with rules, types and status; source tables; full diagrams with mapping lines.",
     audience: "ETL developers",
     mappings: "notdraft",
     watermark: false,
     sections: [
       { type: "conv", options: { stereotypes: false } },
+      { type: "diagrams", figures: { view: "canvas" } },
       { type: "s2t", options: { columns: ["target", "targetType", "system", "sourceColumn", "sourceType", "rule", "status", "typeCheck"], unmapped: true } },
       { type: "sources" },
       { modules: true },
@@ -83,12 +91,16 @@ export const presetOf = (code: DocumentPreset): Preset => PRESETS.find((p) => p.
  * them; where the preset says, every registered kind that names the preset and is available in the workspace now, with
  * its defaults; all on.
  */
-export function presetSections(preset: Preset, kinds: Iterable<DocumentSectionKind>, workspace: Workspace, newId: () => Uuid): DocumentSection[] {
+export function presetSections(preset: Preset, kinds: Iterable<DocumentSectionKind>, workspace: Workspace, newId: () => Uuid, canvasIds: readonly Uuid[] = []): DocumentSection[] {
   const all = [...kinds];
   const byType = new Map(all.map((k) => [k.type, k]));
   return preset.sections.flatMap((s) => {
     if ("modules" in s) return all.filter((k) => k.presets.includes(preset.code) && k.available(workspace)).map((k) => newSection(newId(), k.type, k.defaults(), !k.samePage));
     const kind = byType.get(s.type);
-    return [newSection(newId(), s.type, { ...(kind?.defaults() ?? {}), ...structuredClone(s.options ?? {}) }, !kind?.samePage)];
+    const id = newId();
+    const options = { ...(kind?.defaults() ?? {}), ...structuredClone(s.options ?? {}) };
+    // slice 27 (D9): Diagrams is made with one figure per canvas of the scope's, in the preset's look
+    if (s.type === "diagrams") options.figures = diagramFigures(canvasIds, newId, s.figures);
+    return [newSection(id, s.type, options, !kind?.samePage)];
   });
 }

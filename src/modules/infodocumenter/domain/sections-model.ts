@@ -27,11 +27,13 @@ export const paragraphs = (body: string | null | undefined): DocNode[] =>
  * The workspace's description; the counts (the scope's entities, its source tables, the shown mappings onto its
  * entities with how many are approved, every requirement); the concepts with their entities in scope.
  */
-export function buildOverview({ state, scope, options, language }: SectionBuildInput): DocNode[] {
+export function buildOverview({ state, scope, options, language, figures }: SectionBuildInput): DocNode[] {
   const o = overviewOptions.parse(options);
   const t = wordsOf(language);
   const entities = scopeEntities(state, scope);
   const out: DocNode[] = [...paragraphs(state.snapshot.workspace.description)];
+  // slice 27 (D5): its figures right after the description, or below the section's content
+  if (o.figuresAt === "start") out.push(...figures.list(o.figures));
   if (o.stats) {
     const mappings = entities.flatMap((e) => attributesOf(state, e.id).flatMap((a) => state.lookup.mappingsOfAttribute.get(a.id) ?? [])).filter((m) => statusShown(scope.mappings, m.status));
     const approved = mappings.filter((m) => m.status === "approved").length;
@@ -62,6 +64,7 @@ export function buildOverview({ state, scope, options, language }: SectionBuildI
         }),
       });
   }
+  if (o.figuresAt === "end") out.push(...figures.list(o.figures));
   return out;
 }
 

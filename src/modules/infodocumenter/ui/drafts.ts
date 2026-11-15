@@ -20,11 +20,17 @@ export function storedOf(doc: DraftRecipe, key: string): string {
     const [, part, side] = key.split(".") as [string, "header" | "footer", "left" | "right"];
     return doc.style[part][side] ?? "";
   }
-  const [, id, field] = key.split(":");
+  const [kind, id, field] = key.split(":");
   const s = doc.sections.find((x) => x.id === id);
   if (!s) return "";
+  // slice 27, step 3: a figure's caption, "fig:{section}:{figure}"
+  if (kind === "fig") return figureOf(s, field!)?.caption ?? "";
   return field === "heading" ? (s.heading ?? "") : String(s.options[field!] ?? "");
 }
+
+type Figure = { id: string; caption: string };
+const figuresOf = (s: DraftRecipe["sections"][number]): Figure[] => (Array.isArray(s.options.figures) ? (s.options.figures as Figure[]) : []);
+const figureOf = (s: DraftRecipe["sections"][number], id: string) => figuresOf(s).find((f) => f.id === id);
 
 /** The recipe the preview draws: the stored one with each draft typed over the value it still has. */
 export function withDrafts<R extends DraftRecipe>(doc: R, drafts: ReadonlyMap<string, TextDraft>): R {
@@ -40,7 +46,13 @@ export function withDrafts<R extends DraftRecipe>(doc: R, drafts: ReadonlyMap<st
       const [, part, side] = key.split(".") as [string, "header" | "footer", "left" | "right"];
       out = { ...out, style: { ...out.style, [part]: { ...out.style[part], [side]: nullable } } };
     }
-    else {
+    else if (key.startsWith("fig:")) {
+      const [, id, figure] = key.split(":");
+      out = {
+        ...out,
+        sections: out.sections.map((s) => (s.id !== id ? s : { ...s, options: { ...s.options, figures: figuresOf(s).map((f) => (f.id === figure ? { ...f, caption: text.trim() } : f)) } })),
+      };
+    } else {
       const [, id, field] = key.split(":");
       out = {
         ...out,

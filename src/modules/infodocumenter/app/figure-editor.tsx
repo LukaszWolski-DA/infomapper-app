@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import type { useAction } from "@/app/_components/use-action";
 import { TextField, useChoice } from "@/app/_panels/fields";
 import { uuidv7 } from "@/domain/ids";
-import { newFigure, type FigureEntry } from "../domain/sections";
+import { newFigure, type FigureEntry } from "@/domain/document/figure-entry";
 
 type Answer = ReturnType<ReturnType<typeof useAction>["saveRow"]>;
 
@@ -89,9 +89,11 @@ export function FigureEditor(props: {
   dimensional: boolean;
   readOnly: boolean;
   version: number;
+  /** Slice 27, step 3: the caption's text while it is typed, for the preview (`fig:{section}:{figure}`, D-81's drafts). */
+  typed?: (key: string) => (text: string) => void;
   save: (figures: FigureEntry[]) => Answer;
 }) {
-  const { sectionId, label, hint, sources, summaries, dimensional, readOnly, version, save } = props;
+  const { sectionId, label, hint, sources, summaries, dimensional, readOnly, version, typed, save } = props;
   // the stored list as one object while it stays the same: `useChoice` shows a choice made on that object (D-66)
   const storedKey = JSON.stringify(props.stored);
   const stored = useMemo(() => JSON.parse(storedKey) as FigureEntry[], [storedKey]);
@@ -173,6 +175,7 @@ export function FigureEditor(props: {
                     readOnly={readOnly}
                     placeholder={FIGURE_TEXTS.captionPlaceholder(name)}
                     testId="input-figure-caption"
+                    {...(typed ? { onType: typed(`fig:${sectionId}:${f.id}`) } : {})}
                     onSave={(v) => save(figures.map((x) => (x.id === f.id ? { ...x, caption: v.trim() } : x)))}
                   />
                 </div>

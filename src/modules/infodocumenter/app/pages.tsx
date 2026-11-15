@@ -75,7 +75,7 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
     module: t.module,
     available: t.available(access.workspace),
     heading: t.label(language),
-    checks: t.optionChecks ?? null,
+    fields: t.optionFields ?? (t.optionChecks ? t.optionChecks.map((c) => ({ kind: "check" as const, ...c })) : null),
     note: t.optionNote ?? null,
   }));
   // the register's choices: the workspace's live classifications in list order, a built-in one by its code (Data Vault

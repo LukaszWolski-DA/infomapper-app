@@ -4,7 +4,7 @@
 // InfoCube is on), and Anna's private working dictionary. Step 4b: definitions for twelve logical attributes the
 // documents print (the plain seed has none), written here, not in the seed's model, so no earlier spec reads them. Run
 // after the rest of the demo (`addDocumentsDemoData`), never inside `addFullDemoData`, so earlier fixtures and benches
-// read the demo as before. False when it ran already.
+// read the demo as before. False when it ran already. Slice 27, step 3: the presets' Diagrams with the scope's canvases.
 
 import type { DevDb } from "@/data/local/schema";
 import { seedId } from "@/data/local/seed-model";
@@ -12,6 +12,7 @@ import type { DocumentSectionKind } from "@/domain/document/sections";
 import type { Uuid } from "@/domain/ids";
 import { plainTextPair } from "@/domain/model/plain-text";
 import { defaultStyle } from "../domain/style";
+import { diagramCanvases } from "../domain/figures";
 import { presetOf, presetSections } from "../domain/presets";
 import type { DocumentCover, DocumentDefinition, DocumentPreset, DocumentScope } from "../domain/types";
 
@@ -74,6 +75,10 @@ export function addDocumentsDemo(db: DevDb & { document_definition?: DocumentDef
   }
 
   const list = [...kinds];
+  // slice 27, step 3 (D9): Diagrams gets one figure per canvas of the document's scope, as New document makes it
+  const projects = db.project.filter((p) => p.workspace_id === ws && p.deleted_at === null);
+  const liveCanvases = new Set(db.canvas.filter((c) => c.workspace_id === ws && c.deleted_at === null).map((c) => c.id));
+  const links = db.project_canvas.filter((l) => l.workspace_id === ws && liveCanvases.has(l.canvas_id));
   const make = (key: string, preset: DocumentPreset, author: Uuid, row: { name: string; shared: boolean; scope?: Partial<DocumentScope>; cover?: Partial<DocumentCover> }): DocumentDefinition => {
     const p = presetOf(preset);
     let n = 0;
@@ -97,7 +102,7 @@ export function addDocumentsDemo(db: DevDb & { document_definition?: DocumentDef
       cover: { ...EMPTY_COVER, ...row.cover },
       // the workspace's language (Q8: a seeded document follows it), the preset's draft mark
       style: defaultStyle({ watermark: p.watermark }),
-      sections: presetSections(p, list, workspace, () => id(`document:${key}:section:${n++}`)),
+      sections: presetSections(p, list, workspace, () => id(`document:${key}:section:${n++}`), diagramCanvases(projects, links, row.scope?.projects ?? [])),
     };
   };
   documents.push(

@@ -123,11 +123,20 @@ describe("creating from a preset (D1, D13)", () => {
   });
 
   it("puts the Dimensional model in the source-to-target preset's place only while InfoCube is on (slice 26: D2's presets)", () => {
-    expect(made("s2t").sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", "dq"]);
+    // slice 27, step 3: both presets with the prototype's Diagrams after the conventions
+    expect(made("s2t").sections.map((s) => s.type)).toEqual(["conv", "diagrams", "s2t", "sources", "dq"]);
     const withCube = made("s2t", { infocube: true });
-    expect(withCube.sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", "cube.dim", "dq"]);
-    expect(withCube.sections[3]!.options).toEqual(CUBE_SECTION_KIND.defaults());
-    expect(made("dictionary", { infocube: true }).sections.map((s) => s.type)).toEqual(["text", "overview", "conv", "dict", "reqs", "dq", "classreg"]);
+    expect(withCube.sections.map((s) => s.type)).toEqual(["conv", "diagrams", "s2t", "sources", "cube.dim", "dq"]);
+    expect(withCube.sections[4]!.options).toEqual(CUBE_SECTION_KIND.defaults());
+    expect(made("dictionary", { infocube: true }).sections.map((s) => s.type)).toEqual(["text", "overview", "conv", "diagrams", "dict", "reqs", "dq", "classreg"]);
+  });
+
+  it("makes the preset's Diagrams with one figure per canvas it is given (slice 27, step 3, D9)", () => {
+    const r = createDocument(makeCtx(ME), as("modeler"), { workspaceId: ids.ws, preset: "s2t" }, KINDS, ["c1", "c2"]);
+    const figures = ok(r).document.sections.find((s) => s.type === "diagrams")!.options.figures as { canvasId: string; id: string }[];
+    expect(figures.map((f) => f.canvasId)).toEqual(["c1", "c2"]);
+    expect(new Set(figures.map((f) => f.id)).size).toBe(2);
+    expect(ok(createDocument(makeCtx(ME), as("modeler"), { workspaceId: ids.ws, preset: "blank" }, KINDS, ["c1"])).document.sections.map((s) => s.type)).toEqual(["text"]);
   });
 
   it("is one change event, outside the undo history (R2-4a2)", () => {

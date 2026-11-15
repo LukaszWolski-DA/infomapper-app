@@ -35,6 +35,9 @@ export interface CubeDocWords {
   readonly direct: string;
   readonly lookup: string;
   readonly noDims: string;
+  /** Slice 27, step 3: the star diagram's caption, and its note beyond the limit of dimensions shown. */
+  readonly star: (fact: string) => string;
+  readonly starPart: (shown: number, all: number) => string;
   readonly rels: string;
   readonly related: string;
   readonly relname: string;
@@ -80,6 +83,8 @@ const EN: CubeDocWords = {
   direct: "Direct copy",
   lookup: "Lookup",
   noDims: "There are no facts or dimensions in this model state.",
+  star: (n) => `Star schema of ${n}`,
+  starPart: (a, b) => `${a} of ${b} dimensions shown; all are in the table below`,
   rels: "Relationships",
   related: "Related entity",
   relname: "Relationship",
@@ -122,6 +127,8 @@ const PL: CubeDocWords = {
   direct: "Kopia bezpośrednia",
   lookup: "Lookup",
   noDims: "W tym stanie modelu nie ma faktów ani wymiarów.",
+  star: (n) => `Schemat gwiazdy: ${n}`,
+  starPart: (a, b) => `pokazano ${a} z ${b} wymiarów; wszystkie są w tabeli poniżej`,
   rels: "Relacje",
   related: "Powiązana encja",
   relname: "Relacja",
@@ -173,6 +180,8 @@ const DE: CubeDocWords = {
   direct: "Direkte Übernahme",
   lookup: "Lookup",
   noDims: "In diesem Modellstand gibt es keine Fakten oder Dimensionen.",
+  star: (n) => `Sternschema von ${n}`,
+  starPart: (a, b) => `${a} von ${b} Dimensionen gezeigt; alle stehen in der Tabelle darunter`,
   rels: "Beziehungen",
   related: "Verbundene Entität",
   relname: "Beziehung",

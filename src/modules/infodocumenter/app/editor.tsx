@@ -39,9 +39,10 @@ import {
 } from "./actions";
 import { nextDraft, withDrafts, type TextDraft } from "../ui/drafts";
 import type { DocPanelWidths } from "../ui/panels-cookie";
-import { FigureEditor, type FigureSource } from "./figure-editor";
+import { FIGURE_TEXTS, FigureEditor, type FigureSource } from "./figure-editor";
 import { HANDLE_CSS, PanelHandles } from "./panel-handles";
-import { hasSpec, SectionOptions, type OptionContext } from "./section-options";
+import { hasSpec, ModuleOptions, SectionOptions, type OptionContext } from "./section-options";
+import type { SectionOptionField } from "@/domain/document/sections";
 import { StylePanel } from "./style-panel";
 import { DocumentPreview, LAYOUT_THRESHOLD_MS, PREVIEW_TEXTS, type PreviewHandle, type PreviewMode, type PreviewZoom } from "./preview";
 
@@ -57,7 +58,8 @@ export interface EditorSectionType {
   available: boolean;
   /** The default heading in the document's language (the Heading field's placeholder). */
   heading: string;
-  checks: readonly { key: string; label: string }[] | null;
+  /** A module's options as plain fields (slice 27, step 3: `optionFields`, the earlier `optionChecks` as check boxes). */
+  fields: readonly SectionOptionField[] | null;
   /** A line in place of options (a module's type with none to set). */
   note: string | null;
 }
@@ -85,7 +87,7 @@ export const EDITOR_TEXTS = {
 } as const;
 
 /** InfoDocumenter's own types by their names in the editor (a module's comes with its type). */
-const OWN_NAMES: Record<string, string> = { text: "Text", dict: "Data dictionary", s2t: "Source-to-target mapping", figure: "Figure" };
+const OWN_NAMES: Record<string, string> = { text: "Text", dict: "Data dictionary", s2t: "Source-to-target mapping", figure: "Figure", diagrams: "Diagrams" };
 export const sectionName = (type: string, label: string): string => OWN_NAMES[type] ?? label;
 
 const MAPPINGS: readonly (readonly [MappingFilter, string])[] = [
@@ -475,8 +477,13 @@ export function DocumentEditor(props: EditorProps) {
                 headingRef.current = el;
               }}
               typed={typed}
-              context={optionContext}
-              figures={{ sources: figureSources, summaries: figureSummaries, dimensional: dimensional && doc.scope.dimensional }}
+              context={{ ...optionContext, smallestPt: doc.style.smallestPt }}
+              figures={{
+                sources: figureSources,
+                summaries: figureSummaries,
+                dimensional: dimensional && doc.scope.dimensional,
+                placed: (built?.tree.figures ?? []).filter((f) => f.sectionId === selectedSection.id && f.label).map((f) => ({ label: f.label!, summary: f.summary })),
+              }}
               compact={doc.style.template === "compact"}
               save={(patch) => save({ section: { id: selectedSection.id, ...patch } })}
             />
@@ -647,7 +654,7 @@ function SectionPanel({
   /** The Compact template runs sections on: "Start on a new page" is disabled (the prototype's). */
   compact: boolean;
   /** Slice 27: what a section's figure editor offers and the tree's line per figure. */
-  figures: { sources: readonly FigureSource[]; summaries: ReadonlyMap<string, string>; dimensional: boolean };
+  figures: { sources: readonly FigureSource[]; summaries: ReadonlyMap<string, string>; dimensional: boolean; placed: readonly { label: string; summary: string }[] };
   section: Recipe["sections"][number];
   type: EditorSectionType | null;
   readOnly: boolean;
@@ -659,6 +666,22 @@ function SectionPanel({
 }) {
   const o = s.options;
   const opt = (patch: Record<string, unknown>) => save({ options: patch });
+  // slice 27: a section's figure editor for one of its options' keys
+  const figureEditor = (key: string, label: string, hint?: string) => (
+    <FigureEditor
+      sectionId={s.id}
+      label={label}
+      hint={hint}
+      stored={(o[key] as FigureEntry[] | undefined) ?? []}
+      sources={figures.sources}
+      summaries={figures.summaries}
+      dimensional={figures.dimensional}
+      readOnly={readOnly}
+      version={version}
+      typed={typed}
+      save={(list) => opt({ [key]: list })}
+    />
+  );
   let body: ReactNode = null;
   if (!type) body = <p className="m-0 mt-3 text-im-ink-3">{EDITOR_TEXTS.unknown}</p>;
   else if (s.type === "text")
@@ -676,30 +699,21 @@ function SectionPanel({
         />
       </Field>
     );
-  else if (s.type === "figure")
-    body = (
-      <FigureEditor
-        sectionId={s.id}
-        label="Figures"
-        hint="A canvas, or one frame of it."
-        stored={(o.figures as FigureEntry[] | undefined) ?? []}
-        sources={figures.sources}
-        summaries={figures.summaries}
-        dimensional={figures.dimensional}
-        readOnly={readOnly}
-        version={version}
-        save={(list) => opt({ figures: list })}
-      />
-    );
+  else if (s.type === "figure") body = figureEditor("figures", "Figures", "A canvas, or one frame of it.");
   else if (hasSpec(s.type))
-    body = <SectionOptions sectionId={s.id} type={s.type} options={o} readOnly={readOnly} version={version} context={context} typed={typed} save={opt} />;
-  else if (type.checks)
+    body = <SectionOptions sectionId={s.id} type={s.type} options={o} readOnly={readOnly} version={version} context={context} typed={typed} save={opt} figureEditor={figureEditor} />;
+  else if (type.fields)
     body = (
-      <div className="mt-3 grid gap-1">
-        {type.checks.map((c) => (
-          <Check key={c.key} testId={`check-${s.type}-${c.key}`} label={c.label} stored={!!o[c.key]} disabled={readOnly} onSave={(v) => opt({ [c.key]: v })} />
-        ))}
-      </div>
+      <ModuleOptions
+        type={s.type}
+        fields={type.fields}
+        options={o}
+        readOnly={readOnly}
+        save={opt}
+        figureEditor={figureEditor}
+        placedLines={figures.placed}
+        sizeTexts={{ sizes: FIGURE_TEXTS.sizes, orientations: FIGURE_TEXTS.orientations }}
+      />
     );
   else if (type.note) body = <p className="m-0 mt-3 text-[11.5px] text-im-ink-3">{type.note}</p>;
   const name = type ? sectionName(type.type, type.name) : s.type;

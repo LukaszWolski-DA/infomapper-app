@@ -140,6 +140,10 @@ export const DOCUMENT_LOOK_CSS = `
 .dmono{font-family:var(--font-plex-mono),monospace;font-size:.94em}
 .dnote{color:var(--dink3);font-style:italic;border:1px dashed var(--dline);padding:3mm;border-radius:1.5mm}
 /* slice 27: figures (the prototype's .dfig, .dtile, .drot, .drotw, .dimg, .dph) */
+.dlegend{display:flex;flex-wrap:wrap;gap:1.5mm 5mm;font-size:8pt;color:var(--dink2);border-top:.6px solid var(--dline);padding-top:2mm;margin-top:2mm;break-inside:avoid;font-family:var(--font-plex-sans),sans-serif}
+.dlegend b{width:100%;color:var(--dink)}
+.dlegend span{display:inline-flex;align-items:center;gap:1.5mm}
+.dlof li a{font-size:10pt}
 .dfig{margin:2mm 0 5mm;break-inside:avoid}
 .dfig figcaption{font-size:8.5pt;color:var(--dink2);margin-top:1.5mm}
 .dfig img.dimg{display:block;max-width:none}
@@ -229,6 +233,8 @@ export function quickSheetCss(style: Pick<DocumentStyle, "paper" | "orientation"
   box-shadow:0 1px 3px rgba(0,0,0,.12),0 10px 30px -18px rgba(0,0,0,.35)}
 .dquick .dcover{min-height:${h}mm}
 .dquick .dsec+.dsec{margin-top:6mm}
+/* no page numbers in the contents or the list of figures (D10): Paged.js rewrites the pages' target-counter() rule for the whole document, which drew "0" here */
+.dquick .dtoc a::after{content:none!important}
 .dquick .dwm{position:sticky;top:0;align-self:flex-end;z-index:1;font:600 9pt var(--font-plex-sans),sans-serif;color:#B23A0B;margin-bottom:-8mm;padding:2mm 4mm}
 .dquick .dfoot{font:7.5pt var(--font-plex-sans),sans-serif;color:#7C8794;text-align:center}
 `;

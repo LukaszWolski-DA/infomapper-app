@@ -4,7 +4,8 @@
 // are the prototype's `DOC` ones (`document-css.ts`).
 
 import type { CSSProperties, ReactNode } from "react";
-import type { DocFigure, DocNode, DocRow, DocRun, DocRuns } from "@/domain/document/content";
+import type { DocFigure, DocNode, DocRow, DocRun, DocRuns, LegendMark } from "@/domain/document/content";
+import { FIGURE_PALETTE } from "@/domain/document/figure";
 import type { DocumentTree } from "../domain/document";
 import { frameQuickText } from "./document-css";
 
@@ -269,6 +270,18 @@ function Node({ node }: { node: DocNode }) {
       );
     case "figure":
       return <Figure figure={node.figure} />;
+    case "legend":
+      return (
+        <div className="dlegend" data-testid="figure-legend">
+          <b>{node.title}</b>
+          {node.items.map((it) => (
+            <span key={it.mark} data-mark={it.mark}>
+              <LegendSample mark={it.mark} mono={node.mono} />
+              {it.text}
+            </span>
+          ))}
+        </div>
+      );
     case "meta":
       return (
         <div className="dmeta">
@@ -290,6 +303,83 @@ function Node({ node }: { node: DocNode }) {
 }
 
 const mm = (v: number) => `${v.toFixed(1)}mm`;
+
+/** A legend's sample (the prototype's `legend`): 44 × 14, in the figures' palette. */
+function LegendSample({ mark, mono }: { mark: LegendMark; mono: boolean }) {
+  const P = mono ? FIGURE_PALETTE.mono : FIGURE_PALETTE.colour;
+  const line = (stroke: string, dash?: string) => <path d="M2 7H42" stroke={stroke} strokeWidth={1.6} fill="none" strokeDasharray={dash} />;
+  let body: ReactNode;
+  switch (mark) {
+    case "rel-ie":
+      body = <path d="M2 7H42M30 7L42 1M30 7L42 13M30 7L42 7M8 1V13" stroke={P.rel} strokeWidth={1.4} fill="none" />;
+      break;
+    case "rel-uml":
+      body = (
+        <>
+          <path d="M2 7H42" stroke={P.rel} strokeWidth={1.4} fill="none" />
+          <text x="6" y="5" fontSize="6" fill={P.rel}>
+            1
+          </text>
+          <text x="32" y="5" fontSize="6" fill={P.rel}>
+            0..*
+          </text>
+        </>
+      );
+      break;
+    case "map-ok":
+      body = line(P.map);
+      break;
+    case "map-review":
+      body = line(P.map, "10 3 2 3");
+      break;
+    case "map-draft":
+      body = line(P.map, "6 4");
+      break;
+    case "map-warn":
+      body = line(P.warn);
+      break;
+    case "map-rule":
+      body = (
+        <>
+          {line(P.map)}
+          <circle cx="22" cy="7" r="6" fill="#fff" stroke={P.map} />
+          <text x="22" y="7" fontSize="8" textAnchor="middle" dominantBaseline="central" fill={P.map} fontWeight={600}>
+            ƒ
+          </text>
+        </>
+      );
+      break;
+    case "cube":
+      body = (
+        <>
+          <path d="M2 7H40" stroke={P.ink2} strokeWidth={1.6} />
+          <rect x="37" y="4" width="6" height="6" fill={P.ink2} transform="rotate(45 40 7)" />
+        </>
+      );
+      break;
+    case "src":
+      body = (
+        <>
+          <path d="M2 7H36" stroke={P.ink3} strokeWidth={1.1} />
+          <path d="M42 7L35 3V11Z" fill={P.ink3} />
+        </>
+      );
+      break;
+    case "dots":
+      body = (
+        <>
+          <circle cx="14" cy="7" r="5" fill={P.map} />
+          <circle cx="30" cy="7" r="4.3" fill="none" stroke={P.ink3} strokeWidth={1.5} />
+        </>
+      );
+      break;
+  }
+  return (
+    <svg viewBox="0 0 44 14" width="44" height="14" aria-hidden="true">
+      {body}
+    </svg>
+  );
+}
 
 /**
  * A figure (slice 27, F3, F10): its SVG once, in a hidden holder the page turns into one image source (`figure-images.ts`:
@@ -398,6 +488,22 @@ export function DocumentHtml({ tree, id, quick }: { tree: DocumentTree; id?: str
       {notes}
     </section>
   );
+  // slice 27, step 3 (D10): the list of figures on its own sheet after the contents; page numbers in the pages only
+  const figureList = !tree.listOfFigures ? null : (
+    <section className="dsheet dtoc dlof" data-testid="document-figures" data-sec="doc">
+      <h2>{tree.listOfFigures.heading}</h2>
+      <ol>
+        {tree.figures.map((f) => (
+          <li key={f.anchor}>
+            <a href={`#${f.anchor}`}>
+              <span className="dnum">{f.number}</span>
+              {f.caption}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
   const section = (s: DocumentTree["sections"][number], sheet: boolean) => (
     <section key={s.id} className={sheet ? "dsheet dsec" : "dsec"} data-section={s.type} data-sec={s.id} data-testid="document-section">
       <h2 id={s.anchor}>
@@ -412,6 +518,7 @@ export function DocumentHtml({ tree, id, quick }: { tree: DocumentTree; id?: str
       <div id={id} className="dpages" lang={tree.language} data-testid="document-source">
         {cover}
         {contents}
+        {figureList}
         {tree.sections.map((s, i) => section(s, i === 0 || s.newPage))}
       </div>
     );
@@ -427,6 +534,7 @@ export function DocumentHtml({ tree, id, quick }: { tree: DocumentTree; id?: str
       {tree.frame.watermark && <div className="dwm">{tree.frame.watermark}</div>}
       {cover}
       {contents}
+      {figureList}
       {sheets.map((group) => (
         <div key={group[0]!.id} className="dsheet" data-testid="quick-sheet">
           {group.map((s) => section(s, false))}
