@@ -1093,3 +1093,16 @@ the screenshot and preparation scripts of steps 2 to 4). Nothing stays uncommitt
 10. In Kanton Basel: a dictionary from the business preset (its Diagrams from KB's canvases), a whole canvas and a frame
     in each size, the list of figures on, a PDF; a star diagram if KB has InfoCube's facts; the page outline on a KB
     canvas in A4 and A3, portrait and landscape.
+
+### The full run on the final commit
+
+Workflow "E2E" run 43698544457 on `03a7cba` (the closing's commit), 14 min 36 s wall-clock: 803 passed, 0 failed, 0
+flaky, 16 skipped, no expected failures; no server restarted (threshold 6,431 MB).
+
+| Part | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Time | 12.8 min | 9.6 min | 7.1 min | 10.2 min | 10.2 min | 7.7 min | 10.7 min | 11.1 min |
+| Heap peak | 1,106 MB | 1,193 MB | 1,318 MB | 1,131 MB | 1,423 MB | 1,460 MB | 1,055 MB | 1,603 MB |
+
+Part 8's peak, 1,603 MB, is under 1.95 GB (1,836 MB in step 4's run): no ninth part is due now. Commits after the
+tested one change Markdown files in `docs/` only (`git diff --stat 03a7cba..HEAD`).
