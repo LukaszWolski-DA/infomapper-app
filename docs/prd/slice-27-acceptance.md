@@ -929,3 +929,94 @@ images are decoded once per figure. The threshold stays 1,000 ms (your answer to
 - **No full run in this step:** it changes no shared infrastructure (no undo, save chain, canvas layer, table registry
   or local adapter code; the demo's documents and the content tree are InfoDocumenter's and the document domain's).
   Step 4 and the closing have theirs.
+
+## Step 4: the page outline on the canvas (15 November 2026)
+
+### Step 3's assumptions, as Łukasz answered (15 November 2026)
+
+- **The style's hint for the smallest names** is now true of D4 (a): "A figure whose names come out smaller shows a
+  warning in its line; “Whole, as large as fits” turns it on the page when that makes them larger." The example in the
+  answer ("'Page width, in parts' uses this size to choose how many parts") would not be true: with D4 (a), "Page width,
+  in parts" draws at the page's width whatever the smallest names are (`figureLayout`); the size is read only by the
+  warning and by the turn of "as large as fits".
+- **Diagrams' warning size** for the warning lines only, and **the legend never split**: accepted, unchanged.
+- **A canvas in no project:** with no project ticked ("the whole model"), Diagrams also makes figures of the canvases in
+  no project, after the projects' canvases (`diagramCanvases`'s last argument; New document, "+ Add section" and the
+  demo). A canvas in no project has no tab, so they come **in the order they were made**. With no project ticked the
+  document's scope holds every live canvas (`SectionScope.canvasIds`), so the Data dictionary's concept frame may come
+  from such a canvas too; the entities and source tables in scope do not change (they read the canvases only with a
+  project ticked). Checked by `tests/document-figures-3.test.ts` and S27-04 (a canvas in no project comes last).
+
+### What was built
+
+- **The look's key** (Q6): `CanvasLook.pageOutline` (`{ paper: "A4" | "A3", orientation: "portrait" | "landscape", pt:
+  6 | 7 | 8 }`), present only while on, so a look stored earlier and the column's SQL default read as off: **no change of
+  the local file's format**. `applyLookPatch` takes `pageOutline` (null for off) and keeps it through every other patch
+  (Show all's too); `sameLook` compares it (`sameOutline`); `setCanvasLook`'s input checks it (`strict`, the prototype's
+  values only); "Use this look on all canvases" still copies background and grid only. Not an undo step, as the look.
+- **The extension point:** `ModuleView.pageOutline` (`src/ui/modules.ts`), set by `moduleView` (`src/compose/view.ts`)
+  while InfoDocumenter is on; the canvas page hands it to `CanvasLookProvider` (`outlines`). The key, the control and
+  the layer are InfoMapper's; InfoMapper's code does not name InfoDocumenter. While InfoDocumenter is off the control is
+  not there and nothing is drawn, though the look keeps its key.
+- **The control** (`PageOutlineControls`, `src/canvas/look.tsx`) under "Canvas look" in the canvas's panel, for those
+  who may change the look (as its other controls): "Page outline for documentation" with Off, A4, A3; while on,
+  Portrait, Landscape and 6 pt, 7 pt, 8 pt, and "Keep the cards inside page 1 and this canvas prints whole, with
+  attribute names at least {pt} pt." Turned on, it starts at portrait, 7 pt (the prototype's).
+- **The layer** (`src/canvas/PageOutline.tsx`), behind the frames (z −2 beside `FrameLayer`'s −1): the pages a whole
+  canvas takes, from InfoMapper's page geometry (`outlinePages`, `outlineLabel`, `src/domain/document/page.ts`: the
+  figure's room on such a page, upright, at the scale that draws the names at the chosen size), laid from the figure's
+  box (`figureBoxOf`, now shared with the figure builder). Page 1 "{A4} {landscape} at {7} pt · fits on one page" (green)
+  or "… · needs {n} pages: move cards into page 1 to keep it whole" (blue), the others "page {n}" (orange, thinner), as
+  the prototype's. **It counts what a figure "As on the canvas" draws** (Q6): the cards shown, the expanded frames
+  holding a card with their name strip, the collapsed frames' blocks and the requirement cards; never notes. **Off: no
+  element** (the layer is not mounted). On: the layer and one element per page, its label a `::before`.
+- **Following the cards:** the layer reads the cards' places from React Flow's store, worked out again only when the
+  nodes change (never on a pan or a zoom), and keeps its pages while a card is dragged: they follow the drop. It never
+  re-renders `ModelCanvas` (it is mounted beside the frames and subscribes itself).
+- **Never on a figure or a thumbnail:** the figure builder and the thumbnail route do not read the key.
+
+### Assumed (say if not)
+
+- **Who changes it:** those who may change the canvas's look (owners, admins, modelers), as its other controls; readers
+  and reviewers see the outline but have no control (the prototype's "for everyone" is about who sees it).
+- **Off forgets the orientation and size** (the key is present only while on, your answer to Q6): turned on again, it
+  starts at portrait, 7 pt, as the prototype's first time.
+- **The labels scale with the zoom** (13 px on the canvas, as the prototype's), unlike the frames' names.
+- **A frame's drag** moves the frame and its cards without React Flow's drag flag, so the outline follows it as it
+  moves; a card's drag keeps the pages until the drop.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`, `npm test` (2,269 tests, 181 files) pass. New unit tests: the look's key
+  (`canvas-look.test.ts`), the command (`canvas.test.ts`), the pages, labels and the figure's box (`page.test.ts`), the
+  canvases in no project (`document-figures-3.test.ts`).
+- **S27-09** (3 tests): the choices, the stored key, the pages and labels, off with no element, kept after a reload;
+  the outline follows a drop and not a drag, a note moved far away changes nothing; the figure and the thumbnail of
+  the canvas are the same byte for byte with the outline on; with InfoDocumenter off no control and no outline.
+- Locally, S25, S26, S27, slice 16 (the look's kinds and Show all), slice 14b (the look on the save chain), slice 12b
+  (thumbnails) and the commit counters (S2C-12, S3A-14-idle, S3B-15-idle): 119 passed, 13 skipped (measuring specs).
+- **The element guard** on the measurement build (`S3B-15-elements` against `slice-08.json`), InfoDocumenter off: viewport
+  4,508 / 19,305 / 1,465 / 4,907, page totals 6,137 / 20,934 / 3,004 / 6,446: unchanged. **With InfoDocumenter on**
+  (`e2e/slice-27/S27-09-elements.spec.ts`, the same four views):
+
+  | View | Outline off: viewport | On (A4 landscape, 7 pt): viewport | Pages | Page total off / on |
+  | --- | --- | --- | --- | --- |
+  | 30 %, expanded | 4,508 | 4,569 | 60 | 6,143 / 6,213 |
+  | 100 %, expanded | 19,305 | 19,366 | 60 | 20,940 / 21,010 |
+  | 30 %, collapsed | 1,465 | 1,526 | 60 | 3,010 / 3,080 |
+  | 100 %, collapsed | 4,907 | 4,968 | 60 | 6,452 / 6,522 |
+
+  Off, the viewport equals the baseline; the page total is 6 higher with InfoDocumenter on: the control in the panel
+  (outside the canvas). On: the layer and one element per page (+61; "Performance test" takes 60 A4 landscape pages at
+  7 pt), the spec checks that sum.
+- **The full run** (the canvas page's layers): workflow "E2E" run 43696491179 on `a212c64`, 14 min 32 s wall-clock:
+  803 passed, 0 failed, 0 flaky, 16 skipped (S27-10's four measuring tests are new among them), no expected failures.
+
+  | Part | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Time | 9.8 min | 12.4 min | 10.8 min | 10.2 min | 11.5 min | 7.6 min | 12.9 min | 9.6 min |
+  | Heap peak | 1,343 MB | 993 MB | 851 MB | 1,040 MB | 1,147 MB | 1,421 MB | 1,066 MB | 1,836 MB |
+
+  No server restarted (threshold 6,431 MB). **Part 8's peak, 1,836 MB, is near the 2 GB at which CLAUDE.md says to add
+  a ninth part** (it was 1,258 MB in step 2's run; slices 25 to 27's document specs are there). Not changed here: e2e
+  parts are shared infrastructure, a `chore` of its own; the recut rule does not apply (part 7 is the longest).
