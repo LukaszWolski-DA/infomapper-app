@@ -29,7 +29,7 @@ test("S25-08: a Polish workspace prints its headings and labels in Polish", asyn
   const t = await texts(page);
   expect(t.toc).toBe("Spis treści");
   // slice 26 (D2): the preset's sections, every heading in Polish
-  expect(t.sections).toEqual(["Wprowadzenie", "Przegląd modelu", "Konwencje i notacja", "Słownik danych", "Wymagania i pokrycie", "Reguły jakości danych", "Rejestr klasyfikacji"]);
+  expect(t.sections).toEqual(["Wprowadzenie", "Przegląd modelu", "Konwencje i notacja", "Diagramy", "Słownik danych", "Wymagania i pokrycie", "Reguły jakości danych", "Rejestr klasyfikacji"]);
   expect(t.cover).toEqual(["Klient", "Workspace", "Stan modelu", "Wersja", "Status", "Przygotował(a)"]);
   expect(t.heads).toEqual(expect.arrayContaining(["Atrybut", "Typ", "Dane osobowe"]));
   expect(await marginContent(page, 1, "top-center")).toBe('"WERSJA ROBOCZA · model bieżący"');
@@ -44,7 +44,7 @@ test("S25-08: a German workspace prints its headings and labels in German; names
   await laidOut(page);
   const t = await texts(page);
   expect(t.toc).toBe("Inhalt");
-  expect(t.sections).toEqual(["Einleitung", "Modellübersicht", "Konventionen und Notation", "Datenkatalog", "Anforderungen und Abdeckung", "Datenqualitätsregeln", "Klassifikationsverzeichnis"]);
+  expect(t.sections).toEqual(["Einleitung", "Modellübersicht", "Konventionen und Notation", "Diagramme", "Datenkatalog", "Anforderungen und Abdeckung", "Datenqualitätsregeln", "Klassifikationsverzeichnis"]);
   expect(t.cover).toEqual(["Kunde", "Workspace", "Modellstand", "Version", "Status", "Erstellt von"]);
   expect(t.heads).toEqual(expect.arrayContaining(["Attribut", "Typ", "Personenbezogene Daten"]));
   expect(t.entities).toContain("Customer");

@@ -99,7 +99,8 @@ test.describe("with InfoCube on", () => {
     await page.getByTestId("button-add-section").click();
     const cube = page.locator('[data-testid="button-add-section-type"][data-type="cube.dim"]');
     await expect(cube).toBeEnabled();
-    await expect(cube).toContainText("Facts with grain and type, dimensions and measures; dimensions with history; every dimensional attribute's feed.");
+    // slice 27, step 3: the prototype's line with the star diagram and the figures from canvases
+    await expect(cube).toContainText("Facts with grain, type, a star diagram, dimensions and measures; dimensions with history; every dimensional attribute's feed; figures from canvases.");
     await cube.click();
     await expect.poll(async () => (await typesOf()).at(-1)).toBe("cube.dim");
     await expect(rowOfType(page, "cube.dim")).toContainText("InfoCube");

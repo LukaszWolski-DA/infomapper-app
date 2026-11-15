@@ -20,24 +20,25 @@ test("S25-03: each preset makes a private document with its sections, and opens 
   const dictionary = await fromPreset(page, "dictionary");
   expect(dictionary).toMatchObject({ name: "Data dictionary for the business", shared: false, author_id: SEED_IDS.userLukasz, audience: "Business", preset: "dictionary", source_kind: "live" });
   expect(dictionary.scope.mappings).toBe("approved");
-  // slice 26 (D2): the prototype's preset without Diagrams
+  // slice 26 (D2): the prototype's preset; slice 27, step 3: with its Diagrams
   expect(dictionary.sections.map((s) => [s.type, s.on])).toEqual([
     ["text", true],
     ["overview", true],
     ["conv", true],
+    ["diagrams", true],
     ["dict", true],
     ["reqs", true],
     ["dq", true],
     ["classreg", true],
   ]);
-  await expect(page.getByTestId("editor-section")).toHaveCount(7);
+  await expect(page.getByTestId("editor-section")).toHaveCount(8);
   await expect(page.getByTestId("text-model-state")).toHaveText("Live model (changes as people work)");
 
   const s2t = await fromPreset(page, "s2t");
   // InfoCube is off in this seed: no Dimensional model (D1)
   expect(s2t).toMatchObject({ name: "Source-to-target specification for ETL", audience: "ETL developers" });
   expect(s2t.scope.mappings).toBe("notdraft");
-  expect(s2t.sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", "dq"]);
+  expect(s2t.sections.map((s) => s.type)).toEqual(["conv", "diagrams", "s2t", "sources", "dq"]);
   expect(sectionOf(s2t, "s2t").options).toMatchObject({ unmapped: true, group: "entity" });
 
   const blank = await fromPreset(page, "blank");

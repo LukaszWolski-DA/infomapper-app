@@ -186,8 +186,8 @@ describe("one snapshot of a workspace (F1)", () => {
 });
 
 describe("the registered section kinds (F8)", () => {
-  it("joins InfoDocumenter's sections and InfoCube's two, once each (slice 26: every section without figures; slice 27: Figure)", () => {
-    expect([...DOCUMENT_SECTION_KINDS.keys()]).toEqual(["text", "overview", "figure", "dict", "s2t", "sources", "classreg", "reqs", "ready", "conv", "trace", "dq", CUBE_SECTION_TYPE, "cube.bus"]);
+  it("joins InfoDocumenter's sections and InfoCube's two, once each (slice 26: every section without figures; slice 27: Diagrams and Figure)", () => {
+    expect([...DOCUMENT_SECTION_KINDS.keys()]).toEqual(["text", "overview", "diagrams", "figure", "dict", "s2t", "sources", "classreg", "reqs", "ready", "conv", "trace", "dq", CUBE_SECTION_TYPE, "cube.bus"]);
     const cube = DOCUMENT_SECTION_KINDS.get(CUBE_SECTION_TYPE)!;
     expect(cube.presets).toEqual(["s2t"]);
     expect(cube.options.safeParse(cube.defaults()).success).toBe(true);
@@ -205,7 +205,7 @@ describe("the registered section kinds (F8)", () => {
     for (const w of db.workspace) if (w.id === WS) w.infocube = true;
     await writeDb(file, db);
     await turnOn();
-    // slice 26 (D2): the prototype's preset, the module's section in its place
-    expect((await created(SEED_IDS.userLukasz, "s2t")).sections.map((s) => s.type)).toEqual(["conv", "s2t", "sources", CUBE_SECTION_TYPE, "dq"]);
+    // slice 26 (D2): the prototype's preset, the module's section in its place; slice 27: with its Diagrams
+    expect((await created(SEED_IDS.userLukasz, "s2t")).sections.map((s) => s.type)).toEqual(["conv", "diagrams", "s2t", "sources", CUBE_SECTION_TYPE, "dq"]);
   });
 });

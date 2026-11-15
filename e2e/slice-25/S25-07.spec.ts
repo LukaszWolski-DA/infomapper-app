@@ -55,7 +55,8 @@ test("S25-07: title page, contents with matching page numbers, header and footer
     });
   });
   // slice 26 (D2): the dictionary preset's sections
-  expect(toc.map((t) => t.text)).toEqual(["Introduction", "Model overview", "Conventions and notation", "Data dictionary", "Requirements and coverage", "Data quality rules", "Classification register"]);
+  // slice 27, step 3: the preset's Diagrams after the conventions
+  expect(toc.map((t) => t.text)).toEqual(["Introduction", "Model overview", "Conventions and notation", "Diagrams", "Data dictionary", "Requirements and coverage", "Data quality rules", "Classification register"]);
   for (const t of toc) {
     expect(t.number, t.text!).toBe(t.page);
     expect(t.first, t.text!).toBe(true);
