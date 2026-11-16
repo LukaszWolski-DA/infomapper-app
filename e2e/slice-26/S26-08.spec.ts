@@ -4,7 +4,7 @@
 // with print media emulation.
 
 import { expect, test, type Page } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, formUrl, keepOnly, laidOut, marginContent, openEditor, pagesOf, signInAs, storedDocument, viewUrl } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, formUrl, keepOnly, laidOut, openFold, marginContent, openEditor, pagesOf, signInAs, storedDocument, viewUrl } from "./helpers";
 
 const SHARED = DEMO_DOCUMENT_NAMES.shared;
 const MM = 96 / 25.4;
@@ -54,6 +54,8 @@ test("S26-08: a Formal A3 landscape document in black and white, numbered and ba
   await expect.poll(async () => (await styleOf()).keepRows).toBe(40);
   await page.getByTestId("check-style-watermark").uncheck();
   await expect.poll(async () => (await styleOf()).watermark).toBe(false);
+  // slice 28 (finding 5): Header and footer starts folded
+  await openFold(page, "fold-document-header-footer");
   await page.getByTestId("input-style-header-right").fill("{date}");
   await page.getByTestId("input-style-header-right").press("Enter");
   await page.getByTestId("input-style-footer-right").fill("{page}/{pages}");
