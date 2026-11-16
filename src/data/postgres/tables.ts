@@ -55,8 +55,16 @@ export async function readTable(db: Queryable, schema: StoreSchema, table: strin
 export const workspaceRows = (db: Queryable, schema: StoreSchema, table: string, workspaceId: Uuid, live = false): Promise<AnyRow[]> =>
   readTable(db, schema, table, { where: live ? "workspace_id = $1 and deleted_at is null" : "workspace_id = $1", params: [workspaceId] });
 
+/**
+ * Columns only Postgres has, never handed on with a row: a person's Supabase Auth account (`app_user.auth_user_id`, slice
+ * 29, L3) is read only by the session, with its own query, so no page or action carries it.
+ */
+const POSTGRES_ONLY: Readonly<Record<string, readonly string[]>> = { app_user: ["auth_user_id"] };
+
 /** Rows as the store hands them on: defaults, then upgrades (the order `upgradeRows` and `readRows` run in locally). */
 export function shaped(schema: StoreSchema, table: string, rows: AnyRow[]): AnyRow[] {
+  const hidden = POSTGRES_ONLY[table];
+  if (hidden) rows = rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !hidden.includes(k))));
   const holder = upgradeRows({ [table]: rows }, schema);
   return readRows(holder, table, schema);
 }

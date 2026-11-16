@@ -221,7 +221,7 @@ describe.runIf(!!CONTRACT_DB)("the reads on Postgres: the same as the local adap
     expect(Object.keys(pgReads).sort()).toEqual(Object.keys(localReads).sort());
     for (const name of Object.keys(localReads)) {
       if (name.startsWith("model.loadForUndo")) continue;
-      expect(pgReads[name], name).toEqual(localReads[name]);
+      expect.soft(pgReads[name], name).toEqual(localReads[name]);
     }
   });
 
@@ -232,8 +232,8 @@ describe.runIf(!!CONTRACT_DB)("the reads on Postgres: the same as the local adap
       const pg = pgReads[name] as Record<string, Row[]>;
       expect(Object.keys(pg).sort(), name).toEqual(Object.keys(local).sort());
       for (const table of Object.keys(local)) {
-        if (crowded[table]) expect(byKey(pg[table]!), `${name} ${table}`).toEqual(byKey(local[table]!));
-        else expect(pg[table], `${name} ${table}`).toEqual(local[table]);
+        if (crowded[table]) expect.soft(byKey(pg[table]!), `${name} ${table}`).toEqual(byKey(local[table]!));
+        else expect.soft(pg[table], `${name} ${table}`).toEqual(local[table]);
       }
     }
   });
