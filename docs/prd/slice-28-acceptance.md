@@ -393,3 +393,24 @@ folder joins part 8 (`e2e/parts.ts`, the recut rule).
 - **Q-E.** Q1 (b), the editor's own state with the canvas's constants and cookie format, and no full run in step 2?
 - **Q-F.** The short labels and hints in the table above, F2's figure rows ("view and orientation, then size") and F5's
   sixth group?
+
+### Łukasz's answers (16 November 2026)
+
+All as proposed:
+
+- **Q-A.** The editor's hidden flags and widths are kept apart from the canvas's: its own cookie
+  (`im-doc-panels.{user}`) in the canvas's format.
+- **Q-B.** All three extra hints, under one rule: an option is ticked and nothing in the document uses it, so a short
+  hint says why. They are Source tables' note and classifications, the dictionary's concept frames and the style's
+  List of figures, besides Source-to-target's Note and Rule.
+- **Q-C.** A double-click on a section focuses its first option field, as the prototype does. This amends D-81 (D-83).
+- **Q-D.** S28-08 runs without the element guard. The closing's full run runs the guard as always.
+- **Q-E.** The editor keeps its own panel state and imports the limits and the cookie format from
+  `src/ui/side-panels-cookie.ts` unchanged. No full run in step 2.
+- **Q-F.** Accepted: the short labels and hints, F2's figure rows (view and orientation on one row, size on its own),
+  F5's sixth group and F3's corrected Note wording.
+- **Also accepted:**
+  - Q2: slice 27's `250.330` keeps its widths.
+  - Q3: `Fold` gets a start-shut option and a key prefix.
+  - F1: S28-02 checks that the scale follows the width and that the layout count does not grow.
+  - F6: the padding class is fixed.
