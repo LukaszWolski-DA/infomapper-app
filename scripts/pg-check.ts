@@ -17,7 +17,7 @@ async function main(): Promise<number> {
     const answer = await client.query<{ n: number }>("select $1::int + 1 as n", [41]);
     const tls = await client.query<{ ssl: boolean }>("select ssl from pg_stat_ssl where pid = pg_backend_pid()");
     console.log(`Postgres ${String(version.rows[0]?.server_version)}`);
-    console.log(`TLS verified by the client: yes (rejectUnauthorized); the server reports ssl = ${String(tls.rows[0]?.ssl ?? "unknown (pooler)")}`);
+    console.log(`TLS to the pooler: verified against Supabase Root 2021 CA (rejectUnauthorized). pg_stat_ssl, the pooler-to-Postgres hop: ${String(tls.rows[0]?.ssl ?? "unknown")}`);
     console.log(`Parameterized query: select $1::int + 1 with 41 -> ${String(answer.rows[0]?.n)}`);
     return answer.rows[0]?.n === 42 ? 0 : 1;
   } catch (e) {
