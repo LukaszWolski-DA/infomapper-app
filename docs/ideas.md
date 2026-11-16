@@ -971,6 +971,14 @@ figures, the dictionary's concept frames, InfoCube's star diagram per fact; numb
 presets' Diagrams; the editor's snapshot with canvases, frames, labels and label links; the page outline for
 documentation in a canvas's look; the editor's resizable side panels (a cookie, the separators' values).
 
+**Done in slice 28** (D-83): the editor's side panels hidden and shown as the canvas's, with its limits and defaults, the
+editor's own cookie in the canvas's format, "Fit width" following; a double-click on a section showing the options panel
+and focusing its first control; the right panel's names, folds (Sharing last, Header and footer and Cover shut at first),
+order (a section's options before its heading), short segment labels and long-text labels per section; hints for an
+option that is ticked while nothing in the document uses it. **The one difference left between the canvas's and the
+editor's panels:** the editor resizes live while a handle is dragged, the canvas moves a guide line and applies the width
+on release (D-54); and the editor has no narrow screens' overlay (it stacks up to 1,100 px).
+
 **Then (proposed order, to confirm):**
 1. **Baselines** (their own InfoMapper slice; the design is the entry below), then **documents from a baseline**, the
    section "changes since a baseline" and the sign-off preset.
@@ -991,9 +999,9 @@ documentation in a canvas's look; the editor's resizable side panels (a cookie, 
 - Light markup in Text ("- " lists, **bold**, _italic_, as the prototype; slice 26 keeps D-80's plain text, D11).
 - A document's language back to "the workspace's" once one was chosen (slice 26, step 4: a choice in the select).
 - The editor's snapshot refreshed when others change the model, without a reload (slice 26, step 2).
-- **The canvas page's resizable side panels** (slice 27, C6: the editor's are done; the canvas page keeps slice 5a's
-  fixed widths).
 - The page outline remembering its paper, orientation and size while off (slice 27 stores it only while on, Q6).
+- The editor's narrow screens' overlay and keyboard shortcuts for the panels' toggles (slice 28, "Not in this slice";
+  the canvas has no shortcuts either).
 
 **Follow-ups outside the slices:**
 - **German words of slices 25 to 27** (the document labels, InfoCube's document words, slice 26's new ones listed in
