@@ -531,3 +531,137 @@ Each hint shows under its option (`role="note"`, `hint-{type}-{key}`, `hint-styl
 - **Screenshots** at 1,500 × 950 on the demo, in `.data/measure/slice-28/` (git-ignored):
   - `1-both-panels-shown.png`, `2-both-panels-hidden.png`, `3-document-panel-folded.png`;
   - also `4-s2t-note-hint.png` and `5-diagrams-figure-rows.png`.
+
+## Step 2's follow-up: Łukasz's answers (16 November 2026)
+
+- **No hint for S2T's Rule:** accepted.
+- **The double-click's focus, changed.**
+  - The options panel scrolls to its top, and the focus goes to the section's first control of any kind, a check box
+    and a segment button included. So it never lands on Heading at the panel's end.
+  - This is a deliberate difference from the prototype (D-83).
+  - In `open` (`editor.tsx`), the selector is `:is(input, select, textarea, button):not(:disabled)` within
+    `[data-de-props]`.
+  - The specs changed:
+    - S26-03: the dictionary's first column box;
+    - S28-02: Diagrams' first figure's box, and Source tables' first check box rather than Heading.
+- **The guard** (`tests/class-placeholder-guard.test.ts`):
+  - **What it does.** It scans every `className={`…`}` in `src/`, skipping each placeholder whole (strings and nested
+    templates included). It lists a token glued before `${` or right after a placeholder's `}` when the token is shaped
+    like a Tailwind utility.
+  - **What it found.** Without that filter it found 20 spots, all the app's own CSS classes on the canvas and in the
+    document (`row${…}`, `nm${…}`, `c-${…}`, `dfig${…}`…). Those are harmless: their stylesheet is not generated, and
+    the class string is the same. With the filter, src/ has none.
+  - **Its own cases.** It checks the two shapes slice 28 had (`p-2${`, `grid-cols-[…]${`), `${…}px-2`, and spaced or
+    nested templates left alone.
+- **Checks:**
+  - lint and typecheck clean;
+  - `npm test`: 183 files, 2,279 tests passed;
+  - S28, S26 and S25 specs: 59 passed, 8 skipped (`MEASURE`, `SCREENS`).
+- **S26-screens with `SCREENS` once:** 5 passed. The spec writes under `docs/prd/slice-26-screens/<folder>/`; the
+  pictures were moved to `.data/measure/slice-28/s26-screens/` (git-ignored).
+
+## Step 3: the closing (16 November 2026)
+
+### Decisions
+
+- **D-83** (new, for Łukasz's approval). It is in `docs/decisions.md` after D-82 and quoted in full in the closing
+  report.
+  - It amends D-81: a double-click on a section goes to its first control, not to its heading.
+  - It amends D-82: the panels' limits and defaults are the canvas's, and the panels can be hidden.
+  - D-81 and D-82 now end with "(Changed by … D-83.)".
+
+### Docs
+
+- `docs/inventory-prototype-vs-app.md`:
+  - slice 28's present items;
+  - the double-click as a deliberate difference;
+  - the cookie in place of `localStorage`, 0 wide and inert, "Fit width" as a scale, the toggles' names and place;
+  - the right panel's findings 1 to 12 and the hints.
+- `docs/ideas.md`:
+  - "Done in slice 28", with the one difference left between the canvas's and the editor's panels: live resize against
+    the canvas's guide line on release, and no narrow overlay;
+  - the wrong line about "the canvas page's resizable side panels" removed;
+  - the editor's narrow overlay and the toggles' shortcuts listed for later.
+- `docs/known-limitations.md`: unchanged, nothing is left.
+- `README.md`: the status (slices 0 to 28), slice 28's paragraph and its acceptance link.
+- `CLAUDE.md`:
+  - slice 28's sentence in "What this is";
+  - InfoDocumenter's editor notes (the side panels, one `Field`, `Fold`'s `startShut` and `storeKey`, the hints module,
+    the double-click);
+  - the guard in Testing;
+  - slice 28's fixtures and helpers (`openDocument`, `openFold`, `expectPanel`, `zoomOf`, `panelsCookie`).
+
+### Manual acceptance
+
+**On the demo** (`npm run demo -- --reset`, http://127.0.0.1:3001, as Łukasz; "Retail Co – DWH", Documentation, "Order
+management – S2T for the ETL team"):
+1. **The toggles.** Press the left toggle (before "← Documentation") and the right one (after "Print / PDF"):
+   - each panel goes and comes back at its width;
+   - the preview's pages grow and shrink with "Fit width";
+   - "18 pages" stays (no new layout).
+2. **Reload with both hidden:** they stay hidden from the first paint. Show them again.
+3. **Drag and keys.**
+   - Drag the left handle far right: it stops at 520 px. Double-click it: back to 264.
+   - On the right handle, Home gives 340.
+4. **A hidden options panel and a double-click.**
+   - Hide the options panel, then click sections in the list and in the preview: it stays hidden.
+   - Double-click Diagrams in the preview: it shows at its top, with the first figure's box focused (a ring).
+   - Double-click "Source tables" in the list: its first check box is focused, not Heading.
+5. **Note's hint.**
+   - In "Source-to-target mapping", tick Note: "1 note is on a mapping that Mappings included leaves out." shows under
+     Columns.
+   - On Document, set Mappings included to "All": the hint goes, and the note appears in the pages under webusers.email.
+     Set it back to "Not drafts".
+6. **The Document panel.**
+   - Scope, Style and Sharing are open; Header and footer and Cover are shut; Sharing is last.
+   - Open Cover and shut Scope, then reload: both are remembered.
+   - In Header and footer, "Header, right" shows "Nothing by default" in grey.
+7. **The section panels.**
+   - In every section, its options come first and Heading and "Start on a new page" last.
+   - The segments are on one line: Mappings "All / Not drafts / Approved"; Long texts "Under row / Numbered / Column".
+   - The dictionary's Layout is "Under row / Column / Blocks", each with its full sentence in the hint.
+   - Source tables shows "For each table" above its two table options.
+8. **Figures.**
+   - Diagrams: each figure has view and orientation on one row and the size on its own row, every choice whole, with
+     space inside the box.
+   - Dimensional model: the star's size and orientation are stacked.
+9. **Narrow window.** At 1,100 px or narrower the panels stack and there are no handles. Hide the options panel: it
+   goes, and the preview takes the width.
+10. **Screen reader (optional).** Tab through the Document panel: each field announces its label, and each segment
+    group announces its name.
+
+**On KB** (Łukasz's own dev server on `.data/dev-db.json`, read only: change nothing in a document you want to keep, or
+use a private copy):
+1. Open a document of "Kanton Basel" with long names:
+   - hide the sections panel or widen it to 520 px, and check the names fit;
+   - hide both panels for a full-width preview.
+2. Open the S2T-like document:
+   - tick Note and read the hint against the model's notes and the document's "Mappings included";
+   - check that the Source tables, dictionary and List of figures hints say the truth for KB.
+3. Check the folds' remembered state and the double-click's focus on KB's documents.
+
+### The full run on the final commit
+
+- **Run:** [E2E 43903061704](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/43903061704), on
+  `f4c89bc`, the commit with the fix, the guard and the docs.
+- **Wall clock:** 17 min 26 s (16:02:36 to 16:20:02).
+- **Result:** 816 passed, 0 failed, 16 skipped (`MEASURE`, `SCREENS`, `BROWSERS`), 0 flaky, no expected failures.
+- **Parts, their time and heap peak** (from each part's memory log):
+
+  | Part | Time | Heap peak |
+  | --- | --- | --- |
+  | 1 | 8.4 min | 1,252 MB |
+  | 2 | 11.3 min | 964 MB |
+  | 3 | 10.3 min | 1,115 MB |
+  | 4 | 10.3 min | 1,148 MB |
+  | 5 | 7.9 min | 1,484 MB |
+  | 6 | 9.9 min | 1,263 MB |
+  | 7 | 12.7 min | 1,202 MB |
+  | 8 | 15.8 min | 1,336 MB |
+
+  No server restarted. Part 8's peak, 1,336 MB, is well under about 1.95 GB.
+- **Part 8 is the longest** by 3.1 min over part 7. The recut rule (CLAUDE.md, "The full run in eight parts") reads the
+  median of the last three full runs. This run is one of them; a recut is not part of this slice and is reported only.
+- **The element guard** ran in the full run as always (Q-D).
+- **Commits after `f4c89bc`** touch only this acceptance doc (Markdown in `docs/`), so the run stays valid ("Test
+  runs").
