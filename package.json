@@ -20,7 +20,11 @@
     "schema:check": "tsx scripts/check-schema.ts",
     "measure:build": "tsx scripts/measure.ts build",
     "measure:start": "tsx scripts/measure.ts start",
-    "measure:canvas": "tsx scripts/measure-canvas.ts"
+    "measure:canvas": "tsx scripts/measure-canvas.ts",
+    "dev:pg": "tsx scripts/dev-pg.ts",
+    "pg:check": "tsx scripts/pg-check.ts",
+    "pg:migrate": "tsx scripts/pg-migrate.ts",
+    "pg:seed": "tsx scripts/pg-seed.ts"
   },
   "dependencies": {
     "@tiptap/core": "3.31.3",

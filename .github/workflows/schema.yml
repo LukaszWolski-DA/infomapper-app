@@ -1,6 +1,8 @@
 name: Schema
 
 # AD-31: the SQL migrations, applied to a real Postgres, must match the domain's tables (npm run schema:check).
+# Slice 29: the contract suite of the reads on both adapters (tests/contract), against a throwaway database here; CI never
+# connects to infomapper-dev.
 # Postgres 17 is what Supabase gives new projects (checked 6 October 2026); the image is pinned to a minor version.
 
 on:
@@ -39,3 +41,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run schema:check
+      # slice 29 (Q8, S29-02): the contract suite on both adapters, Postgres in a second database of this container
+      - run: PGPASSWORD=postgres psql -h localhost -U postgres -c "create database contract"
+      - run: npx vitest run tests/contract
+        env:
+          INFOMAPPER_CONTRACT_DB: postgres://postgres:postgres@localhost:5432/contract
