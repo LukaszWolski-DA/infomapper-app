@@ -414,3 +414,120 @@ All as proposed:
   - Q3: `Fold` gets a start-shut option and a key prefix.
   - F1: S28-02 checks that the scale follows the width and that the layout count does not grow.
   - F6: the padding class is fixed.
+
+## Step 2: build (16 November 2026)
+
+### What was built
+
+**The side panels (item 1, Q2, Q-A, Q-E).**
+- **State and cookie.** `panel-handles.tsx` has `useDocPanels`: which panels are shown, `toggle` and `show`, and the
+  widths written straight to the body while a drag runs.
+  - The limits, defaults and cookie format are imported unchanged from `src/ui/side-panels-cookie.ts` (`PANEL_LIMITS`,
+    `clampWidth`, `formatSidePanelsCookie`, `parseSidePanelsCookie`).
+  - `panels-cookie.ts` keeps the editor's own name (`im-doc-panels.{user}`) and reads slice 27's `250.330` as both
+    panels shown with those widths. No canvas file changed.
+- **Toggles.** `PanelToggle` sits before "← Documentation" and after "Print / PDF". It has the canvas's icon and look,
+  `aria-pressed`, and the titles as names: "Show or hide the sections panel", "Show or hide the options panel".
+- **A hidden panel** is drawn by the body's classes `nol` and `nor` (`--dl` or `--dr` 0 px, `!important` over the
+  inline width), with `inert` on the panel and no handle. Up to 1,100 px a hidden panel is `display: none`, and a hidden
+  sections panel gives the preview the whole width. The server draws all of it from the cookie (S28-01 reads the HTML).
+- **The double-click** in the list or in the preview shows the options panel (`open`).
+  - The focus goes to the first option field that takes text or a choice, else Heading (Q-C, `[data-de-props]`): for
+    example the dictionary's "Long definitions", or Diagrams' first figure's view.
+  - A click selects without showing it.
+
+**The right panel (findings 1 to 12).**
+- **1, names.** One `Field` (`app/field.tsx`, `useId`) replaces the three copies: a `<label htmlFor>` for a control,
+  `aria-labelledby` for a group (`Seg` got optional `labelledBy` and `describedBy`; the check lists are
+  `role="group"`), and `aria-describedby` for the hint.
+  - The figure selects are named "View", "Size", "Orientation" and "Rows", and the caption has a hidden label.
+  - The document's name in the top bar has the hidden label "Document name".
+- **2.** The hints (below).
+- **3, F2, F6.**
+  - A figure entry has view and orientation on one row and the size on its own; "Rows" (Adjusted) goes under them.
+  - The star's size and orientation are stacked at full width.
+  - The entry's class is now `p-2 ${…}` and it has its padding.
+- **4, F5.** Short segment labels with the full sentence in the hint:
+  - Mappings included (with new hints);
+  - Long texts;
+  - the dictionary's Layout;
+  - Model overview's "Where the figures go".
+- **5, 12.** `Fold` (`fields.tsx`) has `startShut` (it remembers the titles opened by hand under
+  `infomapper:sections-open`) and `storeKey` (`doc:`).
+  - The Document panel: Model state, then the folds Scope, Style, Header and footer (shut at first), Cover (shut at
+    first) and Sharing (with Audience) last.
+  - The canvas's folds behave as before (default props).
+- **6, 8.** `longTexts(which)` in `section-options.tsx`:
+
+  | Section | Label |
+  | --- | --- |
+  | Source-to-target | "Long texts (rule, note)" |
+  | Source tables | "Long texts (column notes)" |
+  | Classification register | "Long texts (notes)" |
+  | Requirements | "Long texts (description, scope)" |
+  | Data quality rules | "Long texts (rule, description)" |
+
+  One set of words: "Under row", "Numbered", "Column", and the dictionary's "Under row", "Column", "Blocks".
+- **7.** The label "For each table" (`label-sources`) above "Its classifications" and "The modeller's note".
+- **9.** "Header, right" has the placeholder "Nothing by default".
+- **10.** The entry's padding (F6).
+- **11.** A section's own options first, then Heading and "Start on a new page" below a rule
+  (`section-heading-options`).
+
+**The hints (item 2, F3, Q5, Q-B).** `src/modules/infodocumenter/domain/hints.ts`, pure:
+- `sectionHints(state, scope, type, options)` reads the section's scope as the builders do. The editor computes it
+  with `sectionScopeOf` from the snapshot.
+  - Source-to-target's Note (F3's words).
+  - Source tables' table note and classifications.
+  - The dictionary's concept frames.
+- `styleHints` gives the style's List of figures, from the tree's figure count.
+
+Each hint shows under its option (`role="note"`, `hint-{type}-{key}`, `hint-style-listOfFigures`).
+
+### Assumed (say if not)
+
+- **No hint for Source-to-target's Rule.** Q-B accepted one, but the column is never empty while a mapping is shown:
+  each mapping prints its rule or "Direct" (`s2tCell`, `builders.ts`). With no mapping shown, the section says so
+  itself. `hints.ts` says why in its header.
+- **The double-click's focus** skips check boxes and segment buttons, as the prototype's `goTo` does
+  (`:is(textarea, input:not([type=checkbox]), select)`). Sections whose options are only those focus Heading:
+  Source-to-target, Source tables, the register, Model readiness's checks, Conventions, Traceability, Data quality
+  rules.
+- **The folds' look** is the canvas details panel's: 12 px, `text-im-ink-2`, a chevron. The editor's `H` remains only
+  for "Model state".
+- **The canvas's `PanelToggle` was not reused.** It reads the canvas's provider. The editor's button copies its icon
+  and classes (Q-E).
+- **The panels' `aria-label`s are new:** the left panel (`nav`) is "Sections" and the right one (`aside`) is
+  "Options".
+
+### Earlier specs changed, each with its reason
+
+| Spec | Change | Reason |
+| --- | --- | --- |
+| `e2e/slice-27/S27-08.spec.ts` | Bounds 200–520 and 280–640, defaults 264 and 340, cookie `l1.r1.520.280` | Item 1, Q2, Q-E: the canvas's limits and format |
+| `e2e/slice-27/S27-04.spec.ts` | "Below the content" | F5: the short label. Step 1 did not list this spec. |
+| `e2e/slice-25/S25-05.spec.ts` | "Approved" | Finding 4 |
+| `e2e/slice-26/S26-07.spec.ts` | "Column", "Blocks", "Under row" | Findings 4 and 8 |
+| `e2e/slice-26/S26-03.spec.ts` | Opens Cover; the double-click focuses "Long definitions" | Finding 5; Q-C |
+| `e2e/slice-25/S25-03.spec.ts`, `e2e/slice-26/S26-08.spec.ts`, `S26-screens.spec.ts` | Open their fold first (`openFold`, slice 25's helpers) | Finding 5 |
+| `tests/document-figure-html.test.ts` | The cookie's new format and slice 27's value | Q2 |
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: clean.
+- `npm test`: 182 files, 2,277 tests, all passed, with the new `tests/document-hints-28.test.ts` (7 tests).
+- **Slice 28's specs**, `e2e/slice-28`: 13 passed.
+  - The first run had three failures, all in the specs themselves:
+    - a cookie added with the page's path instead of `/`;
+    - a Diagrams section set up without its figures;
+    - S28-06 over the default 60 s for 15 panels. It now allows 240 s and took 1.1 min.
+  - All three were rerun and passed.
+- **Slices 25 to 27's specs:** 61 passed, 12 skipped (the `MEASURE` and `SCREENS` specs) and 1 failed: S27-04, on F5's
+  old label. It was fixed and passed on its own (2 passed).
+- No full run in this step (Q-E).
+- **Bug found and fixed while building:** the editor's body class was first written as `…340px)]${…}`, the same glued
+  placeholder as F6, so Tailwind never generated the grid and both panels were 1,500 px wide. It now has a space and is
+  checked by S28-01's widths.
+- **Screenshots** at 1,500 × 950 on the demo, in `.data/measure/slice-28/` (git-ignored):
+  - `1-both-panels-shown.png`, `2-both-panels-hidden.png`, `3-document-panel-folded.png`;
+  - also `4-s2t-note-hint.png` and `5-diagrams-figure-rows.png`.

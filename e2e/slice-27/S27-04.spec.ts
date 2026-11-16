@@ -152,7 +152,8 @@ test("S27-04: a Figure section between two others starts on the same page; Model
   expect((await order())[0]).toBe("figure");
   await page.locator('[data-testid="editor-section"][data-section="overview"]').click();
   const n = await layouts(page);
-  await page.getByTestId("seg-overview-figuresAt").getByRole("button", { name: "Below the section's content" }).click();
+  // slice 28 (F5): the short label "Below the content" ("Below the section's content" before)
+  await page.getByTestId("seg-overview-figuresAt").getByRole("button", { name: "Below the content", exact: true }).click();
   await expectLayouts(page, n + 1);
   expect((await order()).at(-1)).toBe("figure");
   expect((await order())[0]).not.toBe("figure");
