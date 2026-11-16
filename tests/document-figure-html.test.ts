@@ -8,7 +8,8 @@ import { describe, expect, it } from "vitest";
 import type { DocFigure } from "@/domain/document/content";
 import { Nodes } from "@/modules/infodocumenter/ui/document-html";
 import { figureFontCss, withFonts } from "@/modules/infodocumenter/ui/figure-images";
-import { DEFAULT_DOC_PANELS, formatDocPanelsCookie, parseDocPanelsCookie } from "@/modules/infodocumenter/ui/panels-cookie";
+import { DEFAULT_DOC_PANELS, docPanelsCookieName, parseDocPanelsCookie } from "@/modules/infodocumenter/ui/panels-cookie";
+import { formatSidePanelsCookie } from "@/ui/side-panels-cookie";
 
 const figure = (patch: Partial<DocFigure> = {}): DocFigure => ({
   key: "f1",
@@ -80,12 +81,18 @@ describe("the fonts in a figure (Q2)", () => {
   });
 });
 
-describe("the editor panels' cookie (Q7)", () => {
-  it("keeps both widths within their bounds; anything else reads as the defaults", () => {
-    expect(formatDocPanelsCookie({ left: 300, right: 400 })).toBe("300.400");
-    expect(parseDocPanelsCookie("300.400")).toEqual({ left: 300, right: 400 });
-    expect(parseDocPanelsCookie("100.900")).toEqual({ left: 200, right: 560 });
+describe("the editor panels' cookie (slice 27 Q7; slice 28 Q2, Q-A, Q-E)", () => {
+  it("is the editor's own cookie in the canvas's format, with the canvas's limits; anything else reads as the defaults", () => {
+    expect(docPanelsCookieName("u1")).toBe("im-doc-panels.u1");
+    const hidden = { left: false, right: true, leftWidth: 300, rightWidth: 400 };
+    expect(formatSidePanelsCookie(hidden)).toBe("l0.r1.300.400");
+    expect(parseDocPanelsCookie("l0.r1.300.400")).toEqual(hidden);
+    expect(parseDocPanelsCookie("l1.r0.100.900")).toEqual({ left: true, right: false, leftWidth: 200, rightWidth: 640 });
     expect(parseDocPanelsCookie("x")).toEqual(DEFAULT_DOC_PANELS);
-    expect(parseDocPanelsCookie(undefined)).toEqual({ left: 250, right: 330 });
+    expect(parseDocPanelsCookie(undefined)).toEqual({ left: true, right: true, leftWidth: 264, rightWidth: 340 });
+  });
+  it("reads slice 27's widths-only value with both panels shown and its widths kept (within the new limits)", () => {
+    expect(parseDocPanelsCookie("250.330")).toEqual({ left: true, right: true, leftWidth: 250, rightWidth: 330 });
+    expect(parseDocPanelsCookie("100.900")).toEqual({ left: true, right: true, leftWidth: 200, rightWidth: 640 });
   });
 });
