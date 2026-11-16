@@ -11,7 +11,7 @@ import type { WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
 import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-history";
-import { byTabOrder, liveProjectCanvasesOf, liveRequirementLinksOf, workspaceModelOf, workspacePeopleOf, workspaceSnapshotOf } from "@/domain/model/workspace-model";
+import { byTabOrder, liveLabelLinksOf, liveProjectCanvasesOf, liveProjectPinsOf, liveRequirementLinksOf, workspaceModelOf, workspacePeopleOf, workspaceSnapshotOf } from "@/domain/model/workspace-model";
 import type { ModuleTable, WritableRows } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
 import { assertNotProduction, readDbCached, writeDb } from "./file";
@@ -45,18 +45,8 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
   /** Links whose project and canvas both still exist. */
   const liveLinks = (db: DevDb, workspaceId: Uuid) => liveProjectCanvasesOf(db, workspaceId);
 
-  /** Live label links whose label and item are live too (the domain deletes links with their items; this is a guard). */
-  const liveLabelLinks = (db: Readonly<DevDb>, workspaceId: Uuid) => {
-    const ids = (rows: readonly { id: Uuid; workspace_id: Uuid; deleted_at: string | null }[]) =>
-      new Set(rows.filter((r) => r.deleted_at === null && r.workspace_id === workspaceId).map((r) => r.id));
-    const labels = ids(db.label);
-    const targets = [ids(db.entity), ids(db.attribute), ids(db.mapping), ids(db.source_table), ids(db.source_column)];
-    return live(db.label_link).filter((k) => {
-      if (k.workspace_id !== workspaceId || !labels.has(k.label_id)) return false;
-      const target = [k.entity_id, k.attribute_id, k.mapping_id, k.source_table_id, k.source_column_id];
-      return target.some((id, i) => id !== null && targets[i]!.has(id));
-    });
-  };
+  /** Live label links whose label and item are live too (slice 29, F1: the domain's rule, shared with Postgres). */
+  const liveLabelLinks = (db: Readonly<DevDb>, workspaceId: Uuid) => liveLabelLinksOf(db, workspaceId);
 
   /** Live requirement links whose requirement and element are live too (the domain deletes links with their elements). */
   const liveRequirementLinks = (db: Readonly<DevDb>, workspaceId: Uuid) => liveRequirementLinksOf(db, workspaceId);
@@ -178,12 +168,7 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
         live((await load()).label).find((l) => l.workspace_id === workspaceId && l.id === labelId) ?? null,
       listLinks: async (workspaceId) => liveLabelLinks(await load(), workspaceId),
       getLink: async (workspaceId, labelLinkId) => liveLabelLinks(await load(), workspaceId).find((k) => k.id === labelLinkId) ?? null,
-      listPins: async (workspaceId) => {
-        const db = await load();
-        const labels = new Set(live(db.label).filter((l) => l.workspace_id === workspaceId).map((l) => l.id));
-        const projects = new Set(live(db.project).filter((p) => p.workspace_id === workspaceId).map((p) => p.id));
-        return db.project_pinned_label.filter((p) => p.workspace_id === workspaceId && labels.has(p.label_id) && projects.has(p.project_id));
-      },
+      listPins: async (workspaceId) => liveProjectPinsOf(await load(), workspaceId),
     },
 
     notes: {
