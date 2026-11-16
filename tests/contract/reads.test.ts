@@ -213,7 +213,8 @@ describe.runIf(!!CONTRACT_DB)("the reads on Postgres: the same as the local adap
   }, 300_000);
 
   afterAll(async () => {
-    await getPool().end();
+    // only when the pool was made (a failed load never makes it)
+    if (store) await getPool().end();
   });
 
   it("gives every read the local adapter's result, in its order", () => {
