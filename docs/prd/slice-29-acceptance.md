@@ -617,3 +617,95 @@ Nine unit tests failed on order, and KB's seed-made rows would have moved. The c
    coming from the labels' list), and the commands only remove them (`deleteLabel`, `deleteProject`, `setLabelPinned`).
 6. For `docs/ideas.md` at the closing: where an order means something to a person (the first project in the top bar),
    make it an explicit domain rule instead of the file's order; not now, as it would reorder KB.
+
+---
+
+## Step 2: the adapter's reads and the data (16 November 2026)
+
+### What was built
+
+| Commit | What |
+| --- | --- |
+| `b5f1b82` | F1: `src/data/rows.ts` (the schema type, `readRows`, `upgradeRows`), re-exported by the local adapter under the old names; `liveLabelLinksOf` and `liveProjectPinsOf` in the domain |
+| `72d43db`, `8e0e252` | F6: `src/data/postgres/config.ts` (full TLS verification against Supabase Root 2021 CA, `supabase-ca.crt`; `timestamptz` truncated to milliseconds, `numeric` and `bigint` as numbers); `scripts/pg-check.ts`; `scripts/lib/pg-env.ts` (reads `.env.postgres.local` only after `git check-ignore`) |
+| `323456a` | The Postgres adapter (`src/data/postgres/store.ts`, `tables.ts`, `pool.ts`), `INFOMAPPER_DATA` (`src/data/mode.ts`), the refusals, the refused `apply`, `ShellData.workspace.readOnly` |
+| `c046609` | L3: `app_user.auth_user_id` (migration `20261116200000_app_user_auth_user.sql`, the type's optional field, `data-model-v2.md` §3) |
+| `02aed64`, `df9090c` | `scripts/pg-migrate.ts`, `schema:check -- --existing`, the loader (`src/data/postgres/load.ts`, `scripts/pg-seed.ts`), the contract suite (`tests/contract/reads.test.ts`), the Schema workflow's contract step, `npm run dev:pg`, `.env.example` |
+| `264cd5e`, `b154f74`, `1705b44`, `8a8aa2d` | Fixes found by the first runs (below) and the Documentation tab's read-only state |
+
+### On `infomapper-dev` (named as host/database only: `aws-1-eu-central-1.pooler.supabase.com/postgres`)
+
+- **F6's check:** without Supabase's root certificate, `SELF_SIGNED_CERT_IN_CHAIN` (stopped, reported). With it, both
+  poolers pass with full verification: Postgres 17.12, `select $1::int + 1` with 41 gives 42, through the transaction
+  pooler (6543) and the session pooler (5432). Unnamed parameterized queries work through the transaction pooler.
+- **Migrations:** 22 applied by `scripts/pg-migrate.ts` (one transaction each, recorded in
+  `supabase_migrations.schema_migrations`). Its first `--dry-run` created that schema and its empty table before listing.
+- **`npm run schema:check -- --existing`:** "The schema matches the domain: 43 tables, 585 columns (not in the domain yet:
+  invitation, baseline); Row Level Security on every table."
+- **The loader:** the demo and "Performance test", built in memory, 4,283 rows in 9.8 s in one transaction; every table's
+  count equal to the build's (the script prints them per table; `organization_licence` 2, `source_column` 1,521,
+  `attribute` 885, `canvas_item` 268, …; `change_event` 0: the seed writes none).
+
+### Checks (on `8a8aa2d`)
+
+- **Local:** `npm run lint`, `npm run typecheck` pass; `npm test` 186 files, 2,295 passed, 3 skipped (the contract
+  suite's Postgres side, which runs in CI).
+- **CI:** the Schema workflow (run 43964713419): the schema check, then the contract suite with Postgres, **9 passed, none
+  skipped**: every read of the 14 repositories and `snapshot` equal to the local adapter's, in order (`loadForUndo` as
+  item 1 says), and `apply` refused with the read-only error. CI (lint, typecheck, unit tests) on the same commit.
+- **The full E2E run** (workflow E2E, run 43964990106, on `8a8aa2d`, the local adapter, a full run): **816 passed, 16
+  skipped, 0 failed, 0 flaky, 0 expected failures**; wall-clock 15 min 45 s (21:55:48 to 22:11:33 UTC).
+
+  | Part | Time | Heap peak | Restarts |
+  | --- | --- | --- | --- |
+  | 1 | 13.0 min | 1,179 MB | 0 |
+  | 2 | 13.2 min | 1,146 MB | 0 |
+  | 3 | 10.6 min | 1,008 MB | 0 |
+  | 4 | 7.2 min | 1,504 MB | 0 |
+  | 5 | 8.0 min | 1,420 MB | 0 |
+  | 6 | 10.0 min | 1,179 MB | 0 |
+  | 7 | 12.3 min | 1,276 MB | 0 |
+  | 8 | 11.2 min | **1,877 MB** | 0 |
+
+  Part 8 is near the 2 GB at which CLAUDE.md adds a ninth part (1,603 and 1,836 MB in slice 27's runs); that is a
+  `chore/` branch of its own, not this slice's.
+- **Earlier tests changed:** none. New: `src/data/mode.test.ts`, `src/data/postgres/config.test.ts`,
+  `tests/contract/reads.test.ts`.
+
+### Where step 2 differs from the plan, or found something
+
+1. **A crowded millisecond (F2).** The seed gives `source_column`'s 1,521 rows one millisecond; a millisecond has 1,000
+   microseconds. The loader gives places 0 to 999 and the 522 rows after the 999th share the last one, ordered by key
+   there. Every port that reads `source_column` has its own sort (table, ordinal) except `model.loadForUndo`, whose rows
+   undo reads by id; the contract suite compares that one table of `loadForUndo` as a set, every other read in order.
+   This is short of condition 3 for that one case. **For slices B and C:** an import writes up to 30,000 columns in one
+   write set, and KB's seed-made rows are crowded the same way; a rule is needed before then (L9).
+2. **Migrations by our own script, not the Supabase CLI.** No CLI binary to download, and the URL is never on a command
+   line. The history rows have the CLI's three columns (`version`, `statements`, `name`); whether the CLI accepts them
+   later is not checked.
+3. **A composite key only SQL has.** `entity_stereotype_fk` on `(workspace_id, stereotype)` (slice 24; the local
+   adapter's rules have no composite keys, known-limitations.md). The loader first ordered tables by the store's keys,
+   loaded `entity` before `stereotype` and was refused and rolled back. It now orders by the database's own keys too.
+4. **A stray field in the demo data.** The contract suite on Postgres found `organizations.listLicences` differing: the
+   Sales star's licence row carried `workspace_id` from its `std()` helper (an organization's licence has no workspace).
+   Fixed in `sales-star.ts`; the loader now refuses a field its table has no column for ("table.field", no value),
+   where `json_populate_recordset` dropped it silently. KB may hold the same field on its licence row (slice C's loader
+   will say so).
+5. **`auth_user_id` is not handed out.** The adapter drops it from a person's row, so the reads equal the local
+   adapter's and no page carries it; step 3's session reads it with its own query.
+6. **The smoke set moves to step 3.** It signs in, which needs Supabase Auth (step 3); step 2's CI is the contract suite.
+7. **Read-only on the pages:** `standing` none (no tool, create or editor on the canvas and the homes), no "New
+   project", no workspace switches, the indicator's "Read only", the home's banner, the Documentation tab without
+   create and share. **Not covered:** the document editor still shows its controls; its saves are refused with the
+   read-only message and the drafts kept (slice 13's rules).
+8. **`npm run dev:pg` runs without Turbopack's file-system cache**, as the demo and the e2e servers do (`next.config.ts`
+   turns it off whenever `NEXT_DIST_DIR` is set; unchanged).
+9. **The contract suite's Postgres side runs in CI only** (L6), in the Schema workflow's container; it refuses any host but
+   this machine's, since it empties the database.
+
+### Question for Łukasz
+
+- **L9.** A millisecond with more than 1,000 rows (the seed's `source_column`; later an import's write set and KB's
+  seed-made rows): (a) accept key order past the 999th row (the reads that matter have their own sorts; today only
+  `loadForUndo` shows it), or (b) a rule that keeps the whole order, decided before slice B. I recommend (a) now, and (b)
+  as an item for slice B's step 1.
