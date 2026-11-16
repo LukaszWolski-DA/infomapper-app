@@ -8,6 +8,7 @@
 //   the rows of its table that share its millisecond, so Postgres orders them as the file does; the domain reads
 //   milliseconds only. A millisecond holds 1,000 places: rows after the 999th share the last one and fall back to their
 //   key (`crowded` reports them).
+// - A row field its table has no column for is refused before anything is written (it would be dropped silently).
 // - Counts per table are compared with the rows given before the commit; a difference rolls everything back.
 
 import type { AnyRow, StoreSchema } from "../rows";
@@ -91,6 +92,30 @@ export async function databaseReferences(db: Queryable): Promise<Map<string, Set
   return out;
 }
 
+/** Every column of the public schema's tables, by table. */
+async function databaseColumns(db: Queryable): Promise<Map<string, Set<string>>> {
+  const { rows } = await db.query<{ table_name: string; column_name: string }>(
+    "select table_name, column_name from information_schema.columns where table_schema = 'public'",
+  );
+  const out = new Map<string, Set<string>>();
+  for (const r of rows) (out.get(r.table_name) ?? out.set(r.table_name, new Set()).get(r.table_name)!).add(r.column_name);
+  return out;
+}
+
+/**
+ * The fields of the rows given that their table has no column for (`json_populate_recordset` would drop them without a
+ * word): "table.field" each, never a value.
+ */
+export function strayFields(data: Readonly<Record<string, readonly AnyRow[]>>, columns: ReadonlyMap<string, ReadonlySet<string>>): string[] {
+  const out = new Set<string>();
+  for (const [table, rows] of Object.entries(data)) {
+    const known = columns.get(table);
+    if (!known) continue;
+    for (const r of rows) for (const k of Object.keys(r)) if (!known.has(k)) out.add(`${table}.${k}`);
+  }
+  return [...out].sort();
+}
+
 /** Rows in any of the public tables. */
 export async function hasRows(db: Queryable): Promise<boolean> {
   for (const t of await publicTables(db)) {
@@ -110,6 +135,8 @@ export async function loadRows(db: Queryable, schema: StoreSchema, data: Readonl
   }
   await db.query("begin");
   try {
+    const stray = strayFields(Object.fromEntries(Object.entries(data).filter(([t]) => t !== "format")), await databaseColumns(db));
+    if (stray.length) throw new Error(`Fields no column holds, nothing was loaded: ${stray.join(", ")}`);
     if (options.reset) {
       const all = await publicTables(db);
       if (all.length) await db.query(`truncate table ${all.map(ident).join(", ")}`);

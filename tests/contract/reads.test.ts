@@ -261,3 +261,12 @@ describe("the loader's places (F2)", () => {
     expect(stampPlaces("project_pinned_label", [{ project_id: "p", label_id: "l" }]).rows).toEqual([{ project_id: "p", label_id: "l" }]);
   });
 });
+
+describe("the loader refuses fields no column holds", () => {
+  it("names each stray field as table.field, never a value", async () => {
+    const { strayFields } = await import("@/data/postgres/load");
+    const columns = new Map([["organization_licence", new Set(["id", "organization_id", "module"])]]);
+    expect(strayFields({ organization_licence: [{ id: "a", organization_id: "o", module: "infocube", workspace_id: "w" }] }, columns)).toEqual(["organization_licence.workspace_id"]);
+    expect(strayFields({ organization_licence: [{ id: "a", organization_id: "o", module: "infocube" }] }, columns)).toEqual([]);
+  });
+});
