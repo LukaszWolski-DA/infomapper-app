@@ -1,32 +1,25 @@
-// The editor's side panels' widths (slice 27, item 6, Q7 as Łukasz answered): one person's preference in their browser,
-// kept in a cookie the browser writes and the server reads, so the editor opens with the panels as they were left from
-// its first paint (as slice 5a's canvas side panels). Never stored on the server. A missing or unreadable cookie means
-// the defaults.
+// The editor's side panels (slice 27, item 6; slice 28, item 1): one person's preference in their browser, kept in a
+// cookie the browser writes and the server reads, so the editor opens with the panels as they were left from its first
+// paint (as slice 5a's canvas side panels). Never stored on the server. A missing or unreadable cookie means the
+// defaults: both panels shown at their default widths.
+//
+// Slice 28 (Q-E): the limits, the defaults and the format are the canvas's (`src/ui/side-panels-cookie.ts`: one rule in
+// one place); the cookie stays the editor's own (Q-A), so hiding a panel on the canvas never hides one here. Slice 27's
+// value (`250.330`, the two widths) is still read: both panels shown with those widths (Q2).
 
-/** The prototype's bounds and defaults (`PANELS`): the sections panel and the options panel, in px. */
-export const DOC_PANEL_LIMITS = {
-  left: { min: 200, max: 480, def: 250 },
-  right: { min: 280, max: 560, def: 330 },
-} as const;
-export type DocPanel = keyof typeof DOC_PANEL_LIMITS;
-export type DocPanelWidths = Readonly<Record<DocPanel, number>>;
-export const DEFAULT_DOC_PANELS: DocPanelWidths = { left: DOC_PANEL_LIMITS.left.def, right: DOC_PANEL_LIMITS.right.def };
+import { DEFAULT_SIDE_PANELS, clampWidth, parseSidePanelsCookie, type SidePanelsState } from "@/ui/side-panels-cookie";
+
+export type DocPanels = SidePanelsState;
+export const DEFAULT_DOC_PANELS: DocPanels = DEFAULT_SIDE_PANELS;
 
 /** One cookie per person. */
 export const docPanelsCookieName = (userId: string): string => `im-doc-panels.${userId}`;
 /** A year, like the other preferences. */
 export const DOC_PANELS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
-export const clampDocPanel = (side: DocPanel, width: number): number => {
-  const { min, max } = DOC_PANEL_LIMITS[side];
-  return Math.min(max, Math.max(min, Math.round(width)));
-};
-
-/** `250.330`: the two widths. */
-export const formatDocPanelsCookie = (w: DocPanelWidths): string => `${clampDocPanel("left", w.left)}.${clampDocPanel("right", w.right)}`;
-
-export function parseDocPanelsCookie(value: string | null | undefined): DocPanelWidths {
+/** Slice 27's widths-only value, else the canvas's format (`l1.r0.264.340`). */
+export function parseDocPanelsCookie(value: string | null | undefined): DocPanels {
   const m = value ? /^(\d{1,4})\.(\d{1,4})$/.exec(value) : null;
-  if (!m) return DEFAULT_DOC_PANELS;
-  return { left: clampDocPanel("left", Number(m[1])), right: clampDocPanel("right", Number(m[2])) };
+  if (m) return { left: true, right: true, leftWidth: clampWidth("left", Number(m[1])), rightWidth: clampWidth("right", Number(m[2])) };
+  return parseSidePanelsCookie(value);
 }

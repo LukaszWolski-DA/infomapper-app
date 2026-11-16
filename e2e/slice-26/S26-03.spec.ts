@@ -3,7 +3,7 @@
 // selects its section, a double-click goes to its heading.
 
 import { expect, test } from "./fixtures";
-import { buildTimes, keepOnly, builds, DEMO_DOCUMENT_NAMES, expectLayouts, formUrl, layouts, openEditor, probeBuilds, rowOfType, signInAs, storedDocument } from "./helpers";
+import { buildTimes, keepOnly, builds, DEMO_DOCUMENT_NAMES, expectLayouts, formUrl, layouts, openEditor, openFold, probeBuilds, rowOfType, signInAs, storedDocument } from "./helpers";
 
 const SHARED = DEMO_DOCUMENT_NAMES.shared;
 
@@ -17,6 +17,8 @@ test("S26-03: typing in a field refreshes the preview once, about 500 ms after t
   await openEditor(page, formUrl(doc.id));
   const before = { builds: await builds(page), layouts: await layouts(page), times: (await buildTimes(page)).length };
 
+  // slice 28 (finding 5): Cover starts folded
+  await openFold(page, "fold-document-cover");
   const field = page.getByTestId("input-cover-subtitle");
   await field.click();
   await field.press("End");
@@ -75,8 +77,10 @@ test("S26-03: a section clicked on the left scrolls the preview to it; a click i
   await expect(page.locator('[data-testid="panel-section"][data-section="text"]')).toBeVisible();
   await expect(rowOfType(page, "text")).toHaveAttribute("aria-current", "true");
 
-  // a double-click goes to the section's heading (D9: no inline rename)
+  // a double-click goes to the section's first control of any kind, the panel at its top (slice 28, D-83 amending
+  // D9: the dictionary's first column box; no inline rename)
   await page.locator(`[data-testid="document-host"] [data-sec="${dict.id}"] h2`).first().dblclick();
-  await expect(page.getByTestId("input-section-heading")).toBeFocused();
+  await expect(page.getByTestId("checks-dict-columns-attribute")).toBeFocused();
+  expect(await page.getByTestId("editor-right").evaluate((el) => el.scrollTop)).toBe(0);
   await expect(page.locator('[data-testid="panel-section"][data-section="dict"]')).toBeVisible();
 });

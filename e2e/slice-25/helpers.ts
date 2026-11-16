@@ -18,6 +18,17 @@ export { archive } from "../slice-07a/helpers";
 export { RETAIL, SEED_IDS, DEMO_DOCUMENT_NAMES };
 
 export const docsUrl = (ws: string = RETAIL) => `/w/${ws}?tab=docs`;
+
+/**
+ * Slice 28 (finding 5): opens a fold of the editor's Document panel ("fold-document-cover", "…-header-footer", "…-scope",
+ * "…-style", "…-sharing"), if it is shut. Cover and Header and footer start shut in a fresh browser.
+ */
+export async function openFold(page: Page, testId: string) {
+  const button = page.getByTestId(testId).getByRole("button").first();
+  await expect(button).toBeVisible();
+  if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+  await expect(button).toHaveAttribute("aria-expanded", "true");
+}
 export const settingsUrl = (ws: string = RETAIL) => `/w/${ws}?tab=settings`;
 export const formUrl = (id: string, ws: string = RETAIL) => `/w/${ws}/d/${id}`;
 export const viewUrl = (id: string, ws: string = RETAIL) => `/w/${ws}/d/${id}/view`;

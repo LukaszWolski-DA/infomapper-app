@@ -3,7 +3,7 @@
 // Duplicate makes a private copy; Undo does not touch documents.
 
 import { expect, test, type Page } from "./fixtures";
-import { DEMO_DOCUMENT_NAMES, docRow, docsUrl, documentEvents, expectToast, formUrl, sectionOf, SEED_IDS, signInAs, storedDocument, storedDocuments, updateDocumentAs } from "./helpers";
+import { DEMO_DOCUMENT_NAMES, docRow, docsUrl, documentEvents, expectToast, formUrl, openFold, sectionOf, SEED_IDS, signInAs, storedDocument, storedDocuments, updateDocumentAs } from "./helpers";
 
 async function fromPreset(page: Page, preset: "dictionary" | "s2t" | "blank") {
   await page.goto(docsUrl());
@@ -54,6 +54,8 @@ test("S25-03: a change is saved with a version and a change event; a stale save 
   // step 4b: the breadcrumbs name the document under Documentation
   await expect(page.getByTestId("breadcrumb")).toHaveText(["InfoMate", "Retail Co – DWH", "Documentation", DEMO_DOCUMENT_NAMES.shared]);
   const before = (await documentEvents(doc.id)).length;
+  // slice 28 (finding 5): Cover starts folded
+  await openFold(page, "fold-document-cover");
   await page.getByTestId("input-cover-status").fill("Agreed");
   await page.getByTestId("input-cover-status").press("Enter");
   await expect.poll(async () => (await storedDocument(DEMO_DOCUMENT_NAMES.shared))?.cover.status).toBe("Agreed");

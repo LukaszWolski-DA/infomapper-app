@@ -6,7 +6,7 @@
 
 import path from "node:path";
 import { expect, test } from "./fixtures";
-import { changeDb, DEMO_DOCUMENT_NAMES, expectLayouts, formUrl, laidOut, openEditor, pagesOf, preview, rowOfType, setSections, setThreshold, signInAs, storedDocument, viewUrl } from "./helpers";
+import { changeDb, DEMO_DOCUMENT_NAMES, expectLayouts, formUrl, laidOut, openEditor, openFold, pagesOf, preview, rowOfType, setSections, setThreshold, signInAs, storedDocument, viewUrl } from "./helpers";
 
 const OUT = path.resolve("docs", "prd", "slice-26-screens", process.env.SCREENS === "1" ? "latest" : (process.env.SCREENS ?? "latest"));
 
@@ -41,6 +41,7 @@ test("S26 screens: Pages out of date", async ({ page }) => {
   const doc = (await storedDocument(DEMO_DOCUMENT_NAMES.shared))!;
   await openEditor(page, formUrl(doc.id));
   await expectLayouts(page, 1);
+  await openFold(page, "fold-document-cover");
   await page.getByTestId("input-cover-subtitle").fill("For the business and the data office");
   await page.getByTestId("input-cover-subtitle").press("Enter");
   await expect(preview(page)).toHaveAttribute("data-shown", "quick");

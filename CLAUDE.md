@@ -77,7 +77,12 @@ Slice 27 (D-82) draws figures: canvases and frames as SVG images drawn from the 
 `src/domain/canvas/`), IBM Plex embedded, as on the canvas or adjusted, whole or in parts, upright or turned; the
 Diagrams and Figure sections, Model overview's figures, the dictionary's concept frames, InfoCube's star diagram per
 fact, numbering and the list of figures, the smallest names; the page outline for documentation in a canvas's look; the
-editor's resizable side panels (a cookie).
+editor's resizable side panels (a cookie). Slice 28 (D-83) makes the editor easier to work in: its side panels hidden
+and shown as the canvas's, with its limits and defaults, in the editor's own cookie in the canvas's format; a
+double-click on a section showing the options panel and focusing its first control; the Document panel's folds (Sharing
+last, Header and footer and Cover shut at first), each section's options before its heading, named controls, short
+segment labels, long-text labels per section; hints under an option that is ticked while nothing in the document uses
+it.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -330,6 +335,23 @@ list up to date in each sub-slice):
   in the browser (`src/app/_lib/document-sections.ts`, pure). The document's CSS is `ui/document-css.ts` (`pageCss` with
   the paper and orientation, `styleCss`, `quickSheetCss`). IBM Plex Serif loads only on the editor and the document
   page (`src/app/fonts/plex-serif.ts`).
+  **Slice 28 (D-83):**
+  - **The side panels:** `app/panel-handles.tsx` (`useDocPanels`: which panels show, `toggle`, `show`, the widths written
+    to the body during a drag; `PanelToggle`, `PanelHandles`; the body's classes `nol` and `nor`, a hidden panel `inert`).
+    The limits, defaults and format are the canvas's (`src/ui/side-panels-cookie.ts`, imported unchanged); the cookie
+    is the editor's own (`ui/panels-cookie.ts`, `im-doc-panels.{user}`, which still reads slice 27's widths-only value).
+    The canvas's `side-panels.tsx` is not shared: it shifts the canvas's view and has the narrow overlay.
+  - **One field:** `app/field.tsx` (`Field`, `useId`): a single control takes the field's `id` (`<label htmlFor>`), a
+    group `aria-labelledby` (`Seg`'s `labelledBy` and `describedBy`), the hint `aria-describedby`. **A new control in the
+    editor's panels** goes in a `Field` (S28-06 checks every control's name).
+  - **Folds:** the canvas's `Fold` (`src/app/_panels/fields.tsx`) has `startShut` (shut until opened by hand, remembered
+    under `infomapper:sections-open`) and `storeKey` (a prefix, the editor's `doc:`); without them a fold behaves as
+    before (D-35).
+  - **Hints:** `domain/hints.ts` (`sectionHints` from the section's scope as the builders read it, `sectionScopeOf`;
+    `styleHints`), shown under their option. **A later option that can show nothing** gets its hint there, under the same
+    rule: ticked, and nothing in the document uses it.
+  - **The double-click** (`open` in `editor.tsx`) shows the options panel, scrolls it to its top and focuses the first
+    control of `[data-de-props]` (the section's own options).
 - **A module's own pages** (slice 25, step 4): the routes stay in `src/app` (`/w/{ws}/d/{id}` and `/view`), load the
   shell and render a module's pages through `src/compose/documents-pages.tsx`; `loadShell`'s `rest` keeps such a path for
   the locked organization's return (F27). The pages render `AppShell` with a `trail` (the breadcrumbs after the
@@ -434,6 +456,10 @@ versions, change events in the same write, uniqueness and the “exactly one tar
   drawn (cards, lines, layers), as that slice's performance gate; otherwise the element guard, LayerTree and the commit
   counts are enough. The bench bars listed under "Commands" stay gates (they came from decided PRDs); a new bench has a
   bar only when Łukasz approves one (usually in step 1), and without one it reports a reference figure.
+- **Tailwind classes glued to a placeholder** (slice 28): `tests/class-placeholder-guard.test.ts` scans every
+  `className={`…`}` in `src/` for a Tailwind utility glued to a `${…}` (`p-2${on ? "" : " x"}`): Tailwind's scanner
+  reads it as one token and never generates the class (F6 and the editor's grid in slice 28). Write a space between a
+  class and a placeholder. The app's own CSS classes glued to one (`row${sel ? " sel" : ""}`) are left alone.
 - Use `data-testid` attributes for elements tests need; name them after the components (e.g. `card-entity`,
   `panel-inspector`, `nav-breadcrumbs`).
 - **Łukasz's test model** (since slice 8's manual acceptance, 28 October 2026): the organization KB with the workspace
@@ -839,6 +865,15 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     (`figureEntries`, `expectStoredFigures`).
   A figure's image is a blob of the page: read its SVG in the page (`svgOf`), never from a file. The page outline's
   layer has no size of its own: wait for it `attached`, not visible (S27-09).
+
+  Slice 28's fixtures are slice 27's (`seed` "docs", "plain" or "full"; S28-06 and S28-07 use "full"). Its helpers do
+  the following:
+  - open a demo document's editor by name (`openDocument`, the S2T document by default) and a fold of the Document panel
+    (`openFold`, in slice 25's helpers: Cover and Header and footer start shut in a fresh browser, so every spec that
+    types there opens its fold first);
+  - read the side panels (`sectionsToggle`, `optionsToggle`, `widthOf`, `inertOf`, `expectPanel`: shown with its width
+    and handle, or 0 wide, inert, no handle), the preview's scale (`zoomOf`) and the cookie (`panelsCookie`).
+  A cookie a spec adds needs the path `/` (`url: origin + "/"`), or the page's own cookie wins.
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,

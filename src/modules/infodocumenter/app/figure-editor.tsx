@@ -6,7 +6,7 @@
 // frame to add" and "Add figure". Every change saves the section's whole list (`figures`) on the save chain as one
 // choice (`useChoice`); the caption keeps its draft (D-66) and saves on Enter or when it is left.
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { useAction } from "@/app/_components/use-action";
 import { TextField, useChoice } from "@/app/_panels/fields";
 import { uuidv7 } from "@/domain/ids";
@@ -56,6 +56,8 @@ export const FIGURE_TEXTS = {
     ["cube", "Dimensional"],
   ],
   status: "Status marks",
+  /** Slice 28 (finding 1): the selects' accessible names. */
+  names: { view: "View", size: "Size", orientation: "Orientation", rows: "Rows" },
   caption: "Caption",
   captionPlaceholder: (name: string) => `Caption: ${name}`,
   off: "Not in the document.",
@@ -108,16 +110,19 @@ export function FigureEditor(props: {
   };
   const [pick, setPick] = useState(0);
   const lines = FIGURE_TEXTS.lines.filter(([k]) => k !== "cube" || dimensional);
+  const groupId = useId();
   return (
-    <div className="de-wrap mt-3" data-testid="figure-editor">
-      <div className="mb-1 text-[11.5px] text-im-ink-3">{label}</div>
+    <div className="de-wrap mt-3" role="group" aria-labelledby={`${groupId}-label`} data-testid="figure-editor">
+      <div id={`${groupId}-label`} className="mb-1 text-[11.5px] text-im-ink-3">
+        {label}
+      </div>
       {hint && <div className="mb-1.5 mt-[-2px] text-[11.5px] text-im-ink-3">{hint}</div>}
       {figures.map((f, i) => {
         const name = figureEditorName(f, sources);
         const sel = <K extends "view" | "size" | "orientation" | "rows">(key: K, items: readonly (readonly [string, string])[]) => (
           <select
             data-testid={`select-figure-${key}`}
-            aria-label={key}
+            aria-label={FIGURE_TEXTS.names[key]}
             className={selectClass}
             value={f[key]}
             disabled={readOnly}
@@ -131,7 +136,8 @@ export function FigureEditor(props: {
           </select>
         );
         return (
-          <div key={f.id} className={`mb-2 rounded-lg border border-im-line p-2${f.on ? "" : " opacity-70"}`} data-testid="figure-entry" data-figure={f.id}>
+          // slice 28 (F6): each class a whole word of its own; `p-2${…}` was one token for Tailwind's scanner, never generated
+          <div key={f.id} className={`mb-2 rounded-lg border border-im-line p-2 ${f.on ? "" : "opacity-70"}`} data-testid="figure-entry" data-figure={f.id}>
             <div className="flex items-center gap-1.5">
               <input type="checkbox" data-testid="check-figure-on" checked={f.on} disabled={readOnly} aria-label={FIGURE_TEXTS.inDocument} title={FIGURE_TEXTS.inDocument} onChange={(e) => change(i, { on: e.currentTarget.checked })} />
               <b className="min-w-0 flex-1 truncate text-[12.5px]" data-testid="text-figure-name" title={name}>
@@ -149,12 +155,15 @@ export function FigureEditor(props: {
             </div>
             {f.on ? (
               <>
-                <div className="mt-1.5 flex flex-wrap gap-1">
+                {/* slice 28 (F2): view and orientation on one row, the size on its own (its longest choice needs the width) */}
+                <div className="mt-1.5 flex gap-1" data-testid="figure-row-view">
                   {sel("view", FIGURE_TEXTS.views)}
-                  {sel("size", FIGURE_TEXTS.sizes)}
                   {sel("orientation", FIGURE_TEXTS.orientations)}
-                  {f.view === "custom" && sel("rows", FIGURE_TEXTS.rows)}
                 </div>
+                <div className="mt-1 flex gap-1" data-testid="figure-row-size">
+                  {sel("size", FIGURE_TEXTS.sizes)}
+                </div>
+                {f.view === "custom" && <div className="mt-1 flex gap-1">{sel("rows", FIGURE_TEXTS.rows)}</div>}
                 {f.view === "custom" && (
                   <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
                     {lines.map(([k, l]) => (
@@ -168,8 +177,12 @@ export function FigureEditor(props: {
                   </div>
                 )}
                 <div className="mt-1.5">
+                  <label htmlFor={`${groupId}-${f.id}-caption`} className="sr-only">
+                    {FIGURE_TEXTS.caption}
+                  </label>
                   <TextField
                     key={`${sectionId}:${f.id}:caption`}
+                    id={`${groupId}-${f.id}-caption`}
                     value={f.caption}
                     version={version}
                     readOnly={readOnly}

@@ -493,7 +493,8 @@ table or as a column; the labels in English, Polish and German; a document's own
 figures of canvases and frames (views, rows, line kinds, status marks, six sizes, three orientations, parts, captions),
 the Diagrams and Figure sections, Model overview's figures, the dictionary's concept-frame figure, the star diagram in
 the Dimensional model, the legend, numbering and the list of figures, the smallest names, the presets' Diagrams, the
-canvas's page outline in Canvas look, and the editor's resizable side panels.
+canvas's page outline in Canvas look, and the editor's resizable side panels. **Since slice 28 (D-83):** the editor's
+side panels hidden and shown, with the canvas's limits and defaults, and "Fit width" following them.
 
 **Deliberate differences** (slice 25's D1 to D13 where slice 26 keeps them; slice 26's step 1 D1 to D11 and steps 2 to
 4):
@@ -501,7 +502,10 @@ canvas's page outline in Canvas look, and the editor's resizable side panels.
   preview reads its draft as it is typed.
 - **"Who sees this document"** is shown to everyone; only its author makes a shared document private (slice 25, step
   4b). A section is removed without a question, as in the prototype; documents are outside undo.
-- **The double-click** on a section goes to its Heading (no rename in the list, as the prototype).
+- **The double-click** on a section (no rename in the list, as the prototype) shows a hidden options panel, as the
+  prototype's, scrolled to its top, and gives the focus to the section's first control of any kind, a check box or a
+  segment button included (slice 28, D-83; the prototype focuses the first text field or select, else Heading; slice 26
+  went to Heading).
 - **The preview:** a running layout is stopped, not thrown away; the busy text says "Laying out pages…" while any layout
   runs; the old pages give way at once when the paper, the orientation or the look changes.
 - **The quick sheet's footer** prints the footer fields (D8), not a fixed line.
@@ -527,7 +531,23 @@ canvas's page outline in Canvas look, and the editor's resizable side panels.
   forgets its paper, orientation and size; it counts what a figure draws, never notes (the prototype counts notes); it
   follows a card on its drop.
 - **The editor's side panels (slice 27):** their widths in a cookie per person the server reads (the prototype's
-  `localStorage`), so a page opens with them; each handle is a separator with its width as its value.
+  `localStorage`), so a page opens with them; each handle is a separator with its width as its value. **Slice 28:** the
+  hidden flags are in the same cookie, in the canvas's format, so a hidden panel is drawn from the first paint (the
+  prototype keeps them in `localStorage`); a hidden panel is 0 wide and inert (the prototype hides it with
+  `visibility`); "Fit width" scales the laid-out pages (the prototype draws the preview again 200 ms after a change);
+  the toggles' names are their titles, as the canvas's (the prototype: "Sections panel", "Options panel"); the right
+  toggle is after "Print / PDF" (no "Generate version" yet).
+- **The editor's right panel (slice 28, D-83; the review's findings 1 to 12; the prototype is not changed for them):**
+  every field, select, text area and group is named from its label (the prototype's labels are not tied to their
+  controls); the Document panel folds Scope, Style, Header and footer, Cover and Sharing, in that order, with Header and
+  footer and Cover shut at first (the prototype: plain headings, Sharing between Scope and Style); a section's own
+  options come before Heading and "Start on a new page" (the prototype puts them first); short segment labels with the
+  full sentence in the hint (Mappings included, the long texts, the dictionary's Layout, Model overview's figures); each
+  section's long-text label names its own long texts (the prototype: one label, "definitions, descriptions, rules,
+  notes", everywhere); "For each table" above Source tables' table options; a figure's view and orientation on one row,
+  its size on its own, and the star's size as wide as its row; "Nothing by default" as the header's right placeholder
+  (the prototype: "empty"); hints under an option that is ticked while nothing in the document uses it (Source-to-target's
+  Note, Source tables' table note and classifications, the dictionary's concept frames, the style's List of figures).
 
 ## The app ahead of the prototype (slice 22)
 

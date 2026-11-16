@@ -55,7 +55,8 @@ test("S25-05: the chosen columns, the rule under the row, by target entity with 
 
 test("S25-05: Approved only hides drafts and reviews; by source system the systems are the groups", async ({ page }) => {
   await signInAs(page, "Łukasz");
-  await choose(page, "seg-mappings", "Approved only", (d) => d.scope.mappings, "approved");
+  // slice 28 (finding 4): the short label "Approved" ("Approved only" before)
+  await choose(page, "seg-mappings", "Approved", (d) => d.scope.mappings, "approved");
   const approved = await openView(page);
   expect(approved.statuses).toEqual(["Approved"]);
 

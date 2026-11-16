@@ -27,7 +27,9 @@ test("S26-07: the dictionary's three layouts and long definitions, chosen in the
   await rowOfType(page, "dict").click();
 
   // as a column, with its width
-  await page.getByTestId("seg-dict-layout").getByRole("button", { name: "Definition as a column" }).click();
+  // slice 28 (findings 4, 8): the Layout by its short labels ("Definition as a column", "One block per attribute",
+  // "Definition under each row" before)
+  await page.getByTestId("seg-dict-layout").getByRole("button", { name: "Column", exact: true }).click();
   await expect(page.getByTestId("select-dict-definitionWidth")).toBeVisible();
   await page.getByTestId("select-dict-definitionWidth").selectOption("50");
   await expect.poll(async () => (await storedDocument(SHARED))!.sections[0]!.options.definitionWidth).toBe(50);
@@ -35,12 +37,12 @@ test("S26-07: the dictionary's three layouts and long definitions, chosen in the
   await expect(host.locator("tr.ddr")).toHaveCount(0);
 
   // one block per attribute
-  await page.getByTestId("seg-dict-layout").getByRole("button", { name: "One block per attribute" }).click();
+  await page.getByTestId("seg-dict-layout").getByRole("button", { name: "Blocks", exact: true }).click();
   await expect(host.locator(".dattrc").first()).toBeVisible();
   await expect(host.locator(".dattrc").filter({ hasText: "email" }).locator(".dac-d")).toContainText("Where we write to the customer.");
 
   // long definitions to the end of the section
-  await page.getByTestId("seg-dict-layout").getByRole("button", { name: "Definition under each row" }).click();
+  await page.getByTestId("seg-dict-layout").getByRole("button", { name: "Under row", exact: true }).click();
   await page.getByTestId("select-dict-longDefinitions").selectOption("300");
   await expect(host.locator(".dref").filter({ hasText: "→ note 1" })).toHaveCount(1);
   await expect(host.locator("h3.dh3").filter({ hasText: "Definitions in full" })).toHaveCount(1);
