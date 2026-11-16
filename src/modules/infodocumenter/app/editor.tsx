@@ -290,27 +290,29 @@ export function DocumentEditor(props: EditorProps) {
     if (scroll) preview.current?.scrollTo(sec);
   };
   /**
-   * A double-click: select, scroll, show a hidden options panel (an action that leads to it on purpose, slice 28), and
-   * the section's first option field takes the focus, else its Heading (Q-C, the prototype's `goTo`; amends D-81's D9).
+   * A double-click: select, scroll, show a hidden options panel (an action that leads to it on purpose, slice 28); the
+   * panel scrolls to its top and the section's first control of any kind takes the focus (a check box and a segment
+   * button count), so it never lands on Heading at the panel's end (Łukasz's answer to step 2; D-83 amends D-81's D9,
+   * a deliberate difference from the prototype's first text field or select).
    */
   const open = (sec: string) => {
     choose(sec, true);
     docPanels.show("right");
     if (sec === "doc") return;
     focusOption.current = true;
-    // a render even when the section was selected already, so the field takes the focus
+    // a render even when the section was selected already, so the control takes the focus
     setFocusTick((n) => n + 1);
   };
   useEffect(() => {
     const right = rightRef.current;
     if (!focusOption.current || !right) return;
     void focusTick;
-    const field = ":is(textarea, input:not([type=checkbox]), select):not(:disabled)";
-    const el = right.querySelector<HTMLElement>(`[data-de-props] ${field}`) ?? right.querySelector<HTMLElement>(field);
+    const control = ":is(input, select, textarea, button):not(:disabled)";
+    const el = right.querySelector<HTMLElement>(`[data-de-props] ${control}`) ?? right.querySelector<HTMLElement>(control);
     if (!el) return;
     focusOption.current = false;
+    right.scrollTop = 0;
     el.focus({ preventScroll: true });
-    el.scrollIntoView({ block: "center" });
     el.classList.add("de-flash");
     setTimeout(() => el.classList.remove("de-flash"), 900);
   });

@@ -1,5 +1,6 @@
-// S28-02 (slice 28, item 1, F1, F8, Q-C): selecting a section keeps a hidden options panel hidden; a double-click on a
-// section, in the preview or in the list, shows it and its first option field takes the focus; "Fit width" follows a
+// S28-02 (slice 28, item 1, F1, F8, D-83): selecting a section keeps a hidden options panel hidden; a double-click on a
+// section, in the preview or in the list, shows it at its top and its first control of any kind takes the focus (a
+// check box and a segment button count; never Heading at the panel's end); "Fit width" follows a
 // toggle and a drag by scaling the pages, with no new layout (F1: the app scales, it does not lay the pages out again).
 
 import { expect, test } from "./fixtures";
@@ -19,20 +20,22 @@ test("S28-02: a selection keeps the options panel hidden; a double-click shows i
   await expect(rowOfType(page, "sources")).toHaveAttribute("aria-current", "true");
   await expectPanel(page, "right", false);
 
-  // a double-click in the preview shows it; Diagrams' first option field is its first figure's view (Q-C)
+  // a double-click in the preview shows it; Diagrams' first control is its first figure's box
   const diagrams = doc.sections.find((s) => s.type === "diagrams")!;
   await page.locator(`[data-testid="document-host"] [data-sec="${diagrams.id}"] h2`).first().dblclick();
   await expectPanel(page, "right", true, 340);
   await expect(page.locator('[data-testid="panel-section"][data-section="diagrams"]')).toBeVisible();
-  await expect(page.getByTestId("select-figure-view").first()).toBeFocused();
+  await expect(page.getByTestId("check-figure-on").first()).toBeFocused();
+  expect(await page.getByTestId("editor-right").evaluate((el) => el.scrollTop)).toBe(0);
 
-  // hidden again, a double-click in the list shows it too (the prototype's); a section with no text field or select
-  // among its options focuses its Heading
+  // hidden again, a double-click in the list shows it too (the prototype's); Source tables' first control is a check box,
+  // not its Heading
   await optionsToggle(page).click();
   await expectPanel(page, "right", false);
   await rowOfType(page, "sources").dblclick();
   await expectPanel(page, "right", true, 340);
-  await expect(page.getByTestId("input-section-heading")).toBeFocused();
+  await expect(page.getByTestId("check-sources-tableClassifications")).toBeFocused();
+  await expect(page.getByTestId("input-section-heading")).not.toBeFocused();
 });
 
 test("S28-02: Fit width follows a toggle and a drag by scaling the pages, without a new layout", async ({ page }) => {
