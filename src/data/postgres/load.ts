@@ -21,14 +21,19 @@ export interface LoadReport {
   crowded: Record<string, number>;
 }
 
-/** The tables in an order where every table comes after the tables it refers to (references to itself left out). */
-export function tablesInKeyOrder(schema: StoreSchema): string[] {
+/**
+ * The tables in an order where every table comes after the tables it refers to (references to itself left out): the
+ * store's foreign keys and, when given, the database's own (`databaseReferences`: SQL-only keys such as
+ * `entity_stereotype_fk` on (workspace_id, stereotype), which the local adapter's rules do not have).
+ */
+export function tablesInKeyOrder(schema: StoreSchema, more: ReadonlyMap<string, ReadonlySet<string>> = new Map()): string[] {
   const done = new Set<string>();
   const out: string[] = [];
   const visit = (table: string, path: readonly string[]) => {
     if (done.has(table)) return;
     if (path.includes(table)) throw new Error(`The foreign keys go round: ${[...path, table].join(" → ")}`);
-    for (const target of Object.values(schema.rules[table]?.foreignKeys ?? {})) if (target !== table && schema.rules[target]) visit(target, [...path, table]);
+    const targets = new Set([...Object.values(schema.rules[table]?.foreignKeys ?? {}), ...(more.get(table) ?? [])]);
+    for (const target of targets) if (target !== table && schema.rules[target]) visit(target, [...path, table]);
     done.add(table);
     out.push(table);
   };
@@ -73,6 +78,19 @@ async function publicTables(db: Queryable): Promise<string[]> {
   return (await db.query<{ tablename: string }>("select tablename from pg_tables where schemaname = 'public' order by tablename")).rows.map((r) => r.tablename);
 }
 
+/** Every foreign key of the public schema, as table → the tables it refers to. */
+export async function databaseReferences(db: Queryable): Promise<Map<string, Set<string>>> {
+  const { rows } = await db.query<{ source: string; target: string }>(
+    `select s.relname as source, t.relname as target from pg_constraint c
+       join pg_class s on s.oid = c.conrelid join pg_class t on t.oid = c.confrelid
+       join pg_namespace n on n.oid = s.relnamespace
+      where c.contype = 'f' and n.nspname = 'public'`,
+  );
+  const out = new Map<string, Set<string>>();
+  for (const r of rows) (out.get(r.source) ?? out.set(r.source, new Set()).get(r.source)!).add(r.target);
+  return out;
+}
+
 /** Rows in any of the public tables. */
 export async function hasRows(db: Queryable): Promise<boolean> {
   for (const t of await publicTables(db)) {
@@ -99,7 +117,8 @@ export async function loadRows(db: Queryable, schema: StoreSchema, data: Readonl
       throw new Error("The database has rows already: nothing was loaded. Run with --reset to replace them.");
     }
     const crowded: Record<string, number> = {};
-    for (const table of tablesInKeyOrder(schema)) {
+    const order = tablesInKeyOrder(schema, await databaseReferences(db));
+    for (const table of order) {
       const given = data[table] ?? [];
       if (!given.length) continue;
       const stamped = stampPlaces(table, given);
@@ -107,7 +126,7 @@ export async function loadRows(db: Queryable, schema: StoreSchema, data: Readonl
       await db.query(`insert into ${ident(table)} select * from json_populate_recordset(null::${ident(table)}, $1::json)`, [JSON.stringify(stamped.rows)]);
     }
     const counts: LoadReport["counts"] = [];
-    for (const table of tablesInKeyOrder(schema)) {
+    for (const table of order) {
       const stored = Number((await db.query<{ n: string }>(`select count(*) as n from ${ident(table)}`)).rows[0]!.n);
       counts.push({ table, given: data[table]?.length ?? 0, stored });
     }
