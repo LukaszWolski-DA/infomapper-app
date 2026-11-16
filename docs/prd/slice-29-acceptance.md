@@ -574,3 +574,18 @@ applies every migration itself and refuses a database whose `public` schema has 
 - **L7.** The Supabase local stack in CI for the smoke (F14, about 2–3 minutes a run): agreed?
 - **L8.** The explicit `created_at, id` order for the ports without one, on the local adapter too (F2): agreed? It changes
   no order the app has made, and the full run checks it.
+
+## Łukasz's answers (16 November 2026)
+
+- **F1 to F15:** as proposed. F13's revoke of the API roles' leftover privileges waits for slice D.
+- **L1:** always the session pooler (5432) for the migrations and the loader; the network does not matter.
+- **L2:** Łukasz checks `infomapper-dev`'s signing key before step 3 and says which it is.
+- **L3:** `app_user.auth_user_id`; `docs/data-model-v2.md` §3 changes accordingly.
+- **L4:** environment 2's values in `.env.postgres.local`, read only by `npm run dev:pg` and the Postgres scripts;
+  confirmed git-ignored (`.gitignore`'s `.env*`) before anything reads it. Environment 1 never loads it.
+- **L5:** the proposed wording: the refusal "This server is read-only for now, so nothing was saved."; the indicator
+  "Read only" with "This server shows the workspace read-only for now."
+- **L6:** no Docker for now: the Postgres side of the contract suite and the smoke run in CI only.
+- **L7:** yes, Supabase's local stack in CI for the smoke.
+- **L8:** yes, the explicit `created_at, id` order on both adapters.
+- **`localeCompare`'s locale:** noted for `docs/ideas.md` at the closing.
