@@ -662,6 +662,9 @@ use a private copy):
   No server restarted. Part 8's peak, 1,336 MB, is well under about 1.95 GB.
 - **Part 8 is the longest** by 3.1 min over part 7. The recut rule (CLAUDE.md, "The full run in eight parts") reads the
   median of the last three full runs. This run is one of them; a recut is not part of this slice and is reported only.
-- **The element guard** ran in the full run as always (Q-D).
+- **The element guard did not run.** Q-D's answer assumed the closing's full run runs it, but it is not part of any
+  full run: `S3B-15-elements.spec.ts` runs only in the measurement build (`MEASURE=1`, `MEASURE_BUILD=production` after
+  `npm run measure:build`), and the normal e2e run leaves it out. This slice changes nothing the canvas draws ("When to
+  measure"), so it was not started here; it runs only if Łukasz asks.
 - **Commits after `f4c89bc`** touch only this acceptance doc (Markdown in `docs/`), so the run stays valid ("Test
   runs").
