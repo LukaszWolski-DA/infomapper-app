@@ -8,6 +8,7 @@
 import { useMemo, type ReactNode } from "react";
 import type { useAction } from "@/app/_components/use-action";
 import { Seg, TextArea, useChoice } from "@/app/_panels/fields";
+import { Field } from "./field";
 import type { SectionOptionField } from "@/domain/document/sections";
 import {
   DEFINITION_WIDTHS,
@@ -36,34 +37,40 @@ export interface OptionContext {
 }
 
 type Pairs = readonly (readonly [string, string])[];
-type Field =
+type FieldSpec =
   | { kind: "check"; key: string; label: string }
   | { kind: "checks"; key: string; label?: string; items: Pairs; hint?: string }
   | { kind: "seg"; key: string; label: string; items: Pairs; hints?: Readonly<Record<string, string>> }
   | { kind: "select"; key: string; label: string; items: readonly (readonly [number, string])[]; hint?: string }
   | { kind: "text"; key: string; label: string; placeholder: string; hint: string }
   | { kind: "hint"; text: string }
+  /** Slice 28 (finding 7): a group label above the options after it. */
+  | { kind: "label"; text: string }
   /** Slice 27: a section's figure editor (`FigureEditor`, drawn by the editor). */
   | { kind: "figures"; key: string; label: string; hint?: string };
-type Spec = (o: Record<string, unknown>, cx: OptionContext) => readonly (Field | false)[];
+type Spec = (o: Record<string, unknown>, cx: OptionContext) => readonly (FieldSpec | false)[];
 
 const pairs = <K extends string>(keys: readonly K[], labels: Record<K, string>): Pairs => keys.map((k) => [k, labels[k]] as const);
 const COLUMNS_HINT = "Order follows this list. Headers are written in the document's language.";
-const LONG_TEXTS: Field = {
+/**
+ * Where a section's long texts go (slice 28, findings 4, 6, 8): the label names the section's own long texts (its
+ * builder's `long` columns); short choices on one line, the full sentence in the hint under them.
+ */
+const longTexts = (which: string): FieldSpec => ({
   kind: "seg",
   key: "longTexts",
-  label: "Long texts (definitions, descriptions, rules, notes)",
+  label: `Long texts (${which})`,
   items: [
-    ["row", "Under each row"],
-    ["after", "After the table, numbered"],
-    ["column", "As a column"],
+    ["row", "Under row"],
+    ["after", "Numbered"],
+    ["column", "Column"],
   ],
   hints: {
-    row: "The row keeps the short properties; each long text gets the full width underneath.",
-    after: "The row carries a number; the texts follow the table as numbered notes.",
-    column: "In their own column. Long texts make rows tall.",
+    row: "Under each row: the row keeps the short properties; each long text gets the full width underneath.",
+    after: "After the table, numbered: the row carries a number; the texts follow the table as numbered notes.",
+    column: "As a column: long texts make rows tall.",
   },
-};
+});
 
 export const OPTION_TEXTS = {
   dictionaryColumns: {
@@ -121,9 +128,11 @@ const SPECS: Record<string, Spec> = {
       key: "figuresAt",
       label: "Where the figures go",
       items: [
-        ["end", "Below the section's content"],
-        ["start", "Right after the description"],
+        ["end", "Below the content"],
+        ["start", "After the description"],
       ],
+      // slice 28 (F5): short choices on one line, the full sentence in the hint
+      hints: { end: "Below the section's content.", start: "Right after the description, before the counts and concepts." },
     },
     { kind: "check", key: "stats", label: "Counts of entities, tables, mappings and requirements" },
     { kind: "check", key: "concepts", label: "Concepts with their entities" },
@@ -134,15 +143,16 @@ const SPECS: Record<string, Spec> = {
       kind: "seg",
       key: "layout",
       label: "Layout",
+      // slice 28 (findings 4, 8): the long texts' words, and the dictionary's blocks
       items: [
-        ["below", "Definition under each row"],
-        ["column", "Definition as a column"],
-        ["cards", "One block per attribute"],
+        ["below", "Under row"],
+        ["column", "Column"],
+        ["cards", "Blocks"],
       ],
       hints: {
-        below: "The row keeps the short properties; the definition gets the full width underneath. Long text cannot widen the table.",
-        column: "Every column has a fixed width; long words and links wrap. Best for short definitions.",
-        cards: "Each attribute is a small block: properties on one line, the definition as a paragraph. Reads well for the business.",
+        below: "Definition under each row: the row keeps the short properties; the definition gets the full width underneath. Long text cannot widen the table.",
+        column: "Definition as a column: every column has a fixed width; long words and links wrap. Best for short definitions.",
+        cards: "One block per attribute: properties on one line, the definition as a paragraph. Reads well for the business.",
       },
     },
     o.layout === "column" && { kind: "select", key: "definitionWidth", label: "Width of the definition column", items: DEFINITION_WIDTHS.map((w) => [w, `${w} %`] as const) },
@@ -190,7 +200,7 @@ const SPECS: Record<string, Spec> = {
   ],
   s2t: () => [
     { kind: "checks", key: "columns", label: "Columns", items: pairs(S2T_COLUMNS, OPTION_TEXTS.s2tColumns), hint: COLUMNS_HINT },
-    LONG_TEXTS,
+    longTexts("rule, note"),
     {
       kind: "seg",
       key: "group",
@@ -203,11 +213,12 @@ const SPECS: Record<string, Spec> = {
     { kind: "check", key: "unmapped", label: "List attributes that have no mapping" },
   ],
   sources: (_o, cx) => [
+    { kind: "label", text: "For each table" },
     { kind: "check", key: "tableClassifications", label: "Its classifications" },
     { kind: "check", key: "tableNote", label: "The modeller's note" },
     cx.dataVault ? { kind: "check", key: "dataVault", label: "Data Vault reading (hub, links, satellites)" } : { kind: "hint", text: "The Data Vault reading appears when the workspace is in Data Vault 2.0 mode." },
     { kind: "checks", key: "columns", label: "Column properties", items: pairs(SOURCE_COLUMNS, OPTION_TEXTS.sourceColumns), hint: COLUMNS_HINT },
-    LONG_TEXTS,
+    longTexts("column notes"),
   ],
   classreg: (_o, cx) => {
     const of = (scope: "column" | "table"): Pairs => cx.classifications.filter((c) => c.scope === scope).map((c) => [c.key, c.own ? `${c.name} (${OPTION_TEXTS.own})` : c.name] as const);
@@ -215,7 +226,7 @@ const SPECS: Record<string, Spec> = {
       { kind: "checks", key: "classifications", label: "Column classifications", items: of("column") },
       { kind: "checks", key: "classifications", label: "Table classifications", items: of("table") },
       { kind: "check", key: "attributes", label: "With personal data: also the logical attributes marked as personal data" },
-      LONG_TEXTS,
+      longTexts("notes"),
     ];
   },
   reqs: (o) => [
@@ -230,7 +241,7 @@ const SPECS: Record<string, Spec> = {
       hints: { list: "Key and name as a heading, the properties on one line, the description in full underneath.", table: "Compact; long descriptions make tall rows." },
     },
     { kind: "checks", key: "columns", label: "Properties", items: pairs(REQUIREMENT_COLUMNS, OPTION_TEXTS.requirementColumns), hint: COLUMNS_HINT },
-    o.layout === "table" && LONG_TEXTS,
+    o.layout === "table" && longTexts("description, scope"),
     { kind: "check", key: "onlyScope", label: "Only requirements that touch the document's scope" },
   ],
   ready: () => [
@@ -275,7 +286,7 @@ const SPECS: Record<string, Spec> = {
   ],
   dq: () => [
     { kind: "checks", key: "columns", label: "Columns", items: pairs(QUALITY_COLUMNS, OPTION_TEXTS.qualityColumns), hint: COLUMNS_HINT },
-    LONG_TEXTS,
+    longTexts("rule, description"),
     { kind: "check", key: "onlyScope", label: "Only rules that touch the document's scope" },
   ],
 };
@@ -290,24 +301,40 @@ export function SectionOptions(props: {
   readOnly: boolean;
   version: number;
   context: OptionContext;
+  /** Slice 28: the hints of the options that show nothing, by option key (`domain/hints.ts`). */
+  hints?: Readonly<Record<string, string>>;
   typed: (key: string) => (text: string) => void;
   save: (patch: Record<string, unknown>) => Answer;
   /** Slice 27: a figure editor for an options key, with its label and hint. */
   figureEditor: (key: string, label: string, hint?: string) => ReactNode;
 }) {
-  const { sectionId, type, options: o, readOnly, version, context, typed, save, figureEditor } = props;
-  const fields = (SPECS[type]?.(o, context) ?? []).filter((f): f is Field => !!f);
+  const { sectionId, type, options: o, readOnly, version, context, typed, save, figureEditor, hints = {} } = props;
+  const fields = (SPECS[type]?.(o, context) ?? []).filter((f): f is FieldSpec => !!f);
   return (
     <div data-testid="section-options">
       {fields.map((f, i) => {
-        const id = `${type}-${f.kind === "hint" ? i : f.key}`;
+        const id = `${type}-${f.kind === "hint" || f.kind === "label" ? i : f.key}`;
         switch (f.kind) {
           case "check":
-            return <Check key={`${id}-${i}`} testId={`check-${type}-${f.key}`} label={f.label} stored={!!o[f.key]} disabled={readOnly} onSave={(v) => save({ [f.key]: v })} />;
+            return (
+              <div key={`${id}-${i}`}>
+                <Check testId={`check-${type}-${f.key}`} label={f.label} stored={!!o[f.key]} disabled={readOnly} onSave={(v) => save({ [f.key]: v })} />
+                {hints[f.key] && <OptionHint testId={`hint-${type}-${f.key}`} text={hints[f.key]!} />}
+              </div>
+            );
+          case "label":
+            return (
+              <div key={`${id}-${i}`} className="mb-1 mt-3 text-[11.5px] text-im-ink-3" data-testid={`label-${type}`}>
+                {f.text}
+              </div>
+            );
           case "checks":
             return (
               <Field key={`${id}-${i}`} label={f.label} hint={f.hint}>
+                {(ids) => (
+                <>
                 <ListChecks
+                  labelledBy={ids.labelId}
                   testId={`checks-${type}-${f.key}`}
                   all={f.items}
                   // a list split in two (the register's column and table classifications) saves the whole list
@@ -318,22 +345,30 @@ export function SectionOptions(props: {
                     return save({ [f.key]: [...others, ...chosen] });
                   }}
                 />
+                {hints[f.key] && <OptionHint testId={`hint-${type}-${f.key}`} text={hints[f.key]!} />}
+                </>
+                )}
               </Field>
             );
           case "seg":
             return (
-              <Field key={`${id}-${i}`} label={f.label} hint={f.hints?.[String(o[f.key])]}>
-                <Choice stored={String(o[f.key])} save={(v) => save({ [f.key]: v })}>
-                  {(value, pick) => <Seg testId={`seg-${type}-${f.key}`} value={value} options={f.items} disabled={readOnly} onChange={pick} />}
-                </Choice>
-              </Field>
+              <Choice key={`${id}-${i}`} stored={String(o[f.key])} save={(v) => save({ [f.key]: v })}>
+                {(value, pick) => (
+                  <Field label={f.label} hint={f.hints?.[value]}>
+                    {(ids) => <Seg testId={`seg-${type}-${f.key}`} labelledBy={ids.labelId} describedBy={ids.hintId} value={value} options={f.items} disabled={readOnly} onChange={pick} />}
+                  </Field>
+                )}
+              </Choice>
             );
           case "select":
             return (
               <Field key={`${id}-${i}`} label={f.label} hint={f.hint}>
+                {(ids) => (
                 <Choice stored={Number(o[f.key])} save={(v) => save({ [f.key]: v })}>
                   {(value, pick) => (
                     <select
+                      id={ids.id}
+                      aria-describedby={ids.hintId}
                       data-testid={`select-${type}-${f.key}`}
                       value={value}
                       disabled={readOnly}
@@ -348,13 +383,17 @@ export function SectionOptions(props: {
                     </select>
                   )}
                 </Choice>
+                )}
               </Field>
             );
           case "text":
             return (
               <Field key={`${id}-${i}`} label={f.label} hint={f.hint}>
+                {(ids) => (
                 <TextArea
                   key={`${sectionId}:${f.key}`}
+                  id={ids.id}
+                  aria-describedby={ids.hintId}
                   value={String(o[f.key] ?? "")}
                   version={version}
                   readOnly={readOnly}
@@ -364,6 +403,7 @@ export function SectionOptions(props: {
                   onType={typed(`sec:${sectionId}:${f.key}`)}
                   onSave={(v) => save({ [f.key]: v })}
                 />
+                )}
               </Field>
             );
           case "hint":
@@ -424,17 +464,22 @@ export function ModuleOptions(props: {
           case "seg":
             return (
               <Field key={i} label={f.label}>
+                {(ids) => (
                 <Choice stored={String(o[f.key])} save={(v) => save({ [f.key]: v })}>
-                  {(value, pick) => <Seg testId={`seg-${type}-${f.key}`} value={value} options={f.items} disabled={readOnly} onChange={pick} />}
+                  {(value, pick) => <Seg testId={`seg-${type}-${f.key}`} labelledBy={ids.labelId} value={value} options={f.items} disabled={readOnly} onChange={pick} />}
                 </Choice>
+                )}
               </Field>
             );
           case "select":
             return (
               <Field key={i} label={f.label} hint={f.hint}>
+                {(ids) => (
                 <Choice stored={Number(o[f.key])} save={(v) => save({ [f.key]: v })}>
                   {(value, pick) => (
                     <select
+                      id={ids.id}
+                      aria-describedby={ids.hintId}
                       data-testid={`select-${type}-${f.key}`}
                       value={value}
                       disabled={readOnly}
@@ -449,26 +494,30 @@ export function ModuleOptions(props: {
                     </select>
                   )}
                 </Choice>
+                )}
               </Field>
             );
           case "figureSize":
+            // slice 28 (F2): the size on its own row, as wide as the panel; the orientation under it
             return (
               <Field key={i} label={f.label}>
-                <div className="flex gap-1.5">
+                {(ids) => (
+                <div className="flex flex-col gap-1.5" role="group" aria-labelledby={ids.labelId}>
                   {(
                     [
-                      [f.size, sizeTexts.sizes],
-                      [f.orientation, sizeTexts.orientations],
+                      [f.size, sizeTexts.sizes, "Size"],
+                      [f.orientation, sizeTexts.orientations, "Orientation"],
                     ] as const
-                  ).map(([key, items]) => (
+                  ).map(([key, items, name]) => (
                     <Choice key={key} stored={String(o[key])} save={(v) => save({ [key]: v })}>
                       {(value, pick) => (
                         <select
+                          aria-label={name}
                           data-testid={`select-${type}-${key}`}
                           value={value}
                           disabled={readOnly}
                           onChange={(e) => pick(e.currentTarget.value)}
-                          className="h-8 min-w-0 flex-1 rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
+                          className="h-8 w-full min-w-0 rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
                         >
                           {items.map(([v, l]) => (
                             <option key={v} value={v}>
@@ -480,6 +529,7 @@ export function ModuleOptions(props: {
                     </Choice>
                   ))}
                 </div>
+                )}
               </Field>
             );
           case "figureLines":
@@ -516,14 +566,28 @@ export function Check({ label, stored, onSave, disabled, testId }: { label: stri
 }
 
 /** A subset of a fixed list, kept in the list's order; `mine`: the list's own keys (a list split in two saves the rest). */
-function ListChecks({ all, stored, onSave, disabled, testId }: { all: Pairs; stored: readonly string[]; onSave: (chosen: string[], mine: string[]) => Answer; disabled?: boolean; testId: string }) {
+function ListChecks({
+  all,
+  stored,
+  onSave,
+  disabled,
+  testId,
+  labelledBy,
+}: {
+  all: Pairs;
+  stored: readonly string[];
+  onSave: (chosen: string[], mine: string[]) => Answer;
+  disabled?: boolean;
+  testId: string;
+  labelledBy?: string;
+}) {
   const keys = all.map(([k]) => k);
   // the stored list as one object while it stays the same: `useChoice` shows a choice made on that object (D-66)
   const shownKey = JSON.stringify(stored.filter((k) => keys.includes(k)));
   const shown = useMemo(() => JSON.parse(shownKey) as string[], [shownKey]);
   const choice = useChoice<readonly string[]>(shown, (v) => onSave([...v], keys));
   return (
-    <div className="grid grid-cols-2 gap-1" data-testid={testId}>
+    <div className="grid grid-cols-2 gap-1" role="group" aria-labelledby={labelledBy} data-testid={testId}>
       {all.map(([k, label]) => (
         <label key={k} className="flex items-center gap-2">
           <input
@@ -543,12 +607,11 @@ function ListChecks({ all, stored, onSave, disabled, testId }: { all: Pairs; sto
   );
 }
 
-function Field({ label, hint, children }: { label?: string; hint?: string; children: ReactNode }) {
+/** Slice 28 (item 2, Q-B): why an option that is on shows nothing in this document. */
+function OptionHint({ text, testId }: { text: string; testId: string }) {
   return (
-    <div className="de-wrap mt-3">
-      {label && <div className="mb-1 text-[11.5px] text-im-ink-3">{label}</div>}
-      {children}
-      {hint && <div className="mt-1 text-[11.5px] text-im-ink-3">{hint}</div>}
+    <div className="mt-1 rounded bg-im-hover px-2 py-1 text-[11.5px] text-im-ink-2" role="note" data-testid={testId}>
+      {text}
     </div>
   );
 }

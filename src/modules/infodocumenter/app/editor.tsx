@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useAction } from "@/app/_components/use-action";
 import { DOCUMENT_SECTION_TYPES, documentStateFor } from "@/app/_lib/document-sections";
-import { Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
+import { Fold, Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type { DocLanguage, ModuleTable } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
@@ -38,9 +38,12 @@ import {
   updateDocumentAction,
 } from "./actions";
 import { nextDraft, withDrafts, type TextDraft } from "../ui/drafts";
-import type { DocPanelWidths } from "../ui/panels-cookie";
+import type { DocPanels } from "../ui/panels-cookie";
+import { sectionHints, styleHints } from "../domain/hints";
+import { sectionScopeOf } from "../domain/scope";
+import { Field } from "./field";
 import { FIGURE_TEXTS, FigureEditor, type FigureSource } from "./figure-editor";
-import { HANDLE_CSS, PanelHandles } from "./panel-handles";
+import { HANDLE_CSS, PanelHandles, PanelToggle, useDocPanels } from "./panel-handles";
 import { hasSpec, ModuleOptions, SectionOptions, type OptionContext } from "./section-options";
 import type { SectionOptionField } from "@/domain/document/sections";
 import { StylePanel } from "./style-panel";
@@ -84,17 +87,26 @@ export const EDITOR_TEXTS = {
   newPage: "Start on a new page",
   compactRunsOn: "The Compact template runs sections on.",
   whoSees: "Who sees this document",
+  nameLabel: "Document name",
 } as const;
 
 /** InfoDocumenter's own types by their names in the editor (a module's comes with its type). */
 const OWN_NAMES: Record<string, string> = { text: "Text", dict: "Data dictionary", s2t: "Source-to-target mapping", figure: "Figure", diagrams: "Diagrams" };
 export const sectionName = (type: string, label: string): string => OWN_NAMES[type] ?? label;
 
+/** Slice 28 (finding 4): short labels on one line, the full sentence in the hint under them. */
 const MAPPINGS: readonly (readonly [MappingFilter, string])[] = [
-  ["all", "All, drafts marked"],
-  ["notdraft", "Approved and in review"],
-  ["approved", "Approved only"],
+  ["all", "All"],
+  ["notdraft", "Not drafts"],
+  ["approved", "Approved"],
 ];
+const MAPPINGS_HINTS: Readonly<Record<MappingFilter, string>> = {
+  all: "All mappings; drafts are marked.",
+  notdraft: "Approved and in review; drafts are left out.",
+  approved: "Approved mappings only.",
+};
+/** The editor's folds keep their remembered state apart from the canvas panels' (slice 28, Q3). */
+const FOLD_KEY = "doc:";
 
 export interface EditorProps {
   workspaceId: string;
@@ -115,9 +127,9 @@ export interface EditorProps {
   dimensional: boolean;
   /** What the sections' options need from the workspace. */
   optionContext: OptionContext;
-  /** Slice 27: the person (their panels' cookie) and the widths the server read from it. */
+  /** Slice 27: the person (their panels' cookie) and the layout the server read from it (slice 28: with the hidden flags). */
   userId: string;
-  panels: DocPanelWidths;
+  panels: DocPanels;
   /** The workspace's documentation language: what a document without its own follows (Q8). */
   workspaceLanguage: DocLanguage;
 }
@@ -143,6 +155,8 @@ export const TYPING_PAUSE_MS = 500;
 export function DocumentEditor(props: EditorProps) {
   const { workspaceId, document: doc, types, rights, archived, author, authorMember, projects, concepts, date, testHooks, dimensional, optionContext, workspaceLanguage, userId, panels } = props;
   const bodyRef = useRef<HTMLDivElement>(null);
+  const rightRef = useRef<HTMLElement>(null);
+  const docPanels = useDocPanels(userId, panels);
   const { saveRow, run, pending } = useAction();
   const toast = useToast();
   const router = useRouter();
@@ -269,30 +283,39 @@ export function DocumentEditor(props: EditorProps) {
     // a removed section's selection goes back to "Document"
     if (removed) setSelected("doc");
   }, [doc.sections, selected]);
-  const focusHeading = useRef(false);
+  const focusOption = useRef(false);
   const [focusTick, setFocusTick] = useState(0);
   const choose = (sec: string, scroll: boolean) => {
     setSelected(sec);
     if (scroll) preview.current?.scrollTo(sec);
   };
-  /** A double-click: select, scroll, and the section's Heading takes the focus (D9). */
+  /**
+   * A double-click: select, scroll, show a hidden options panel (an action that leads to it on purpose, slice 28), and
+   * the section's first option field takes the focus, else its Heading (Q-C, the prototype's `goTo`; amends D-81's D9).
+   */
   const open = (sec: string) => {
     choose(sec, true);
+    docPanels.show("right");
     if (sec === "doc") return;
-    focusHeading.current = true;
-    // a render even when the section was selected already, so the heading takes the focus
+    focusOption.current = true;
+    // a render even when the section was selected already, so the field takes the focus
     setFocusTick((n) => n + 1);
   };
-  const headingRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
-    if (!focusHeading.current || !headingRef.current) return;
+    const right = rightRef.current;
+    if (!focusOption.current || !right) return;
     void focusTick;
-    focusHeading.current = false;
-    const el = headingRef.current;
-    el.focus();
+    const field = ":is(textarea, input:not([type=checkbox]), select):not(:disabled)";
+    const el = right.querySelector<HTMLElement>(`[data-de-props] ${field}`) ?? right.querySelector<HTMLElement>(field);
+    if (!el) return;
+    focusOption.current = false;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: "center" });
     el.classList.add("de-flash");
     setTimeout(() => el.classList.remove("de-flash"), 900);
   });
+  // slice 28 (item 2, Q5): the hints of the options that show nothing, from the section's scope as the builders read it
+  const sectionScope = useMemo(() => (snapshot ? sectionScopeOf(drawn.scope, snapshot) : null), [snapshot, drawn.scope]);
 
   // ---- the sections' writes ----
   const addSection = async (type: string) => {
@@ -313,9 +336,10 @@ export function DocumentEditor(props: EditorProps) {
     if (r.ok) router.push(r.value.href);
   };
 
-  const text = (key: string, value: string | null, patch: (v: string | null) => Patch, opts: { placeholder?: string; testId: string; required?: boolean; inputRef?: (el: HTMLInputElement | null) => void }) => (
+  const text = (key: string, value: string | null, patch: (v: string | null) => Patch, opts: { placeholder?: string; testId: string; required?: boolean; id?: string; inputRef?: (el: HTMLInputElement | null) => void }) => (
     <TextField
       key={`${doc.id}:${key}`}
+      id={opts.id}
       value={value ?? ""}
       version={doc.version}
       readOnly={ro}
@@ -336,10 +360,17 @@ export function DocumentEditor(props: EditorProps) {
       <style>{EDITOR_CSS}</style>
       {/* the top bar */}
       <div className="flex flex-wrap items-center gap-2.5 border-b border-im-line bg-im-surface px-3.5 py-2" data-testid="editor-top">
+        <PanelToggle side="left" panels={docPanels} />
         <Link href={tabHref} data-testid="link-documentation" title={EDITOR_TEXTS.backTitle} className={smallLink}>
           {EDITOR_TEXTS.back}
         </Link>
-        <div className="w-[min(340px,40vw)]">{text("name", doc.name, (v) => ({ name: v ?? "" }), { testId: "input-document-name", required: true })}</div>
+        <div className="w-[min(340px,40vw)]">
+          {/* slice 28 (finding 1): the name's field is named */}
+          <label htmlFor="document-name" className="sr-only">
+            {EDITOR_TEXTS.nameLabel}
+          </label>
+          {text("name", doc.name, (v) => ({ name: v ?? "" }), { testId: "input-document-name", required: true, id: "document-name" })}
+        </div>
         <Badge testId="badge-sharing">{doc.shared ? "Shared" : "Private"}</Badge>
         {ro && <Badge testId="badge-read-only">Read only</Badge>}
         <span className="flex-1" />
@@ -370,6 +401,7 @@ export function DocumentEditor(props: EditorProps) {
         <button type="button" className={smallButton} data-testid="button-print" disabled={!built} onClick={() => preview.current?.print()}>
           {EDITOR_TEXTS.print}
         </button>
+        <PanelToggle side="right" panels={docPanels} />
       </div>
       {notice ? (
         <div className="flex flex-wrap items-center gap-2.5 bg-im-warn-soft px-3.5 py-2" data-testid="banner-document-read-only">
@@ -386,12 +418,20 @@ export function DocumentEditor(props: EditorProps) {
 
       <div
         ref={bodyRef}
-        className="de-body grid min-h-0 grid-cols-[var(--dl,250px)_minmax(0,1fr)_var(--dr,330px)]"
-        style={{ "--dl": `${panels.left}px`, "--dr": `${panels.right}px` } as CSSProperties}
+        className={`de-body grid min-h-0 grid-cols-[var(--dl,264px)_minmax(0,1fr)_var(--dr,340px)] ${docPanels.className}`}
+        style={{ "--dl": `${panels.leftWidth}px`, "--dr": `${panels.rightWidth}px` } as CSSProperties}
+        data-testid="editor-body"
       >
-        <PanelHandles body={bodyRef} userId={userId} initial={panels} />
+        <PanelHandles body={bodyRef} panels={docPanels} />
         {/* the left: Document and the sections */}
-        <nav id="editor-left" className="min-h-0 overflow-auto border-r border-im-line bg-im-surface p-2.5" data-testid="editor-left">
+        <nav
+          id="editor-left"
+          aria-label="Sections"
+          inert={!docPanels.shown.left}
+          data-shown={docPanels.shown.left}
+          className="min-h-0 overflow-auto border-r border-im-line bg-im-surface p-2.5"
+          data-testid="editor-left"
+        >
           <button
             type="button"
             data-testid="row-editor-document"
@@ -465,7 +505,15 @@ export function DocumentEditor(props: EditorProps) {
         <span hidden data-testid="text-build-ms" data-ms={built ? built.ms.toFixed(1) : undefined} data-builds={built?.n ?? 0} data-state-ms={state ? state.ms.toFixed(1) : undefined} />
 
         {/* the right: what is selected */}
-        <aside id="editor-right" className="min-h-0 overflow-auto border-l border-im-line bg-im-surface px-4 pb-6" data-testid="editor-right">
+        <aside
+          id="editor-right"
+          ref={rightRef}
+          aria-label="Options"
+          inert={!docPanels.shown.right}
+          data-shown={docPanels.shown.right}
+          className="min-h-0 overflow-auto border-l border-im-line bg-im-surface px-4 pb-6"
+          data-testid="editor-right"
+        >
           {selectedSection ? (
             <SectionPanel
               key={selectedSection.id}
@@ -473,10 +521,8 @@ export function DocumentEditor(props: EditorProps) {
               type={typeOf.get(selectedSection.type) ?? null}
               readOnly={ro}
               version={doc.version}
-              headingRef={(el) => {
-                headingRef.current = el;
-              }}
               typed={typed}
+              hints={state && sectionScope ? sectionHints(state.state, sectionScope, selectedSection.type, selectedSection.options) : {}}
               context={{ ...optionContext, smallestPt: doc.style.smallestPt }}
               figures={{
                 sources: figureSources,
@@ -488,46 +534,40 @@ export function DocumentEditor(props: EditorProps) {
               save={(patch) => save({ section: { id: selectedSection.id, ...patch } })}
             />
           ) : (
+            // slice 28 (findings 5, 12): Scope, Style, Header and footer, Cover and Sharing fold as the canvas's details
+            // panel's sections (remembered per title, D-35); Header and footer and Cover start shut; Sharing last
             <div data-testid="panel-document">
               <H>Model state</H>
               <div data-testid="text-model-state" className="text-im-ink-2">
                 {EDITOR_TEXTS.modelState}
               </div>
 
-              <H>Scope</H>
-              <Field label="Projects" hint="None ticked: the whole model. Otherwise what the projects' canvases show.">
-                <IdChecks testId="checks-projects" items={projects} chosen={doc.scope.projects} disabled={ro} onSave={(ids) => save({ scope: { projects: ids } })} />
-              </Field>
-              <Field label="Concepts" hint="None ticked: every concept.">
-                <IdChecks testId="checks-concepts" items={concepts} chosen={doc.scope.concepts} disabled={ro} onSave={(ids) => save({ scope: { concepts: ids } })} />
-              </Field>
-              {/* only while the dimensional level is drawn (the prototype's; Łukasz's answer to step 2) */}
-              {dimensional && (
-                <Field label="Model levels">
-                  <div className="flex flex-wrap gap-4">
-                    <Check testId="check-level-logical" label="Logical" stored={doc.scope.logical} disabled={ro} onSave={(on) => save({ scope: { logical: on } })} />
-                    <Check testId="check-level-dimensional" label="Dimensional (InfoCube)" stored={doc.scope.dimensional} disabled={ro} onSave={(on) => save({ scope: { dimensional: on } })} />
-                  </div>
+              <Fold title="Scope" storeKey={FOLD_KEY} testId="fold-document-scope">
+                <Field label="Projects" hint="None ticked: the whole model. Otherwise what the projects' canvases show.">
+                  {(f) => <IdChecks testId="checks-projects" labelledBy={f.labelId} items={projects} chosen={doc.scope.projects} disabled={ro} onSave={(ids) => save({ scope: { projects: ids } })} />}
                 </Field>
-              )}
-              <Field label="Mappings included">
+                <Field label="Concepts" hint="None ticked: every concept.">
+                  {(f) => <IdChecks testId="checks-concepts" labelledBy={f.labelId} items={concepts} chosen={doc.scope.concepts} disabled={ro} onSave={(ids) => save({ scope: { concepts: ids } })} />}
+                </Field>
+                {/* only while the dimensional level is drawn (the prototype's; Łukasz's answer to step 2) */}
+                {dimensional && (
+                  <Field label="Model levels">
+                    {(f) => (
+                      <div className="flex flex-wrap gap-4" role="group" aria-labelledby={f.labelId}>
+                        <Check testId="check-level-logical" label="Logical" stored={doc.scope.logical} disabled={ro} onSave={(on) => save({ scope: { logical: on } })} />
+                        <Check testId="check-level-dimensional" label="Dimensional (InfoCube)" stored={doc.scope.dimensional} disabled={ro} onSave={(on) => save({ scope: { dimensional: on } })} />
+                      </div>
+                    )}
+                  </Field>
+                )}
                 <Choice stored={doc.scope.mappings} save={(m) => save({ scope: { mappings: m } })}>
-                  {(value, pick) => <Seg testId="seg-mappings" value={value} options={MAPPINGS} disabled={ro} onChange={pick} />}
+                  {(value, pick) => (
+                    <Field label="Mappings included" hint={MAPPINGS_HINTS[value]}>
+                      {(f) => <Seg testId="seg-mappings" labelledBy={f.labelId} describedBy={f.hintId} value={value} options={MAPPINGS} disabled={ro} onChange={pick} />}
+                    </Field>
+                  )}
                 </Choice>
-              </Field>
-
-              <H>Sharing</H>
-              <SharedChoice
-                workspaceId={workspaceId}
-                row={row}
-                shared={doc.shared}
-                mayShare={rights.share}
-                // a shared document is made private by its author only (slice 25 step 4b); while the author is gone it stays shared (F17 a)
-                lockedBecause={doc.shared && !rights.unshare ? (authorMember ? RIGHTS_TEXTS.onlyAuthor(author) : RIGHTS_TEXTS.authorGone(author)) : null}
-              />
-              <Field label="Audience (for your own orientation)">
-                {text("audience", doc.audience, (v) => ({ audience: v }), { testId: "input-document-audience", placeholder: "e.g. Business, ETL developers, Client" })}
-              </Field>
+              </Fold>
 
               <StylePanel
                 style={doc.style}
@@ -536,17 +576,34 @@ export function DocumentEditor(props: EditorProps) {
                 version={doc.version}
                 documentId={doc.id}
                 typed={typed}
+                hints={built ? styleHints(doc.style.listOfFigures, built.tree.figures.length) : {}}
+                foldKey={FOLD_KEY}
                 save={(patch) => save({ style: patch })}
               />
 
-              <H>Cover</H>
-              <Field label="Title">{text("cover.title", doc.cover.title, (v) => ({ cover: { title: v } }), { testId: "input-cover-title", placeholder: doc.name })}</Field>
-              <Field label="Subtitle">{text("cover.subtitle", doc.cover.subtitle, (v) => ({ cover: { subtitle: v } }), { testId: "input-cover-subtitle" })}</Field>
-              <Field label="Version label">{text("cover.version", doc.cover.version, (v) => ({ cover: { version: v } }), { testId: "input-cover-version", placeholder: "e.g. 1.0" })}</Field>
-              <Field label="Status">{text("cover.status", doc.cover.status, (v) => ({ cover: { status: v } }), { testId: "input-cover-status", placeholder: "e.g. Draft for review" })}</Field>
-              <Field label="Prepared by">
-                {text("cover.preparedBy", doc.cover.preparedBy, (v) => ({ cover: { preparedBy: v } }), { testId: "input-cover-prepared-by", placeholder: author })}
-              </Field>
+              <Fold title="Cover" startShut storeKey={FOLD_KEY} testId="fold-document-cover">
+                <Field label="Title">{(f) => text("cover.title", doc.cover.title, (v) => ({ cover: { title: v } }), { testId: "input-cover-title", placeholder: doc.name, id: f.id })}</Field>
+                <Field label="Subtitle">{(f) => text("cover.subtitle", doc.cover.subtitle, (v) => ({ cover: { subtitle: v } }), { testId: "input-cover-subtitle", id: f.id })}</Field>
+                <Field label="Version label">{(f) => text("cover.version", doc.cover.version, (v) => ({ cover: { version: v } }), { testId: "input-cover-version", placeholder: "e.g. 1.0", id: f.id })}</Field>
+                <Field label="Status">{(f) => text("cover.status", doc.cover.status, (v) => ({ cover: { status: v } }), { testId: "input-cover-status", placeholder: "e.g. Draft for review", id: f.id })}</Field>
+                <Field label="Prepared by">
+                  {(f) => text("cover.preparedBy", doc.cover.preparedBy, (v) => ({ cover: { preparedBy: v } }), { testId: "input-cover-prepared-by", placeholder: author, id: f.id })}
+                </Field>
+              </Fold>
+
+              <Fold title="Sharing" storeKey={FOLD_KEY} testId="fold-document-sharing">
+                <SharedChoice
+                  workspaceId={workspaceId}
+                  row={row}
+                  shared={doc.shared}
+                  mayShare={rights.share}
+                  // a shared document is made private by its author only (slice 25 step 4b); while the author is gone it stays shared (F17 a)
+                  lockedBecause={doc.shared && !rights.unshare ? (authorMember ? RIGHTS_TEXTS.onlyAuthor(author) : RIGHTS_TEXTS.authorGone(author)) : null}
+                />
+                <Field label="Audience (for your own orientation)">
+                  {(f) => text("audience", doc.audience, (v) => ({ audience: v }), { testId: "input-document-audience", placeholder: "e.g. Business, ETL developers, Client", id: f.id })}
+                </Field>
+              </Fold>
             </div>
           )}
         </aside>
@@ -638,13 +695,13 @@ function SectionRow({
   );
 }
 
-/** A section's options on the right: its heading, "Start on a new page", then its type's options. */
+/** A section's options on the right: its type's options, then its heading and "Start on a new page" (slice 28, finding 11). */
 function SectionPanel({
   section: s,
   type,
   readOnly,
   version,
-  headingRef,
+  hints,
   typed,
   save,
   context,
@@ -660,7 +717,8 @@ function SectionPanel({
   readOnly: boolean;
   version: number;
   context: OptionContext;
-  headingRef: (el: HTMLInputElement | null) => void;
+  /** Slice 28: the hints of the options that show nothing, by option key (`domain/hints.ts`). */
+  hints: Readonly<Record<string, string>>;
   typed: (key: string) => (text: string) => void;
   save: (patch: { on?: boolean; heading?: string | null; newPage?: boolean; options?: Record<string, unknown> }) => Answer;
 }) {
@@ -687,8 +745,10 @@ function SectionPanel({
   else if (s.type === "text")
     body = (
       <Field label="Text">
+        {(f) => (
         <TextArea
           key={`${s.id}:body`}
+          id={f.id}
           value={(o.body as string) ?? ""}
           version={version}
           readOnly={readOnly}
@@ -697,11 +757,12 @@ function SectionPanel({
           onType={typed(`sec:${s.id}:body`)}
           onSave={(v) => opt({ body: v })}
         />
+        )}
       </Field>
     );
   else if (s.type === "figure") body = figureEditor("figures", "Figures", "A canvas, or one frame of it.");
   else if (hasSpec(s.type))
-    body = <SectionOptions sectionId={s.id} type={s.type} options={o} readOnly={readOnly} version={version} context={context} typed={typed} save={opt} figureEditor={figureEditor} />;
+    body = <SectionOptions sectionId={s.id} type={s.type} options={o} readOnly={readOnly} version={version} context={context} hints={hints} typed={typed} save={opt} figureEditor={figureEditor} />;
   else if (type.fields)
     body = (
       <ModuleOptions
@@ -724,24 +785,29 @@ function SectionPanel({
         {type?.module && <Chip>{type.module}</Chip>}
       </h3>
       {type && <p className="m-0 mt-1 text-[11.5px] text-im-ink-3">{type.description}</p>}
-      <Field label="Heading" hint={EDITOR_TEXTS.headingHint}>
-        <TextField
-          key={`${s.id}:heading`}
-          value={s.heading ?? ""}
-          version={version}
-          readOnly={readOnly}
-          placeholder={type?.heading ?? ""}
-          testId="input-section-heading"
-          inputRef={headingRef}
-          onType={typed(`sec:${s.id}:heading`)}
-          onSave={(v) => save({ heading: v.trim() ? v : null })}
-        />
-      </Field>
-      <div className="mt-3">
-        <Check testId="check-section-new-page" label={EDITOR_TEXTS.newPage} stored={s.newPage} disabled={readOnly || compact} onSave={(v) => save({ newPage: v })} />
-        {compact && <div className="mt-1 text-[11.5px] text-im-ink-3">{EDITOR_TEXTS.compactRunsOn}</div>}
+      {/* the type's own options first (slice 28, finding 11); a double-click focuses their first field (Q-C) */}
+      <div data-de-props>{body}</div>
+      <div className="mt-4 border-t border-im-line pt-1" data-testid="section-heading-options">
+        <Field label="Heading" hint={EDITOR_TEXTS.headingHint}>
+          {(f) => (
+            <TextField
+              key={`${s.id}:heading`}
+              id={f.id}
+              value={s.heading ?? ""}
+              version={version}
+              readOnly={readOnly}
+              placeholder={type?.heading ?? ""}
+              testId="input-section-heading"
+              onType={typed(`sec:${s.id}:heading`)}
+              onSave={(v) => save({ heading: v.trim() ? v : null })}
+            />
+          )}
+        </Field>
+        <div className="mt-3">
+          <Check testId="check-section-new-page" label={EDITOR_TEXTS.newPage} stored={s.newPage} disabled={readOnly || compact} onSave={(v) => save({ newPage: v })} />
+          {compact && <div className="mt-1 text-[11.5px] text-im-ink-3">{EDITOR_TEXTS.compactRunsOn}</div>}
+        </div>
       </div>
-      {body}
     </div>
   );
 }
@@ -774,8 +840,11 @@ function SharedChoice({
   });
   return (
     <Field label={EDITOR_TEXTS.whoSees}>
+      {(f) => (
+      <>
       <Seg
         testId="seg-shared"
+        labelledBy={f.labelId}
         value={choice.value ? "shared" : "private"}
         options={[
           ["private", "Private"],
@@ -794,6 +863,8 @@ function SharedChoice({
         <p className="m-0 mt-1.5 text-[12px] text-im-warn" role="alert" data-testid="text-shared-refusal">
           {refusal}
         </p>
+      )}
+      </>
       )}
     </Field>
   );
@@ -814,7 +885,21 @@ function Check({ label, stored, onSave, disabled, testId }: { label: string; sto
   );
 }
 
-function IdChecks({ items, chosen, onSave, disabled, testId }: { items: { id: string; name: string }[]; chosen: string[]; onSave: (v: string[]) => Answer; disabled?: boolean; testId: string }) {
+function IdChecks({
+  items,
+  chosen,
+  onSave,
+  disabled,
+  testId,
+  labelledBy,
+}: {
+  items: { id: string; name: string }[];
+  chosen: string[];
+  onSave: (v: string[]) => Answer;
+  disabled?: boolean;
+  testId: string;
+  labelledBy?: string;
+}) {
   const live = new Set(items.map((i) => i.id));
   // ids deleted since stay in the recipe and are ignored (F7): the boxes show the live ones, as one object while they
   // stay the same (`useChoice` shows a choice made on that object)
@@ -822,7 +907,7 @@ function IdChecks({ items, chosen, onSave, disabled, testId }: { items: { id: st
   const shown = useMemo(() => JSON.parse(shownKey) as string[], [shownKey]);
   const choice = useChoice<readonly string[]>(shown, (v) => onSave([...v]));
   return (
-    <div className="flex flex-col gap-1" data-testid={testId}>
+    <div className="flex flex-col gap-1" role="group" aria-labelledby={labelledBy} data-testid={testId}>
       {items.map((i) => (
         <label key={i.id} className="flex items-center gap-2">
           <input
@@ -866,16 +951,6 @@ function IconButton({ label, testId, disabled, onClick, children }: { label: str
 const Chip = ({ children }: { children: ReactNode }) => <span className="ml-1 rounded bg-im-hover px-1.5 text-[11px] font-normal text-im-ink-2">{children}</span>;
 const H = ({ children }: { children: ReactNode }) => <h3 className="mb-0 mt-5 text-[13px] font-semibold text-im-ink">{children}</h3>;
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <div className="de-wrap mt-3">
-      <div className="mb-1 text-[11.5px] text-im-ink-3">{label}</div>
-      {children}
-      {hint && <div className="mt-1 text-[11.5px] text-im-ink-3">{hint}</div>}
-    </div>
-  );
-}
-
 function Badge({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
     <span data-testid={testId} className="inline-flex h-[22px] items-center rounded-[11px] bg-im-hover px-[9px] text-[11.5px] font-medium text-im-ink-2">
@@ -898,6 +973,6 @@ const EDITOR_CSS = `
 @keyframes de-flash{0%{box-shadow:0 0 0 3px var(--im-logical)}100%{box-shadow:0 0 0 0 transparent}}
 .de-wrap [role=group]{display:flex;flex-wrap:wrap}
 ${HANDLE_CSS}
-@media (max-width:1100px){.de-body{grid-template-columns:220px minmax(0,1fr)!important}.de-body>aside{grid-column:1/-1;border-left:0;border-top:1px solid var(--im-line)}}
+@media (max-width:1100px){.de-body{grid-template-columns:220px minmax(0,1fr)!important}.de-body>aside{grid-column:1/-1;border-left:0;border-top:1px solid var(--im-line)}.de-body.nol{grid-template-columns:minmax(0,1fr)!important}.de-body.nol>#editor-left,.de-body.nor>#editor-right{display:none}}
 @media (max-width:720px){.de-body{grid-template-columns:minmax(0,1fr)!important}}
 `;

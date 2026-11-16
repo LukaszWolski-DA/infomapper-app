@@ -587,6 +587,8 @@ export function Seg<V extends string>({
   disabled,
   testId,
   columns,
+  labelledBy,
+  describedBy,
 }: {
   value: V;
   options: readonly (readonly [V, string])[];
@@ -595,10 +597,13 @@ export function Seg<V extends string>({
   testId?: string;
   /** Slice 19 (prototype .seg.g2): the choices in a grid of two columns. */
   columns?: 2;
+  /** Slice 28: the group's name and description, by the ids of its label and hint. */
+  labelledBy?: string;
+  describedBy?: string;
 }) {
   const layout = columns === 2 ? "grid grid-cols-2 gap-0.5" : "inline-flex";
   return (
-    <div className={`${layout} rounded-[7px] bg-im-hover p-0.5`} role="group" data-testid={testId}>
+    <div className={`${layout} rounded-[7px] bg-im-hover p-0.5`} role="group" aria-labelledby={labelledBy} aria-describedby={describedBy} data-testid={testId}>
       {options.map(([v, label]) => (
         <button
           key={v}
@@ -787,20 +792,33 @@ export function ConfirmDelete({
 // ---- folding sections and long lists (D-35) ----
 
 const SECTIONS_KEY = "infomapper:sections-shut";
+/** Slice 28: the folds that start shut remember the titles opened by hand instead. */
+const OPENED_KEY = "infomapper:sections-open";
 /** Sections fold per title, numbers aside (“Other sources for email” and “… for name” are different titles). */
 const sectionKey = (title: string) => title.replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
 
-function readShut(): Set<string> {
+function readSet(name: string): Set<string> {
   try {
-    const v = JSON.parse(window.localStorage.getItem(SECTIONS_KEY) ?? "[]") as unknown;
+    const v = JSON.parse(window.localStorage.getItem(name) ?? "[]") as unknown;
     return new Set(Array.isArray(v) ? v.filter((k): k is string => typeof k === "string") : []);
   } catch {
     return new Set();
   }
 }
+function writeSet(name: string, set: Set<string>) {
+  try {
+    window.localStorage.setItem(name, JSON.stringify([...set]));
+  } catch {
+    // not remembered
+  }
+}
 
-/** A panel section whose heading folds it; the state is remembered per title in this browser. */
-export function Fold({ title, count, children, testId, openOn, flash, sectionRef }: {
+/**
+ * A panel section whose heading folds it; the state is remembered per title in this browser (D-35). Slice 28: a fold
+ * may start shut (`startShut`: shut until opened by hand, which is remembered) and keep its state under a prefix
+ * (`storeKey`), so another page's titles never share it.
+ */
+export function Fold({ title, count, children, testId, openOn, flash, sectionRef, startShut = false, storeKey = "" }: {
   title: string;
   count?: number;
   children: ReactNode;
@@ -810,35 +828,35 @@ export function Fold({ title, count, children, testId, openOn, flash, sectionRef
   /** Slice 20: the section flashes once (the status bar's jump). */
   flash?: boolean;
   sectionRef?: React.Ref<HTMLElement>;
+  /** Slice 28: shut until opened by hand (then remembered open). */
+  startShut?: boolean;
+  /** Slice 28: a prefix for the remembered state's key (the editor's `doc:`). */
+  storeKey?: string;
 }) {
-  const key = sectionKey(title);
-  const [shut, setShut] = useState(false);
+  const key = storeKey + sectionKey(title);
+  const isShut = () => (startShut ? !readSet(OPENED_KEY).has(key) : readSet(SECTIONS_KEY).has(key));
+  const [shut, setShut] = useState(startShut);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only preference, read after mount
-    setShut(readShut().has(key));
-  }, [key]);
+    setShut(startShut ? !readSet(OPENED_KEY).has(key) : readSet(SECTIONS_KEY).has(key));
+  }, [key, startShut]);
+  /** Remembers the fold open or shut. */
+  const remember = (open: boolean) => {
+    const set = readSet(startShut ? OPENED_KEY : SECTIONS_KEY);
+    if (startShut === open) set.add(key);
+    else set.delete(key);
+    writeSet(startShut ? OPENED_KEY : SECTIONS_KEY, set);
+  };
   useEffect(() => {
     if (!openOn) return;
-    const all = readShut();
-    if (all.delete(key)) {
-      try {
-        window.localStorage.setItem(SECTIONS_KEY, JSON.stringify([...all]));
-      } catch {
-        // not remembered
-      }
-    }
+    remember(true);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- asked for from outside (the status bar's count)
     setShut(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a request is the counter's change
   }, [openOn, key]);
   const toggle = () => {
-    const all = readShut();
-    if (!all.delete(key)) all.add(key);
-    try {
-      window.localStorage.setItem(SECTIONS_KEY, JSON.stringify([...all]));
-    } catch {
-      // not remembered
-    }
-    setShut(all.has(key));
+    remember(isShut());
+    setShut(isShut());
   };
   return (
     <section data-testid={testId} ref={sectionRef} data-flash={flash || undefined} className={flash ? "rounded bg-im-warn-soft transition-colors duration-300" : "transition-colors duration-300"}>
