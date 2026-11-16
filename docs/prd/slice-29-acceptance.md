@@ -589,3 +589,31 @@ applies every migration itself and refuses a database whose `public` schema has 
 - **L7:** yes, Supabase's local stack in CI for the smoke.
 - **L8:** yes, the explicit `created_at, id` order on both adapters.
 - **`localeCompare`'s locale:** noted for `docs/ideas.md` at the closing.
+
+### F2 decided (Łukasz, 16 November 2026)
+
+**L8 is withdrawn: the local adapter keeps its order.** Step 2's first try (`created_at`, then `id`, on both adapters)
+reordered the demo seed: its rows share one `created_at` and its ids are not in the order the rows were made (in the
+in-memory build, for example, 443 of `attribute`'s 885 neighbouring pairs and 31 of `entity`'s 60 were out of order).
+Nine unit tests failed on order, and KB's seed-made rows would have moved. The change was reverted before any commit.
+
+**Option A, with Łukasz's conditions:**
+1. The convention is in `docs/data-model-v2.md`, "Conventions", "The stored order". At the closing a note to AD-12 is
+   proposed: on Postgres, the microseconds of a row's time column carry its place in the file (the loader, slice C's
+   copy) or in its write set; the domain reads milliseconds only.
+2. The pool's `timestamptz` parser truncates to milliseconds, so the domain never sees the microseconds; a unit test
+   shows it.
+3. The contract suite requires the same order on both adapters for every port without an explicit sort.
+4. **Do the ids of `src/domain/ids.ts` increase within one millisecond?** Yes, within one process: `uuidv7` keeps a
+   12-bit counter that counts up inside a millisecond (from a random start in its lower half) and borrows the next
+   millisecond when it overflows, so one process's ids are strictly increasing. **Not across processes:** two server
+   instances (Vercel's Fluid compute, or a script beside the dev server) each start their own counter at random, so two
+   commands in the same millisecond on two instances are not ordered by id, and the instances' clocks may differ. The
+   demo seed's ids are partly fixed constants and are not in creation order either. **For slice B:** `apply` stamps the
+   microseconds by place in the write set, as the loader does; a command's rows share one millisecond (`ctx.now`), so
+   the place within the write set is what orders them, and the change events' `occurred_at` the same.
+5. **`project_pinned_label`** (no time column, ordered by its key): its order shows nowhere. The project home reads the
+   pins as a set (`pinned`, `src/app/w/[workspaceId]/p/[projectId]/page.tsx`: "pinned first, then by items", the order
+   coming from the labels' list), and the commands only remove them (`deleteLabel`, `deleteProject`, `setLabelPinned`).
+6. For `docs/ideas.md` at the closing: where an order means something to a person (the first project in the top bar),
+   make it an explicit domain rule instead of the file's order; not now, as it would reorder KB.
