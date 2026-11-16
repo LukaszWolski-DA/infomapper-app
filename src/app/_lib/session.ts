@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { getDataStore } from "@/data";
+import { getDataStore, isPostgresMode } from "@/data";
 import { sessionSecret } from "@/data/local/session-secret";
 import type { Uuid } from "@/domain/ids";
 import type { AppUser } from "@/domain/types";
@@ -17,6 +17,8 @@ export interface Session {
  * production, an unsigned or edited cookie (F1) and ids of unknown users.
  */
 export async function getSession(): Promise<Session | null> {
+  // slice 29: on Postgres the development cookie is never read (DB5); Supabase Auth signs people in there (step 3)
+  if (isPostgresMode()) return null;
   const session = decodeSession((await cookies()).get(DEV_SESSION_COOKIE)?.value, sessionSecret());
   if (!session) return null;
   const user = await getDataStore().users.get(session.userId);
@@ -30,5 +32,6 @@ export async function getSessionUser(): Promise<AppUser | null> {
 
 /** Starts or replaces the session (a server action only: cookies cannot be written while a page renders). */
 export async function writeSession(userId: Uuid, unlocked: Iterable<Uuid>): Promise<void> {
+  if (isPostgresMode()) throw new Error("The development session is the local adapter's (slice 29, DB5).");
   (await cookies()).set(DEV_SESSION_COOKIE, encodeSession({ userId, unlocked: [...unlocked] }, sessionSecret()), devCookieOptions);
 }

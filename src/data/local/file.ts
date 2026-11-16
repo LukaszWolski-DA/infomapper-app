@@ -7,6 +7,7 @@ import { uuidv7 } from "@/domain/ids";
 import { builtinText, CLASSIFICATION_CODES, isBuiltin, type ClassificationCode } from "@/domain/model/classifications";
 import { deriveSourceChanges } from "@/domain/source-changes/derive";
 import type { ChangeEvent } from "@/domain/types";
+import { assertLocalMode } from "../mode";
 import { isLocalModeAllowed } from "./measure-mode";
 import { DEMO_PASSWORD_HASH } from "./demo-password";
 import { DEV_DB_FORMAT, type DevDb } from "./schema";
@@ -35,8 +36,10 @@ export class NoDevDataError extends Error {
   }
 }
 
+/** Refuses a production build (AD-29) and, since slice 29 (Q4), a server on Postgres: no JSON file is read or written. */
 export function assertNotProduction(): void {
   if (!isLocalModeAllowed()) throw new ProductionRefusedError();
+  assertLocalMode("The local data file");
 }
 
 /** The refusal of a file a newer branch wrote (slice 15a): nothing is read or written. */

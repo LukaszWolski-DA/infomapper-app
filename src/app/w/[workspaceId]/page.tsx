@@ -7,7 +7,7 @@ import { AppShell } from "@/app/_components/app-shell";
 import { GoneNotice } from "@/app/_components/gone-notice";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { projectHref, workspaceHref } from "@/app/_lib/paths";
-import { ROLE_LABEL } from "@/app/_lib/roles";
+import { READ_ONLY_SERVER_TEXT, ROLE_LABEL } from "@/app/_lib/roles";
 import { loadShell } from "@/app/_lib/shell";
 import { thumbnailHrefs } from "@/app/_lib/thumbnails";
 import { workspaceStats } from "@/app/_panels/stats";
@@ -53,12 +53,14 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const tab = chosenHomeTab(query.tab, moduleTabs);
   const moduleTab = moduleTabs.find((t) => t.id === tab);
   const archived = shell.workspace.archived;
+  // slice 29 (Q5): a server that takes no writes offers no change, as an archive does
+  const canHere = (action: Parameters<typeof can>[1]) => !shell.workspace.readOnly && can(access, action);
   const isOwner = shell.role === "owner";
   const isAdmin = isOwner || shell.role === "admin";
   const roleLabel = ROLE_LABEL[shell.role] + (shell.guest ? " · guest" : "");
   // People (slice 8, items 10–13): owners and admins change people, not in an archived workspace; an admin leaves owners
   // alone and nobody changes their own row (F12). The access box is for the organization's owners and admins (F17).
-  const managesPeople = can(access, "people.edit");
+  const managesPeople = canHere("people.edit");
   const mayChange = (userId: string, role: string) => managesPeople && userId !== shell.user.id && (isOwner || role !== "owner");
   const organizationRole = (await store.organizations.getMember(workspace.organization_id, shell.user.id))?.role;
   const organizationAccess =
@@ -127,6 +129,10 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               {isOwner && (
                 <UnarchiveButton workspaceId={workspace.id} workspaceName={workspace.name} version={workspace.version} />
               )}
+            </Banner>
+          ) : shell.workspace.readOnly ? (
+            <Banner tone="info" testId="banner-read-only">
+              {READ_ONLY_SERVER_TEXT}
             </Banner>
           ) : shell.standing !== "full" ? (
             <Banner tone="info" testId="banner-role">
@@ -218,7 +224,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                     </Link>
                   );
                 })}
-                {can(access, "project.create") && <NewProjectTile workspaceId={workspace.id} />}
+                {canHere("project.create") && <NewProjectTile workspaceId={workspace.id} />}
               </div>
 
               {isAdmin && (
@@ -318,7 +324,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               workspaceId={workspace.id}
               workspaceVersion={workspace.version}
               // D-57's roles for every field of the tab (Q7): owners, admins and modelers, not in an archived workspace
-              editable={can(access, "model.edit")}
+              editable={canHere("model.edit")}
               dataVault={workspace.dv2_mode}
               classifications={model.classifications}
               uses={classificationUses(model)}
@@ -338,7 +344,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
 
           {tab === "settings" && (
             <SettingsForm
-              editable={can(access, "workspace.edit_settings")}
+              editable={canHere("workspace.edit_settings")}
               modules={await settingsBoxes(store, access)}
               dataVaultUses={dataVaultUses(indexOf(model))}
               initial={{

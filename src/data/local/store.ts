@@ -14,6 +14,7 @@ import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-
 import { byTabOrder, liveLabelLinksOf, liveProjectCanvasesOf, liveProjectPinsOf, liveRequirementLinksOf, workspaceModelOf, workspacePeopleOf, workspaceSnapshotOf } from "@/domain/model/workspace-model";
 import type { ModuleTable, WritableRows } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
+import { newestImportFirst, oldestChangeFirst } from "../order";
 import { assertNotProduction, readDbCached, writeDb } from "./file";
 import { CORE_SCHEMA, findViolation, keyOf, readRows, rowsOf, upgradeRows, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
 
@@ -134,11 +135,11 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
       listImports: async (workspaceId, sourceSystemId) =>
         live((await load()).source_import)
           .filter((i) => i.workspace_id === workspaceId && (sourceSystemId === undefined || i.source_system_id === sourceSystemId))
-          .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)),
+          .sort(newestImportFirst),
       listChanges: async (workspaceId) =>
         live((await load()).source_change)
           .filter((c) => c.workspace_id === workspaceId)
-          .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)),
+          .sort(oldestChangeFirst),
       loadForUndo: async (workspaceId) => {
 
         const db = await load();

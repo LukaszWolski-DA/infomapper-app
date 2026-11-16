@@ -5,11 +5,13 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { isLocalModeAllowed } from "@/data/local/measure-mode";
+import { isPostgresMode } from "@/data/mode";
 import { isUuid, type Uuid } from "@/domain/ids";
 
 export const DEV_SESSION_COOKIE = "infomapper_dev_session";
 
-export const isDevSignInEnabled = (): boolean => isLocalModeAllowed();
+/** Development and the measurement-only build, on the local adapter only (slice 29, DB5: never on Postgres). */
+export const isDevSignInEnabled = (): boolean => isLocalModeAllowed() && !isPostgresMode();
 
 /** Who is signed in and which organizations this session has unlocked with their password (P4). */
 export interface DevSession {
