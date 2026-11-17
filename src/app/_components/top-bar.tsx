@@ -138,10 +138,15 @@ function OrganizationSwitcher({ shell }: { shell: ShellData }) {
               </MenuLink>
             ) : null,
           )}
-          <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
-          <DropdownMenuItem className={itemClass} data-testid="menu-item-new-organization" onSelect={() => setCreating(true)}>
-            New organization…
-          </DropdownMenuItem>
+          {/* slice 29 (Q5, DB10): no new organization on a server that takes no writes; scripts make them there */}
+          {!shell.workspace.readOnly && (
+            <>
+              <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+              <DropdownMenuItem className={itemClass} data-testid="menu-item-new-organization" onSelect={() => setCreating(true)}>
+                New organization…
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       {creating && <NewOrganizationDialog onClose={() => setCreating(false)} />}

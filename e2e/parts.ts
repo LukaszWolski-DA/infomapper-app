@@ -12,6 +12,12 @@
 import { readdirSync } from "node:fs";
 import path from "node:path";
 
+/**
+ * Folders that run only against Postgres (slice 29: the smoke set, `playwright.pg.config.ts`, in the Schema workflow):
+ * never part of the full run, which stays on the local adapter.
+ */
+export const POSTGRES_ONLY_FOLDERS: readonly string[] = ["slice-29"];
+
 /** The first folder of parts 2 to 8. */
 export const PART_STARTS = ["slice-02b", "slice-04b1", "slice-07a", "slice-08", "slice-11", "slice-15a", "slice-20"] as const;
 export const PART_COUNT = PART_STARTS.length + 1;
@@ -34,5 +40,6 @@ function e2eFolders(): string[] {
   return readdirSync(path.resolve("e2e"), { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name)
+    .filter((name) => !POSTGRES_ONLY_FOLDERS.includes(name))
     .sort();
 }
