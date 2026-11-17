@@ -3,6 +3,10 @@
 The pages read from Postgres on the Vercel preview, measured from Łukasz's laptop, beside the same pages on the local
 adapter. **Figures only (DB7): no read fix is made or proposed here as decided; bars come after Łukasz has seen these.**
 
+**Łukasz's decision (17 November 2026): option A.** No read fixes in slice 29 (no step 5): slice B's rights round
+changes the same reads, so the read fixes are a slice of their own after slice B, measured with this spec against these
+figures (`docs/ideas.md`, "The database program: what comes later"). No bars are set yet.
+
 ## How it was measured
 
 - **The preview:** the branch address `infomapper-app-dev-git-slice-2-f77c19-lukaszs-projects-9ffbc132.vercel.app`, serving

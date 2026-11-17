@@ -1022,3 +1022,43 @@ skipped, 0 flaky, 0 expected failures**; wall-clock 13 min 40 s (20:55:43 to 21:
 | Heap peak (MB) | 936 | 904 | 1,092 | 1,229 | 1,119 | 1,703 | 1,371 | 1,191 | 1,825 |
 
 No restart. CI, the contract suite and the smoke set (the Schema workflow) passed on the same commit.
+
+---
+
+## Step 6: the closing (17 November 2026)
+
+**Łukasz's decision on the figures: option A.** No step 5: the read fixes are a slice of their own after slice B.
+
+**`.env.example`** (`dd7a96d`, the closing's first commit, so the full run is on it): `INFOMAPPER_TIMING` (read by the
+app; 1 in Vercel's Preview only) and `VERCEL_AUTOMATION_BYPASS_SECRET` (read by the measuring spec, the smoke set's
+preview mode and `scripts/preview-probe.ts`; only in `.env.postgres.local`). The measuring spec's own switches stay out,
+like the earlier measuring specs'.
+
+**The docs** (Markdown only, after `dd7a96d`):
+- `docs/decisions.md`: AD-31 amended; notes to AD-29, AD-04, D-58, AD-22 (the Vercel facts) and AD-12 (the stored order,
+  F2); **AD-37**, the walking skeleton (an architecture decision, after AD-36). Quoted in full in the closing report for
+  Łukasz's approval.
+- `docs/data-model-v2.md`: §2's "The stored order" (step 2) and §3's `auth_user_id` (L3, step 2), final as they stand.
+- `docs/known-limitations.md`: "The database skeleton (slice 29, AD-37)": the Postgres figures, cold loads, the snapshot
+  at 49 % of 4.5 MB, the proxy at the edge, the bootstrap's public frontend, the document editor's controls, the crowded
+  millisecond, the contract suite's Postgres side in CI only (and S3B-06, step 4).
+- `docs/ideas.md`: "The database program: what comes later": the read fixes slice, a `dev` integration branch, the
+  spike's removal, `localeCompare`'s locale, explicit orders, part 9's heap.
+- `README.md`: the status, slice 29's summary and links, "Environments (slice 29)", "Hosting (slice 29, AD-22's note)",
+  the Postgres commands, the repository layout.
+- `CLAUDE.md`: "What this is", the layers' `src/data`, the local adapter's paragraph and "The Postgres adapter (slice
+  29, AD-37)", the test runs' Postgres side, Security, "Environments and hosting (slice 29)", the commands.
+
+**Merge and tag:** only on Łukasz's command, after the approved decision texts are committed and CI passed on the last
+commit (The slice cycle, 7).
+
+**Manual acceptance (Łukasz):**
+1. Sign in on the preview (`infomapper-app-dev-git-slice-2-f77c19-lukaszs-projects-9ffbc132.vercel.app`, signed in to
+   Vercel) as `lukasz@infomate.pl` with the demo password; open Retail Co – DWH's home, Customer 360's home and its
+   canvases, a document's page, and "Performance test"'s home and canvas; see "Read only" in the top bar.
+2. Sign in as `m.lis@retailco.com` and `k.zielinska@retailco.com` (the silo: the workspaces each sees are in step 3's
+   table); a wrong password is refused; sign out.
+3. Read `docs/prd/slice-29-measurement.md`.
+4. Locally: `npm run dev` still signs in by the test users' list on `.data/dev-db.json` (KB) as before; `npm run dev:pg`
+   signs in with an account.
+KB is never read or written by this slice.
