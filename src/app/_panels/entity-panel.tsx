@@ -68,8 +68,8 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
     return result;
   }
   // choice fields show the newest stored value after a refusal (slice 13, R4)
-  const stereotype = useChoice(e.stereotype, (s) => save({ stereotype: s }));
-  const concept = useChoice(e.concept_id, (c) => save({ conceptId: c }));
+  const stereotype = useChoice(e.stereotype, (s) => save({ stereotype: s }), e.version);
+  const concept = useChoice(e.concept_id, (c) => save({ conceptId: c }), e.version);
   // the workspace's stereotypes in the list's order, value the code and text the name (slice 24, item 10, F24)
   const stereotypes = useMemo(() => stereotypeIndex(ix.model.stereotypes), [ix.model.stereotypes]);
   const stereotypeOptions = stereotypes.of(stereotype.value)

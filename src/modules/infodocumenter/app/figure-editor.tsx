@@ -99,7 +99,7 @@ export function FigureEditor(props: {
   // the stored list as one object while it stays the same: `useChoice` shows a choice made on that object (D-66)
   const storedKey = JSON.stringify(props.stored);
   const stored = useMemo(() => JSON.parse(storedKey) as FigureEntry[], [storedKey]);
-  const choice = useChoice<readonly FigureEntry[]>(stored, (v) => save([...v]));
+  const choice = useChoice<readonly FigureEntry[]>(stored, (v) => save([...v]), version);
   const figures = choice.value;
   const change = (i: number, patch: Partial<FigureEntry>) => choice.choose(figures.map((f, k) => (k === i ? { ...f, ...patch } : f)));
   const move = (i: number, by: -1 | 1) => {

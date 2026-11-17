@@ -126,7 +126,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   // only the part that changed (slice 9, F1): a queued Scale save must not send back the precision this render showed
   const saveType = (patch: TypeInput) => saveFollowed({ type: patch });
   // a choice shows the newest stored value after a refusal (slice 13, R4)
-  const dataType = useChoice(a.data_type, (t) => saveType({ dataType: t }));
+  const dataType = useChoice(a.data_type, (t) => saveType({ dataType: t }), a.version);
 
   async function addColumn(columnId: string) {
     const sent = ui.selection;

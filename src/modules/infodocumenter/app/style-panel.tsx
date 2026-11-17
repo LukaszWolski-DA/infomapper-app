@@ -113,7 +113,7 @@ export function StylePanel({
       <Fold title={T.style} storeKey={foldKey} testId="fold-document-style">
       <Field label={T.language} hint={T.languageHint}>
         {(f) => (
-        <Choice stored={style.language ?? workspaceLanguage} save={(v) => save({ language: v })}>
+        <Choice version={version} stored={style.language ?? workspaceLanguage} save={(v) => save({ language: v })}>
           {(value, pick) => (
             <select id={f.id} aria-describedby={f.hintId} data-testid="select-style-language" value={value} disabled={readOnly} onChange={(e) => pick(e.currentTarget.value as DocLanguage)} className={selectClass}>
               {(Object.keys(T.languages) as DocLanguage[]).map((l) => (
@@ -126,10 +126,10 @@ export function StylePanel({
         </Choice>
         )}
       </Field>
-      <SegField label={T.template} k="template" stored={style.template} items={T.templates} hints={T.templateHints} readOnly={readOnly} save={save} />
+      <SegField label={T.template} k="template" stored={style.template} items={T.templates} hints={T.templateHints} readOnly={readOnly} version={version} save={save} />
       <Field label={T.accent} hint={T.accentHint}>
         {(f) => (
-        <Choice stored={style.accent} save={(v) => save({ accent: v })}>
+        <Choice version={version} stored={style.accent} save={(v) => save({ accent: v })}>
           {(value, pick) => (
             <div className="flex gap-2" role="group" aria-labelledby={f.labelId} aria-describedby={f.hintId} data-testid="choice-style-accent">
               {ACCENTS.map((a) => (
@@ -159,14 +159,15 @@ export function StylePanel({
           ["A3", "A3"],
         ]}
         readOnly={readOnly}
+        version={version}
         save={save}
       />
-      <SegField label={T.orientation} k="orientation" stored={style.orientation} items={T.orientations} readOnly={readOnly} save={save} />
-      <SegField label={T.colours} k="colours" stored={style.colours} items={T.colourChoices} readOnly={readOnly} save={save} />
-      <SegField label={T.notation} k="notation" stored={style.notation} items={T.notations} readOnly={readOnly} save={save} />
+      <SegField label={T.orientation} k="orientation" stored={style.orientation} items={T.orientations} readOnly={readOnly} version={version} save={save} />
+      <SegField label={T.colours} k="colours" stored={style.colours} items={T.colourChoices} readOnly={readOnly} version={version} save={save} />
+      <SegField label={T.notation} k="notation" stored={style.notation} items={T.notations} readOnly={readOnly} version={version} save={save} />
       <Field label={T.keepRows} hint={T.keepRowsHint}>
         {(f) => (
-        <Choice stored={style.keepRows} save={(v) => save({ keepRows: v })}>
+        <Choice version={version} stored={style.keepRows} save={(v) => save({ keepRows: v })}>
           {(value, pick) => (
             <select id={f.id} aria-describedby={f.hintId} data-testid="select-style-keepRows" value={value} disabled={readOnly} onChange={(e) => pick(Number(e.currentTarget.value) as DocumentStyle["keepRows"])} className={selectClass}>
               {KEEP_ROWS.map((n) => (
@@ -181,7 +182,7 @@ export function StylePanel({
       </Field>
       <Field label={T.smallestPt} hint={T.smallestPtHint}>
         {(f) => (
-        <Choice stored={style.smallestPt} save={(v) => save({ smallestPt: v })}>
+        <Choice version={version} stored={style.smallestPt} save={(v) => save({ smallestPt: v })}>
           {(value, pick) => (
             <select id={f.id} aria-describedby={f.hintId} data-testid="select-style-smallestPt" value={value} disabled={readOnly} onChange={(e) => pick(Number(e.currentTarget.value) as DocumentStyle["smallestPt"])} className={selectClass}>
               {SMALLEST_PT.map((n) => (
@@ -197,7 +198,7 @@ export function StylePanel({
       <div className="mt-1">
         {T.switches.map(([k, label]) => (
           <div key={k}>
-            <Check testId={`check-style-${k}`} label={label} stored={style[k]} disabled={readOnly} onSave={(v) => save({ [k]: v })} />
+            <Check version={version} testId={`check-style-${k}`} label={label} stored={style[k]} disabled={readOnly} onSave={(v) => save({ [k]: v })} />
             {hints[k] && (
               <div className="ml-6 mt-0.5 text-[11.5px] text-im-ink-3" data-testid={`hint-style-${k}`}>
                 {hints[k]}
@@ -240,6 +241,7 @@ function SegField<K extends "template" | "paper" | "orientation" | "colours" | "
   items,
   hints,
   readOnly,
+  version,
   save,
 }: {
   label: string;
@@ -248,10 +250,11 @@ function SegField<K extends "template" | "paper" | "orientation" | "colours" | "
   items: readonly (readonly [DocumentStyle[K], string])[];
   hints?: Record<string, string>;
   readOnly: boolean;
+  version: number;
   save: (patch: StylePatch) => Answer;
 }) {
   return (
-    <Choice stored={stored} save={(v) => save({ [k]: v } as StylePatch)}>
+    <Choice version={version} stored={stored} save={(v) => save({ [k]: v } as StylePatch)}>
       {(value, pick) => (
         <Field label={label} hint={hints?.[value]}>
           {(f) => <Seg testId={`seg-style-${k}`} labelledBy={f.labelId} describedBy={f.hintId} value={value} options={items} disabled={readOnly} onChange={pick} />}
@@ -261,8 +264,9 @@ function SegField<K extends "template" | "paper" | "orientation" | "colours" | "
   );
 }
 
-function Choice<T>({ stored, save, children }: { stored: T; save: (v: T) => Answer; children: (value: T, choose: (v: T) => void) => ReactNode }) {
-  const choice = useChoice(stored, save);
+/** `version`: the document's, which every style save writes (fix/choice-after-undo). */
+function Choice<T>({ stored, save, version, children }: { stored: T; save: (v: T) => Answer; version: number; children: (value: T, choose: (v: T) => void) => ReactNode }) {
+  const choice = useChoice(stored, save, version);
   return <>{children(choice.value, choice.choose)}</>;
 }
 
