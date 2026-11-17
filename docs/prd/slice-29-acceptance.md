@@ -986,3 +986,39 @@ stays this way until slice D, which gives production its own project. The `cooki
 (`877c160`, above) is accepted.
 
 **Next:** one more empty commit; Łukasz confirms it is a Preview with its variables and sends its address.
+
+### The preview checked (S29-07), the timing record, the measurement (17 November 2026)
+
+**The preview** (branch address `infomapper-app-dev-git-slice-2-f77c19-lukaszs-projects-9ffbc132.vercel.app`; Preview,
+with its variables):
+- **Deployment Protection:** without the bypass, both the branch and the deployment address answer 302 to Vercel's
+  sign-in (`vercel.com/sso-api`); no function runs (`X-Vercel-Id` names the edge only).
+- **With the bypass** (`scripts/preview-probe.ts`, statuses only): `/sign-in` 200 from a function in **fra1**
+  (`arn1 → fra1`); `/` and a workspace page 307 to `/sign-in` from the proxy, which runs at the edge (`arn1`), not in
+  fra1; the thumbnail's path 401 without a session (F9).
+- **No page prerendered:** the build's route list (`877c160`, above).
+- **The smoke set on the preview:** 11 of 11 (sign-in, the silo, a wrong password and an unknown address refused,
+  sign-out, the four pages read only, the thumbnail without `Set-Cookie`), plus **S29-03**: the document editor's section
+  switch refused with "This server is read-only for now, so nothing was saved." and the stored version unchanged.
+  `playwright.pg.config.ts` sends the bypass header to a `vercel.app` address and records no trace there.
+
+**The timing record** (`5f974fd`; Q9, F15), with `INFOMAPPER_TIMING=1` only: `src/data/timing.ts` (port calls, SQL
+statements and their time, waits for a pool connection, the reads' span; `getDataStore` wraps the store, the pool times
+its clients), `src/app/_lib/timing.tsx` (an `AsyncLocalStorage` for the thumbnail route and the snapshot action, React's
+`cache` for a page's render). It shows as `Server-Timing` on the thumbnail route, a hidden JSON record
+(`data-testid="im-timing"`) at the end of the workspace home, the project home and the canvas page, and one log line of
+numbers for the snapshot action. Reading that log line needs Vercel's runtime logs (the dashboard; no token added).
+
+**The measurement:** `docs/prd/slice-29-measurement.md` (S29-08): warm medians of 10 on the preview and on the local
+adapter's measurement build, a cold run on a fresh deployment, the snapshot's sizes against 4.5 MB. **Stopped with the
+figures (DB7):** no read fix without Łukasz's decision.
+
+**The full run on `d04187d`** (run 44174423565, nine parts, the final code commit of step 4): **822 passed, 0 failed, 16
+skipped, 0 flaky, 0 expected failures**; wall-clock 13 min 40 s (20:55:43 to 21:09:23 UTC).
+
+| Part | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Time (min) | 10.3 | 10.7 | 7.8 | 6.9 | 12.0 | 9.6 | 7.5 | 10.2 | 9.5 |
+| Heap peak (MB) | 936 | 904 | 1,092 | 1,229 | 1,119 | 1,703 | 1,371 | 1,191 | 1,825 |
+
+No restart. CI, the contract suite and the smoke set (the Schema workflow) passed on the same commit.
