@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { getDataStore } from "@/data";
+import { getDataStore, isPostgresMode } from "@/data";
 import { isUuid } from "@/domain/ids";
 import { signInAsDevUser } from "../_actions/session";
 import { isDevSignInEnabled } from "../_lib/dev-session";
 import { getSession } from "../_lib/session";
-import { CreateOrganizationForm, OrganizationLinkForm, SignInSteps } from "./start-forms";
+import { AccountSignInForm, CreateOrganizationForm, OrganizationLinkForm, SignInSteps } from "./start-forms";
 
 export const metadata: Metadata = { title: "Sign in · InfoMapper" };
 
@@ -19,6 +19,16 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   // Decided per request, not at build time: the measurement-only build (AD-31) is built like a normal production build
   // and only differs in how it is started.
   await connection();
+  // slice 29 (F8): on Postgres the start page is the account form alone, in development and production alike
+  if (isPostgresMode()) {
+    const next = (await searchParams).next;
+    return (
+      <main data-testid="page-sign-in" className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+        <h1 className="text-lg font-semibold">InfoMapper</h1>
+        <AccountSignInForm next={typeof next === "string" ? next : null} />
+      </main>
+    );
+  }
   if (!isDevSignInEnabled()) notFound();
 
   const store = getDataStore();

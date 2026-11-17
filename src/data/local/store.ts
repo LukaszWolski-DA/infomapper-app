@@ -66,6 +66,8 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
       list: async () => (await load()).app_user,
       get: async (userId) => (await load()).app_user.find((u) => u.id === userId) ?? null,
       getByEmail: async (email) => (await load()).app_user.find((u) => u.email === email) ?? null,
+      // slice 29: the local adapter has no Supabase accounts
+      getByAuthUserId: async () => null,
       listForWorkspace: async (workspaceId) => workspacePeopleOf(await load(), workspaceId),
     },
 

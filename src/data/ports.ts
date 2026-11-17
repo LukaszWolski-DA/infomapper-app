@@ -44,6 +44,11 @@ export interface UserRepository {
   /** The account with this e-mail address (compared as stored: trimmed, lower case), or null. */
   getByEmail(email: string): Promise<AppUser | null>;
   /**
+   * The person a Supabase Auth account is linked to (`app_user.auth_user_id`, slice 29, L3), or null. On Postgres only:
+   * the local adapter has no accounts and always answers null.
+   */
+  getByAuthUserId(authUserId: Uuid): Promise<AppUser | null>;
+  /**
    * The people a workspace's pages may name (slice 8, F10): its members and everyone with a change event in it, removed
    * people included, so earlier work keeps its author's name. Never anyone else.
    */
