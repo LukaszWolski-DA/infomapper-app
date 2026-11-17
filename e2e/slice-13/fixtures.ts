@@ -1,7 +1,7 @@
 // Every slice 13 test starts from freshly seeded data: an automatic fixture resets the e2e data file before each
 // test. The undo history lives in the server's memory and leaves out steps whose change group is no longer in the file.
 
-import { test as base } from "@playwright/test";
+import { test as base } from "../settle";
 import { resetDevData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";
 

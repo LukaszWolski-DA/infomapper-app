@@ -3,7 +3,7 @@
 // Customer.last_order_id, Product.country_code, Product.Product_Name, Sales Order.total_amount calculated, Customer
 // Address.country_code no foreign key). Earlier slices' fixtures do not add slice 20's demo (answer 11).
 
-import { test as base } from "@playwright/test";
+import { test as base } from "../settle";
 import { addFullDemoData } from "../../src/compose/seed";
 import { resetDevData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";

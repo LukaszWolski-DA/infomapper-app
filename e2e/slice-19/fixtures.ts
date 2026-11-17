@@ -2,7 +2,7 @@
 // (item 8): Fact Orders an aggregate of Fact Sales, Dim Category an outrigger of Dim Product ("groups"), Dim Order Flags a
 // junk dimension, Dim Product a month-end snapshot. Slice 15's and 18's fixtures keep the star without them.
 
-import { test as base } from "@playwright/test";
+import { test as base } from "../settle";
 import { addTypesDemoData } from "../../src/compose/seed";
 import { resetDevData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";

@@ -216,7 +216,7 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): { report
 
 // The last read of each file, kept until the file changes on disk (S1A-14: reading and parsing the whole file on
 // every repository call took about half of the canvas page's server time). Frozen, so a caller cannot change it.
-type Stamp = { mtimeMs: number; size: number; ino: number };
+export type Stamp = { mtimeMs: number; size: number; ino: number };
 const cache = new Map<string, { stamp: Stamp; db: Readonly<DevDb> }>();
 
 async function stampOf(file: string): Promise<Stamp | null> {
@@ -236,6 +236,15 @@ const sameStamp = (a: Stamp, b: Stamp) => a.mtimeMs === b.mtimeMs && a.size === 
  * seed scripts or the e2e reset, may write it). The result is shared and deeply frozen: clone it before changing it.
  */
 export async function readDbCached(file: string): Promise<Readonly<DevDb>> {
+  return (await readDbStamped(file)).db;
+}
+
+/**
+ * readDbCached with the stamp of the file it read, for a write that replaces the file only if nothing changed it
+ * since (`writeDb`'s `ifUnchanged`, fix/write-after-reseed). `null` when the file changed while it was read, so the
+ * read cannot be told apart from the change: such a write reads again.
+ */
+export async function readDbStamped(file: string): Promise<{ db: Readonly<DevDb>; stamp: Stamp | null }> {
   assertNotProduction();
   const stamp = await stampOf(file);
   if (!stamp) {
@@ -243,13 +252,16 @@ export async function readDbCached(file: string): Promise<Readonly<DevDb>> {
     throw new NoDevDataError(file);
   }
   const hit = cache.get(file);
-  if (hit && sameStamp(hit.stamp, stamp)) return hit.db;
+  if (hit && sameStamp(hit.stamp, stamp)) return { db: hit.db, stamp };
   const db = deepFreeze(await readDb(file));
   // Keep it only if the file did not change while it was read.
   const after = await stampOf(file);
-  if (after && sameStamp(after, stamp)) cache.set(file, { stamp, db });
-  else cache.delete(file);
-  return db;
+  if (after && sameStamp(after, stamp)) {
+    cache.set(file, { stamp, db });
+    return { db, stamp };
+  }
+  cache.delete(file);
+  return { db, stamp: null };
 }
 
 function deepFreeze<T>(value: T): T {
@@ -260,14 +272,34 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-/** Writes the whole file atomically: a temp file next to it, then a rename over the old one. */
-export async function writeDb(file: string, db: DevDb): Promise<void> {
+/**
+ * Writes the whole file atomically: a temp file next to it, then a rename over the old one.
+ *
+ * `ifUnchanged` (fix/write-after-reseed): the stamp of the read this file was built from. Just before the rename the
+ * file's stamp is compared with it; when another process (the e2e reseed, a script, a hand edit) changed the file since,
+ * nothing is replaced and the answer is `false`, so the caller reads again. Without it the file is replaced as it is
+ * (the seed and reset scripts). Between the comparison and the rename a window of microseconds stays open: closing it
+ * needs a lock file shared by every writer (docs/known-limitations.md).
+ */
+export async function writeDb(file: string, db: DevDb, options?: { ifUnchanged: Stamp | null }): Promise<boolean> {
   assertNotProduction();
   await mkdir(path.dirname(file), { recursive: true });
   const temp = `${file}.${randomUUID()}.tmp`;
   // compact (slice 7a): after large imports the file is many MB, and indenting doubled its size and its writing time
   await writeFile(temp, JSON.stringify(db) + "\n", "utf8");
+  // The temp file's stamp is the file's once renamed (a rename keeps its inode and times): the cache takes it, so a
+  // change by another process right after the rename is never cached as this write's.
+  let stamp: Stamp | null;
   try {
+    stamp = await stampOf(temp);
+    if (options) {
+      const now = await stampOf(file);
+      if (!options.ifUnchanged || !now || !sameStamp(now, options.ifUnchanged)) {
+        await rm(temp, { force: true });
+        cache.delete(file);
+        return false;
+      }
+    }
     await withRetry(() => rename(temp, file));
   } catch (e) {
     await rm(temp, { force: true });
@@ -275,9 +307,9 @@ export async function writeDb(file: string, db: DevDb): Promise<void> {
   }
   // The file now holds what this process wrote: keep it, so the next read does not parse it again (slice 7a: after a
   // large import the file is tens of MB). Frozen, as every cached read; the caller hands over `db`.
-  const stamp = await stampOf(file);
   if (stamp) cache.set(file, { stamp, db: deepFreeze(db) });
   else cache.delete(file);
+  return true;
 }
 
 // On Windows a rename or read can fail briefly while another process has the file open.
