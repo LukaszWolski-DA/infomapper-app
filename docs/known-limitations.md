@@ -84,6 +84,28 @@ created after the page read the data (`readAt`) stay, and the versions the canva
   several people working at once make late pages more likely. Not built now: the local adapter has one person at a
   time, and the per-row rule above covers what can stay wrong.
 
+### A file changed by another process while a server writes (fix/write-after-reseed; fixed in the local adapter)
+
+Every write replaces the whole file with a copy built from its own read (`applyToFile`, `src/data/local/store.ts`).
+Writes of one server are serialised, but another process does not wait for them: the e2e fixtures' reseed, a script
+(`npm run seed:large`, `scripts/licence.ts`) or a hand edit of `.data/dev-db.json` while a server runs. Until this fix a
+write that had read the file before such a change replaced the file after it, and the change was gone without a word.
+
+Since fix/write-after-reseed `writeDb` compares the stamp of the write's read (`mtimeMs`, size, inode; `readDbStamped`)
+with the file's just before the rename. When they differ it replaces nothing; the write reads the file again and is
+applied once more, so it is checked against what is there now: a row the outside change touched is a stale version
+(the usual refusal, its fresh page and D-66's line), and every other outside change is kept. A file changed again during
+the second try is refused as a stale version. The cache takes the temp file's stamp from before the rename, so a change
+right after the rename is never cached as the write's own. Tested in `src/data/local/store.test.ts` ("a file changed by
+another process during a write").
+
+- **What is left:** a window of microseconds between the comparison and the rename, where an outside change can still
+  be replaced. Closing it needs a lock file shared by every writer (servers, scripts, the e2e fixtures); not built, as
+  the window is that small and the local adapter is development only.
+- **For Łukasz's test model:** a script or a hand edit made while a dev server runs on `.data/dev-db.json` is now kept,
+  or the server's write that collides with it is refused; it is no longer overwritten silently.
+- **The database slice (last, AD-31):** the database's transactions do this; nothing to carry over.
+
 ## Canvas performance (slice 1a)
 
 ### Where the canvas stands after slice 4b-2 (20 October 2026)
@@ -1057,6 +1079,34 @@ InfoCube's dimensional mapping delete included. RP-07's assertions are unchanged
 `e2e/fixes/selection-after-delete.spec.ts` (a card clicked while the delete is held stays selected) and
 `e2e/fixes/selection-after-entity-delete.spec.ts` (a selected attribute of an entity whose delete is held is cleared),
 with the cascade cases in `src/canvas/selection.test.ts`.
+
+### S11-08 failed once: a save on its way when the next test reseeded (a bug in the local adapter and the fixtures, fixed on fix/write-after-reseed)
+
+In PR 66's full run (run 44043914367, 17 November 2026), `e2e/slice-11/S11-08.spec.ts` failed in part 6: searching
+"Klient" found two items, Customer and an entity named "Bardzo długa nazwa klienta do sprawdzenia skracania", which is
+S11-07's rename of Sales Order; alone it passed 3 of 3 (run 44046209147). S11-07 ended at 08:13:25.843 and S11-08 began
+2 ms later. S11-07's last step, the "Entity aliases" check box, shows its result at once and sends its save on the
+canvas's queue, so the test passed before the save's answer. The server's write had read S11-07's file and renamed its
+copy over the file after S11-08's reseed: S11-08's failure snapshot shows the box ticked, which S11-08 never does,
+Sales Order under S11-07's name, and Customer with S11-08's own alias written after it. **The cause was in shared
+infrastructure, found through the test** (CLAUDE.md, "A race in a test"; "The slice cycle", 4). A reproduction outside
+the app showed two ways:
+
+- **A:** the write has read the file when the reseed replaces it; the write then replaces the fresh seed with the
+  earlier test's whole file (the failure above).
+- **B:** the request reaches the server only after the reseed and lands on the fresh seed, whose ids and versions are
+  the same every time, so no version check refuses it.
+
+**The fix closes it from both sides.** The adapter no longer replaces a file another process changed since its read
+(the entry under "Local data adapter", which closes A for every outside writer). Every fixture that reseeds now
+extends `e2e/settle.ts`, whose automatic fixture waits after each test, before its pages close and so before the next
+reseed, until nothing is on its way: the saves each page counts (leave-guard's `track`, read through the test hook
+`window.__imSavesOnTheWay`, `src/ui/save-hook.tsx`, rendered by the root layout only where the test hooks are on) and
+every POST the test's context has not had answered. That closes B. After 10 s it goes on with a warning (a save held on
+purpose and never let go); a page the test closed itself is not waited for. `resetDevData` no longer removes the file
+before writing it: the rename replaces it atomically, so a read never finds no file. No spec's assertions changed. The
+fix is checked by the store tests above and `e2e/fixes/write-after-reseed.spec.ts` (variant B with the names switch's
+request held past a reseed, without the wait and through it).
 
 ## Source import (slice 7a)
 
