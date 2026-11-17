@@ -55,8 +55,9 @@ test("the fixtures' wait lasts until the save's answer, so the next reseed comes
   let answeredAt = 0;
   void hold.given.then(() => (answeredAt = performance.now()));
   const settling = settleSaves(context).then((settled) => ({ settled, at: performance.now() }));
-  // the page counts the save while its request is held
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __imSavesOnTheWay: () => number }).__imSavesOnTheWay())).toBe(1);
+  // the page counts the save while its request is held (on the save chain, which holds the canvas's row, and on the
+  // canvas's queue: both track it)
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __imSavesOnTheWay: () => number }).__imSavesOnTheWay())).toBeGreaterThan(0);
   hold.release();
   const { settled, at } = await settling;
   expect(settled).toBe(true);
