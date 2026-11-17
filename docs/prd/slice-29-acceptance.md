@@ -972,3 +972,17 @@ Nothing was exposed (the local adapter refuses to start in a production build, a
 The Production Branch was `main` all along, so that was not the cause; **the cause is not known** (Łukasz's guess: the
 project had no Production deployment after `main`'s was deleted, so Vercel promoted the first build). Łukasz deleted the
 Production deployment of `877c160`; an empty commit makes the next deployment, and Łukasz reports how Vercel labels it.
+
+**The cause, found by Łukasz** (Vercel community reports; no official answer): while a project has **no Production
+deployment**, Vercel classifies any build as Production, even one from a preview branch. It happened twice, because the
+Production deployment was deleted each time (`main`'s from the import, then `877c160`'s); so `3dd2b86` (an empty commit)
+became Production as well.
+
+**The bootstrap deployment (Łukasz's decision):** `3dd2b86`'s Production deployment stays, on purpose, so the project
+always has one and later builds from this branch are Previews. It is inert: built without variables (Production has
+none), so it runs in local mode, whose adapter refuses to start in a production build, and it has no database URL.
+Its domain (`infomapper-app-dev.vercel.app`) answers only the proxy's redirect to `/sign-in` and a 404 there. Production
+stays this way until slice D, which gives production its own project. The `cookies()` fix in `supabaseServer()`
+(`877c160`, above) is accepted.
+
+**Next:** one more empty commit; Łukasz confirms it is a Preview with its variables and sends its address.
