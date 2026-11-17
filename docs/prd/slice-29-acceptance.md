@@ -940,3 +940,35 @@ includes only traced files, so `next.config.ts` needs `outputFileTracingIncludes
 No restart. CI (run 44152688960) and the Schema workflow (run 44152689223: migrations, the contract suite, the smoke set)
 passed on the same commit. Step 4's first half is done; Łukasz sets up the Vercel project from the checklist, then the
 second half (the first deployment, `outputFileTracingIncludes` for the CA, the timing record, the measurement).
+
+---
+
+## Step 4, second half: the first deployment (17 November 2026)
+
+**Łukasz's Vercel project** (from the checklist), as he set it up: the project is `infomapper-app-dev` (production gets
+its own project in slice D). The import wizard detected two Next.js apps (`/` and `spikes/canvas-react-flow`) and offered
+a "multi-service" project with its own prompt for a `services` key in `vercel.json`; Łukasz imported a standalone
+project (root `./`, Next.js) and the prompt was not acted on (`vercel.json` has no `services` key). The import's
+Production deployment of `main` was deleted. Node.js 22.x, Fluid compute on, the Ignored Build Step as written,
+Vercel Authentication with Standard Protection, one Protection Bypass for Automation secret (in `.env.postgres.local` as
+`VERCEL_AUTOMATION_BYPASS_SECRET`). Five variables, Preview only, scoped to the branch: `INFOMAPPER_DATABASE_URL`,
+`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (Secret), `INFOMAPPER_DATA=postgres`, `INFOMAPPER_TIMING=1` (plain).
+
+**`877c160`** (accepted by Łukasz):
+- `next.config.ts`: `outputFileTracingIncludes: { "/**": ["./src/data/postgres/supabase-ca.crt"] }`; in a local
+  production build every route's trace (12 of 12) carries the certificate.
+- **Found on the way:** with `INFOMAPPER_DATA=postgres` and no Supabase values in the build's environment, `next build`
+  prerendered `/` and failed ("SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY must be set"): `supabaseServer()` read the
+  project's values before `cookies()`, the call that makes a page dynamic. It now calls `cookies()` first, so every page
+  that asks for the session is dynamic whatever the build's environment holds. The build's route list: every route
+  dynamic (`ƒ`); only `/_not-found` static, which reads nothing.
+
+**The first deployment was not a Preview.** Vercel's check passed ("Deployment has completed"), but its pull request
+comment named the project's own domain as the deployment's address (`previewUrl` `infomapper-app-dev.vercel.app`,
+`isMonorepo` true), and that domain answered as this branch's build **in local mode, without Deployment Protection**: `/`
+307 to `/sign-in`, `/sign-in` 404 (no development sign-in in a production build), `/w/x` 307; `X-Vercel-Id` ending in
+`fra1`. So it had been built as a Production deployment, without the Preview variables, on the public production domain.
+Nothing was exposed (the local adapter refuses to start in a production build, and Production has no database URL).
+The Production Branch was `main` all along, so that was not the cause; **the cause is not known** (Łukasz's guess: the
+project had no Production deployment after `main`'s was deleted, so Vercel promoted the first build). Łukasz deleted the
+Production deployment of `877c160`; an empty commit makes the next deployment, and Łukasz reports how Vercel labels it.
