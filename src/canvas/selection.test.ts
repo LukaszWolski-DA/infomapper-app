@@ -4,7 +4,7 @@ import { deletedIds } from "@/domain/changes";
 import { deleteAttribute } from "@/domain/commands/attribute";
 import { deleteEntity } from "@/domain/commands/entity";
 import { deleteMapping } from "@/domain/commands/mapping";
-import { afterLasso, allKeys, cardKey, fromKeys, lassoHits, rectBetween, selectedCardIds, selectedKeys, selectionBounds, selectionDeleted, toggleCard, toggleItem, unitsOf, type ItemBox } from "./selection";
+import { afterLasso, allKeys, cardKey, fromKeys, lassoHits, rectBetween, selectedCardIds, selectedKeys, sameSelection, selectionAfterAnswer, selectionBounds, selectionDeleted, toggleCard, toggleItem, unitsOf, type ItemBox } from "./selection";
 
 const cards: ItemBox[] = [
   { id: "c1", key: "entity:customer", rect: { x: 0, y: 0, w: 256, h: 200 } },
@@ -268,5 +268,40 @@ describe("the selection after a delete's answer (fix/selection-after-delete)", (
 
   it("nothing deleted clears nothing", () => {
     expect(selectionDeleted({ t: "card", id: itemCustomer }, new Set())).toBe(false);
+  });
+});
+
+// fix/late-selection-after-create: an answer selects what it made only if the selection is still the one it was sent with
+describe("selectionAfterAnswer", () => {
+  const made = { t: "ext", kind: "cube_mapping", id: "m-new" } as const;
+
+  it("selects what was made when nothing was selected meanwhile", () => {
+    const sent = { t: "row", cardId: "c1", id: "a1" } as const;
+    expect(selectionAfterAnswer(sent, sent, made)).toBe(made);
+    expect(selectionAfterAnswer(null, null, made)).toBe(made);
+  });
+
+  it("compares by what is selected, not by the object: an equal selection rebuilt meanwhile still counts as unchanged", () => {
+    expect(selectionAfterAnswer({ t: "row", cardId: "c1", id: "a1" }, { t: "row", cardId: "c1", id: "a1" }, made)).toBe(made);
+    expect(selectionAfterAnswer({ t: "multi", keys: ["entity:b", "entity:a"] }, { t: "multi", keys: ["entity:a", "entity:b"] }, made)).toBe(made);
+  });
+
+  it("keeps a selection made while the action was on its way", () => {
+    const sent = { t: "row", cardId: "c1", id: "a1" } as const;
+    const clicked = { t: "card", id: "c2" } as const;
+    expect(selectionAfterAnswer(clicked, sent, made)).toBe(clicked);
+    // a selection cleared meanwhile (Escape, a click on the empty canvas) stays cleared
+    expect(selectionAfterAnswer(null, sent, made)).toBeNull();
+    // something selected from nothing
+    expect(selectionAfterAnswer(clicked, null, made)).toBe(clicked);
+  });
+
+  it("tells selections apart by every part that names them", () => {
+    expect(sameSelection({ t: "row", cardId: "c1", id: "a1" }, { t: "row", cardId: "c2", id: "a1" })).toBe(false);
+    expect(sameSelection({ t: "element", kind: "entity", id: "x" }, { t: "element", kind: "attribute", id: "x" })).toBe(false);
+    expect(sameSelection({ t: "ext", kind: "cube_mapping", id: "x" }, { t: "ext", kind: "other", id: "x" })).toBe(false);
+    expect(sameSelection({ t: "card", id: "x" }, { t: "frame", id: "x" })).toBe(false);
+    expect(sameSelection({ t: "multi", keys: ["entity:a"] }, { t: "multi", keys: ["entity:a", "entity:b"] })).toBe(false);
+    expect(sameSelection({ t: "bundle", id: "k" }, { t: "bundle", id: "k" })).toBe(true);
   });
 });

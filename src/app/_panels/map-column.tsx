@@ -45,11 +45,13 @@ export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelI
     async (columnId: Uuid, attributeId: Uuid) => {
       const attribute = ix.attribute.get(attributeId), column = ix.column.get(columnId);
       const fits = !attribute || !column || checkColumnType(attribute, column).ok;
+      const sent = ui.selection;
       const result = await run(
         () => createMappingAction(workspaceId, { attributeId, sourceColumnId: columnId }),
         `Mapped ${columnLabel(ix, columnId)} to ${attributeLabel(ix, attributeId)}${fits ? "" : ". The data types don't fit."}`,
       );
-      if (result.ok) ui.select({ t: "map", id: result.value.mappingId });
+      // a selection made while the mapping was on its way stays (fix/late-selection-after-create)
+      if (result.ok) ui.selectMade(sent, { t: "map", id: result.value.mappingId });
     },
     [ix, run, workspaceId, ui],
   );
@@ -81,10 +83,11 @@ export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelI
       if (!mapping) return;
       if (mapping.rule_expression?.trim()) {
         // on the mapping's save chain (slice 10a): after its panel's saves, with the newest version
+        const sent = ui.selection;
         void saveRow(mapping, (v) => addMappingInputAction(workspaceId, { mappingId: mapping.id, expectedVersion: v, sourceColumnId: c.columnId })).then(
           (r) => {
             if (!r.ok) return;
-            ui.select({ t: "map", id: mapping.id });
+            ui.selectMade(sent, { t: "map", id: mapping.id });
             toast(r.value.notice ?? `Added ${columnLabel(ix, c.columnId)} to the mapping.`);
           },
         );
@@ -108,15 +111,17 @@ export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelI
         mapColumn(columnId, named.id, at);
         return;
       }
+      const sent = ui.selection;
       const result = await run(() => createAttributeFromColumnAction(workspaceId, { entityId, sourceColumnId: columnId }));
       if (!result.ok) return;
       const { attributeId, mappingId, createdAttribute } = result.value;
       if (createdAttribute) {
         const card = cardOf(entityId);
-        if (card) ui.select({ t: "row", cardId: card, id: attributeId });
+        // a selection made while the drop was on its way stays (fix/late-selection-after-create)
+        if (card) ui.selectMade(sent, { t: "row", cardId: card, id: attributeId });
         toast(`Added ${column?.name ?? "the attribute"} to ${ix.entity.get(entityId)?.name ?? "the entity"}, mapped from ${columnLabel(ix, columnId)}. Rename it on the right.`);
       } else {
-        ui.select({ t: "map", id: mappingId });
+        ui.selectMade(sent, { t: "map", id: mappingId });
         toast(`Mapped ${columnLabel(ix, columnId)} to ${attributeLabel(ix, attributeId)}`);
       }
     },
