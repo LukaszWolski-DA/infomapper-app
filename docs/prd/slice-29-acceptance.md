@@ -1062,3 +1062,9 @@ commit (The slice cycle, 7).
 4. Locally: `npm run dev` still signs in by the test users' list on `.data/dev-db.json` (KB) as before; `npm run dev:pg`
    signs in with an account.
 KB is never read or written by this slice.
+
+**The closing's full run** (run 44178288458, on `dd7a96d`, nine parts): **822 passed, 0 failed, 16 skipped, 0 flaky, 0
+expected failures**; wall-clock 12 min 40 s (21:17:43 to 21:30:23 UTC). Part times 7.0, 8.4, 10.2, 7.8, 8.1, 8.9, 9.9,
+11.0, 9.3 min; heap peaks 1,251, 1,336, 1,098, 1,241, 1,745, 1,818, 1,236, 992, 1,688 MB; no restart. Every later commit
+changes only Markdown in `docs/` and the repository root (`git diff --stat dd7a96d..HEAD`), so it counts for the merge.
+CI and the Schema workflow (the contract suite, the smoke set) passed on `075c7d5`.
