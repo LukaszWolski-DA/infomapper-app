@@ -928,3 +928,15 @@ latest deployment). Step 4's second half checks it: the region `fra1`, Deploymen
 **Known for the second half:** the pool reads `src/data/postgres/supabase-ca.crt` at run time; Vercel's function bundle
 includes only traced files, so `next.config.ts` needs `outputFileTracingIncludes` for it (with the first deployment, step
 4's second half).
+
+**The full run on `7b28da8`** (run 44152711183, nine parts, with `vercel.json` and this checklist): **822 passed, 0 failed,
+16 skipped, 0 flaky, 0 expected failures**; wall-clock 11 min 54 s (18:53:39 to 19:05:33 UTC). S3B-06 passed.
+
+| Part | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Time (min) | 9.8 | 9.3 | 8.0 | 7.7 | 10.2 | 10.4 | 6.5 | 6.5 | 9.8 |
+| Heap peak (MB) | 1,066 | 1,243 | 1,189 | 1,237 | 1,316 | 1,399 | 1,446 | 1,526 | 1,717 |
+
+No restart. CI (run 44152688960) and the Schema workflow (run 44152689223: migrations, the contract suite, the smoke set)
+passed on the same commit. Step 4's first half is done; Łukasz sets up the Vercel project from the checklist, then the
+second half (the first deployment, `outputFileTracingIncludes` for the CA, the timing record, the measurement).
