@@ -24,7 +24,8 @@
     "dev:pg": "tsx scripts/dev-pg.ts",
     "pg:check": "tsx scripts/pg-check.ts",
     "pg:migrate": "tsx scripts/pg-migrate.ts",
-    "pg:seed": "tsx scripts/pg-seed.ts"
+    "pg:seed": "tsx scripts/pg-seed.ts",
+    "pg:accounts": "tsx scripts/pg-accounts.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
