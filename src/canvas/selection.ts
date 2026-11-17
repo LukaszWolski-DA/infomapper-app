@@ -193,3 +193,25 @@ export function selectionDeleted(sel: Selection, deleted: ReadonlySet<string>): 
       return deleted.has(sel.id);
   }
 }
+
+/** Whether two selections are the same: the same kind naming the same rows (a multi-selection's keys in any order). */
+export function sameSelection(a: Selection, b: Selection): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.t !== b.t) return false;
+  if (a.t === "multi" && b.t === "multi") return a.keys.length === b.keys.length && a.keys.every((k) => b.keys.includes(k));
+  if (a.t === "row" && b.t === "row") return a.id === b.id && a.cardId === b.cardId;
+  if (a.t === "element" && b.t === "element") return a.kind === b.kind && a.id === b.id;
+  if (a.t === "ext" && b.t === "ext") return a.kind === b.kind && a.id === b.id;
+  return "id" in a && "id" in b && a.id === b.id;
+}
+
+/**
+ * The selection after an answer that selects what it made (fix/late-selection-after-create): `made` only if the
+ * selection is still what it was when the action was sent (`sent`), else the current one. The one rule for a create, a
+ * paste, a duplicate or any other write whose answer selects its result (`ui.selectMade`): a selection the person made
+ * while the action was on its way stays. The answer of `selectionDeleted`'s twin: it compares with the sent selection,
+ * not with the rows written.
+ */
+export function selectionAfterAnswer(current: Selection, sent: Selection, made: Selection): Selection {
+  return sameSelection(current, sent) ? made : current;
+}

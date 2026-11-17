@@ -156,8 +156,10 @@ export function useCubeCanvas(context: CanvasExtContext): CanvasExtHandlers {
           toast(MAPPING_EXISTS_SELECTED);
         } else if (plan.t === "refuse") toast(plan.message, "refusal");
         else if (plan.t === "map") {
+          // a selection made while the drop was on its way stays (fix/late-selection-after-create)
+          const sent = ui.selection;
           void run(() => createCubeMappingAction(workspaceId, { inputAttributeId: plan.inputId, targetAttributeId: plan.targetId }), (v) => v.toast, { undoable: true }).then((r) => {
-            if (r.ok) select(r.value.mappingId);
+            if (r.ok) ui.selectMade(sent, { t: "ext", kind: CUBE_MAPPING_KIND, id: r.value.mappingId });
           });
         } else if (plan.t === "header") {
           const cardId = cardOfEntity.get(plan.entityId);
@@ -168,9 +170,10 @@ export function useCubeCanvas(context: CanvasExtContext): CanvasExtHandlers {
               ...(cardId && expectedVersion !== undefined ? { card: { canvasItemId: cardId, expectedVersion } } : {}),
             });
           // the card opens with the new row (the prototype): on the card's queue, with its version then
+          const sent = ui.selection;
           const write = () => run(() => (cardId ? ui.withCard(cardId, (v) => send(v)) : send()), (v) => v.toast, { undoable: true });
           void write().then((r) => {
-            if (r.ok && cardId) ui.select({ t: "row", cardId, id: r.value.attributeId });
+            if (r.ok && cardId) ui.selectMade(sent, { t: "row", cardId, id: r.value.attributeId });
           });
         }
       },

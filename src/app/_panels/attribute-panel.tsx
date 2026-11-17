@@ -129,12 +129,14 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   const dataType = useChoice(a.data_type, (t) => saveType({ dataType: t }));
 
   async function addColumn(columnId: string) {
+    const sent = ui.selection;
     const result = await run(() => createMappingAction(p.workspaceId, { attributeId: a.id, sourceColumnId: columnId }));
     if (!result.ok) return;
     const column = ix.column.get(columnId);
     const fits = column ? checkMappingTypes({ kind: "direct", rule_expression: null }, a, [column]).ok : true;
     toast(`Mapped ${columnLabel(ix, columnId)} to ${attributeLabel(ix, a.id)}${fits ? "" : ". The data types don't fit."}`);
-    ui.select({ t: "map", id: result.value.mappingId });
+    // a selection made while the mapping was on its way stays (fix/late-selection-after-create)
+    ui.selectMade(sent, { t: "map", id: result.value.mappingId });
   }
 
   async function remove() {

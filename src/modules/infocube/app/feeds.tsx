@@ -67,8 +67,10 @@ function ComesFrom({ a, index }: { a: Attribute; index: MappingIndex }) {
   const groups = useMemo(() => attributeGroups(index, p, "logical"), [index, p]);
 
   async function add(inputAttributeId: string) {
+    const sent = ui.selection;
     const result = await run(() => createCubeMappingAction(p.workspaceId, { inputAttributeId, targetAttributeId: a.id }), (v) => v.toast, { undoable: true });
-    if (result.ok) ui.select({ t: "ext", kind: CUBE_MAPPING_KIND, id: result.value.mappingId });
+    // a selection made while the add was on its way stays (fix/late-selection-after-create)
+    if (result.ok) ui.selectMade(sent, { t: "ext", kind: CUBE_MAPPING_KIND, id: result.value.mappingId });
   }
 
   return (
