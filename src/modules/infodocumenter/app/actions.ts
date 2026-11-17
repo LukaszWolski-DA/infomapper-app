@@ -10,6 +10,7 @@ import { DOCUMENT_SECTION_KINDS, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES } from 
 import { loadAccess, modelRead } from "@/app/_lib/model-command";
 import { documentHref } from "@/app/_lib/paths";
 import { runCommand, type ActionResult, type Saved } from "@/app/_lib/run-command";
+import { withTiming } from "@/app/_lib/timing";
 import type { DataStore } from "@/data";
 import type { CommandResult } from "@/domain/changes";
 import type { Uuid } from "@/domain/ids";
@@ -149,6 +150,15 @@ export async function moveDocumentSectionAction(input: MoveDocumentSectionInput)
  * open; a read, no write.
  */
 export async function documentSnapshotAction(input: { workspaceId: string; documentId: string }): Promise<ActionResult<WorkspaceSnapshot<ModuleTable>>> {
+  // slice 29 (Q9): with INFOMAPPER_TIMING=1 one log line of numbers (no id, name or value): the reads and the bytes
+  return withTiming(
+    () => snapshotFor(input),
+    (summary, result) =>
+      console.log(`timing ${JSON.stringify({ route: "document-snapshot", ok: result.ok, ...summary, bytes: result.ok ? Buffer.byteLength(JSON.stringify(result.value)) : 0 })}`),
+  );
+}
+
+function snapshotFor(input: { workspaceId: string; documentId: string }): Promise<ActionResult<WorkspaceSnapshot<ModuleTable>>> {
   return modelRead(input?.workspaceId, async (access, _model, store) => {
     const doc = await documentOf(store, access, input?.documentId);
     if (openRefusal(access, doc)) throw new Error("not_found");

@@ -1,3 +1,4 @@
+import { TimingRecord } from "@/app/_lib/timing";
 import { dataVaultUses, indexOf } from "@/domain/model/classifications";
 import { stereotypeUses } from "@/domain/model/stereotypes";
 import Link from "next/link";
@@ -362,6 +363,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
         </div>
       </div>
     </AppShell>
+    {/* slice 29 (Q9): the page's reads, hidden, with INFOMAPPER_TIMING=1 only */}
+    <TimingRecord />
     </UndoProvider>
   );
 }

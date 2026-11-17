@@ -7,12 +7,21 @@
 import { getSession } from "@/app/_lib/session";
 import { workspaceAccess } from "@/app/_lib/shell";
 import { thumbnailKey } from "@/app/_lib/thumbnails";
+import { serverTimingHeader, withTiming } from "@/app/_lib/timing";
 import { getDataStore } from "@/data";
 import { moduleRowFeeds } from "@/compose";
 import { canvasThumbnail, thumbnailDrawing, thumbnailIndex } from "@/domain/model/thumbnail";
 import { thumbnailSymbolFile } from "@/ui/thumbnail-svg";
 
 export async function GET(request: Request, ctx: RouteContext<"/w/[workspaceId]/thumbnail/[canvasId]">) {
+  // slice 29 (Q9): with INFOMAPPER_TIMING=1 the answer carries its reads as Server-Timing
+  return withTiming(
+    () => thumbnail(request, ctx),
+    (summary, response) => response.headers.set("Server-Timing", serverTimingHeader(summary)),
+  );
+}
+
+async function thumbnail(request: Request, ctx: RouteContext<"/w/[workspaceId]/thumbnail/[canvasId]">): Promise<Response> {
   const { workspaceId, canvasId } = await ctx.params;
   const session = await getSession();
   if (!session) return new Response(null, { status: 401 });

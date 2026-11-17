@@ -8,6 +8,7 @@ import { createLocalDataStore } from "./local/store";
 import { dataMode } from "./mode";
 import type { DataStore } from "./ports";
 import { createPostgresDataStore } from "./postgres/store";
+import { isTimingOn, timedStore } from "./timing";
 
 export type { DataStore } from "./ports";
 export { dataMode, isPostgresMode, type DataMode } from "./mode";
@@ -17,5 +18,7 @@ export { dataMode, isPostgresMode, type DataMode } from "./mode";
  * passes the composition root's (`STORE_SCHEMA` from `@/compose`), so a module's rows are stored and undone.
  */
 export function getDataStore(schema?: LocalSchema): DataStore {
-  return dataMode() === "postgres" ? createPostgresDataStore(schema) : createLocalDataStore(devDbPath(), schema);
+  const store = dataMode() === "postgres" ? createPostgresDataStore(schema) : createLocalDataStore(devDbPath(), schema);
+  // slice 29 (Q9): counted and timed only with INFOMAPPER_TIMING=1
+  return isTimingOn() ? timedStore(store) : store;
 }

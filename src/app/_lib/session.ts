@@ -7,6 +7,8 @@ import type { Uuid } from "@/domain/ids";
 import type { AppUser } from "@/domain/types";
 import { decodeSession, DEV_SESSION_COOKIE, devCookieOptions, encodeSession } from "./dev-session";
 import { supabaseServer } from "./supabase";
+// slice 29 (Q9): sets the timing record's source before any read (on only with INFOMAPPER_TIMING=1)
+import "./timing";
 
 export interface Session {
   user: AppUser;

@@ -7,6 +7,7 @@
 // Server only. The connection string is never logged.
 
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
+import { countStatement, countWait, isTimingOn } from "../timing";
 import { pgClientConfig } from "./config";
 
 export const DATABASE_URL_ENV = "INFOMAPPER_DATABASE_URL";
@@ -24,8 +25,54 @@ export function getPool(): Pool {
   if (process.env.VERCEL) {
     void import("@vercel/functions").then(({ attachDatabasePool }) => attachDatabasePool(pool));
   }
+  if (isTimingOn()) timePool(pool);
   holder.__infomapperPgPool = pool;
   return pool;
+}
+
+/**
+ * With the timing record on (slice 29, step 4): every statement's time and every wait for a connection go into the
+ * current request's record (`../timing.ts`). Statements on a transaction's client count too (begin and commit included:
+ * they are round trips).
+ */
+function timePool(pool: Pool): void {
+  const timedQuery = <T extends { query: (...args: never[]) => unknown }>(target: T) => {
+    const query = target.query.bind(target) as (...args: unknown[]) => Promise<unknown>;
+    (target as unknown as { query: unknown }).query = async (...args: unknown[]) => {
+      const start = performance.now();
+      try {
+        return await query(...args);
+      } finally {
+        countStatement(performance.now() - start);
+      }
+    };
+  };
+  // Only clients are timed: node-postgres's own `pool.query` takes a client through `this.connect(callback)` and runs the
+  // statement on it, so timing the pool too would count every statement twice. Both forms of `connect` are kept: a
+  // promise (`readTransaction`) and a callback (`pool.query`).
+  type Done = (release?: unknown) => void;
+  type Callback = (err: Error | undefined, client?: PoolClient, done?: Done) => void;
+  const connect = pool.connect.bind(pool) as (cb?: Callback) => Promise<PoolClient> | void;
+  const timeClient = (client: PoolClient) => {
+    if ((client as { __timed?: boolean }).__timed) return;
+    timedQuery(client);
+    (client as { __timed?: boolean }).__timed = true;
+  };
+  (pool as unknown as { connect: unknown }).connect = (cb?: Callback) => {
+    const start = performance.now();
+    if (typeof cb === "function") {
+      return connect((err, client, done) => {
+        countWait(performance.now() - start);
+        if (client) timeClient(client);
+        cb(err, client, done);
+      });
+    }
+    return (connect() as Promise<PoolClient>).then((client) => {
+      countWait(performance.now() - start);
+      timeClient(client);
+      return client;
+    });
+  };
 }
 
 /** Something to run queries on: the pool, or one transaction's client. */
