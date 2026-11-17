@@ -140,6 +140,8 @@ export class FieldDraft {
 export interface Chosen<T> {
   value: T;
   on: T;
+  /** The row's version its stored save's answer gave (fix/choice-after-undo); absent while on its way or without one. */
+  landed?: number;
 }
 
 export const choiceShown = <T>(chosen: Chosen<T> | null, stored: T): T => (chosen && Object.is(chosen.on, stored) ? chosen.value : stored);
@@ -149,3 +151,13 @@ export const choiceShown = <T>(chosen: Chosen<T> | null, stored: T): T => (chose
  * change back to the value it was made on (an undo) shows as stored instead of the old choice again.
  */
 export const choiceLanded = <T>(chosen: Chosen<T>, stored: T): boolean => !Object.is(chosen.on, chosen.value) && Object.is(stored, chosen.value);
+
+/**
+ * Whether a choice's save is in the page (fix/choice-after-undo): the field is drawn with the version its stored save's
+ * answer gave, or a newer one. `useChoice` then forgets it, whatever the stored value is: the save's page may be drawn
+ * in one commit with an undo's (the stored value back to the one the choice was made on, never equal to the choice),
+ * and a fresh page may bring another session's revert. A field given no version (null), or an answer with none, keeps
+ * `choiceLanded` only.
+ */
+export const choiceSettled = <T>(chosen: Chosen<T>, version: number | null): boolean =>
+  typeof chosen.landed === "number" && version !== null && version >= chosen.landed;

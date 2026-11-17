@@ -546,23 +546,23 @@ export function DocumentEditor(props: EditorProps) {
 
               <Fold title="Scope" storeKey={FOLD_KEY} testId="fold-document-scope">
                 <Field label="Projects" hint="None ticked: the whole model. Otherwise what the projects' canvases show.">
-                  {(f) => <IdChecks testId="checks-projects" labelledBy={f.labelId} items={projects} chosen={doc.scope.projects} disabled={ro} onSave={(ids) => save({ scope: { projects: ids } })} />}
+                  {(f) => <IdChecks version={doc.version} testId="checks-projects" labelledBy={f.labelId} items={projects} chosen={doc.scope.projects} disabled={ro} onSave={(ids) => save({ scope: { projects: ids } })} />}
                 </Field>
                 <Field label="Concepts" hint="None ticked: every concept.">
-                  {(f) => <IdChecks testId="checks-concepts" labelledBy={f.labelId} items={concepts} chosen={doc.scope.concepts} disabled={ro} onSave={(ids) => save({ scope: { concepts: ids } })} />}
+                  {(f) => <IdChecks version={doc.version} testId="checks-concepts" labelledBy={f.labelId} items={concepts} chosen={doc.scope.concepts} disabled={ro} onSave={(ids) => save({ scope: { concepts: ids } })} />}
                 </Field>
                 {/* only while the dimensional level is drawn (the prototype's; Łukasz's answer to step 2) */}
                 {dimensional && (
                   <Field label="Model levels">
                     {(f) => (
                       <div className="flex flex-wrap gap-4" role="group" aria-labelledby={f.labelId}>
-                        <Check testId="check-level-logical" label="Logical" stored={doc.scope.logical} disabled={ro} onSave={(on) => save({ scope: { logical: on } })} />
-                        <Check testId="check-level-dimensional" label="Dimensional (InfoCube)" stored={doc.scope.dimensional} disabled={ro} onSave={(on) => save({ scope: { dimensional: on } })} />
+                        <Check version={doc.version} testId="check-level-logical" label="Logical" stored={doc.scope.logical} disabled={ro} onSave={(on) => save({ scope: { logical: on } })} />
+                        <Check version={doc.version} testId="check-level-dimensional" label="Dimensional (InfoCube)" stored={doc.scope.dimensional} disabled={ro} onSave={(on) => save({ scope: { dimensional: on } })} />
                       </div>
                     )}
                   </Field>
                 )}
-                <Choice stored={doc.scope.mappings} save={(m) => save({ scope: { mappings: m } })}>
+                <Choice version={doc.version} stored={doc.scope.mappings} save={(m) => save({ scope: { mappings: m } })}>
                   {(value, pick) => (
                     <Field label="Mappings included" hint={MAPPINGS_HINTS[value]}>
                       {(f) => <Seg testId="seg-mappings" labelledBy={f.labelId} describedBy={f.hintId} value={value} options={MAPPINGS} disabled={ro} onChange={pick} />}
@@ -624,6 +624,7 @@ function SectionRow({
   last,
   selected,
   readOnly,
+  version,
   onSelect,
   onOpen,
   onSwitch,
@@ -646,7 +647,7 @@ function SectionRow({
   const name = s.heading?.trim() || (type ? sectionName(type.type, type.name) : s.type);
   const typeName = type ? sectionName(type.type, type.name) : s.type;
   const off = !!type && !type.available;
-  const choice = useChoice(s.on, onSwitch);
+  const choice = useChoice(s.on, onSwitch, version);
   return (
     <div
       className={`de-sec ${rowClass} group flex items-center gap-1.5 ${!choice.value || off ? "off" : ""}`}
@@ -772,6 +773,7 @@ function SectionPanel({
         fields={type.fields}
         options={o}
         readOnly={readOnly}
+        version={version}
         save={opt}
         figureEditor={figureEditor}
         placedLines={figures.placed}
@@ -806,7 +808,7 @@ function SectionPanel({
           )}
         </Field>
         <div className="mt-3">
-          <Check testId="check-section-new-page" label={EDITOR_TEXTS.newPage} stored={s.newPage} disabled={readOnly || compact} onSave={(v) => save({ newPage: v })} />
+          <Check version={version} testId="check-section-new-page" label={EDITOR_TEXTS.newPage} stored={s.newPage} disabled={readOnly || compact} onSave={(v) => save({ newPage: v })} />
           {compact && <div className="mt-1 text-[11.5px] text-im-ink-3">{EDITOR_TEXTS.compactRunsOn}</div>}
         </div>
       </div>
@@ -839,7 +841,7 @@ function SharedChoice({
     const answer = await saveRow(row, (v) => setDocumentSharedAction({ workspaceId, documentId: row.id, expectedVersion: v, shared: next }), undefined, { quiet: true });
     if (!answer.ok && answer.message) setRefusal(answer.message);
     return answer;
-  });
+  }, row.version);
   return (
     <Field label={EDITOR_TEXTS.whoSees}>
       {(f) => (
@@ -872,13 +874,14 @@ function SharedChoice({
   );
 }
 
-function Choice<T>({ stored, save, children }: { stored: T; save: (v: T) => Answer; children: (value: T, choose: (v: T) => void) => ReactNode }) {
-  const choice = useChoice(stored, save);
+/** `version`: the document's, which every save of the editor writes (fix/choice-after-undo). */
+function Choice<T>({ stored, save, version, children }: { stored: T; save: (v: T) => Answer; version: number; children: (value: T, choose: (v: T) => void) => ReactNode }) {
+  const choice = useChoice(stored, save, version);
   return <>{children(choice.value, choice.choose)}</>;
 }
 
-function Check({ label, stored, onSave, disabled, testId }: { label: string; stored: boolean; onSave: (v: boolean) => Answer; disabled?: boolean; testId: string }) {
-  const choice = useChoice(stored, onSave);
+function Check({ label, stored, onSave, version, disabled, testId }: { label: string; stored: boolean; onSave: (v: boolean) => Answer; version: number; disabled?: boolean; testId: string }) {
+  const choice = useChoice(stored, onSave, version);
   return (
     <label className="flex items-center gap-2">
       <input type="checkbox" data-testid={testId} checked={choice.value} disabled={disabled} onChange={(e) => choice.choose(e.currentTarget.checked)} />
@@ -891,6 +894,7 @@ function IdChecks({
   items,
   chosen,
   onSave,
+  version,
   disabled,
   testId,
   labelledBy,
@@ -898,6 +902,7 @@ function IdChecks({
   items: { id: string; name: string }[];
   chosen: string[];
   onSave: (v: string[]) => Answer;
+  version: number;
   disabled?: boolean;
   testId: string;
   labelledBy?: string;
@@ -907,7 +912,7 @@ function IdChecks({
   // stay the same (`useChoice` shows a choice made on that object)
   const shownKey = JSON.stringify(chosen.filter((id) => live.has(id)));
   const shown = useMemo(() => JSON.parse(shownKey) as string[], [shownKey]);
-  const choice = useChoice<readonly string[]>(shown, (v) => onSave([...v]));
+  const choice = useChoice<readonly string[]>(shown, (v) => onSave([...v]), version);
   return (
     <div className="flex flex-col gap-1" role="group" aria-labelledby={labelledBy} data-testid={testId}>
       {items.map((i) => (

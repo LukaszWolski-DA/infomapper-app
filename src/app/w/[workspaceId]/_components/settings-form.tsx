@@ -89,9 +89,9 @@ export function SettingsForm({
   const { bind: nameBind, defaultValue: nameInitial, commit: nameCommit, keyDown: nameKeyDown, mark: nameMark, takeStored: nameTake, keepMine: nameKeep } = useDraft<HTMLInputElement>(initial.name, (v) => save({ name: v }), { ...trim, required: true, onEmpty: () => toast(NAME_REQUIRED, "refusal") });
   const { bind: clientBind, defaultValue: clientInitial, commit: clientCommit, keyDown: clientKeyDown, mark: clientMark, takeStored: clientTake, keepMine: clientKeep } = useDraft<HTMLInputElement>(initial.clientName, (v) => save({ clientName: v }), trim);
   const { bind: descriptionBind, defaultValue: descriptionInitial, commit: descriptionCommit, keyDown: descriptionKeyDown, mark: descriptionMark, takeStored: descriptionTake, keepMine: descriptionKeep } = useDraft<HTMLTextAreaElement>(initial.description, (v) => save({ description: v }), trim);
-  const language = useChoice(initial.docLanguage, (docLanguage) => save({ docLanguage }));
-  const dv2 = useChoice(initial.dv2Mode, (dv2Mode) => save({ dv2Mode }));
-  const fourEyes = useChoice(initial.fourEyes, (on) => save({ fourEyes: on }));
+  const language = useChoice(initial.docLanguage, (docLanguage) => save({ docLanguage }), initial.version);
+  const dv2 = useChoice(initial.dv2Mode, (dv2Mode) => save({ dv2Mode }), initial.version);
+  const fourEyes = useChoice(initial.fourEyes, (on) => save({ fourEyes: on }), initial.version);
 
   const dis = !editable;
   return (
@@ -237,6 +237,7 @@ function ConceptColourLine({ workspaceId, concept, editable }: { workspaceId: st
       `Changed the colour of ${concept.name}.`,
       { undoable: true },
     ),
+    concept.version,
   );
   return (
     <div className="mb-2 flex items-center gap-2.5" data-testid="concept-colour" data-concept={concept.name}>

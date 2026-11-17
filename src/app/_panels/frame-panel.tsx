@@ -49,8 +49,8 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
 
   // frames save through the canvas's queue, whose answer says why a save was refused (slice 14a): the name keeps its
   // draft with slice 13's line, and a choice shows the stored value after a refusal
-  const concept = useChoice(view?.frame.conceptId ?? "", (conceptId) => ui.updateFrame(frameId, { conceptId }));
-  const system = useChoice(view?.frame.sourceSystemId ?? "", (sourceSystemId) => ui.updateFrame(frameId, { sourceSystemId }));
+  const concept = useChoice(view?.frame.conceptId ?? "", (conceptId) => ui.updateFrame(frameId, { conceptId }), view?.frame.version ?? null);
+  const system = useChoice(view?.frame.sourceSystemId ?? "", (sourceSystemId) => ui.updateFrame(frameId, { sourceSystemId }), view?.frame.version ?? null);
 
   if (!view) return null;
   const { frame: f, members, stats } = view;

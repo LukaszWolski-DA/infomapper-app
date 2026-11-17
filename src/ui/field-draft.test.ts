@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choiceLanded, choiceShown, FieldDraft, storedBy, versionBy } from "./field-draft";
+import { choiceLanded, choiceSettled, choiceShown, FieldDraft, storedBy, versionBy, type Chosen } from "./field-draft";
 
 describe("FieldDraft (slice 13, D-66)", () => {
   it("takes a fresh stored value only without the focus and without a draft", () => {
@@ -181,6 +181,36 @@ describe("choiceLanded (slice 15b)", () => {
     expect(choiceLanded(chosen, "entity")).toBe(false); // on its way
     expect(choiceLanded(chosen, "hub")).toBe(true); // stored: forgotten, then an undo shows "entity"
     expect(choiceLanded(chosen, "link")).toBe(false); // another value: choiceShown shows it anyway
+  });
+});
+
+describe("choiceSettled (fix/choice-after-undo)", () => {
+  // the field shows the choice while it is not forgotten: what useChoice does on each render
+  const shownAfter = <T,>(chosen: Chosen<T>, stored: T, version: number | null): T =>
+    choiceLanded(chosen, stored) || choiceSettled(chosen, version) ? stored : choiceShown(chosen, stored);
+
+  it("(a) an undo's page drawn in one commit with the save's: the stored value shows, not the choice", () => {
+    // the flag turned on at version 2 (off), stored at version 3; the undo's page brings version 4, off again
+    const chosen: Chosen<boolean> = { value: true, on: false, landed: 3 };
+    expect(shownAfter(chosen, false, 2)).toBe(true); // the answer came, the save's page not yet
+    expect(shownAfter(chosen, false, 4)).toBe(false); // version 3 never drawn
+    expect(choiceLanded(chosen, false)).toBe(false); // the old rule alone kept the choice
+  });
+
+  it("(b) a fresh page with a newer version and the value from before the click: another session's revert shows", () => {
+    const chosen: Chosen<string> = { value: "hub", on: "entity", landed: 5 };
+    expect(shownAfter(chosen, "entity", 6)).toBe("entity");
+    expect(shownAfter(chosen, "entity", 5)).toBe("entity"); // the save's own version, the value reverted since
+    expect(shownAfter(chosen, "hub", 5)).toBe("hub");
+  });
+
+  it("keeps the choice before its answer, below its version, and without a version (the old rule only)", () => {
+    expect(choiceSettled({ value: "hub", on: "entity" }, 9)).toBe(false); // on its way
+    expect(choiceSettled({ value: "hub", on: "entity", landed: 5 }, 4)).toBe(false); // an older page
+    expect(choiceSettled({ value: "hub", on: "entity", landed: 5 }, null)).toBe(false); // the field has no version
+    const noVersion: Chosen<boolean> = { value: true, on: false };
+    expect(shownAfter(noVersion, false, null)).toBe(true);
+    expect(shownAfter(noVersion, true, null)).toBe(true); // landed: forgotten by choiceLanded
   });
 });
 

@@ -40,7 +40,7 @@ export function InfoDocumenterBox({ workspaceId, version, on, licensed, organiza
     );
     if (!answer.ok && answer.message) setRefusal(answer.message);
     return answer;
-  });
+  }, version);
   return (
     <div className="mt-4 rounded-lg border border-im-line px-3 py-2.5" data-testid="box-infodoc">
       <h4 className="m-0 mb-1 flex items-center gap-1.5 text-[13.5px] font-semibold">

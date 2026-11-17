@@ -1302,7 +1302,9 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     wrote or a newer one, still holds the text it sent and has no focus, it takes the stored value (`FieldDraft.settle`),
     so an Undo drawn in one commit with the save's page, or a command's trimmed form, shows; a save's answer must give
     that row's version (`Saved`'s `value.version`, a canvas save's `version`). Choice fields use
-    `useChoice`: no draft, the newest stored value after a refusal.
+    `useChoice`: no draft, the newest stored value after a refusal. Since fix/choice-after-undo a choice field passes its
+    row's version (`useChoice(stored, save, version)`, `null` only where the row or its save's answer has none): the
+    choice ends once the field shows its save's version or a newer one (`choiceSettled`).
   - **A refusal that cuts brings the fresh page:** `runCommand` revalidates after `stale_version`, `forbidden`,
     `archived` and `not_found`, and `useAction`'s `saveRow` and `saveRows` answer such a refusal only once the transition
     that applies its page has committed (`afterPage`), so the field sees the newest value and version; a plain `run`
