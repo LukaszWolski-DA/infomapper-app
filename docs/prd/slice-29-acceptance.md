@@ -709,3 +709,15 @@ Nine unit tests failed on order, and KB's seed-made rows would have moved. The c
   seed-made rows): (a) accept key order past the 999th row (the reads that matter have their own sorts; today only
   `loadForUndo` shows it), or (b) a rule that keeps the whole order, decided before slice B. I recommend (a) now, and (b)
   as an item for slice B's step 1.
+
+### Łukasz's answers to step 2 (17 November 2026)
+
+- **L9:** accepted for now: past the 999th row of one millisecond, key order; the contract compares that table
+  (`source_column` in `loadForUndo`) as a set. **For slice B's step 1:** list every table one write set can fill with
+  more than 1,000 rows (an import's `source_column`, `mapping_input`, `classification_link`, `change_event`, …), whether
+  its order is read anywhere, and a rule where it is. The microseconds hold 1,000 places per millisecond.
+- **Migrations by our own script:** accepted. `npm run pg:migrate` is the only way to migrate `infomapper-dev`,
+  documented at the closing; no promise of the Supabase CLI's compatibility.
+- **The document editor's controls while read only:** accepted as a known limitation of slice A, gone in slice B.
+- **The signing key (L2):** `infomapper-dev`'s current key is ECC (P-256), that is ES256, so `getClaims()` checks
+  sessions locally against the JWKS, without a call to Auth.
