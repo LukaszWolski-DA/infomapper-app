@@ -3,6 +3,8 @@ import localFont from "next/font/local";
 import { ToastProvider } from "@/ui/components/toast";
 import { NoBrowserMenu } from "@/ui/no-browser-menu";
 import { PickHost } from "@/ui/pick-popover";
+import { SaveHook } from "@/ui/save-hook";
+import { areTestHooksOn } from "@/data/local/measure-mode";
 import "./globals.css";
 import "@/compose/styles";
 
@@ -39,6 +41,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ToastProvider>{children}</ToastProvider>
         {/* slice 17 (D-72): the picker for a new entity's concept and for requirements to link */}
         <PickHost />
+        {/* fix/write-after-reseed: the saves on their way, for the e2e fixtures (test hooks only) */}
+        {areTestHooksOn() && <SaveHook />}
       </body>
     </html>
   );

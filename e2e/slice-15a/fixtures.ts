@@ -2,7 +2,7 @@
 // on in "Retail Co – DWH", Fact Sales, Fact Orders, Dim Customer, Dim Product and Dim Date on the canvas "Sales star".
 // `test.use({ star: false })` starts from the plain seed every earlier spec uses: no licence, InfoCube off.
 
-import { test as base } from "@playwright/test";
+import { test as base } from "../settle";
 import { addModuleDemoData } from "../../src/compose/seed";
 import { resetDevData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";

@@ -5,7 +5,7 @@
 // - "full": everything the seed writes (`addSeedDemoData`: the star with its derivations, types and checks, then the
 //   documents), for InfoCube's Dimensional model (S25-06).
 
-import { test as base } from "@playwright/test";
+import { test as base } from "../settle";
 import { addDocumentsDemoData, addSeedDemoData } from "../../src/compose/seed";
 import { resetDevData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";

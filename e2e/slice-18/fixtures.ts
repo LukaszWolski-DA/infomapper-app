@@ -3,7 +3,7 @@
 // Sales.net_amount calculated from the fact's quantity, unit_price and discount_pct. Slice 15's fixtures keep the star
 // without them.
 
-import { test as base } from "@playwright/test";
+import { test as base } from "../settle";
 import { addDemoData } from "../../src/compose/seed";
 import { resetDevData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";
