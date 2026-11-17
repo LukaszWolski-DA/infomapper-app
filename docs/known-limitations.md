@@ -1080,6 +1080,48 @@ InfoCube's dimensional mapping delete included. RP-07's assertions are unchanged
 `e2e/fixes/selection-after-entity-delete.spec.ts` (a selected attribute of an entity whose delete is held is cleared),
 with the cascade cases in `src/canvas/selection.test.ts`.
 
+### S15-24 failed once: a create's answer replaced a newer selection (a bug, fixed on fix/late-selection-after-create)
+
+In slice 29's full run (run 44038848793), `e2e/slice-15d/S15-24.spec.ts` failed; it passed 3 of 3 on its own (run
+44041007805). **The cause was in the app, found through the test** (CLAUDE.md, "A race in a test"), the twin of RP-07's
+above: when InfoCube's "Add a logical attribute" answered, `ComesFrom` (`src/modules/infocube/app/feeds.tsx`) selected the
+new mapping (`ui.select`), whatever was selected by then. The test waits for the data file, which is written before the
+answer reaches the page, and then opens Dim Date; the answer then replaced that selection with the mapping's panel. A
+person who clicks another card while the add is on its way loses their selection the same way. A spec that held the
+answer (slice 13's `holdUntil`) and opened Fact Sales meanwhile showed the "Dimensional mapping" panel every time.
+
+**The fix:** one rule beside `selectionDeleted`, `selectionAfterAnswer(current, sent, made)` (`src/canvas/selection.ts`,
+with `sameSelection`): an answer selects what it made only if the selection is still the one the action was sent with,
+compared by what it names, not by the object. It is applied by `ui.selectMade(sent, made)` (`CanvasUiApi`,
+`CanvasProvider`) to the selection as it is when the answer arrives; the caller reads `sent` from `ui.selection` when it
+sends the action. InfoCube reaches it through the canvas context, as it does `deselectDeleted` (AD-19, AD-33). S15-24's
+assertions are unchanged. The fix is checked by `e2e/fixes/selection-after-create.spec.ts` (a card opened while the add
+is held stays selected; with nothing clicked meanwhile the new mapping is selected) and the rule's cases in
+`src/canvas/selection.test.ts`.
+
+**Every answer that selects something, and where each stands:**
+
+- **Fixed with the same call** (the selection is the answer's only effect on what is shown): InfoCube's "Add a logical
+  attribute" (`feeds.tsx`); a column mapped from the attribute panel (`attribute-panel.tsx`, `addColumn`); the relate
+  drag between two entities (`canvas-host.tsx`, `relate`); a column dropped on a row, the D-48 choice's "add to this
+  mapping", and a column dropped on an entity's header (`map-column.tsx`: `createDirect`, `confirm`, `dropOnEntity`);
+  InfoCube's row drops, a mapping and "Create attribute and its mapping" on a header (`canvas-ext.tsx`).
+- **The same race, not fixed here** (the answer also opens the details panel, focuses the new name or moves the view,
+  which would have to follow the same rule: more than one call): "Relate to itself", "Paste attribute", "Add
+  attribute" and "Add attribute below" in a card's menus (`canvas-host.tsx`: `relateToItself`, `pasteInto`,
+  `addAttributeTo`); a new entity, fact or dimension from the canvas or its toolbox (`canvas-host.tsx`, `createEntityAt`)
+  and from the left panel's concept and Cube tab (`left-panel.tsx`: `addEntity`, `createIn`); the entity panel's "Add
+  attribute" (`entity-panel.tsx`); "New requirement" (`left-panel.tsx`). Inside the canvas, which reads the selection
+  through its own state and would need a reader that does not re-render `ModelCanvas`: placing a card (`ModelCanvas`'s
+  `place`, behind the left panel's and the go-to links' placing and a new source table), "Place sources beside"
+  (`placeBeside`), placing requirement cards, a new frame and "Put in a new frame" (`useFrames.ts`, also focusing the
+  frame's name), and a new note's first save (`useNotes.ts`, which replaces the draft note's selection).
+- **Behind a modal dialog** (no click reaches the canvas while it waits; only if the dialog is closed with Escape first):
+  "Create dimension from this…" (`create-dimension-dialog.tsx`) and an import's source system (`use-imported.ts`).
+- **No race:** a split (its answer selects nothing), the selections made on a click before any write (the tree, the
+  go-to links, the checks, a requirement dropped from the left panel, "That mapping already exists"), and Focus's and a
+  found row's selections. The app has no duplicate command.
+
 ### S11-08 failed once: a save on its way when the next test reseeded (a bug in the local adapter and the fixtures, fixed on fix/write-after-reseed)
 
 In PR 66's full run (run 44043914367, 17 November 2026), `e2e/slice-11/S11-08.spec.ts` failed in part 6: searching
