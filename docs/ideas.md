@@ -1015,8 +1015,10 @@ on release (D-54); and the editor has no narrow screens' overlay (it stacks up t
 - **Part 8 of the full run:** its heap peaked at 2,088 MB in slice 26 (past CLAUDE.md's 2 GB); recut on
   `chore/recut-e2e-parts` (`PART_STARTS`: `slice-02b`, `slice-04b1`, `slice-07a`, `slice-08`, `slice-11`, `slice-15a`,
   `slice-20`), by the median folder times of the full runs 43496089437, 43485073406 and 43481776730. Slice 27: part 8
-  peaked at 1,836 MB in step 4's run (`docs/prd/slice-27-acceptance.md`); a ninth part goes on its own `chore/` branch
-  after slice 27's merge when a full run's part 8 comes near 2 GB.
+  peaked at 1,836 MB in step 4's run (`docs/prd/slice-27-acceptance.md`). Slice 29: part 8 peaked at 1,877 and 1,908 MB
+  (runs 43964990106, 44038848793); the ninth part is `chore/ninth-e2e-part` (`PART_STARTS`: `slice-02a`, `slice-03b`,
+  `slice-05a`, `slice-07b`, `slice-10a`, `slice-14a`, `slice-16`, `slice-22`), by the median folder times and heap growth
+  of the full runs 43903061704, 43964990106 and 44038848793, each part's growth under about 1.5 GB.
 - **KB to format 17:** only on Łukasz's command, after the backup; then a dictionary of Kanton Basel.
 - **Paged.js** in `next.config.ts` (the alias) and the editor's two uses of its internals: check at each Paged.js or
   Next.js upgrade (`docs/known-limitations.md`).

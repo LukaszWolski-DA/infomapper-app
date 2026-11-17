@@ -420,7 +420,7 @@ versions, change events in the same write, uniqueness and the “exactly one tar
   - Before a merge: one full e2e run. It also counts for a later commit when the diff from the tested commit touches
     only Markdown files in `docs/` and the repository root; the report shows it with `git diff --stat <tested>..HEAD`
     (Łukasz, 7 November 2026).
-  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its eight parts
+  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its nine parts
     (`e2e/parts.ts`) side by side on GitHub's Linux runners, each with its own fresh dev server, no retries; one job
     merges their reports. Start it by hand (`gh workflow run e2e.yml --ref <branch>`, or "Run workflow" on the Actions
     page) or with the label `full-e2e` on the pull request (it tests the branch's head commit). A push starts none; a
@@ -429,7 +429,7 @@ versions, change events in the same write, uniqueness and the “exactly one tar
   - **Heap peaks** (chore heap findings, 13 November 2026): a full run's heap peaks include garbage not yet collected;
     with a forced GC, slices 20 to 26 retain 4 to 8 MB a test (the 6 MB below holds). The retained growth is React's
     development-only async tracking in the RSC server bundled with Next.js (`pendingOperations` keeps every rendered
-    request); production builds don't have it. Add a ninth part when part 8's peak in a full run reaches about 2 GB; do
+    request); production builds don't have it. Add a part (or recut) when a part's peak in a full run reaches about 2 GB; do
     not hunt an app leak for that growth unless a forced-GC measurement shows more than about 8 MB a test.
   - **The single-file check:** `gh workflow run e2e.yml --ref <branch> -f files="e2e/<folder>/<spec>.ts ..." -f
     rounds=3`: `rounds` jobs side by side, each with its own fresh dev server, each running the files once (paths under
@@ -504,7 +504,7 @@ npm run lint             # ESLint, including the layer rules (eslint-plugin-boun
 npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
 npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
-npm run e2e -- --part 2   # one of the full run's eight parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
+npm run e2e -- --part 2   # one of the full run's nine parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
 npm run e2e -- --list    # each part's files, as CI runs them (--part <n>: one part); starts no server
 gh workflow run e2e.yml --ref <branch>                                          # the full run in GitHub Actions (or the label full-e2e on the pull request)
 gh workflow run e2e.yml --ref <branch> -f files="e2e/slice-06a/S6A-07.spec.ts" -f rounds=3   # a single-file check: 3 jobs side by side, each with a fresh server
@@ -962,10 +962,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   and total objects, paint, layerize; as `S6A-09-hand.spec.ts` does) rather than unprepared medians to the screen, whose
   run-to-run spread (up to 12 ms in slice 6a) is larger than what is measured.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
-- **The full run in eight parts** (chore e2e reliability, P2 B; seven since chore CI e2e; eight since chore e2e eight
-  parts; recut by chore recut e2e parts): `npm run e2e` (`scripts/e2e.ts`) runs the folders in eight parts
-  (`e2e/parts.ts`, `PART_STARTS`: from `slice-02b`, `slice-04b1`, `slice-07a`, `slice-08`, `slice-11`, `slice-15a`,
-  `slice-20`; `tests/e2e-parts.test.ts`),
+- **The full run in nine parts** (chore e2e reliability, P2 B; seven since chore CI e2e; eight since chore e2e eight
+  parts; recut by chore recut e2e parts; nine since chore ninth e2e part): `npm run e2e` (`scripts/e2e.ts`) runs the
+  folders in nine parts (`e2e/parts.ts`, `PART_STARTS`: from `slice-02a`, `slice-03b`, `slice-05a`, `slice-07b`,
+  `slice-10a`, `slice-14a`, `slice-16`, `slice-22`; `tests/e2e-parts.test.ts`),
   each with its own fresh dev server, one
   after another locally and side by side in CI, and merges their blob reports into one result (`playwright-report/`);
   failure traces and the server's output (`server.log`, `scripts/e2e-server.ts`) are in `test-results/part-<n>/`.
