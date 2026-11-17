@@ -1102,11 +1102,19 @@ the app showed two ways:
 extends `e2e/settle.ts`, whose automatic fixture waits after each test, before its pages close and so before the next
 reseed, until nothing is on its way: the saves each page counts (leave-guard's `track`, read through the test hook
 `window.__imSavesOnTheWay`, `src/ui/save-hook.tsx`, rendered by the root layout only where the test hooks are on) and
-every POST the test's context has not had answered. That closes B. After 10 s it goes on with a warning (a save held on
+every POST the test's context has not had answered, until its page loads a new document. That closes B. After 10 s it goes on with a warning (a save held on
 purpose and never let go); a page the test closed itself is not waited for. `resetDevData` no longer removes the file
 before writing it: the rename replaces it atomically, so a read never finds no file. No spec's assertions changed. The
 fix is checked by the store tests above and `e2e/fixes/write-after-reseed.spec.ts` (variant B with the names switch's
 request held past a reseed, without the wait and through it).
+
+- **What is left of B:** a POST stops counting once its page has loaded a new document after it started
+  (`domcontentloaded`), since the browser abandons the requests of the document it leaves and Playwright never reports
+  their end. PR 67's first version waited for them: in its two full runs the wait ran out at 10 s in 9 and 10 tests, the
+  page counting nothing each time, and a diagnosis found the cause in 11 specs (a sign-in as another person or a
+  `page.goto` right after a save: S3B-02, S3B-07, S3B-12, S4A-12, S4B2-03, S11-02, S12A-06, S18-01, S19-01, S20-Q10,
+  S25-02). The server does not know a request was abandoned and finishes it, so a late write remains possible only when
+  the server's handling (about 100 to 400 ms) outlasts the next page's load and the rest of the test. Accepted.
 
 ## Source import (slice 7a)
 
