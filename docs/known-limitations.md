@@ -1122,6 +1122,31 @@ is held stays selected; with nothing clicked meanwhile the new mapping is select
   go-to links, the checks, a requirement dropped from the left panel, "That mapping already exists"), and Focus's and a
   found row's selections. The app has no duplicate command.
 
+### S22-02 failed once: a choice kept its value after an undo pressed while its save was on its way (a bug, fixed on fix/choice-after-undo)
+
+In PR 67's first full run (run 44057084159, part 8), `e2e/slice-22/S22-02.spec.ts:113` failed: after the first Undo the
+"Unknown member" button stayed pressed for 15 s; it passed 3 of 3 on its own (run 44060383374). In the trace the undo's
+answer brought Dim Customer at version 4 with `has_unknown_member: false`, and the data file was off. **The cause was in
+the app, found through the test** (CLAUDE.md, "A race in a test"), the choice fields' twin of fix/field-draft-after-undo:
+`useChoice` (`src/app/_panels/fields.tsx`) forgot a choice only in a render whose stored value equalled it
+(`choiceLanded`, slice 15b). The test waits for the pressed button (the choice, shown from the click) and the data file,
+both before the save's page reaches the panel, and then presses Undo, which runs right after the save's answer
+(`rowSaves.exclusive`). The save's page and the undo's were then drawn in one commit: the panel went from version 2 (off)
+to version 4 (off), never drew version 3 (on), and the choice, made on "off", matched the stored value again and showed
+"on" until the next change. A person who presses Undo (or Ctrl+Z) right after a choice sees the same. A probe that held
+the save's answer (slice 13's `holdUntil`) until Undo was pressed reproduced it every time; a fresh page that already
+shows another session's revert (the value from before the click, at a newer version) does the same.
+
+**The fix:** a choice field passes its row's shown version (`useChoice(stored, save, version)`), and a stored save's
+answer records its version in the choice (`Chosen.landed`, read with `versionBy`). The one rule is `choiceSettled`
+(`src/ui/field-draft.ts`, beside `choiceLanded`): once the field is drawn with that version or a newer one, the choice is
+forgotten whatever the stored value is. With no version (`null`) the old rule stays. Every choice field passes one, except
+the relationship's key in InfoCube's section (`KeySection`, `sections.tsx`): the key is a `cube_key` row of its own and
+`linkKeyAction` answers no version. S22-02's assertions are unchanged. The fix is checked by
+`e2e/fixes/choice-after-undo.spec.ts` (the unknown member's flag and an entity's stereotype, each with its save held until
+Undo is pressed; both failed without the rule) and the rule's cases in `src/ui/field-draft.test.ts` (the undo's page in
+one commit with the save's, and another session's revert at a newer version).
+
 ### S11-08 failed once: a save on its way when the next test reseeded (a bug in the local adapter and the fixtures, fixed on fix/write-after-reseed)
 
 In PR 66's full run (run 44043914367, 17 November 2026), `e2e/slice-11/S11-08.spec.ts` failed in part 6: searching
