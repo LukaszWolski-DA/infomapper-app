@@ -745,3 +745,76 @@ never printed, and deleted again):
 **Stopped:** DB8 and DB10 say sign-ups are off in `infomapper-dev`; they are on. With them on, anyone who knows the
 project's URL and publishable key could make an account (no page offers it, but Auth's endpoint does). Łukasz turns them
 off (dashboard: Authentication → Sign In / Providers → "Allow new users to sign up" off), then the check runs again.
+
+### Step 3 again, after sign-ups were turned off (17 November 2026)
+
+**The Auth check**, after Łukasz turned "Allow new users to sign up" off and saved it (the first rerun still read
+`disable_signup = false`; the change was not saved yet): every line PASS. The Data API gives no data (HTTP 503); Auth
+answers; **sign-ups are off** (`disable_signup = true`); `admin.createUser` with the secret key works with sign-ups off;
+sign-in with the publishable key; `getClaims()` with `alg` ES256; a wrong password `invalid_credentials`; **a public
+sign-up refused with `signup_disabled`**; the throwaway account deleted.
+
+**What was built:**
+
+| Commit | What |
+| --- | --- |
+| `09bc11c` | `@supabase/supabase-js` 2.118.0 and `@supabase/ssr` 0.12.7 (pinned); `scripts/pg-auth-check.ts` |
+| `e7901b1` | The proxy on Postgres (refresh and check with `getClaims`, redirect without a session; the thumbnail's path never refreshed, 401 without the cookie: F9); `getSession` on Postgres (`getClaims`, then `users.getByAuthUserId`, every organization unlocked: DB5); `/sign-in` the account form alone (F8); `signInWithAccountAction`, sign-out through Supabase. Only the sign-in and sign-out actions write the session's cookies |
+| `4c4d059` | `npm run pg:accounts` |
+| `8e60ae9` | The smoke set (`e2e/slice-29`, `playwright.pg.config.ts`) and the Schema workflow's smoke job on Supabase's local stack; the folder kept out of the full run (`POSTGRES_ONLY_FOLDERS`, the local config's `testIgnore`); no "New organization…" on a read-only server |
+| `eae76b6`, `ef190c5` | `tsconfig.json` includes `.next-pg`'s types (Next.js added them); the smoke report ignored; ESLint ignores `.next-pg/` |
+
+**The accounts on `infomapper-dev`** (`npm run pg:accounts`): 5 people, 5 accounts created with sign-ups off, all linked.
+The sign-in e-mails and the workspaces each sees (organization / workspace, role):
+
+| E-mail | Workspaces |
+| --- | --- |
+| `lukasz@infomate.pl` (Łukasz) | InfoMate / Bank X – Risk DWH, owner, archived; InfoMate / Performance test, owner; InfoMate / Retail Co – DWH, owner; Retail Co / Sales analytics, reviewer |
+| `anna.nowak@infomate.pl` (Anna Nowak) | InfoMate / Bank X – Risk DWH, modeler, archived; InfoMate / Retail Co – DWH, modeler |
+| `piotr.w@infomate.pl` (Piotr Wiśniewski) | InfoMate / Retail Co – DWH, reviewer |
+| `k.zielinska@retailco.com` (Kasia Zielińska) | InfoMate / Retail Co – DWH, reader (a guest of InfoMate) |
+| `m.lis@retailco.com` (Marek Lis) | Retail Co / Sales analytics, owner |
+
+**`npm run dev:pg` checked** (environment 2 on `infomapper-dev`): without a session `/` redirects to `/sign-in`, which shows
+the account form alone (no test users, no "Create an organization"). The sign-ins themselves were checked with the smoke
+set against this server (11 passed): typing the demo password through the browser tools would have put it into the
+session's record, so the spec reads `INFOMAPPER_DEMO_PASSWORD` itself. No server errors in its log.
+
+**Checks:**
+- Local: `npm run lint` (after `ef190c5`), `npm run typecheck`; `npm test` 186 files, 2,295 passed, 3 skipped (the
+  contract suite's Postgres side).
+- The Schema workflow (run 44038325024, on `eae76b6`): migrations and the contract suite, 9 passed; **the smoke job, 11
+  passed** (3 min 4 s: the local stack, the CLI applying the 22 migrations itself, `pg:migrate` "22 applied before, 0 to
+  apply", the schema check, the load in 318 ms, 5 accounts, a production build, the specs in 12.6 s).
+- **The full E2E run** (run 44038848793, on `eae76b6`): **815 passed, 1 failed, 16 skipped, 0 flaky**; wall-clock 15 min
+  54 s. The failure: `S15-24` (slice 15d) timed out waiting for the entity panel. The single-file check (run
+  44041007805, 3 rounds on `ef190c5`): **3 of 3 passed** (27 to 35 s each).
+
+  | Part | Time | Heap peak | Restarts |
+  | --- | --- | --- | --- |
+  | 1 | 13.1 min | 1,165 MB | 0 |
+  | 2 | 8.8 min | 1,540 MB | 0 |
+  | 3 | 9.7 min | 1,085 MB | 0 |
+  | 4 | 9.4 min | 1,147 MB | 0 |
+  | 5 | 9.0 min | 1,571 MB | 0 |
+  | 6 | 10.1 min | 1,176 MB | 0 |
+  | 7 | 13.7 min | 1,034 MB | 0 (S15-24 failed) |
+  | 8 | 10.6 min | **1,908 MB** | 0 |
+
+- **`ef190c5` after the full run's commit** changes only `eslint.config.mjs` (an ignored folder): no code that runs.
+
+**S15-24's race, its cause.** The spec creates a feed with "Add logical attribute" and waits for the new row in the e2e
+data file, which is written before the action's answer reaches the page; it then clicks "Dim Date". When the answer
+arrives, `src/modules/infocube/app/feeds.tsx:71` selects the new mapping (`ui.select({ t: "ext", kind: … })`), replacing
+the selection made after the add was sent, so the mapping's panel opens instead of the entity's. Partly the app's: a late
+answer overrides a newer selection, as CLAUDE.md warns for a late navigation. Not slice 29's code (slice 15c) and not
+shared infrastructure; **proposal (L10):** its own `fix/` branch: select the new mapping only while the selection is still
+the one the add was sent from, and the spec waits for the page's answer (the feed's row in the panel) before it clicks.
+
+**Not done in step 3:** the Vercel preview (step 4). Part 8's heap (1,908 MB) is close to the 2 GB at which CLAUDE.md
+adds a ninth part.
+
+### Questions for Łukasz
+
+- **L10.** S15-24's race (above): a `fix/` branch from `main` now, or after slice 29?
+- **L11.** Part 8 at 1,908 MB: the ninth part on its own `chore/` branch now (CLAUDE.md's rule), or wait?
