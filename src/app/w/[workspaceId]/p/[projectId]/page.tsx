@@ -1,3 +1,4 @@
+import { TimingRecord } from "@/app/_lib/timing";
 import { AppShell } from "@/app/_components/app-shell";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { loadProjectView } from "@/app/_lib/project-view";
@@ -163,6 +164,8 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
         </div>
       </div>
     </AppShell>
+    {/* slice 29 (Q9): the page's reads, hidden, with INFOMAPPER_TIMING=1 only */}
+    <TimingRecord />
     </UndoProvider>
   );
 }

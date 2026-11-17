@@ -126,6 +126,8 @@ const eslintConfig = defineConfig([
     ".next-e2e*/**",
     ".next-measure/**",
     ".next-demo/**",
+    // slice 29: npm run dev:pg's build folder
+    ".next-pg/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

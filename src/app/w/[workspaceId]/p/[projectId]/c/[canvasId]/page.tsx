@@ -1,3 +1,4 @@
+import { TimingRecord } from "@/app/_lib/timing";
 import { placeCardAction, placeCardsAction, placeRequirementCardsAction, removeCardAction, removeCardsAction, updateCardAction } from "@/app/_actions/canvas-item";
 import {
   arrangeIntoFramesAction,
@@ -372,6 +373,8 @@ export default async function CanvasPage({
       </PanelsProvider>
       </ModulesProvider>
       </CanvasLookProvider>
+      {/* slice 29 (Q9): the page's reads, hidden, with INFOMAPPER_TIMING=1 only */}
+      <TimingRecord />
     </CanvasProvider>
   );
 }

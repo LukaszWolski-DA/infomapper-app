@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 28 are built, and so are the e2e reliability, CI e2e and eight-part e2e chores, the Next.js 16.4 update and the relationship ends' fix; each slice is merged and tagged (`slice-NN`) when Łukasz accepts it. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 29 are built, and so are the e2e reliability, CI e2e, eight-part and nine-part e2e chores, the Next.js 16.4 updates and the fixes since; each slice is merged and tagged (`slice-NN`) when Łukasz accepts it. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -81,11 +81,16 @@ the editor easier to work in (D-83): its side panels are hidden and shown as the
 double-click on a section shows its options and focuses the first; the Document panel folds its parts, with Header and
 footer and Cover shut at first and Sharing last; every control is named for screen readers; short labels keep choices on
 one line; and an option that is ticked while nothing in the document uses it says why.
+Slice 29 is the database program's walking skeleton (AD-37), with no change to how the app behaves on the local adapter:
+- a Postgres adapter that reads every port as the local adapter does and refuses every write, the pages then read only;
+- Supabase Auth with a password per person;
+- the Supabase project `infomapper-dev` and a protected Vercel preview in Frankfurt;
+- a timing record per request and the first measurement ([slice 29's figures](docs/prd/slice-29-measurement.md)).
 Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md), [slice 9](docs/prd/slice-09-acceptance.md), [slice 10a](docs/prd/slice-10a-acceptance.md), [slice 10b](docs/prd/slice-10b-acceptance.md), [slice 10c](docs/prd/slice-10c-acceptance.md), [slice 11](docs/prd/slice-11-acceptance.md), [slice 12a](docs/prd/slice-12a-acceptance.md), [slice 12b](docs/prd/slice-12b-acceptance.md), [slice 13](docs/prd/slice-13-acceptance.md), [slice 14a](docs/prd/slice-14a-acceptance.md), [slice 14b](docs/prd/slice-14b-acceptance.md), [slice 15](docs/prd/slice-15-acceptance.md) (15a to 15d), [slice 16](docs/prd/slice-16-acceptance.md), [slice 17](docs/prd/slice-17-acceptance.md), [slice 18](docs/prd/slice-18-acceptance.md), [slice 19](docs/prd/slice-19-acceptance.md), [slice 20](docs/prd/slice-20-acceptance.md), [slice 21](docs/prd/slice-21-acceptance.md), [slice 22](docs/prd/slice-22-acceptance.md), [slice 23](docs/prd/slice-23-acceptance.md), [slice 24](docs/prd/slice-24-acceptance.md), [slice 25](docs/prd/slice-25-acceptance.md), [slice 26](docs/prd/slice-26-acceptance.md), [slice 27](docs/prd/slice-27-acceptance.md), [slice 28](docs/prd/slice-28-acceptance.md).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md), [slice 9](docs/prd/slice-09-acceptance.md), [slice 10a](docs/prd/slice-10a-acceptance.md), [slice 10b](docs/prd/slice-10b-acceptance.md), [slice 10c](docs/prd/slice-10c-acceptance.md), [slice 11](docs/prd/slice-11-acceptance.md), [slice 12a](docs/prd/slice-12a-acceptance.md), [slice 12b](docs/prd/slice-12b-acceptance.md), [slice 13](docs/prd/slice-13-acceptance.md), [slice 14a](docs/prd/slice-14a-acceptance.md), [slice 14b](docs/prd/slice-14b-acceptance.md), [slice 15](docs/prd/slice-15-acceptance.md) (15a to 15d), [slice 16](docs/prd/slice-16-acceptance.md), [slice 17](docs/prd/slice-17-acceptance.md), [slice 18](docs/prd/slice-18-acceptance.md), [slice 19](docs/prd/slice-19-acceptance.md), [slice 20](docs/prd/slice-20-acceptance.md), [slice 21](docs/prd/slice-21-acceptance.md), [slice 22](docs/prd/slice-22-acceptance.md), [slice 23](docs/prd/slice-23-acceptance.md), [slice 24](docs/prd/slice-24-acceptance.md), [slice 25](docs/prd/slice-25-acceptance.md), [slice 26](docs/prd/slice-26-acceptance.md), [slice 27](docs/prd/slice-27-acceptance.md), [slice 28](docs/prd/slice-28-acceptance.md), [slice 29](docs/prd/slice-29-acceptance.md).
 
 ## Getting started
 
@@ -114,10 +119,54 @@ of the demo's systems; see the README there): “Import sources…” at the top
 | InfoMate | Bank X – Risk DWH (archived) | Łukasz owner, Anna Nowak modeler |
 | Retail Co | Sales analytics | Marek Lis owner, Łukasz reviewer (guest) |
 
-Until the database slice (last, AD-31), data lives in a JSON file on the server, and sign-in means picking a test user
-(AD-29) or an organization's shared password (D-58). All of it exists only in development: a production build refuses
-it. The session is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at least 32 characters) or
-else `.data/session-secret`, made on first use.
+On the local adapter, data lives in a JSON file on the server, and sign-in means picking a test user (AD-29) or an
+organization's shared password (D-58). All of it exists only in development: a production build refuses it. The session
+is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at least 32 characters) or else
+`.data/session-secret`, made on first use.
+
+## Environments (slice 29)
+
+| # | Environment | Adapter and sign-in | Where its values live |
+| --- | --- | --- | --- |
+| 1 | `npm run dev` on the laptop | the local adapter (`.data/dev-db.json`, `.data/demo-db.json`), the development sign-in | `.env.local` (none needed) |
+| 2 | `npm run dev:pg` on the laptop | Postgres on `infomapper-dev`, Supabase Auth | `.env.postgres.local` (git-ignored), read only by `npm run dev:pg` and the Postgres scripts |
+| 3 | The Vercel preview of `slice/29-database-skeleton` | Postgres on `infomapper-dev`, Supabase Auth, read only | Vercel's Preview environment, scoped to that branch |
+| 4 | Production (slice D) | its own Vercel project `infomapper-app` and Supabase project `infomapper-prod` | – |
+
+- **The switch** is `INFOMAPPER_DATA` (`local` by default, `postgres` set by `npm run dev:pg`, the Postgres scripts, CI's
+  Postgres jobs and Vercel). It is never in `.env.local`, which Next.js loads for `npm run dev`. The two never mix: on
+  Postgres the local adapter and its files refuse to start; on the local adapter no connection is opened.
+- **Environments 2 and 3 share `infomapper-dev`.** Fine while writes are refused (slice A). From slice B, a write in one
+  shows in the other, and a `pg:seed -- --reset` from the laptop changes what the preview shows at once.
+- **Running against Postgres:** put the values in `.env.postgres.local` (the names are in `.env.example`), then
+  `npm run pg:check`, `npm run pg:migrate`, `npm run schema:check -- --existing`, `npm run pg:seed` (`-- --reset` to start
+  over), `npm run pg:accounts`, `npm run dev:pg`. The demo people sign in with their e-mail addresses (the table above)
+  and `INFOMAPPER_DEMO_PASSWORD`.
+
+## Hosting (slice 29, AD-22's note)
+
+- **Vercel project `infomapper-app-dev`** (Pro, functions in `fra1` beside Supabase's Frankfurt; Fluid compute; Node.js
+  22.x set explicitly, since Vercel's default is newer than `package.json`'s `engines`). Production in slice D gets its
+  own project, `infomapper-app`, and Supabase `infomapper-prod`.
+- **Only `slice/29-database-skeleton` deploys**, by two layers that say the same: `vercel.json`'s
+  `git.deploymentEnabled` and the project's Ignored Build Step. Why both: Vercel reads `vercel.json` from the commit it
+  builds, so a branch without the file (`main`, until slice 29 is merged) would deploy.
+- **To preview another branch,** change three things together: `deploymentEnabled`, the Ignored Build Step's branch name
+  and the variables' branch scope.
+- **Never delete the project's last Production deployment.** While a project has none, Vercel classifies any build as
+  Production, even from a preview branch, on the public domain without the Preview variables (seen twice on 17 November
+  2026; community reports, no official answer). The current one is an inert bootstrap: an empty commit built without
+  variables, whose local mode refuses to start. The same care applies to the production project's first deployment in
+  slice D.
+- **Importing the repository:** the wizard detects `spikes/canvas-react-flow` as a second Next.js app and offers a
+  "multi-service" project with a prompt for a `services` key. Import a standalone project (root `./`, Next.js) and ignore
+  the prompt.
+- **Variables:** Preview only, scoped to the branch. The database URL (the transaction pooler), `SUPABASE_URL` and
+  `SUPABASE_PUBLISHABLE_KEY` as Secret; `INFOMAPPER_DATA=postgres` and `INFOMAPPER_TIMING=1` as plain values.
+  - **Never in Vercel:** `SUPABASE_SECRET_KEY` (it bypasses Row Level Security; only the accounts script needs it),
+    `INFOMAPPER_MIGRATION_URL` (the scripts' only) and `INFOMAPPER_DEMO_PASSWORD`.
+  - The Protection Bypass for Automation secret lives only in `.env.postgres.local`
+    (`VERCEL_AUTOMATION_BYPASS_SECRET`), for the measuring spec and the probe script.
 
 ## Commands
 
@@ -187,7 +236,16 @@ else `.data/session-secret`, made on first use.
 | `npx tsx scripts/measure-ab.ts` | S2A-14's pan and zoom: `main` and this branch in turns, dev server and measurement build, medians compared (within 5 %); `main` in `../infomapper-ab-main`; results in `test-results/S2A-14-ab.json` |
 | `npm run measure:build` / `npm run measure:start` | The measurement-only production build on the local adapter (AD-31), on http://127.0.0.1:3300 with `INFOMAPPER_MEASURE=1`; `MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>` measures against it |
 | `DIAG=nolines` or `DIAG=blocks` with `MEASURE_BUILD=production` | Measurement-only diagnosis (slice 2a): the canvas without its line layer, or every card as its below-40 % block; results get `-diag-…` in their name. Slice 2b: `DIAG=noframes`, `DIAG=nolabels`; slice 2c: `DIAG=collapsed` (every frame shown collapsed, nothing saved; what needs drawn cards is recorded as not applicable); slice 3a: `DIAG=nonotes` (no notes), `DIAG=nolabelmarks` (no label marks) |
-| `npm run schema:check` | Applies `supabase/migrations/` to a Postgres and compares the schema with the domain's tables (AD-31; CI runs it) |
+| `npm run schema:check` | Applies `supabase/migrations/` to a Postgres and compares the schema with the domain's tables (AD-31; CI runs it); `-- --existing` compares a migrated database and applies nothing, and requires Row Level Security on every table (slice 29) |
+| `npm run dev:pg` | The laptop's dev server on `infomapper-dev` (environment 2, `.env.postgres.local`) on http://localhost:3000 |
+| `npm run pg:check` | One parameterized query through the transaction pooler with full TLS verification (`-- --migration`: the session pooler) |
+| `npm run pg:migrate` | Applies the migrations `infomapper-dev` has not had yet (`-- --dry-run` lists them); the only way to migrate it |
+| `npm run pg:seed` | The demo and "Performance test" into Postgres in one transaction, counts checked (`-- --reset` empties every table first; never a JSON file) |
+| `npm run pg:accounts` | A Supabase Auth account per person with `INFOMAPPER_DEMO_PASSWORD`, linked by `auth_user_id` (after `pg:seed`) |
+| `npx tsx scripts/pg-auth-check.ts` | Checks Auth on `infomapper-dev`: the Data API off, sign-ups off, the admin API, sign-in, `getClaims` (statuses only) |
+| `npx tsx scripts/pg-snapshot-size.ts` | The editor's snapshot per workspace through the Postgres adapter: its bytes against Vercel's 4.5 MB |
+| `npx tsx scripts/preview-probe.ts <preview> [paths]` | A protected preview's status, redirect and regions, with the bypass header |
+| `npx playwright test --config playwright.pg.config.ts` | The smoke set on Postgres (`e2e/slice-29`): against `npm run dev:pg`, or `PG_BASE_URL=<preview>` (the bypass header, no traces); `PG_SERVE=1` in CI. `MEASURE=1 … S29-08` is the measurement (`docs/prd/slice-29-measurement.md`) |
 
 **Tests per step** (CLAUDE.md, "Testing"): after each step the specs of what it touched plus CI, a full run in a step
 that touches shared infrastructure, and one full run before a merge (it also counts for a later commit whose diff
@@ -208,14 +266,14 @@ files are never subset or otherwise changed; the folder's `README.md` lists thei
 | Folder | What's in it |
 | --- | --- |
 | `src/domain` | Pure TypeScript: types, commands, permissions, validation, business rules |
-| `src/data` | Repository interfaces (`ports.ts`) and adapters (`local/` now); the only layer that touches stored data |
+| `src/data` | Repository interfaces (`ports.ts`) and adapters (`local/`, the JSON file; `postgres/`, reads only since slice 29); the only layer that touches stored data |
 | `src/app` | Next.js App Router routes, server actions, screens |
 | `src/ui` | Shared UI components (shadcn/ui, toasts) |
 | `src/canvas` | The modeling canvas (React Flow, AD-24): cards, line layer, Overview, geometry |
 | `e2e/` | Playwright acceptance tests, one folder per slice, one file per criterion |
 | `tests/` | Repository-level checks (the layer rules) |
 | `docs/` | Decisions, data model, PRDs, acceptance, ideas, known limitations, and the prototype (the reference for behaviour) |
-| `supabase/migrations/` | Database migrations (Supabase arrives with the database slice, last, AD-31) |
+| `supabase/migrations/` | Database migrations, applied to `infomapper-dev` by `npm run pg:migrate` |
 | `spikes/` | Throwaway experiments; not part of the application |
 
 How we work and the architecture rules are in `CLAUDE.md`.

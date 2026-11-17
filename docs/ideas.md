@@ -1043,3 +1043,24 @@ logged; content immutable; soft delete; read only in an archived workspace. Live
 not drawn from a baseline; later, freezing the labels and label links that drive them (option a). A document from a
 baseline after that slice; a workspace transfer with baselines holding InfoCube rows is a question for the transfer
 slice.
+
+## The database program: what comes later (slice 29, the walking skeleton)
+
+- **The read fixes, a slice of their own after slice B** (Łukasz, 17 November 2026: slice B's rights round changes the
+  same reads). The thumbnail first (a whole `model.load` and five more reads for one canvas: 264 ms against 12 ms
+  locally), then one read per page instead of 31 to 50 port calls and 73 to 116 statements, and the link guards' tables
+  in one query each. Measured with `e2e/slice-29/S29-08-measure.spec.ts` against `docs/prd/slice-29-measurement.md`.
+- **A `dev` integration branch** (Łukasz, 17 November 2026): slices merge into `dev`, and `dev` into `main` for a
+  release; a `chore/` branch after slice 29, before slice B. It changes the slice cycle in CLAUDE.md (pull requests'
+  base, tags, where the full runs run) and the three hosting items (`vercel.json`'s `deploymentEnabled`, the Ignored Build
+  Step's branch, the variables' branch scope). `dev` stays a Preview, not the Production Branch, so Standard Protection
+  covers it; a stable domain can be assigned to the `dev` branch.
+- **`spikes/canvas-react-flow`** (optional): move its conclusions into `docs/decisions.md` (AD-24 has most of them) and
+  remove the code; Vercel's import wizard detects it as a second Next.js app and offers a multi-service project.
+- **`localeCompare` with no locale:** the app sorts names by the runtime's default locale (probably en-US on Vercel,
+  maybe Polish on the laptop), so names with Polish letters may sort differently on the two; give the sorts one locale.
+- **Explicit orders where an order means something to a person** (slice 29, F2's condition 6): the first project in the
+  top bar, and other lists read in the stored order, should come from an explicit domain rule, not the order rows were
+  stored in. Not now: it would reorder KB.
+- **Part 9's heap peaks** (1,717 and 1,825 MB in slice 29's full runs): recut the e2e parts on a `chore/` branch when the
+  median of three full runs reaches about 2 GB.

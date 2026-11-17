@@ -7,7 +7,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { useToast } from "@/ui/components/toast";
-import { organizationsForEmailAction, signInWithPasswordAction, type SignInOrganization } from "../_actions/session";
+import { organizationsForEmailAction, signInWithAccountAction, signInWithPasswordAction, type SignInOrganization } from "../_actions/session";
 import { createOrganizationAction, previewCreateOrganizationAction, type CreateOrganizationFormInput } from "../_actions/organization";
 import type { ActionResult } from "../_lib/run-command";
 import { DOC_LANGUAGE_LABEL, DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
@@ -295,6 +295,44 @@ export function CreateOrganizationForm() {
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+/**
+ * Sign-in on Postgres (slice 29, step 3, F8): e-mail and password per person, through Supabase Auth. No organization
+ * step, no "Create an organization" and no test users: organizations and accounts are made by script (DB10).
+ */
+export function AccountSignInForm({ next }: { next: string | null }) {
+  const router = useRouter();
+  const { run, pending } = useStartAction();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+
+  const signIn = async (e: FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    const r = await run(() => signInWithAccountAction({ email, password, next }));
+    if (!r.ok) return setMessage(r.message);
+    router.push(r.value.href);
+  };
+
+  return (
+    <section data-testid="panel-account-sign-in" className="w-full max-w-md rounded-md border border-im-line bg-im-surface p-4">
+      <h2 className="mb-3 text-[15px] font-semibold">Sign in</h2>
+      <form onSubmit={signIn} className="space-y-3" noValidate>
+        <Field label="E-mail">
+          <input data-testid="input-sign-in-email" type="email" autoComplete="email" className={input} value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
+        <Field label="Password">
+          <input data-testid="input-sign-in-password" type="password" autoComplete="current-password" className={input} value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
+        <Message text={message} />
+        <button type="submit" data-testid="button-sign-in" className={primary} disabled={pending}>
+          Sign in
+        </button>
+      </form>
     </section>
   );
 }

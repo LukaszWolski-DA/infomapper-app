@@ -45,6 +45,7 @@ import type {
 } from "@/domain/types";
 import { BUILTIN_STEREOTYPE_CODES } from "@/domain/model/stereotypes";
 import { UNDOABLE_TABLES } from "@/domain/commands/undo";
+import { readRows as readStoredRows, rowsOf as rowsOfStore, upgradeRows, type AnyRow, type StoreSchema, type TableRules } from "../rows";
 import {
   CARDINALITY_MAX,
   CHANGE_OPERATIONS,
@@ -145,7 +146,10 @@ export interface DevDb {
 }
 
 export type DevTable = Exclude<keyof DevDb, "format">;
-export type AnyRow = Record<string, unknown>;
+export type { AnyRow, TableRules } from "../rows";
+/** The local adapter's name for the shared schema (slice 29, F1: `StoreSchema` in `src/data/rows.ts`). */
+export type LocalSchema = StoreSchema;
+export { upgradeRows };
 
 /**
  * A module's tables in the same file (slice 15a, AD-33): beside InfoMapper's, under their own names, absent until a
@@ -194,31 +198,6 @@ export const emptyDb = (): DevDb => ({
   note: [],
   change_event: [],
 });
-
-export interface TableRules {
-  key: readonly string[];
-  /** column -> referenced table (always its `id`). Null values are allowed where the column is nullable. */
-  foreignKeys: Readonly<Record<string, StoreTable>>;
-  /**
-   * Unique indexes besides the key; `live` = only rows with deleted_at null, `where` = a further condition
-   * (partial indexes such as "where entity_id is not null and deleted_at is null"), `lower` = columns compared in lower
-   * case (an index on `lower(column)`).
-   */
-  unique?: readonly { columns: readonly string[]; live?: boolean; where?: (row: AnyRow) => boolean; lower?: readonly string[] }[];
-  checks?: readonly { name: string; test: (row: AnyRow) => boolean }[];
-  /**
-   * A module's columns added after its table had rows (slice 18, Q2: InfoCube's lookup columns): a row without one reads
-   * it as this value. A module's tables are not part of the file's format (AD-33), so no upgrade writes them.
-   */
-  defaults?: Readonly<Record<string, unknown>>;
-  /**
-   * A module's row stored in an older shape (slice 19, F1: InfoCube's `scd_type` became `history`): the row as it reads
-   * now, or null when it is current. Pure and idempotent; the adapter runs it on every row of the table when the file is
-   * loaded, before any read or check (`upgradeRows`), so the file holds the new shape after its next write. A module's
-   * tables are not part of the file's format (AD-33): this is how a module changes its own rows' shape.
-   */
-  upgrade?: (row: AnyRow) => AnyRow | null;
-}
 
 const audit = { created_by: "app_user", updated_by: "app_user" } as const;
 export const oneOf = (values: readonly string[], column: string) => (row: AnyRow) => values.includes(row[column] as string);
@@ -606,17 +585,6 @@ export const RULES: Record<DevTable, TableRules> = {
 
 export const TABLES = Object.keys(RULES) as DevTable[];
 
-/**
- * The tables a store knows (slice 15a, AD-33): InfoMapper's rules and the registered modules', and the tables undo
- * reads. Made once by `localSchema`; `src/compose/tables.ts` makes the application's.
- */
-export interface LocalSchema {
-  readonly rules: Readonly<Record<string, TableRules>>;
-  readonly tables: readonly string[];
-  /** The tables `loadForUndo` reads: InfoMapper's undoable ones and the modules'. */
-  readonly undoable: readonly string[];
-}
-
 /** InfoMapper's rules with a module's added; a name InfoMapper already has is refused. */
 export function localSchema(moduleRules: Readonly<Partial<Record<ModuleTable, TableRules>>>, undoable: readonly string[] = UNDOABLE_TABLES): LocalSchema {
   const rules: Record<string, TableRules> = { ...RULES };
@@ -631,52 +599,11 @@ export function localSchema(moduleRules: Readonly<Partial<Record<ModuleTable, Ta
 /** InfoMapper's tables only: tests, scripts and earlier specs' helpers that write no module rows. */
 export const CORE_SCHEMA: LocalSchema = localSchema({});
 
-/**
- * The rows of a table as plain records, for the generic rules below and the adapter. A module's table may be absent from
- * the file (no rows yet): read as empty.
- */
-export const rowsOf = (db: DevDb, table: StoreTable): AnyRow[] => ((db as unknown as Record<string, AnyRow[] | undefined>)[table] ?? []);
+/** The rows of a table as plain records (`rowsOf` in `src/data/rows.ts`, typed for the file). */
+export const rowsOf = (db: DevDb, table: StoreTable): AnyRow[] => rowsOfStore(db, table);
 
-const upgraded = new WeakMap<object, WeakMap<LocalSchema, DevDb>>();
-
-/**
- * The file as the store reads it (slice 19, F1): every module table with an `upgrade` gets its older rows in the current
- * shape. The same object when nothing needs it; otherwise a copy with only those tables new, frozen like the cached file,
- * and remembered per loaded file and schema, so a cached read is upgraded once.
- */
-export function upgradeRows(db: Readonly<DevDb>, schema: LocalSchema): Readonly<DevDb> {
-  const seen = upgraded.get(db)?.get(schema);
-  if (seen) return seen;
-  let out: DevDb | null = null;
-  for (const [table, rules] of Object.entries(schema.rules)) {
-    if (!rules.upgrade) continue;
-    const rows = rowsOf(db as DevDb, table as StoreTable);
-    let changed: AnyRow[] | null = null;
-    rows.forEach((r, i) => {
-      const next = rules.upgrade!(r);
-      if (!next) return;
-      changed ??= [...rows];
-      changed[i] = Object.freeze(next);
-    });
-    if (!changed) continue;
-    out ??= { ...(db as DevDb) };
-    (out as unknown as Record<string, unknown>)[table] = Object.freeze(changed);
-  }
-  const result = out ? (Object.freeze(out) as Readonly<DevDb>) : db;
-  let bySchema = upgraded.get(db);
-  if (!bySchema) upgraded.set(db, (bySchema = new WeakMap()));
-  bySchema.set(schema, result as DevDb);
-  return result;
-}
-
-/** The rows as a command reads them: a module's columns a row lacks take their defaults (`TableRules.defaults`). */
-export function readRows(db: DevDb, table: StoreTable, schema: LocalSchema): AnyRow[] {
-  const rows = rowsOf(db, table);
-  const defaults = schema.rules[table]?.defaults;
-  if (!defaults) return rows;
-  const keys = Object.keys(defaults);
-  return rows.map((r) => (keys.every((k) => k in r) ? r : { ...defaults, ...r }));
-}
+/** The rows as a command reads them, with a module's defaults (`readRows` in `src/data/rows.ts`, typed for the file). */
+export const readRows = (db: DevDb, table: StoreTable, schema: LocalSchema): AnyRow[] => readStoredRows(db, table, schema);
 
 export const keyOf = (table: StoreTable, row: AnyRow, schema: LocalSchema = CORE_SCHEMA): string => {
   const rules = schema.rules[table];
@@ -731,7 +658,7 @@ export function findViolation(
       for (const [column, target] of Object.entries(rules.foreignKeys)) {
         const value = row[column];
         if (value === null || value === undefined) continue;
-        if (!ids(target).has(String(value))) {
+        if (!ids(target as StoreTable).has(String(value))) {
           return { kind: "foreign_key", table, detail: `${column} = ${String(value)} is not in ${target}` };
         }
       }

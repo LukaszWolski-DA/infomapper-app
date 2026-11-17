@@ -76,6 +76,21 @@ e.g. `REQ-104`), numbered per workspace.
 | `updated_at`, `updated_by` | timestamptz, uuid | last change |
 | `deleted_at` | timestamptz, null | soft delete; rows with a value are hidden everywhere but history and undo |
 
+**The stored order (slice 29, F2).** A list a store returns without a sort of its own is in the order its rows were
+stored. The local adapter keeps them in its file in that order. On Postgres, **the microseconds of a row's time column
+carry its place**:
+- the column is `created_at`, or `added_at` (`project_canvas`), `occurred_at` (`change_event`) or `changed_at`
+  (`organization_access`);
+- the seed loader and slice C's copy of a file set them by the row's place in the file; from slice B, `apply` sets them
+  by the row's place in its write set;
+- the adapter orders such a list by that column, then by `id` (or a link's key columns);
+- the domain reads times in milliseconds only: the pool's `timestamptz` parser truncates to them, so the microseconds
+  never reach a rule, a page or a change image.
+
+`project_pinned_label` has no time column; its rows are ordered by their key, and no page shows their order (the
+project home reads them as a set). Where an order means something to a person (the first project), an explicit domain
+rule should say it, not the stored order (`docs/ideas.md`).
+
 **Closed value lists.** Stored as `text` with a `CHECK` constraint, never as database enum types (AD-18). Values are
 lower-case English words, e.g. `status in ('draft','review','approved')`. The UI shows its own labels.
 
@@ -106,12 +121,15 @@ copies point to it.
 ## 3. Tenancy and access
 
 ### `app_user`
-A person who can sign in. With Supabase, `id` equals the id of the Supabase Auth user; there is deliberately no foreign
-key into the `auth` schema, so the table works with any identity provider later.
+A person who can sign in. `id` is the application's own (AD-11). Since slice 29 (L3) the Supabase Auth account is linked
+by `auth_user_id`, set by the accounts script (later by invitations, slice B); there is deliberately no foreign key into
+the `auth` schema, so the table works with any identity provider later, and a person's id never changes with their
+account. The local adapter's file has no such column (no format change): it reads as null.
 
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
-| `id` | uuid | no | primary key; the auth provider's user id |
+| `id` | uuid | no | primary key |
+| `auth_user_id` | uuid | yes | unique: the Supabase Auth user signed in as this person (slice 29); null without an account |
 | `email` | text | no | unique, lower-case |
 | `display_name` | text | no | |
 | `created_at` | timestamptz | no | |

@@ -1147,6 +1147,19 @@ the relationship's key in InfoCube's section (`KeySection`, `sections.tsx`): the
 Undo is pressed; both failed without the rule) and the rule's cases in `src/ui/field-draft.test.ts` (the undo's page in
 one commit with the save's, and another session's revert at a newer version).
 
+### S3B-06 failed once in slice 29 (cause not found)
+
+In slice 29's full run after main was merged (run 44147585823, commit `ff98fd4`, 17 November 2026),
+`e2e/slice-03b/S3B-06.spec.ts` failed once:
+- **What failed:** a context element labeled directly on the live canvas should become a full card whose filter is
+  "all"; after 15 s the card was still a context card ("labeled").
+- **Alone:** it passed 3 of 3 (single-file check, run 44150698438, 28 to 32 s each).
+- **Cause:** not found. Slice 29 did not change the code it runs (the local adapter's live canvas and labels).
+- **Kept:** the run's trace, error and server log are in `.data/e2e-29-s3b06/` (git-ignored), as well as on the run's
+  page for 14 days.
+- **Next:** a step 1 diagnosis on its own `fix/` branch after slice 29 (CLAUDE.md, "A race in a test"). The cause may be in
+  the app, as it was for RP-07, S15-24 and S22-02.
+
 ### S11-08 failed once: a save on its way when the next test reseeded (a bug in the local adapter and the fixtures, fixed on fix/write-after-reseed)
 
 In PR 66's full run (run 44043914367, 17 November 2026), `e2e/slice-11/S11-08.spec.ts` failed in part 6: searching
@@ -1708,3 +1721,65 @@ while it moves. Its labels scale with the zoom (13 px on the canvas, as the prot
 
 Every save of a document writes its whole row, recipe included, before and after (AD-13), private documents too. No page
 lists change events today; a later history or export filters private documents by their author (step 1, F18).
+
+## The database skeleton (slice 29, AD-37)
+
+The Postgres adapter reads only (slice A of the database program); the writes are slice B. The items marked "the
+database slice" in the sections above now belong to slices B (writes, undo, counts in the transaction, imports through
+Storage, sign-in limits) to D (production).
+
+### Pages on Postgres are 270 to 380 ms slower than on the local adapter (measured, not fixed)
+
+On the Vercel preview (`docs/prd/slice-29-measurement.md`, warm medians of 10), the homes and the canvas page take 270 to
+380 ms longer than on the local adapter's measurement build: a page makes 31 to 50 port calls and **73 to 116 SQL
+statements**, and the reads are 74 to 98 % of the server's time. The thumbnail's drawing reads the whole model for one
+canvas: 264 ms on the demo (37 statements) against 12 ms locally. The waits for a pool connection are small (5 to 43 ms).
+**Later:** the read fixes are a slice of their own after slice B (Łukasz, 17 November 2026: slice B's rights round
+changes the same reads), the thumbnail first, measured with the same spec against these figures.
+
+### Cold loads
+
+A fresh deployment's first loads are 1.1 to 2.8 times the warm medians (one sample each); the document editor's first
+load took 5 s. A project home's first load waited 196 to 312 ms for a connection, most likely the pool opening its
+connections through the pooler (not measured apart). **Later:** cold starts are measured again in slice D, on production.
+
+### The editor's snapshot is half of Vercel's 4.5 MB on "Performance test"
+
+The snapshot the editor reads once is 2.25 MB uncompressed on "Performance test" (48.9 % of Vercel's 4.5 MB body limit;
+135 KB gzip), 193 KB on the demo. **Whether the limit applies** to a server action's answer (a streamed RSC response,
+which Vercel's page exempts) is not confirmed. A workspace about twice "Performance test" would reach it if it does.
+**Later:** confirm the limit's rule, or send the snapshot in parts, before a customer's model grows that large.
+
+### The proxy runs at the edge, not in fra1
+
+Vercel deploys the proxy (`src/proxy.ts`) to the region a request arrives at (`arn1`, Stockholm, for Łukasz's laptop),
+whatever `vercel.json` says for functions. It reads no database: `getClaims()` checks the session against the cached
+JWKS (ES256). A token refresh there calls Supabase Auth in Frankfurt from the edge.
+
+### The bootstrap Production deployment answers publicly
+
+The project `infomapper-app-dev` keeps one Production deployment on purpose (AD-22's note: while a project has none,
+Vercel makes any build Production). It is an empty commit built without variables, on the project's public domain
+`infomapper-app-dev.vercel.app`, which Standard Protection does not cover. It holds no data and no secret: in local mode
+the adapter refuses to start in a production build, so it answers only the proxy's redirect to `/sign-in` and a 404
+there. **Later:** slice D's production project replaces it.
+
+### Read only: the document editor still offers its controls
+
+On a server that takes no writes the pages offer no change (standing none, no creates, no switches), except the document
+editor: its controls stay, and each save is refused with "This server is read-only for now, so nothing was saved." with
+the draft kept (slice 13's rules; S29-03). Accepted by Łukasz for slice A; slice B's writes remove it.
+
+### More than 1,000 rows in one millisecond are ordered by key
+
+The stored order's microseconds hold 1,000 places per millisecond (AD-12's note). The seed gives `source_column`'s 1,521
+rows one millisecond, so the 522 after the 999th are ordered by key on Postgres; only `loadForUndo` returns them in that
+order, and undo reads rows by id (accepted by Łukasz, L9). **For slice B's step 1:** list every table one write set can
+fill with more than 1,000 rows (an import's `source_column`, `mapping_input`, `classification_link`, `change_event`, …),
+whether its order is read anywhere, and a rule where it is.
+
+### The contract suite's Postgres side runs in CI only
+
+Docker is not on Łukasz's laptop, so the contract suite's Postgres side and the smoke set on Supabase's local stack run in
+the Schema workflow only (L6); locally the suite runs on the local adapter, and the smoke set runs against `npm run dev:pg`
+or the preview.

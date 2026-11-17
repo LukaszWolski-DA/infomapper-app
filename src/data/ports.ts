@@ -1,5 +1,5 @@
 // Repository interfaces (AD-19). The app talks to stored data only through these.
-// Adapters: the local JSON file now (src/data/local, AD-29), Supabase later.
+// Adapters: the local JSON file (src/data/local, AD-29) and, since slice 29, Postgres for reads (src/data/postgres).
 // Every read of workspace data takes the workspace id and filters on it. Soft-deleted rows are never returned.
 
 import type { WriteSet } from "@/domain/changes";
@@ -43,6 +43,11 @@ export interface UserRepository {
   get(userId: Uuid): Promise<AppUser | null>;
   /** The account with this e-mail address (compared as stored: trimmed, lower case), or null. */
   getByEmail(email: string): Promise<AppUser | null>;
+  /**
+   * The person a Supabase Auth account is linked to (`app_user.auth_user_id`, slice 29, L3), or null. On Postgres only:
+   * the local adapter has no accounts and always answers null.
+   */
+  getByAuthUserId(authUserId: Uuid): Promise<AppUser | null>;
   /**
    * The people a workspace's pages may name (slice 8, F10): its members and everyone with a change event in it, removed
    * people included, so earlier work keeps its author's name. Never anyone else.
@@ -185,6 +190,12 @@ export interface UndoHistoryRepository {
 export type ApplyResult = { ok: true } | { ok: false; error: DomainError };
 
 export interface DataStore {
+  /**
+   * The store takes no writes (slice 29, Q5): `apply` refuses every write set with code `archived` and
+   * `READ_ONLY_SERVER_MESSAGE`, and the pages show the workspace read-only (`ShellData.workspace.readOnly`). The Postgres
+   * adapter until slice B; absent on the local adapter.
+   */
+  readOnly?: boolean;
   users: UserRepository;
   organizations: OrganizationRepository;
   workspaces: WorkspaceRepository;

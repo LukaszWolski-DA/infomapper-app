@@ -6,7 +6,7 @@
 
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { getDataStore, type DataStore } from "@/data";
+import { getDataStore, isPostgresMode, type DataStore } from "@/data";
 import { scryptHasher } from "@/data/password";
 import { normalizeEmail } from "@/domain/commands/organization";
 import { isUuid, type Uuid } from "@/domain/ids";
@@ -16,6 +16,8 @@ import { workspaceHref } from "../_lib/paths";
 import { LAST_WORKSPACE_COOKIE } from "../_lib/preferences";
 import type { ActionResult } from "../_lib/run-command";
 import { getSession, writeSession } from "../_lib/session";
+import { supabaseServer } from "../_lib/supabase";
+import { ACCOUNT_SIGN_IN_REFUSED, ACCOUNT_WITHOUT_PERSON } from "../_lib/account-texts";
 import { DEV_SESSION_COOKIE } from "../_lib/dev-session";
 
 const UNKNOWN_EMAIL_MESSAGE = "No organization uses this e-mail address.";
@@ -33,7 +35,9 @@ export async function signInAsDevUser(formData: FormData): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
-  (await cookies()).delete(DEV_SESSION_COOKIE);
+  // slice 29: on Postgres the Supabase session ends (its cookies go); the development cookie is the local adapter's
+  if (isPostgresMode()) await (await supabaseServer({ write: true })).auth.signOut();
+  else (await cookies()).delete(DEV_SESSION_COOKIE);
   redirect("/sign-in");
 }
 
@@ -110,4 +114,28 @@ export async function signInWithPasswordAction(input: {
   if (back) return { ok: true, value: { href: back } };
   const last = (await cookies()).get(LAST_WORKSPACE_COOKIE)?.value;
   return { ok: true, value: { href: workspaceHref(last && inOrganization.has(last) ? last : workspaceIds[0]!) } };
+}
+
+/**
+ * Signs in with an e-mail address and a password per person through Supabase Auth (slice 29, step 3, DB5; Postgres only).
+ * The session is Supabase's cookies, written by `@supabase/ssr`; every organization the person belongs to is open. Lands
+ * on `next` when it is a page of one of their workspaces (F14), else on the start page, which picks a workspace (AD-07).
+ */
+export async function signInWithAccountAction(input: { email: string; password: string; next?: string | null }): Promise<ActionResult<{ href: string }>> {
+  if (!isPostgresMode()) return { ok: false, code: "not_found", message: "Not found." };
+  const email = typeof input?.email === "string" ? normalizeEmail(input.email) : "";
+  const password = typeof input?.password === "string" ? input.password : "";
+  if (!email) return { ok: false, code: "invalid", message: "Enter an e-mail address.", fields: { email: "Enter an e-mail address." } };
+  if (!password) return { ok: false, code: "invalid", message: "Enter the password.", fields: { password: "Enter the password." } };
+  const supabase = await supabaseServer({ write: true });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error || !data.user) return { ok: false, code: "forbidden", message: ACCOUNT_SIGN_IN_REFUSED, fields: { password: ACCOUNT_SIGN_IN_REFUSED } };
+  const store = getDataStore();
+  const user = await store.users.getByAuthUserId(data.user.id);
+  if (!user) {
+    await supabase.auth.signOut();
+    return { ok: false, code: "forbidden", message: ACCOUNT_WITHOUT_PERSON };
+  }
+  const workspaceIds = new Set((await store.workspaces.listForUser(user.id)).map((w) => w.id));
+  return { ok: true, value: { href: safeReturnPath(input.next, workspaceIds) ?? "/" } };
 }

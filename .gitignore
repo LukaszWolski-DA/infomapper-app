@@ -6,6 +6,7 @@ node_modules/
 .next-e2e*/
 .next-measure/
 .next-demo/
+.next-pg/
 out/
 build/
 next-env.d.ts
@@ -17,6 +18,7 @@ next-env.d.ts
 coverage/
 test-results/
 playwright-report/
+/playwright-report-pg/
 blob-report/
 
 # local development data (AD-29)

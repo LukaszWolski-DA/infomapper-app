@@ -18,6 +18,7 @@ import type {
   Organization,
   Project,
   ProjectCanvas,
+  ProjectPinnedLabel,
   Requirement,
   RequirementLink,
   Workspace,
@@ -98,6 +99,24 @@ export function liveRequirementLinksOf(rows: Pick<StoredRows, "requirement" | "r
     const target = [k.entity_id, k.attribute_id, k.mapping_id, k.source_table_id, k.source_column_id];
     return target.some((id, i) => id !== null && targets[i]!.has(id));
   });
+}
+
+/** Live label links whose label and item are live too (the domain deletes links with their items; this is a guard). */
+export function liveLabelLinksOf(rows: Pick<StoredRows, "label" | "label_link" | "entity" | "attribute" | "mapping" | "source_table" | "source_column">, workspaceId: Uuid): LabelLink[] {
+  const labels = idsOf(rows.label, workspaceId);
+  const targets = [idsOf(rows.entity, workspaceId), idsOf(rows.attribute, workspaceId), idsOf(rows.mapping, workspaceId), idsOf(rows.source_table, workspaceId), idsOf(rows.source_column, workspaceId)];
+  return live(rows.label_link).filter((k) => {
+    if (k.workspace_id !== workspaceId || !labels.has(k.label_id)) return false;
+    const target = [k.entity_id, k.attribute_id, k.mapping_id, k.source_table_id, k.source_column_id];
+    return target.some((id, i) => id !== null && targets[i]!.has(id));
+  });
+}
+
+/** Pins of live labels to live projects (slice 3a). */
+export function liveProjectPinsOf(rows: Pick<StoredRows, "label" | "project" | "project_pinned_label">, workspaceId: Uuid): ProjectPinnedLabel[] {
+  const labels = idsOf(rows.label, workspaceId);
+  const projects = idsOf(rows.project, workspaceId);
+  return rows.project_pinned_label.filter((p) => p.workspace_id === workspaceId && labels.has(p.label_id) && projects.has(p.project_id));
 }
 
 /** Links whose project and canvas both still exist. */

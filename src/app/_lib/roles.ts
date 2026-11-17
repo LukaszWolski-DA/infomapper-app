@@ -13,6 +13,9 @@ export const ROLE_CAN: Record<WorkspaceRole, string> = {
   reader: "You can only read this workspace.",
 };
 
+/** What the indicator and the workspace home say on a server that takes no writes (slice 29, Q5, L5). */
+export const READ_ONLY_SERVER_TEXT = "This server shows the workspace read-only for now.";
+
 /** full = may edit, review = may approve and add notes, none = read-only (reader or archived workspace). */
 export type Standing = "full" | "review" | "none";
 

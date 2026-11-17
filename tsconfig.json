@@ -47,7 +47,9 @@
     ".next-e2e-preview/types/**/*.ts",
     ".next-e2e-preview/dev/types/**/*.ts",
     ".next-demo/types/**/*.ts",
-    ".next-demo/dev/types/**/*.ts"
+    ".next-demo/dev/types/**/*.ts",
+    ".next-pg/types/**/*.ts",
+    ".next-pg/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

@@ -250,7 +250,10 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
   }
 
   if (!db.organization_licence.some((l) => l.organization_id === t.organizationId && l.module === "infocube" && l.deleted_at === null)) {
-    db.organization_licence.push({ ...std("licence"), organization_id: t.organizationId, module: "infocube" });
+    // an organization's licence has no workspace (slice 29: `std` gave it a stray workspace_id, which Postgres has no column for)
+    const { workspace_id: _ws, ...licence } = std("licence");
+    void _ws;
+    db.organization_licence.push({ ...licence, organization_id: t.organizationId, module: "infocube" });
   }
   // slice 15d (O7, X-5; prototype `cubeDemo`): REQ-210 with its key as given, the requirement counter untouched; three
   // links to the star's attributes, no card on the canvas. Its coverage is 0 of 3 on purpose: the logical attributes

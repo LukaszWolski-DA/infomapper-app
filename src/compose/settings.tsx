@@ -15,7 +15,8 @@ export async function settingsBoxes(store: DataStore, access: WorkspaceAccess) {
     // the default store knows InfoMapper's tables only: a module's table is read through the composed one
     getDataStore(STORE_SCHEMA).modules.list(workspace.id, "document_definition"),
   ]);
-  const canSwitch = can(access, "workspace.edit_settings");
+  // slice 29 (Q5): no switch on a server that takes no writes
+  const canSwitch = !store.readOnly && can(access, "workspace.edit_settings");
   const organizationName = organization?.name ?? "";
   return (
     <>

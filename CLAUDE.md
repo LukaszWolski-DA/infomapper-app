@@ -82,7 +82,10 @@ and shown as the canvas's, with its limits and defaults, in the editor's own coo
 double-click on a section showing the options panel and focusing its first control; the Document panel's folds (Sharing
 last, Header and footer and Cover shut at first), each section's options before its heading, named controls, short
 segment labels, long-text labels per section; hints under an option that is ticked while nothing in the document uses
-it.
+it. Slice 29 (AD-37) is the database program's walking skeleton (AD-31 as amended): a Postgres adapter that reads every
+port as the local adapter does and refuses every write (the pages then read only), Supabase Auth with a password per
+person, the Supabase project `infomapper-dev`, a protected Vercel preview in `fra1`, a timing record and the first
+measurement; the local adapter stays for development, the demo and the full e2e run.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -156,7 +159,8 @@ If these disagree, stop and ask. Do not resolve a conflict silently.
 src/domain   pure TypeScript: types, commands, validation, business rules. No React, no Next.js, no database.
              Since slice 27 also the canvas's pure drawing rules (`src/domain/canvas/`: cards, geometry, text widths,
              lines and their routes, frames, requirement cards, traces), which `src/canvas` re-exports.
-src/data     repository interfaces and their adapters: a local JSON-file adapter now (AD-29), Supabase later.
+src/data     repository interfaces and their adapters: the local JSON-file adapter (AD-29) and, since slice 29, the
+             Postgres adapter (reads only until slice B, AD-37).
              Only this layer touches stored data.
 src/app      Next.js App Router routes, server actions, route handlers, screens.
 src/ui       shared UI components (shadcn/ui based).
@@ -401,10 +405,42 @@ visual polish may improve, behaviour may not change without a decision.
 
 **Canvas (AD-24).** React Flow with the named workarounds listed under AD-24 in docs/decisions.md. Follow them in all canvas work; the spike in spikes/canvas-react-flow shows how.
 
-**Local adapter and development sign-in (AD-29).** Until the database slice (last, AD-31), data lives in a JSON file
-on the server (`.data/dev-db.json`, git-ignored) and people sign in by picking a test user. Both exist only in
-development: a production build must refuse to start them. The local adapter enforces the same rules as a real database would:
-versions, change events in the same write, uniqueness and the “exactly one target” checks from the data model.
+**Local adapter and development sign-in (AD-29).** On the local adapter data lives in a JSON file on the server
+(`.data/dev-db.json`, git-ignored) and people sign in by picking a test user. Both exist only in development: a production
+build must refuse to start them, and since slice 29 so does a server on Postgres. The local adapter enforces the same
+rules as a real database would: versions, change events in the same write, uniqueness and the “exactly one target”
+checks from the data model. It stays for development, the demo and the full e2e run (AD-29's note).
+
+**The Postgres adapter (slice 29, AD-37).** Chosen by `INFOMAPPER_DATA` (`src/data/mode.ts`: `local` by default,
+`postgres` set only by `npm run dev:pg`, the Postgres scripts, CI's Postgres jobs and Vercel; never in `.env.local`). The
+two never mix: on Postgres `assertNotProduction` refuses the local adapter's files and the development session; on the
+local adapter no pool is made.
+- **Reads** (`src/data/postgres/`): `store.ts` reads every port with one statement per table, then the domain's own
+  rules (`workspaceModelOf`, `liveRequirementLinksOf`, `liveLabelLinksOf`, `liveProjectPinsOf`, `workspacePeopleOf`,
+  `workspaceSnapshotOf`); a call over several tables runs in one read-only REPEATABLE READ transaction
+  (`readTransaction`). The rows go through the shared rules in `src/data/rows.ts` (a module's defaults and upgrades;
+  the local adapter re-exports them) and the sorts in `src/data/order.ts`. **A later port** gets its read on both
+  adapters and its case in `tests/contract/reads.test.ts`, never a rule of its own in SQL.
+- **The stored order** (AD-12's note, `data-model-v2.md`): `tables.ts` orders a table by its time column, then its
+  key; the loader stamps a row's place in the file into the column's microseconds (`load.ts`, `stampPlaces`); the pool
+  reads `timestamptz` truncated to milliseconds (`config.ts`). The local adapter keeps its file's order.
+- **Types and TLS** (`config.ts`): `numeric` and `bigint` as numbers, the connection string's `sslmode` dropped and
+  the server verified against `supabase-ca.crt` (traced into every route by `next.config.ts`). The pool
+  (`pool.ts`): 5 connections, 5 s idle, `attachDatabasePool` on Vercel, the transaction pooler, never a named statement.
+- **Writes:** `apply` refuses every write set with code `archived` and `READ_ONLY_SERVER_MESSAGE` until slice B, so
+  every client rule for a read-only refusal applies; `DataStore.readOnly` gives `ShellData.workspace.readOnly`
+  (standing none, no creates, the indicator's "Read only", the home's banner, `READ_ONLY_SERVER_TEXT`).
+  `app_user.auth_user_id` is never handed out with a person's row (`POSTGRES_ONLY` in `tables.ts`).
+- **Sign-in on Postgres** (AD-04's note): `src/app/_lib/supabase.ts` (`supabaseServer`: the request's cookies first, so
+  no page is prerendered; only the sign-in and sign-out actions pass `write: true`), the proxy's `postgresProxy`
+  (`getClaims`, never on `THUMBNAIL_PATH`), `getSession`'s `postgresSession` (`users.getByAuthUserId`, every organization
+  unlocked), `/sign-in`'s `AccountSignInForm` and `signInWithAccountAction`.
+- **The timing record** (`INFOMAPPER_TIMING=1` only): `src/data/timing.ts` (`timedStore`, the pool's timed clients)
+  and `src/app/_lib/timing.tsx` (`withTiming` for a route or an action, React's `cache` for a page, `TimingRecord` at a
+  page's end, `serverTimingHeader`). Numbers only. **A later page to measure** puts `<TimingRecord />` last.
+- **The data:** `npm run pg:seed` builds the demo and "Performance test" in memory (`scripts/lib/seed-rows.ts`) and
+  loads them with `loadRows` (one transaction, the database's own key order, a field no column holds refused, counts
+  checked); it never reads a JSON file, so never KB.
 
 ## Testing (AD-21)
 
@@ -431,6 +467,12 @@ versions, change events in the same write, uniqueness and the “exactly one tar
     development-only async tracking in the RSC server bundled with Next.js (`pendingOperations` keeps every rendered
     request); production builds don't have it. Add a part (or recut) when a part's peak in a full run reaches about 2 GB; do
     not hunt an app leak for that growth unless a forced-GC measurement shows more than about 8 MB a test.
+  - **The Postgres side** (slice 29): the full run stays on the local adapter; `e2e/slice-29` is kept out of its parts
+    (`POSTGRES_ONLY_FOLDERS`, the local config's `testIgnore`). The Schema workflow (`schema.yml`) runs on every push:
+    the schema check, the contract suite with Postgres (a second database of its container; `INFOMAPPER_CONTRACT_DB`,
+    localhost only, since the suite empties it) and the smoke job (Supabase's local stack, Postgres and Auth only; a
+    production build; `playwright.pg.config.ts`). CI never connects to `infomapper-dev`. The smoke set needs no
+    `e2e/settle.ts`: it never reseeds and its writes are refused.
   - **The single-file check:** `gh workflow run e2e.yml --ref <branch> -f files="e2e/<folder>/<spec>.ts ..." -f
     rounds=3`: `rounds` jobs side by side, each with its own fresh dev server, each running the files once (paths under
     `e2e/` only, checked before a server starts).
@@ -473,10 +515,50 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 
 ## Security
 
-- Secrets only in `.env.local` (git-ignored). Keep `.env.example` up to date with every variable, without values.
-- The Supabase service-role key is used on the server only. Row Level Security stays on for every table with no
-  public policies unless a decision says otherwise.
+- Secrets only in `.env.local` and `.env.postgres.local` (both git-ignored; the Postgres scripts read the second only
+  after `git check-ignore`) and in Vercel's Preview variables (Secret). Keep `.env.example` up to date with every
+  variable, without values. Never print, log, commit or quote a key, a password or a connection string: name a database
+  as host/database only (`targetName`).
+- The Supabase secret key (`SUPABASE_SECRET_KEY`, acting as `service_role`) is used by the accounts script only, never by
+  the app and never in Vercel. Row Level Security stays on for every table with no public policies unless a decision
+  says otherwise; `npm run schema:check -- --existing` checks it.
 - Never log personal data or rich-text content.
+
+## Environments and hosting (slice 29)
+
+| # | Environment | Adapter, sign-in | Its values |
+| --- | --- | --- | --- |
+| 1 | `npm run dev` on the laptop | local (`.data/dev-db.json`, KB; `.data/demo-db.json`), the development sign-in | none needed |
+| 2 | `npm run dev:pg` on the laptop | Postgres on `infomapper-dev`, Supabase Auth | `.env.postgres.local` |
+| 3 | The Vercel preview of `slice/29-database-skeleton` | Postgres on `infomapper-dev`, Supabase Auth, read only | Vercel's Preview, scoped to the branch |
+| 4 | Production (slice D) | its own Vercel project `infomapper-app` and Supabase `infomapper-prod` | – |
+
+Environments 2 and 3 share `infomapper-dev`: from slice B a write in one shows in the other, and a `pg:seed -- --reset`
+changes what the preview shows. **Running against Postgres:** `npm run pg:check`, `pg:migrate` (the only way to migrate
+`infomapper-dev`), `schema:check -- --existing`, `pg:seed`, `pg:accounts`, `dev:pg`.
+
+**Hosting rules** (AD-22's note):
+- **Vercel project `infomapper-app-dev`** (Pro, `fra1` beside Supabase's Frankfurt, Fluid compute, Node.js 22.x set
+  explicitly because Vercel's default is newer than `engines`). Production in slice D gets its own project,
+  `infomapper-app`, and Supabase `infomapper-prod`.
+- **Only `slice/29-database-skeleton` deploys**, by two layers that say the same: `vercel.json`'s `git.deploymentEnabled`
+  and the project's Ignored Build Step. Why both: Vercel reads `vercel.json` from the commit it builds, so a branch
+  without the file would deploy.
+- **To preview another branch,** change three things together: `deploymentEnabled`, the Ignored Build Step's branch name
+  and the variables' branch scope.
+- **Never delete the project's last Production deployment:** while none exists, Vercel classifies any build as
+  Production, even from a preview branch (seen twice on 17 November 2026; community reports, no official answer). The
+  current one is an inert bootstrap (no variables; its local mode refuses). The same care applies to the production
+  project's first deployment in slice D.
+- **The import wizard** detects `spikes/canvas-react-flow` and offers a multi-service project: import standalone, root
+  `./`, and ignore its services prompt (`vercel.json` has no `services` key).
+- **Variables:** Preview only, branch-scoped; the three connection values (`INFOMAPPER_DATABASE_URL`, `SUPABASE_URL`,
+  `SUPABASE_PUBLISHABLE_KEY`) as Secret, `INFOMAPPER_DATA` and `INFOMAPPER_TIMING` as plain. **Never in Vercel:**
+  `SUPABASE_SECRET_KEY`, `INFOMAPPER_MIGRATION_URL`, `INFOMAPPER_DEMO_PASSWORD`. The bypass secret
+  (`VERCEL_AUTOMATION_BYPASS_SECRET`) lives only in `.env.postgres.local`.
+- **A preview is protected** (Vercel Authentication, Standard Protection): reach it with the bypass header
+  (`scripts/preview-probe.ts`, `PG_BASE_URL=<preview>` with `playwright.pg.config.ts`, which then records no trace).
+  A Vercel token goes nowhere without Łukasz's decision; its runtime logs are read in the dashboard.
 
 ## Things not to touch
 
@@ -497,6 +579,17 @@ npm run demo             # the demo data with the Sales star in .data/demo-db.js
 npx tsx scripts/licence.ts grant "<organization name>" infocube|infodoc [--file <db>]   # slice 15a (infodoc: slice 25): a module's licence in a local file (development only)
 npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards, labels and notes; slice 4b-2: a second canvas with 12 requirement cards) to .data/dev-db.json; works on a file with module rows (the seed's star); on Łukasz's test model only on his command, after a backup (INFOMAPPER_DEV_DB points it elsewhere)
 npm run dev              # local app on http://localhost:3000; sign in at /sign-in by picking a test user
+npm run dev:pg           # slice 29, environment 2: the dev server on infomapper-dev (.env.postgres.local), Supabase Auth
+npm run pg:check         # one parameterized query through the transaction pooler, full TLS (-- --migration: the session pooler)
+npm run pg:migrate       # the migrations infomapper-dev has not had yet (-- --dry-run lists them); the only way to migrate it
+npm run schema:check -- --existing   # compare a migrated database (INFOMAPPER_MIGRATION_URL) with the domain, RLS on every table
+npm run pg:seed          # the demo and Performance test into Postgres, counts checked (-- --reset empties every table first)
+npm run pg:accounts      # a Supabase Auth account per person (INFOMAPPER_DEMO_PASSWORD), linked by auth_user_id
+npx tsx scripts/pg-auth-check.ts       # Auth on infomapper-dev: Data API off, sign-ups off, admin API, sign-in, getClaims
+npx tsx scripts/pg-snapshot-size.ts    # the editor's snapshot per workspace against Vercel's 4.5 MB
+npx tsx scripts/preview-probe.ts <preview> [paths]   # a protected preview's status, redirect and regions (bypass header)
+npx playwright test --config playwright.pg.config.ts   # the smoke set on Postgres: against dev:pg, or PG_BASE_URL=<preview>
+MEASURE=1 PG_BASE_URL=<preview> npx playwright test --config playwright.pg.config.ts S29-08   # slice 29's measurement (LOCAL_DB=<file> against measure:start)
 npm run build            # production build (npm start serves it; no dev sign-in, no local data)
 npm run measure:build    # measurement-only production build in .next-measure (AD-31)
 npm run measure:start    # serve it on http://127.0.0.1:3300 with INFOMAPPER_MEASURE=1 (local adapter, dev sign-in)

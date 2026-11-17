@@ -44,6 +44,11 @@ export interface AppUser {
   display_name: string;
   created_at: Timestamp;
   last_seen_at: Timestamp | null;
+  /**
+   * The Supabase Auth account signed in as this person (slice 29, L3; data-model-v2.md §3). Only on Postgres: the local
+   * adapter's file has no such column, so it is absent there and reads as null (no format change).
+   */
+  auth_user_id?: Uuid | null;
 }
 
 export interface Organization extends VersionedColumns {

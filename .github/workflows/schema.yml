@@ -1,6 +1,8 @@
 name: Schema
 
 # AD-31: the SQL migrations, applied to a real Postgres, must match the domain's tables (npm run schema:check).
+# Slice 29: the contract suite of the reads on both adapters (tests/contract), against a throwaway database here; CI never
+# connects to infomapper-dev.
 # Postgres 17 is what Supabase gives new projects (checked 6 October 2026); the image is pinned to a minor version.
 
 on:
@@ -39,3 +41,65 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run schema:check
+      # slice 29 (Q8, S29-02): the contract suite on both adapters, Postgres in a second database of this container
+      - run: PGPASSWORD=postgres psql -h localhost -U postgres -c "create database contract"
+      - run: npx vitest run tests/contract
+        env:
+          INFOMAPPER_CONTRACT_DB: postgres://postgres:postgres@localhost:5432/contract
+
+  # slice 29 (Q8, F14, S29-05, S29-06): the smoke set on Postgres with Supabase Auth, against Supabase's local stack on
+  # this runner (Postgres and Auth only, throwaway; its keys are the CLI's local ones, not infomapper-dev's). The app
+  # runs as a production build (next start, INFOMAPPER_DATA=postgres), as on Vercel.
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_CLI: supabase@2.122.0
+      # a test value for the local stack's demo accounts only
+      INFOMAPPER_DEMO_PASSWORD: smoke-demo-password-29
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Start Supabase's local stack (Postgres and Auth; the CLI applies supabase/migrations)
+        run: |
+          npx -y "$SUPABASE_CLI" init --force
+          npx -y "$SUPABASE_CLI" start -x realtime,storage-api,imgproxy,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      - name: Point the app and the scripts at it
+        run: |
+          npx -y "$SUPABASE_CLI" status -o env > "$RUNNER_TEMP/stack.env"
+          node -e '
+            const fs = require("fs");
+            const env = Object.fromEntries(fs.readFileSync(process.argv[1], "utf8").split(/\r?\n/).map((l) => /^([A-Z_]+)="?(.*?)"?$/.exec(l)).filter(Boolean).map((m) => [m[1], m[2]]));
+            const pick = (...names) => { for (const n of names) if (env[n]) return env[n]; throw new Error("The stack gave none of " + names.join(", ")); };
+            const out = [
+              "INFOMAPPER_DATA=postgres",
+              "SUPABASE_URL=" + pick("API_URL"),
+              "SUPABASE_PUBLISHABLE_KEY=" + pick("PUBLISHABLE_KEY", "ANON_KEY"),
+              "SUPABASE_SECRET_KEY=" + pick("SECRET_KEY", "SERVICE_ROLE_KEY"),
+              "INFOMAPPER_DATABASE_URL=" + pick("DB_URL"),
+              "INFOMAPPER_MIGRATION_URL=" + pick("DB_URL"),
+            ];
+            fs.appendFileSync(process.env.GITHUB_ENV, out.join("\n") + "\n");
+            console.log("Set: " + out.map((l) => l.split("=")[0]).join(", "));
+          ' "$RUNNER_TEMP/stack.env"
+      - run: npm run pg:migrate
+      - run: npm run schema:check -- --existing
+      - run: npm run pg:seed
+      - run: npm run pg:accounts
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --config playwright.pg.config.ts
+        env:
+          PG_SERVE: "1"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: smoke-report
+          path: |
+            playwright-report-pg/
+            test-results/pg/
+          retention-days: 14

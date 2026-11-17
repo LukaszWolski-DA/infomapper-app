@@ -30,8 +30,9 @@ const DOCUMENTATION: HomeTabSource = {
           workspaceId={access.workspace.id}
           language={access.workspace.doc_language}
           documents={documents}
-          canCreate={createRefusal(access) === null}
-          canShare={checkPermission(access, "model.edit") === null && checkPermission(access, "module.own_objects") === null}
+          // slice 29 (Q5): nothing is offered on a server that takes no writes
+          canCreate={!store.readOnly && createRefusal(access) === null}
+          canShare={!store.readOnly && checkPermission(access, "model.edit") === null && checkPermission(access, "module.own_objects") === null}
         />
       ),
     };
