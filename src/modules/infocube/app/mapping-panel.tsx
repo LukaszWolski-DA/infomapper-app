@@ -125,10 +125,10 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
       setTimeout(() => document.getElementById(chosen ? NO_MATCH_ID : VIA_ID)?.focus(), 0);
     }
     return result;
-  });
-  const via = useChoice<string>(m.lookup_relationship_id ?? "", (next) => write((v) => updateCubeMappingAction(p.workspaceId, { ...ref(v), lookupRelationshipId: next || null })));
-  const status = useChoice<CubeMappingStatus>(m.status, (next) => saveRow(m, (v) => setCubeMappingStatusAction(p.workspaceId, { ...ref(v), status: next })));
-  const retarget = useChoice<Uuid>(m.attribute_id, (to) => write((v) => retargetCubeMappingAction(p.workspaceId, { ...ref(v), attributeId: to }), (v) => v.toast));
+  }, m.version);
+  const via = useChoice<string>(m.lookup_relationship_id ?? "", (next) => write((v) => updateCubeMappingAction(p.workspaceId, { ...ref(v), lookupRelationshipId: next || null })), m.version);
+  const status = useChoice<CubeMappingStatus>(m.status, (next) => saveRow(m, (v) => setCubeMappingStatusAction(p.workspaceId, { ...ref(v), status: next })), m.version);
+  const retarget = useChoice<Uuid>(m.attribute_id, (to) => write((v) => retargetCubeMappingAction(p.workspaceId, { ...ref(v), attributeId: to }), (v) => v.toast), m.version);
 
   async function addInput(attributeId: Uuid) {
     const result = await write((v) => addCubeMappingInputAction(p.workspaceId, { ...ref(v), attributeId }), (v) => v.toast);

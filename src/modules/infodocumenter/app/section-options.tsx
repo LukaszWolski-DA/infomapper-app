@@ -318,7 +318,7 @@ export function SectionOptions(props: {
           case "check":
             return (
               <div key={`${id}-${i}`}>
-                <Check testId={`check-${type}-${f.key}`} label={f.label} stored={!!o[f.key]} disabled={readOnly} onSave={(v) => save({ [f.key]: v })} />
+                <Check version={version} testId={`check-${type}-${f.key}`} label={f.label} stored={!!o[f.key]} disabled={readOnly} onSave={(v) => save({ [f.key]: v })} />
                 {hints[f.key] && <OptionHint testId={`hint-${type}-${f.key}`} text={hints[f.key]!} />}
               </div>
             );
@@ -333,7 +333,7 @@ export function SectionOptions(props: {
               <Field key={`${id}-${i}`} label={f.label} hint={f.hint}>
                 {(ids) => (
                 <>
-                <ListChecks
+                <ListChecks version={version}
                   labelledBy={ids.labelId}
                   testId={`checks-${type}-${f.key}`}
                   all={f.items}
@@ -352,7 +352,7 @@ export function SectionOptions(props: {
             );
           case "seg":
             return (
-              <Choice key={`${id}-${i}`} stored={String(o[f.key])} save={(v) => save({ [f.key]: v })}>
+              <Choice version={version} key={`${id}-${i}`} stored={String(o[f.key])} save={(v) => save({ [f.key]: v })}>
                 {(value, pick) => (
                   <Field label={f.label} hint={f.hints?.[value]}>
                     {(ids) => <Seg testId={`seg-${type}-${f.key}`} labelledBy={ids.labelId} describedBy={ids.hintId} value={value} options={f.items} disabled={readOnly} onChange={pick} />}
@@ -364,7 +364,7 @@ export function SectionOptions(props: {
             return (
               <Field key={`${id}-${i}`} label={f.label} hint={f.hint}>
                 {(ids) => (
-                <Choice stored={Number(o[f.key])} save={(v) => save({ [f.key]: v })}>
+                <Choice version={version} stored={Number(o[f.key])} save={(v) => save({ [f.key]: v })}>
                   {(value, pick) => (
                     <select
                       id={ids.id}
@@ -436,19 +436,21 @@ export function ModuleOptions(props: {
   fields: readonly SectionOptionField[];
   options: Record<string, unknown>;
   readOnly: boolean;
+  /** The document's version, which the options' saves write (fix/choice-after-undo). */
+  version: number;
   save: (patch: Record<string, unknown>) => Answer;
   figureEditor: (key: string, label: string, hint?: string) => ReactNode;
   placedLines: readonly { label: string; summary: string }[];
   sizeTexts: PlacedSizeTexts;
 }) {
-  const { type, fields, options: o, readOnly, save, figureEditor, placedLines, sizeTexts } = props;
+  const { type, fields, options: o, readOnly, version, save, figureEditor, placedLines, sizeTexts } = props;
   const shown = fields.filter((f) => (f.when ?? []).every((w) => o[w.key] === w.is));
   return (
     <div data-testid="section-options">
       {shown.map((f, i) => {
         switch (f.kind) {
           case "check":
-            return <Check key={i} testId={`check-${type}-${f.key}`} label={f.label} stored={!!o[f.key]} disabled={readOnly} onSave={(v) => save({ [f.key]: v })} />;
+            return <Check version={version} key={i} testId={`check-${type}-${f.key}`} label={f.label} stored={!!o[f.key]} disabled={readOnly} onSave={(v) => save({ [f.key]: v })} />;
           case "label":
             return (
               <div key={i} className="mb-1 mt-3 text-[11.5px] text-im-ink-3">
@@ -465,7 +467,7 @@ export function ModuleOptions(props: {
             return (
               <Field key={i} label={f.label}>
                 {(ids) => (
-                <Choice stored={String(o[f.key])} save={(v) => save({ [f.key]: v })}>
+                <Choice version={version} stored={String(o[f.key])} save={(v) => save({ [f.key]: v })}>
                   {(value, pick) => <Seg testId={`seg-${type}-${f.key}`} labelledBy={ids.labelId} value={value} options={f.items} disabled={readOnly} onChange={pick} />}
                 </Choice>
                 )}
@@ -475,7 +477,7 @@ export function ModuleOptions(props: {
             return (
               <Field key={i} label={f.label} hint={f.hint}>
                 {(ids) => (
-                <Choice stored={Number(o[f.key])} save={(v) => save({ [f.key]: v })}>
+                <Choice version={version} stored={Number(o[f.key])} save={(v) => save({ [f.key]: v })}>
                   {(value, pick) => (
                     <select
                       id={ids.id}
@@ -509,7 +511,7 @@ export function ModuleOptions(props: {
                       [f.orientation, sizeTexts.orientations, "Orientation"],
                     ] as const
                   ).map(([key, items, name]) => (
-                    <Choice key={key} stored={String(o[key])} save={(v) => save({ [key]: v })}>
+                    <Choice version={version} key={key} stored={String(o[key])} save={(v) => save({ [key]: v })}>
                       {(value, pick) => (
                         <select
                           aria-label={name}
@@ -550,13 +552,14 @@ export function ModuleOptions(props: {
   );
 }
 
-function Choice<T>({ stored, save, children }: { stored: T; save: (v: T) => Answer; children: (value: T, choose: (v: T) => void) => ReactNode }) {
-  const choice = useChoice(stored, save);
+/** `version`: the document's, which every option's save writes (fix/choice-after-undo). */
+function Choice<T>({ stored, save, version, children }: { stored: T; save: (v: T) => Answer; version: number; children: (value: T, choose: (v: T) => void) => ReactNode }) {
+  const choice = useChoice(stored, save, version);
   return <>{children(choice.value, choice.choose)}</>;
 }
 
-export function Check({ label, stored, onSave, disabled, testId }: { label: string; stored: boolean; onSave: (v: boolean) => Answer; disabled?: boolean; testId: string }) {
-  const choice = useChoice(stored, onSave);
+export function Check({ label, stored, onSave, version, disabled, testId }: { label: string; stored: boolean; onSave: (v: boolean) => Answer; version: number; disabled?: boolean; testId: string }) {
+  const choice = useChoice(stored, onSave, version);
   return (
     <label className="mt-2 flex items-center gap-2">
       <input type="checkbox" data-testid={testId} checked={choice.value} disabled={disabled} onChange={(e) => choice.choose(e.currentTarget.checked)} />
@@ -570,6 +573,7 @@ function ListChecks({
   all,
   stored,
   onSave,
+  version,
   disabled,
   testId,
   labelledBy,
@@ -577,6 +581,7 @@ function ListChecks({
   all: Pairs;
   stored: readonly string[];
   onSave: (chosen: string[], mine: string[]) => Answer;
+  version: number;
   disabled?: boolean;
   testId: string;
   labelledBy?: string;
@@ -585,7 +590,7 @@ function ListChecks({
   // the stored list as one object while it stays the same: `useChoice` shows a choice made on that object (D-66)
   const shownKey = JSON.stringify(stored.filter((k) => keys.includes(k)));
   const shown = useMemo(() => JSON.parse(shownKey) as string[], [shownKey]);
-  const choice = useChoice<readonly string[]>(shown, (v) => onSave([...v], keys));
+  const choice = useChoice<readonly string[]>(shown, (v) => onSave([...v], keys), version);
   return (
     <div className="grid grid-cols-2 gap-1" role="group" aria-labelledby={labelledBy} data-testid={testId}>
       {all.map(([k, label]) => (

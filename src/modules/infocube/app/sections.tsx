@@ -164,11 +164,11 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
   // slice 19 (D-74): the type, factless and the base, each saved on the chain with the row checked
   const save = (change: Omit<Parameters<typeof updateCubeEntityAction>[1], "cubeEntityId" | "expectedVersion">) =>
     saveRow(row, (v) => updateCubeEntityAction(p.workspaceId, { cubeEntityId: row.id, expectedVersion: v, ...change }));
-  const type = useChoice<FactType>(row.fact_type ?? "transaction", (factType) => save({ factType }));
-  const factless = useChoice<boolean>(!!row.is_factless, (isFactless) => save({ isFactless }));
+  const type = useChoice<FactType>(row.fact_type ?? "transaction", (factType) => save({ factType }), row.version);
+  const factless = useChoice<boolean>(!!row.is_factless, (isFactless) => save({ isFactless }), row.version);
   const aggregates = cube.aggregates();
   const base = aggregates.baseOf(entity.id);
-  const baseChoice = useChoice<string>(base ?? "", (id) => save({ baseFactEntityId: id || null }));
+  const baseChoice = useChoice<string>(base ?? "", (id) => save({ baseFactEntityId: id || null }), row.version);
   const choices = baseChoices(aggregates, entity.id, p.ix.model.entities.map((e) => e.id), (id) => cube.roleOf(id) === "fact");
   const aggregatedBy = aggregates.aggregatesOf(entity.id);
   const snapshotDimension = (id: Uuid) => cube.cubeOf(id)?.history === "snapshot";
@@ -325,8 +325,8 @@ function DimensionSection({ entity, row, cube }: { entity: Entity; row: CubeEnti
   const { saveRow } = useAction();
   const save = (change: Omit<Parameters<typeof updateCubeEntityAction>[1], "cubeEntityId" | "expectedVersion">) =>
     saveRow(row, (version) => updateCubeEntityAction(p.workspaceId, { cubeEntityId: row.id, expectedVersion: version, ...change }));
-  const kind = useChoice<DimKind>(row.dim_kind ?? "standard", (dimKind) => save({ dimKind }));
-  const choice = useChoice<History>(row.history ?? "overwrite", (history) => save({ history }));
+  const kind = useChoice<DimKind>(row.dim_kind ?? "standard", (dimKind) => save({ dimKind }), row.version);
+  const choice = useChoice<History>(row.history ?? "overwrite", (history) => save({ history }), row.version);
   const users = usedBy(cube, entity.id, p.ix.model.relationships);
   const outOf = cube.outriggers().outOf(entity.id);
   const outs = cube.outriggers().outs(entity.id);
@@ -440,7 +440,7 @@ function UnknownMember({
 }) {
   const p = usePanel();
   const { saveRows } = useAction();
-  const flag = useChoice<boolean>(row.has_unknown_member !== false, (hasUnknownMember) => save({ hasUnknownMember }));
+  const flag = useChoice<boolean>(row.has_unknown_member !== false, (hasUnknownMember) => save({ hasUnknownMember }), row.version);
   const attributes = cube.attributesOf(entity.id);
   // the rows as the page shows them now, for a save sent later than it was started
   const shown = useRef<(attributeId: Uuid) => Known>(() => null);
@@ -587,7 +587,7 @@ function MeasureFields({ a, m }: { a: Attribute; m: CubeMeasure }) {
   const { saveRow } = useAction();
   const save = (change: { additivity?: CubeMeasure["additivity"]; semiNote?: string | null }) =>
     saveRow(m, (v) => updateMeasureAction(p.workspaceId, { measureId: m.id, expectedVersion: v, ...change }));
-  const additivity = useChoice(m.additivity, (v) => save({ additivity: v }));
+  const additivity = useChoice(m.additivity, (v) => save({ additivity: v }), m.version);
   return (
     <>
       <Field label="Additivity">
@@ -638,7 +638,8 @@ function KeySection({ r, fact, dimension, cube }: { r: Relationship; fact: Uuid;
     const currentKeyId = cube.linkOfRelationship(r.id)?.id ?? null;
     const rows = [{ id: r.id }, ...(attributeId ? [{ id: attributeId }] : [])];
     return saveRows(rows, () => linkKeyAction(p.workspaceId, { relationshipId: r.id, currentKeyId, attributeId: attributeId || null }));
-  });
+    // no version: the key is a cube_key row of its own (or none), and the answer gives no version (fix/choice-after-undo)
+  }, null);
   return (
     <Fold title="InfoCube" testId="section-cube-key">
       <div className="rounded-lg border border-im-line px-3 pb-3 pt-0.5">

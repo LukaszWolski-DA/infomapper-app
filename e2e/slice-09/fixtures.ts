@@ -1,7 +1,7 @@
 // Every slice 9 test starts from freshly seeded data: an automatic fixture resets the e2e data file before each
 // test. The dev server reads the file on every request, so no test depends on what another test did or undid.
 
-import { test as base } from "@playwright/test";
+import { test as base } from "../settle";
 import { resetDevData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";
 

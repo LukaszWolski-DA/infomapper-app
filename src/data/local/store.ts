@@ -15,7 +15,7 @@ import { byTabOrder, liveLabelLinksOf, liveProjectCanvasesOf, liveProjectPinsOf,
 import type { ModuleTable, WritableRows } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
 import { newestImportFirst, oldestChangeFirst } from "../order";
-import { assertNotProduction, readDbCached, writeDb } from "./file";
+import { assertNotProduction, readDbCached, readDbStamped, writeDb } from "./file";
 import { CORE_SCHEMA, findViolation, keyOf, readRows, rowsOf, upgradeRows, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
 
 const live = <R extends { deleted_at: string | null }>(rows: R[]): R[] => rows.filter((r) => r.deleted_at === null);
@@ -238,10 +238,25 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
   };
 }
 
+/**
+ * The write, from a read of the file to the file replaced (fix/write-after-reseed): when another process changed the file
+ * between the two (the e2e reseed, a script, a hand edit), the write reads it again and is applied once more, so it is
+ * checked against what is there now (a row changed meanwhile is a stale version) and the outside change is kept. A file
+ * changed again during the second try is refused as a stale version.
+ */
 async function applyToFile(file: string, writeSet: WriteSet, schema: LocalSchema): Promise<ApplyResult> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await applyOnce(file, writeSet, schema);
+    if (result !== "changed") return result;
+  }
+  return { ok: false, error: staleVersion() };
+}
+
+async function applyOnce(file: string, writeSet: WriteSet, schema: LocalSchema): Promise<ApplyResult | "changed"> {
+  const read = await readDbStamped(file);
   // Copy on write (slice 7a): the cached file is frozen, so only the tables this write touches get new arrays; their
   // written rows are new objects, every other row is shared with the cache.
-  const current = upgradeRows(await readDbCached(file), schema);
+  const current = upgradeRows(read.db, schema);
   const next = { ...current } as DevDb;
   const touched = new Set<StoreTable>(writeSet.writes.map((w) => w.table));
   // slice 15a: a table this store does not know is refused before anything is written, never skipped
@@ -271,7 +286,7 @@ async function applyToFile(file: string, writeSet: WriteSet, schema: LocalSchema
   // only what this write can have broken: the touched tables and the new change events
   const violation = findViolation(next, { tables: touched, newEvents: writeSet.events.length }, schema);
   if (violation) return { ok: false, error: violationError(violation) };
-  await writeDb(file, next);
+  if (!(await writeDb(file, next, { ifUnchanged: read.stamp }))) return "changed";
   return { ok: true };
 }
 

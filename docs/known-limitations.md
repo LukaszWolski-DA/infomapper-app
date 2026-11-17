@@ -84,6 +84,28 @@ created after the page read the data (`readAt`) stay, and the versions the canva
   several people working at once make late pages more likely. Not built now: the local adapter has one person at a
   time, and the per-row rule above covers what can stay wrong.
 
+### A file changed by another process while a server writes (fix/write-after-reseed; fixed in the local adapter)
+
+Every write replaces the whole file with a copy built from its own read (`applyToFile`, `src/data/local/store.ts`).
+Writes of one server are serialised, but another process does not wait for them: the e2e fixtures' reseed, a script
+(`npm run seed:large`, `scripts/licence.ts`) or a hand edit of `.data/dev-db.json` while a server runs. Until this fix a
+write that had read the file before such a change replaced the file after it, and the change was gone without a word.
+
+Since fix/write-after-reseed `writeDb` compares the stamp of the write's read (`mtimeMs`, size, inode; `readDbStamped`)
+with the file's just before the rename. When they differ it replaces nothing; the write reads the file again and is
+applied once more, so it is checked against what is there now: a row the outside change touched is a stale version
+(the usual refusal, its fresh page and D-66's line), and every other outside change is kept. A file changed again during
+the second try is refused as a stale version. The cache takes the temp file's stamp from before the rename, so a change
+right after the rename is never cached as the write's own. Tested in `src/data/local/store.test.ts` ("a file changed by
+another process during a write").
+
+- **What is left:** a window of microseconds between the comparison and the rename, where an outside change can still
+  be replaced. Closing it needs a lock file shared by every writer (servers, scripts, the e2e fixtures); not built, as
+  the window is that small and the local adapter is development only.
+- **For Łukasz's test model:** a script or a hand edit made while a dev server runs on `.data/dev-db.json` is now kept,
+  or the server's write that collides with it is refused; it is no longer overwritten silently.
+- **The database slice (last, AD-31):** the database's transactions do this; nothing to carry over.
+
 ## Canvas performance (slice 1a)
 
 ### Where the canvas stands after slice 4b-2 (20 October 2026)
@@ -866,7 +888,7 @@ top bar does not scroll" (`e2e/slice-06a/S6A-10.spec.ts`), an expected failure o
 
 ### The full e2e run in GitHub Actions (chore CI e2e, 6 November 2026)
 
-Since chore CI e2e the full run is the workflow "E2E" (`.github/workflows/e2e.yml`): the parts of `e2e/parts.ts` (eight since chore e2e eight parts)
+Since chore CI e2e the full run is the workflow "E2E" (`.github/workflows/e2e.yml`): the parts of `e2e/parts.ts` (eight since chore e2e eight parts, nine since chore ninth e2e part)
 side by side on GitHub's Linux runners (4 cores, 16 GB), each with its own fresh dev server, no retries, in about 12
 minutes instead of the laptop's 93 to 97 (CLAUDE.md, "Testing").
 
@@ -1057,6 +1079,109 @@ InfoCube's dimensional mapping delete included. RP-07's assertions are unchanged
 `e2e/fixes/selection-after-delete.spec.ts` (a card clicked while the delete is held stays selected) and
 `e2e/fixes/selection-after-entity-delete.spec.ts` (a selected attribute of an entity whose delete is held is cleared),
 with the cascade cases in `src/canvas/selection.test.ts`.
+
+### S15-24 failed once: a create's answer replaced a newer selection (a bug, fixed on fix/late-selection-after-create)
+
+In slice 29's full run (run 44038848793), `e2e/slice-15d/S15-24.spec.ts` failed; it passed 3 of 3 on its own (run
+44041007805). **The cause was in the app, found through the test** (CLAUDE.md, "A race in a test"), the twin of RP-07's
+above: when InfoCube's "Add a logical attribute" answered, `ComesFrom` (`src/modules/infocube/app/feeds.tsx`) selected the
+new mapping (`ui.select`), whatever was selected by then. The test waits for the data file, which is written before the
+answer reaches the page, and then opens Dim Date; the answer then replaced that selection with the mapping's panel. A
+person who clicks another card while the add is on its way loses their selection the same way. A spec that held the
+answer (slice 13's `holdUntil`) and opened Fact Sales meanwhile showed the "Dimensional mapping" panel every time.
+
+**The fix:** one rule beside `selectionDeleted`, `selectionAfterAnswer(current, sent, made)` (`src/canvas/selection.ts`,
+with `sameSelection`): an answer selects what it made only if the selection is still the one the action was sent with,
+compared by what it names, not by the object. It is applied by `ui.selectMade(sent, made)` (`CanvasUiApi`,
+`CanvasProvider`) to the selection as it is when the answer arrives; the caller reads `sent` from `ui.selection` when it
+sends the action. InfoCube reaches it through the canvas context, as it does `deselectDeleted` (AD-19, AD-33). S15-24's
+assertions are unchanged. The fix is checked by `e2e/fixes/selection-after-create.spec.ts` (a card opened while the add
+is held stays selected; with nothing clicked meanwhile the new mapping is selected) and the rule's cases in
+`src/canvas/selection.test.ts`.
+
+**Every answer that selects something, and where each stands:**
+
+- **Fixed with the same call** (the selection is the answer's only effect on what is shown): InfoCube's "Add a logical
+  attribute" (`feeds.tsx`); a column mapped from the attribute panel (`attribute-panel.tsx`, `addColumn`); the relate
+  drag between two entities (`canvas-host.tsx`, `relate`); a column dropped on a row, the D-48 choice's "add to this
+  mapping", and a column dropped on an entity's header (`map-column.tsx`: `createDirect`, `confirm`, `dropOnEntity`);
+  InfoCube's row drops, a mapping and "Create attribute and its mapping" on a header (`canvas-ext.tsx`).
+- **The same race, not fixed here** (the answer also opens the details panel, focuses the new name or moves the view,
+  which would have to follow the same rule: more than one call): "Relate to itself", "Paste attribute", "Add
+  attribute" and "Add attribute below" in a card's menus (`canvas-host.tsx`: `relateToItself`, `pasteInto`,
+  `addAttributeTo`); a new entity, fact or dimension from the canvas or its toolbox (`canvas-host.tsx`, `createEntityAt`)
+  and from the left panel's concept and Cube tab (`left-panel.tsx`: `addEntity`, `createIn`); the entity panel's "Add
+  attribute" (`entity-panel.tsx`); "New requirement" (`left-panel.tsx`). Inside the canvas, which reads the selection
+  through its own state and would need a reader that does not re-render `ModelCanvas`: placing a card (`ModelCanvas`'s
+  `place`, behind the left panel's and the go-to links' placing and a new source table), "Place sources beside"
+  (`placeBeside`), placing requirement cards, a new frame and "Put in a new frame" (`useFrames.ts`, also focusing the
+  frame's name), and a new note's first save (`useNotes.ts`, which replaces the draft note's selection).
+- **Behind a modal dialog** (no click reaches the canvas while it waits; only if the dialog is closed with Escape first):
+  "Create dimension from this…" (`create-dimension-dialog.tsx`) and an import's source system (`use-imported.ts`).
+- **No race:** a split (its answer selects nothing), the selections made on a click before any write (the tree, the
+  go-to links, the checks, a requirement dropped from the left panel, "That mapping already exists"), and Focus's and a
+  found row's selections. The app has no duplicate command.
+
+### S22-02 failed once: a choice kept its value after an undo pressed while its save was on its way (a bug, fixed on fix/choice-after-undo)
+
+In PR 67's first full run (run 44057084159, part 8), `e2e/slice-22/S22-02.spec.ts:113` failed: after the first Undo the
+"Unknown member" button stayed pressed for 15 s; it passed 3 of 3 on its own (run 44060383374). In the trace the undo's
+answer brought Dim Customer at version 4 with `has_unknown_member: false`, and the data file was off. **The cause was in
+the app, found through the test** (CLAUDE.md, "A race in a test"), the choice fields' twin of fix/field-draft-after-undo:
+`useChoice` (`src/app/_panels/fields.tsx`) forgot a choice only in a render whose stored value equalled it
+(`choiceLanded`, slice 15b). The test waits for the pressed button (the choice, shown from the click) and the data file,
+both before the save's page reaches the panel, and then presses Undo, which runs right after the save's answer
+(`rowSaves.exclusive`). The save's page and the undo's were then drawn in one commit: the panel went from version 2 (off)
+to version 4 (off), never drew version 3 (on), and the choice, made on "off", matched the stored value again and showed
+"on" until the next change. A person who presses Undo (or Ctrl+Z) right after a choice sees the same. A probe that held
+the save's answer (slice 13's `holdUntil`) until Undo was pressed reproduced it every time; a fresh page that already
+shows another session's revert (the value from before the click, at a newer version) does the same.
+
+**The fix:** a choice field passes its row's shown version (`useChoice(stored, save, version)`), and a stored save's
+answer records its version in the choice (`Chosen.landed`, read with `versionBy`). The one rule is `choiceSettled`
+(`src/ui/field-draft.ts`, beside `choiceLanded`): once the field is drawn with that version or a newer one, the choice is
+forgotten whatever the stored value is. With no version (`null`) the old rule stays. Every choice field passes one, except
+the relationship's key in InfoCube's section (`KeySection`, `sections.tsx`): the key is a `cube_key` row of its own and
+`linkKeyAction` answers no version. S22-02's assertions are unchanged. The fix is checked by
+`e2e/fixes/choice-after-undo.spec.ts` (the unknown member's flag and an entity's stereotype, each with its save held until
+Undo is pressed; both failed without the rule) and the rule's cases in `src/ui/field-draft.test.ts` (the undo's page in
+one commit with the save's, and another session's revert at a newer version).
+
+### S11-08 failed once: a save on its way when the next test reseeded (a bug in the local adapter and the fixtures, fixed on fix/write-after-reseed)
+
+In PR 66's full run (run 44043914367, 17 November 2026), `e2e/slice-11/S11-08.spec.ts` failed in part 6: searching
+"Klient" found two items, Customer and an entity named "Bardzo długa nazwa klienta do sprawdzenia skracania", which is
+S11-07's rename of Sales Order; alone it passed 3 of 3 (run 44046209147). S11-07 ended at 08:13:25.843 and S11-08 began
+2 ms later. S11-07's last step, the "Entity aliases" check box, shows its result at once and sends its save on the
+canvas's queue, so the test passed before the save's answer. The server's write had read S11-07's file and renamed its
+copy over the file after S11-08's reseed: S11-08's failure snapshot shows the box ticked, which S11-08 never does,
+Sales Order under S11-07's name, and Customer with S11-08's own alias written after it. **The cause was in shared
+infrastructure, found through the test** (CLAUDE.md, "A race in a test"; "The slice cycle", 4). A reproduction outside
+the app showed two ways:
+
+- **A:** the write has read the file when the reseed replaces it; the write then replaces the fresh seed with the
+  earlier test's whole file (the failure above).
+- **B:** the request reaches the server only after the reseed and lands on the fresh seed, whose ids and versions are
+  the same every time, so no version check refuses it.
+
+**The fix closes it from both sides.** The adapter no longer replaces a file another process changed since its read
+(the entry under "Local data adapter", which closes A for every outside writer). Every fixture that reseeds now
+extends `e2e/settle.ts`, whose automatic fixture waits after each test, before its pages close and so before the next
+reseed, until nothing is on its way: the saves each page counts (leave-guard's `track`, read through the test hook
+`window.__imSavesOnTheWay`, `src/ui/save-hook.tsx`, rendered by the root layout only where the test hooks are on) and
+every POST the test's context has not had answered, until its page loads a new document. That closes B. After 10 s it goes on with a warning (a save held on
+purpose and never let go); a page the test closed itself is not waited for. `resetDevData` no longer removes the file
+before writing it: the rename replaces it atomically, so a read never finds no file. No spec's assertions changed. The
+fix is checked by the store tests above and `e2e/fixes/write-after-reseed.spec.ts` (variant B with the names switch's
+request held past a reseed, without the wait and through it).
+
+- **What is left of B:** a POST stops counting once its page has loaded a new document after it started
+  (`domcontentloaded`), since the browser abandons the requests of the document it leaves and Playwright never reports
+  their end. PR 67's first version waited for them: in its two full runs the wait ran out at 10 s in 9 and 10 tests, the
+  page counting nothing each time, and a diagnosis found the cause in 11 specs (a sign-in as another person or a
+  `page.goto` right after a save: S3B-02, S3B-07, S3B-12, S4A-12, S4B2-03, S11-02, S12A-06, S18-01, S19-01, S20-Q10,
+  S25-02). The server does not know a request was abandoned and finishes it, so a late write remains possible only when
+  the server's handling (about 100 to 400 ms) outlasts the next page's load and the rest of the test. Accepted.
 
 ## Source import (slice 7a)
 

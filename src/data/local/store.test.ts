@@ -1,7 +1,7 @@
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildWriteSet, type CommandContext, type WriteSet } from "@/domain/changes";
 import { renameCanvas } from "@/domain/commands/canvas";
 import { createProject, deleteProject, LAST_PROJECT_MESSAGE } from "@/domain/commands/project";
@@ -16,6 +16,21 @@ import { emptyDb, findViolation, keyOf, TABLES } from "./schema";
 import { buildSeed, SEED_IDS, SEED_USERS } from "./seed";
 import { createLocalDataStore } from "./store";
 
+// fix/write-after-reseed: another process (the e2e reseed, a script, a hand edit) changes the file while a write is
+// between its read and its rename. `outside.run` is called when the write starts its temp file, `outside.times` times.
+const outside = vi.hoisted(() => ({ run: null as null | (() => Promise<void>), times: 0 }));
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  const writeFile = (async (...args: Parameters<typeof actual.writeFile>) => {
+    if (outside.run && outside.times > 0 && String(args[0]).endsWith(".tmp")) {
+      outside.times--;
+      await outside.run();
+    }
+    return actual.writeFile(...args);
+  }) as typeof actual.writeFile;
+  return { ...actual, default: { ...actual, writeFile }, writeFile };
+});
+
 let dir: string;
 let file: string;
 let store: DataStore;
@@ -28,6 +43,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  outside.run = null;
+  outside.times = 0;
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -407,6 +424,79 @@ describe("reading from memory until the file changes (S1A-14)", () => {
     await readDbCached(file);
     await rm(file);
     await expect(readDbCached(file)).rejects.toThrow(/npm run seed/);
+  });
+});
+
+describe("a file changed by another process during a write (fix/write-after-reseed)", () => {
+  /** Changes the file as another process would: written in place, never through this process's cache. */
+  const changeOutside = (times: number, change: (db: Awaited<ReturnType<typeof readDb>>, round: number) => void) => {
+    let round = 0;
+    outside.times = times;
+    outside.run = async () => {
+      const db = await readDb(file);
+      change(db, ++round);
+      await writeFile(file, JSON.stringify(db) + "\n", "utf8");
+    };
+  };
+
+  it("keeps an outside change made between a write's read and its rename, and applies the write on top", async () => {
+    const { actor, access } = await accessOf("lukasz", "Retail Co – DWH");
+    const bank = await workspaceNamed("Bank X – Risk DWH");
+    await readDbCached(file); // the write's read comes from the cache, as on a running server
+    const r = createProject(ctxFor(actor.id), access, { workspaceId: access.workspace.id, name: "Finance" });
+    if (!r.ok) throw new Error(r.error.message);
+    changeOutside(1, (db) => (db.workspace.find((w) => w.id === bank.id)!.name = "Changed outside"));
+
+    expect(await store.apply(r.writeSet)).toEqual({ ok: true });
+    expect(outside.times).toBe(0);
+    const db = await readDb(file);
+    expect(db.workspace.find((w) => w.id === bank.id)!.name).toBe("Changed outside");
+    expect(db.project.filter((p) => p.workspace_id === access.workspace.id).map((p) => p.name)).toContain("Finance");
+  });
+
+  it("refuses the write as stale when the outside change touched its row, and keeps the outside change", async () => {
+    const { actor, access } = await accessOf("lukasz", "Retail Co – DWH");
+    const r = updateWorkspaceSettings(ctxFor(actor.id), access, { workspaceId: access.workspace.id, expectedVersion: 1, name: "New name" });
+    if (!r.ok) throw new Error(r.error.message);
+    changeOutside(1, (db) => Object.assign(db.workspace.find((w) => w.id === access.workspace.id)!, { name: "Changed outside", version: 2 }));
+
+    expect(await store.apply(r.writeSet)).toEqual({ ok: false, error: { code: "stale_version", message: STALE_VERSION_MESSAGE } });
+    expect((await workspaceNamed("Changed outside")).version).toBe(2);
+    expect(await store.changeEvents.list(access.workspace.id)).toHaveLength(0);
+  });
+
+  it("refuses as stale when the file changes again during the second try, and keeps both outside changes", async () => {
+    const { actor, access } = await accessOf("lukasz", "Retail Co – DWH");
+    const bank = await workspaceNamed("Bank X – Risk DWH");
+    const r = createProject(ctxFor(actor.id), access, { workspaceId: access.workspace.id, name: "Finance" });
+    if (!r.ok) throw new Error(r.error.message);
+    changeOutside(2, (db, round) => (db.workspace.find((w) => w.id === bank.id)!.name = `Changed outside ${round}`));
+
+    expect(await store.apply(r.writeSet)).toEqual({ ok: false, error: { code: "stale_version", message: STALE_VERSION_MESSAGE } });
+    const db = await readDb(file);
+    expect(db.workspace.find((w) => w.id === bank.id)!.name).toBe("Changed outside 2");
+    expect(db.project.map((p) => p.name)).not.toContain("Finance");
+    expect(await readdir(dir)).toEqual(["dev-db.json"]); // no temp file left
+  });
+
+  it("caches what it wrote under the file's stamp: the next read is not parsed again", async () => {
+    const { actor, access } = await accessOf("lukasz", "Retail Co – DWH");
+    const r = createProject(ctxFor(actor.id), access, { workspaceId: access.workspace.id, name: "Finance" });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(await store.apply(r.writeSet)).toEqual({ ok: true });
+    const first = await readDbCached(file);
+    expect(first.project.map((p) => p.name)).toContain("Finance");
+    expect(await readDbCached(file)).toBe(first);
+  });
+
+  it("a reset replaces the file without a moment where it is missing", async () => {
+    let missing = false;
+    outside.times = 1;
+    outside.run = async () => {
+      missing = !(await readdir(dir)).includes("dev-db.json");
+    };
+    await resetDevData(file);
+    expect(missing).toBe(false);
   });
 });
 

@@ -278,11 +278,13 @@ export function useCanvasHost({
         toast("Pick a different entity, or use “Relate to itself” in the card's menu.");
         return;
       }
+      const sent = ui.selection;
       const result = await run(
         () => createRelationshipAction(workspaceId, { fromEntityId: from.targetId, toEntityId: to.targetId }),
         "Relationship added. Name it and set the cardinality on the right.",
       );
-      if (result.ok) ui.select({ t: "rel", id: result.value.relationshipId });
+      // a selection made while the relationship was on its way stays (fix/late-selection-after-create)
+      if (result.ok) ui.selectMade(sent, { t: "rel", id: result.value.relationshipId });
     },
     [editable, cardById, toast, run, workspaceId, ui],
   );

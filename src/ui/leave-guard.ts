@@ -62,5 +62,15 @@ export function track<T>(key: unknown, save: Promise<T>): Promise<T> {
   return save;
 }
 
+/**
+ * How many saves are on their way (`track`ed and not yet answered), the e2e fixtures' wait before a page closes and the
+ * next test's reseed (fix/write-after-reseed; `SaveHook`, only where the test hooks are on).
+ */
+export function savesOnTheWay(): number {
+  let n = 0;
+  for (const count of onTheWay.values()) n += count;
+  return n;
+}
+
 /** Whether the listener is on the window (tests). */
 export const isListening = (): boolean => holds.size > 0;

@@ -434,6 +434,12 @@ export interface CanvasUiApi extends CanvasHandle {
    * person made while the delete was on its way stays. Every delete that used to clear the selection calls it.
    */
   deselectDeleted: (deleted: readonly string[] | undefined) => void;
+  /**
+   * After an answer that selects what it made (fix/late-selection-after-create): selects `made` only if the selection is
+   * still `sent`, the one the action was sent with (`selectionAfterAnswer`). A selection the person made while the
+   * action was on its way stays. Read `sent` from `selection` when the action is sent, before awaiting it.
+   */
+  selectMade: (sent: Selection, made: Selection) => void;
   registerCanvas: (handle: CanvasHandle | null) => void;
   /** The active canvas tool, shared with the top bar's Entity tool button. */
   mode: CanvasMode;
@@ -468,6 +474,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   selection: null,
   select: noop,
   deselectDeleted: noop,
+  selectMade: noop,
   fit: noop,
   shiftView: noop,
   place: async () => null,

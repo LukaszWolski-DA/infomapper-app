@@ -126,15 +126,17 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   // only the part that changed (slice 9, F1): a queued Scale save must not send back the precision this render showed
   const saveType = (patch: TypeInput) => saveFollowed({ type: patch });
   // a choice shows the newest stored value after a refusal (slice 13, R4)
-  const dataType = useChoice(a.data_type, (t) => saveType({ dataType: t }));
+  const dataType = useChoice(a.data_type, (t) => saveType({ dataType: t }), a.version);
 
   async function addColumn(columnId: string) {
+    const sent = ui.selection;
     const result = await run(() => createMappingAction(p.workspaceId, { attributeId: a.id, sourceColumnId: columnId }));
     if (!result.ok) return;
     const column = ix.column.get(columnId);
     const fits = column ? checkMappingTypes({ kind: "direct", rule_expression: null }, a, [column]).ok : true;
     toast(`Mapped ${columnLabel(ix, columnId)} to ${attributeLabel(ix, a.id)}${fits ? "" : ". The data types don't fit."}`);
-    ui.select({ t: "map", id: result.value.mappingId });
+    // a selection made while the mapping was on its way stays (fix/late-selection-after-create)
+    ui.selectMade(sent, { t: "map", id: result.value.mappingId });
   }
 
   async function remove() {

@@ -420,7 +420,7 @@ versions, change events in the same write, uniqueness and the “exactly one tar
   - Before a merge: one full e2e run. It also counts for a later commit when the diff from the tested commit touches
     only Markdown files in `docs/` and the repository root; the report shows it with `git diff --stat <tested>..HEAD`
     (Łukasz, 7 November 2026).
-  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its eight parts
+  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its nine parts
     (`e2e/parts.ts`) side by side on GitHub's Linux runners, each with its own fresh dev server, no retries; one job
     merges their reports. Start it by hand (`gh workflow run e2e.yml --ref <branch>`, or "Run workflow" on the Actions
     page) or with the label `full-e2e` on the pull request (it tests the branch's head commit). A push starts none; a
@@ -429,7 +429,7 @@ versions, change events in the same write, uniqueness and the “exactly one tar
   - **Heap peaks** (chore heap findings, 13 November 2026): a full run's heap peaks include garbage not yet collected;
     with a forced GC, slices 20 to 26 retain 4 to 8 MB a test (the 6 MB below holds). The retained growth is React's
     development-only async tracking in the RSC server bundled with Next.js (`pendingOperations` keeps every rendered
-    request); production builds don't have it. Add a ninth part when part 8's peak in a full run reaches about 2 GB; do
+    request); production builds don't have it. Add a part (or recut) when a part's peak in a full run reaches about 2 GB; do
     not hunt an app leak for that growth unless a forced-GC measurement shows more than about 8 MB a test.
   - **The single-file check:** `gh workflow run e2e.yml --ref <branch> -f files="e2e/<folder>/<spec>.ts ..." -f
     rounds=3`: `rounds` jobs side by side, each with its own fresh dev server, each running the files once (paths under
@@ -504,7 +504,7 @@ npm run lint             # ESLint, including the layer rules (eslint-plugin-boun
 npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
 npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
-npm run e2e -- --part 2   # one of the full run's eight parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
+npm run e2e -- --part 2   # one of the full run's nine parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
 npm run e2e -- --list    # each part's files, as CI runs them (--part <n>: one part); starts no server
 gh workflow run e2e.yml --ref <branch>                                          # the full run in GitHub Actions (or the label full-e2e on the pull request)
 gh workflow run e2e.yml --ref <branch> -f files="e2e/slice-06a/S6A-07.spec.ts" -f rounds=3   # a single-file check: 3 jobs side by side, each with a fresh server
@@ -605,7 +605,9 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
 ```
 
 - e2e tests import `test`/`expect` from `e2e/slice-XX/fixtures.ts` (fresh seed per test); shared steps are in
-  `helpers.ts`. One file per acceptance criterion, named after its id (`S0-04.spec.ts`, `S1A-07.spec.ts`). Slice 1a's
+  `helpers.ts`. **A fixture that reseeds extends `e2e/settle.ts`** (fix/write-after-reseed), never `@playwright/test`
+  directly: after each test it waits until no save is on its way (`window.__imSavesOnTheWay`, open POSTs), so a late
+  write never lands in the next test's data. One file per acceptance criterion, named after its id (`S0-04.spec.ts`, `S1A-07.spec.ts`). Slice 1a's
   helpers read the model from the e2e data file (`loadModel`) and open a canvas at a given view (`openCanvas`).
   Slice 1b's add a real-mouse drag (`dragTo`), the toolbox (`toolboxAt`), an empty spot (`emptySpot`) and test data
   made through the domain (`asLukasz`, `asUser`); its measurement steps are in `e2e/slice-01b/measure.ts`. Slice 2a's add
@@ -962,10 +964,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   and total objects, paint, layerize; as `S6A-09-hand.spec.ts` does) rather than unprepared medians to the screen, whose
   run-to-run spread (up to 12 ms in slice 6a) is larger than what is measured.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
-- **The full run in eight parts** (chore e2e reliability, P2 B; seven since chore CI e2e; eight since chore e2e eight
-  parts; recut by chore recut e2e parts): `npm run e2e` (`scripts/e2e.ts`) runs the folders in eight parts
-  (`e2e/parts.ts`, `PART_STARTS`: from `slice-02b`, `slice-04b1`, `slice-07a`, `slice-08`, `slice-11`, `slice-15a`,
-  `slice-20`; `tests/e2e-parts.test.ts`),
+- **The full run in nine parts** (chore e2e reliability, P2 B; seven since chore CI e2e; eight since chore e2e eight
+  parts; recut by chore recut e2e parts; nine since chore ninth e2e part): `npm run e2e` (`scripts/e2e.ts`) runs the
+  folders in nine parts (`e2e/parts.ts`, `PART_STARTS`: from `slice-02a`, `slice-03b`, `slice-05a`, `slice-07b`,
+  `slice-10a`, `slice-14a`, `slice-16`, `slice-22`; `tests/e2e-parts.test.ts`),
   each with its own fresh dev server, one
   after another locally and side by side in CI, and merges their blob reports into one result (`playwright-report/`);
   failure traces and the server's output (`server.log`, `scripts/e2e-server.ts`) are in `test-results/part-<n>/`.
@@ -1283,6 +1285,11 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     `ui.deselectDeleted(result.deleted)` (the rule `selectionDeleted`, `src/canvas/selection.ts`): a selection made
     while the delete was on its way stays unless the delete took it along. **A later delete** calls it, never
     `ui.select(null)` after its answer.
+  - **The selection after a create** (fix/late-selection-after-create): an answer that selects what it made calls
+    `ui.selectMade(sent, made)` with `sent` read from `ui.selection` when the action is sent (the rule
+    `selectionAfterAnswer`, `src/canvas/selection.ts`): a selection made meanwhile stays. **A later write whose answer
+    selects its result** calls it, never `ui.select` after the answer; the sites not yet moved to it are listed in
+    `docs/known-limitations.md`.
 
   **Slice 13 (D-66):**
   - **The draft:** a text field is uncontrolled and keeps what was typed (`useDraft` in `src/app/_panels/fields.tsx`; the
@@ -1295,7 +1302,9 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     wrote or a newer one, still holds the text it sent and has no focus, it takes the stored value (`FieldDraft.settle`),
     so an Undo drawn in one commit with the save's page, or a command's trimmed form, shows; a save's answer must give
     that row's version (`Saved`'s `value.version`, a canvas save's `version`). Choice fields use
-    `useChoice`: no draft, the newest stored value after a refusal.
+    `useChoice`: no draft, the newest stored value after a refusal. Since fix/choice-after-undo a choice field passes its
+    row's version (`useChoice(stored, save, version)`, `null` only where the row or its save's answer has none): the
+    choice ends once the field shows its save's version or a newer one (`choiceSettled`).
   - **A refusal that cuts brings the fresh page:** `runCommand` revalidates after `stale_version`, `forbidden`,
     `archived` and `not_found`, and `useAction`'s `saveRow` and `saveRows` answer such a refusal only once the transition
     that applies its page has committed (`afterPage`), so the field sees the newest value and version; a plain `run`

@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
 import { useToast } from "@/ui/components/toast";
-import { choiceLanded, choiceShown, FieldDraft, storedBy, versionBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
+import { choiceLanded, choiceSettled, choiceShown, FieldDraft, storedBy, versionBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
 import { dropDraft, isGone, keepDraft, markGone, takeDraft, unmarkGone, updateDraft } from "@/ui/field-drafts";
 import { guard, release } from "@/ui/leave-guard";
 
@@ -440,19 +440,27 @@ function InlineDraftLine({ mark, onUse, onKeep }: { mark: NonNullable<DraftMark>
 
 /**
  * A choice field (a select, a check box; slice 13, R4): the choice shows from the click until the stored value changes;
- * after a refusal the field shows the stored value, which the refusal's fresh page brings.
+ * after a refusal the field shows the stored value, which the refusal's fresh page brings. `version` is the shown
+ * version of the row the save writes (fix/choice-after-undo): once the field is drawn with the version its stored
+ * save's answer gave, or a newer one, the choice is forgotten whatever the stored value is (`choiceSettled`); `null`
+ * where the row has none or the answer gives none, which keeps the slice 15b rule only.
  */
-export function useChoice<T>(stored: T, save: FieldSave<T>) {
+export function useChoice<T>(stored: T, save: FieldSave<T>, version: number | null) {
   const [chosen, setChosen] = useState<Chosen<T> | null>(null);
-  // the choice is stored (slice 15b): forget it, so an undo that brings the old value back shows it (A → B → A showed B)
-  if (chosen && choiceLanded(chosen, stored)) setChosen(null);
+  // the choice is stored (slice 15b): forget it, so an undo that brings the old value back shows it (A → B → A showed B);
+  // or its save's version is drawn, even when the save's page came in one commit with an undo's (fix/choice-after-undo)
+  if (chosen && (choiceLanded(chosen, stored) || choiceSettled(chosen, version))) setChosen(null);
   const value = choiceShown(chosen, stored);
   const choose = (next: T) => {
     if (Object.is(next, value)) return;
-    const mine = { value: next, on: stored };
+    const mine: Chosen<T> = { value: next, on: stored };
     setChosen(mine);
     const back = () => setChosen((c) => (c === mine ? null : c));
-    Promise.resolve(save(next)).then((answer) => storedBy(answer) !== true && back(), back);
+    Promise.resolve(save(next)).then((answer) => {
+      if (storedBy(answer) !== true) return back();
+      const landed = versionBy(answer);
+      if (landed !== null) setChosen((c) => (c === mine ? { ...mine, landed } : c));
+    }, back);
   };
   return { value, choose };
 }

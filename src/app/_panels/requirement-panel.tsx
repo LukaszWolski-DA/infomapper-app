@@ -54,8 +54,8 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
     saveRow(r, (v) => updateRequirementAction(p.workspaceId, { requirementId: r.id, expectedVersion: v, field, value } as UpdateRequirementInput));
   // a refused text field keeps its draft, a choice shows the newest stored value (slice 13, D-66); an empty name goes
   // back with the server's message (D-59, F14), an empty key goes to the server, which refuses it ("Enter a key.")
-  const kind = useChoice(r.kind, (k) => save("kind", k));
-  const parent = useChoice(r.parent_id ?? "", (id) => save("parent_id", id || null));
+  const kind = useChoice(r.kind, (k) => save("kind", k), r.version);
+  const parent = useChoice(r.parent_id ?? "", (id) => save("parent_id", id || null), r.version);
   const setStatus = (status: string) =>
     void saveRow(r, (v) => setRequirementStatusAction(p.workspaceId, { requirementId: r.id, expectedVersion: v, status }));
   async function remove() {

@@ -1,7 +1,7 @@
 // Seeding and resetting the local data file (npm run seed, npm run reset-dev-data, npm run seed:large).
 
 import { existsSync } from "node:fs";
-import { assertNotProduction, readDb, removeDb, writeDb } from "./file";
+import { assertNotProduction, readDb, writeDb } from "./file";
 import { CORE_SCHEMA, type DevDb, type LocalSchema } from "./schema";
 import { buildSeed } from "./seed";
 import { addLargeWorkspace } from "./seed-large";
@@ -22,9 +22,12 @@ export async function seedDevData(file: string, extra?: SeedExtra): Promise<"cre
   return "created";
 }
 
+/**
+ * Replaces the file with fresh demo data. The rename in `writeDb` replaces it atomically, so a server reading it meanwhile
+ * reads the old file or the new one, never none (fix/write-after-reseed: removing it first left a moment without a file).
+ */
 export async function resetDevData(file: string, extra?: SeedExtra): Promise<void> {
   assertNotProduction();
-  await removeDb(file);
   await writeDb(file, seeded(extra));
 }
 
