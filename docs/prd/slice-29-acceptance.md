@@ -818,3 +818,113 @@ adds a ninth part.
 
 - **L10.** S15-24's race (above): a `fix/` branch from `main` now, or after slice 29?
 - **L11.** Part 8 at 1,908 MB: the ninth part on its own `chore/` branch now (CLAUDE.md's rule), or wait?
+
+---
+
+## Step 4, first half: main merged, `vercel.json`, the Vercel checklist (17 November 2026)
+
+### Main merged (PRs 66 to 70)
+
+`ff98fd4` merges `main` (`06ce3ad`): nine e2e parts, `e2e/settle.ts` (write-after-reseed), Next.js 16.4.6, the late
+selection after a create, the choice after undo. **Two conflicts, both resolved by keeping both sides:**
+
+| File | Conflict | Resolved |
+| --- | --- | --- |
+| `e2e/parts.ts` | main's nine `PART_STARTS` against slice 29's `POSTGRES_ONLY_FOLDERS` beside the old eight | main's nine parts and slice 29's list and filter: `e2e/slice-29` stays out of every part (`npm run e2e -- --list` and the local config's list show none of it) |
+| `src/data/local/store.ts` | the import lines: `../order` (slice 29) and `readDbStamped` (fix/write-after-reseed) | both imports |
+
+No conflict in the proxy, the session, the fixtures or `getDataStore`: main changed none of the proxy, the session or
+`getDataStore`; its fixtures' changes (every reseeding fixture extends `e2e/settle.ts`) are in folders slice 29 does not
+touch; its local adapter changes (`readDbStamped`, `writeDb`'s `ifUnchanged`) merged beside slice 29's without a
+conflict.
+
+**The smoke set and `e2e/settle.ts`:** not needed, so not applied. `settle.ts` is the base of a fixture that **reseeds**
+(CLAUDE.md), so that a save still on its way cannot land in the next test's fresh data. The smoke set never reseeds (the
+loader runs once per CI job, before the specs), and on Postgres every write is refused, so no save can land in anything.
+Its specs keep `@playwright/test`.
+
+**The full run on the merge** (run 44147585823, `ff98fd4`, nine parts): 821 passed, **1 failed**, 16 skipped, 0 flaky;
+wall-clock 15 min 56 s; part times 7.7, 8.0, 9.9, 6.9, 11.8, 13.4, 7.8, 10.3, 9.4 min; heap peaks 940, 1,397, 1,039, 1,221,
+1,225, 1,347, 1,445, 1,181, 1,803 MB; no restart. The failure, `S3B-06` (slice 3b, a context element labeled directly on
+the live canvas stayed a context card), passed 3 of 3 alone (run 44150698438). Recorded in `docs/known-limitations.md`
+("S3B-06 failed once in slice 29"); its diagnosis on its own `fix/` branch after slice 29 (Łukasz). The full run is run
+again on the commit with `vercel.json` and this checklist. CI and the Schema workflow (contract suite, smoke) passed on
+`ff98fd4`.
+
+**S15-24's race** (step 3, L10): fixed on main by PR 69 (`fix/late-selection-after-create`, `ui.selectMade`); the
+proposed `fix/` session was withdrawn.
+
+### `vercel.json` (repository root)
+
+```json
+{
+  "regions": ["fra1"],
+  "git": { "deploymentEnabled": { "**": false, "slice/29-database-skeleton": true } }
+}
+```
+
+Functions in Frankfurt beside Supabase's Central EU; a branch deploys when any `true` rule matches it, so this branch
+only. **It works only where the file is**: `main` has no `vercel.json` until slice 29 is merged, so the project's own
+settings (B5, the Ignored Build Step) keep `main` from deploying meanwhile.
+
+### The checklist for Łukasz (Vercel Pro)
+
+**A. Create the project**
+1. Vercel → Add New → Project → import `LukaszWolski-DA/infomapper-app` from GitHub (grant the Vercel app access to this
+   repository only).
+2. Framework preset: **Next.js** (detected). Root directory: the repository root. Build command, output and install
+   command: the defaults (`next build`; Turbopack is Next.js 16's default build).
+3. **Do not add environment variables on the import screen** (they would apply to every environment): C below.
+4. The import builds `main` at once as a Production deployment. When it has finished (or failed), delete it (Deployments
+   → the deployment → ⋯ → Delete). `main` has no Postgres configuration, so it shows nothing but a 404; deleting it
+   leaves no public deployment.
+
+**B. Settings**
+1. **Settings → Build and Deployment → Node.js Version: 22.x** (`package.json`'s `engines` asks for 22; Vercel's default
+   is 26).
+2. **Settings → Functions:** Fluid compute **on** (the default for new projects; check). Function region: `vercel.json`
+   sets **Frankfurt (fra1)**; the page should show it after the first deployment from this branch. Memory and
+   duration: the defaults.
+3. **Settings → Deployment Protection:** Vercel Authentication **on**, **Standard Protection** (every deployment but the
+   production domain needs a Vercel sign-in with access to the team).
+4. **Settings → Deployment Protection → Protection Bypass for Automation:** create one secret. Copy it into
+   `.env.postgres.local` as `VERCEL_AUTOMATION_BYPASS_SECRET` (the measuring spec on the laptop sends it; never into a
+   file in the repository, a commit or a message).
+5. **Settings → Git → Ignored Build Step:** "Run my own command" with
+   `if [ "$VERCEL_GIT_COMMIT_REF" = "slice/29-database-skeleton" ]; then exit 1; else exit 0; fi`
+   (exit 1 builds, exit 0 skips): every other branch, `main` included, is skipped whatever its files say. It stays until
+   slice D; slice 29's merge brings `vercel.json` to `main`, which says the same.
+
+**C. Environment variables** (Settings → Environment Variables): every one **Preview only**, with **"Preview"
+restricted to the branch `slice/29-database-skeleton`**, typed **Sensitive** (Vercel's "Secret" type: write-only).
+Nothing in Production or Development.
+
+| Name | Value |
+| --- | --- |
+| `INFOMAPPER_DATA` | `postgres` |
+| `INFOMAPPER_DATABASE_URL` | the **transaction pooler**'s string (port **6543**), the same as in `.env.postgres.local` |
+| `SUPABASE_URL` | the project's URL (`https://<ref>.supabase.co`) |
+| `SUPABASE_PUBLISHABLE_KEY` | the publishable key (`sb_publishable_…`) |
+| `INFOMAPPER_TIMING` | `1` (the timing record, step 4's second half; may be added then) |
+
+A change to a variable applies only to the next deployment: redeploy after adding them.
+
+**D. Never in Vercel**
+
+| Name | Why |
+| --- | --- |
+| `SUPABASE_SECRET_KEY` | the accounts script's only; it acts as `service_role` and bypasses RLS. The app needs none (S29-09) |
+| `INFOMAPPER_MIGRATION_URL` | the scripts' session pooler; the app never migrates or loads |
+| `INFOMAPPER_DEMO_PASSWORD` | the demo accounts' password: only the accounts script and the specs on the laptop |
+| `INFOMAPPER_SESSION_SECRET`, `INFOMAPPER_DEV_DB`, `INFOMAPPER_TEST_HOOKS`, `INFOMAPPER_MEASURE`, `DATABASE_URL`, `INFOMAPPER_CONTRACT_DB` | the local adapter's, the tests' or the schema check's: meaningless or harmful on Vercel |
+
+**E. Nothing to change in Supabase.** The sign-in is a password through the server (no e-mail link, no OAuth
+redirect), so neither the Site URL nor the redirect URLs matter; sign-ups stay off.
+
+**F. Then tell me.** The first deployment from this branch comes with the next push (or Redeploy on the branch's
+latest deployment). Step 4's second half checks it: the region `fra1`, Deployment Protection, sign-in, the read-only pages
+(S29-07), then the timing record and the measurement.
+
+**Known for the second half:** the pool reads `src/data/postgres/supabase-ca.crt` at run time; Vercel's function bundle
+includes only traced files, so `next.config.ts` needs `outputFileTracingIncludes` for it (with the first deployment, step
+4's second half).

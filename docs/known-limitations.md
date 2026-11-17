@@ -1147,6 +1147,19 @@ the relationship's key in InfoCube's section (`KeySection`, `sections.tsx`): the
 Undo is pressed; both failed without the rule) and the rule's cases in `src/ui/field-draft.test.ts` (the undo's page in
 one commit with the save's, and another session's revert at a newer version).
 
+### S3B-06 failed once in slice 29 (cause not found)
+
+In slice 29's full run after main was merged (run 44147585823, commit `ff98fd4`, 17 November 2026),
+`e2e/slice-03b/S3B-06.spec.ts` failed once:
+- **What failed:** a context element labeled directly on the live canvas should become a full card whose filter is
+  "all"; after 15 s the card was still a context card ("labeled").
+- **Alone:** it passed 3 of 3 (single-file check, run 44150698438, 28 to 32 s each).
+- **Cause:** not found. Slice 29 did not change the code it runs (the local adapter's live canvas and labels).
+- **Kept:** the run's trace, error and server log are in `.data/e2e-29-s3b06/` (git-ignored), as well as on the run's
+  page for 14 days.
+- **Next:** a step 1 diagnosis on its own `fix/` branch after slice 29 (CLAUDE.md, "A race in a test"). The cause may be in
+  the app, as it was for RP-07, S15-24 and S22-02.
+
 ### S11-08 failed once: a save on its way when the next test reseeded (a bug in the local adapter and the fixtures, fixed on fix/write-after-reseed)
 
 In PR 66's full run (run 44043914367, 17 November 2026), `e2e/slice-11/S11-08.spec.ts` failed in part 6: searching
