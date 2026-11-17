@@ -721,3 +721,27 @@ Nine unit tests failed on order, and KB's seed-made rows would have moved. The c
 - **The document editor's controls while read only:** accepted as a known limitation of slice A, gone in slice B.
 - **The signing key (L2):** `infomapper-dev`'s current key is ECC (P-256), that is ES256, so `getClaims()` checks
   sessions locally against the JWKS, without a call to Auth.
+
+---
+
+## Step 3: sign-in (17 November 2026), stopped at the Auth check
+
+`scripts/pg-auth-check.ts` on `infomapper-dev` (statuses only; its throwaway account was made with a random password,
+never printed, and deleted again):
+
+| Check | Result |
+| --- | --- |
+| The Data API gives no data (`/rest/v1/`) | PASS: HTTP 503 |
+| Auth answers its settings (`/auth/v1/settings`) | PASS: HTTP 200 |
+| **Sign-ups are off** | **FAIL: `disable_signup` is `false`** |
+| E-mail and password sign-in is on | PASS |
+| `admin.createUser` with the secret key | PASS, but with sign-ups **on**, so not the case asked for |
+| `signInWithPassword` with the publishable key (Auth with the Data API off) | PASS |
+| `getClaims()` checks the token | PASS: `alg` ES256, checked locally |
+| A wrong password is refused | PASS: `invalid_credentials` |
+| A public sign-up is refused | refused, but as `email_address_invalid` (Supabase refuses example.com addresses), not as `signup_disabled`: says nothing about sign-ups. The check now passes only on `signup_disabled`. |
+| The throwaway account is deleted | PASS |
+
+**Stopped:** DB8 and DB10 say sign-ups are off in `infomapper-dev`; they are on. With them on, anyone who knows the
+project's URL and publishable key could make an account (no page offers it, but Auth's endpoint does). Łukasz turns them
+off (dashboard: Authentication → Sign In / Providers → "Allow new users to sign up" off), then the check runs again.
