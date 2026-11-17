@@ -14,8 +14,10 @@ import { supabaseConfig } from "./supabase-config";
  *   answer must carry no `Set-Cookie` (AD-32, F9).
  */
 export async function supabaseServer({ write = false }: { write?: boolean } = {}) {
-  const { url, publishableKey } = supabaseConfig();
+  // the request's cookies first: they make every page that asks for the session dynamic, so no page is prerendered at
+  // build time, with or without the project's values in the build's environment
   const store = await cookies();
+  const { url, publishableKey } = supabaseConfig();
   return createServerClient(url, publishableKey, {
     cookies: {
       getAll: () => store.getAll(),
