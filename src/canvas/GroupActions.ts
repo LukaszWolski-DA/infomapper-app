@@ -26,7 +26,7 @@ import type { LayoutChange } from "./layout-plan";
 import { besideSpots, CARD_W, cardHeight, cardWidth, inside, newCardHeight, snap8, type Pt, type Rect } from "./geometry";
 import type { Selection } from "./line-data";
 import type { NoteData } from "./note-data";
-import { isNoteKey, selectedCardIds, selectedKeys, selectedReqCardIds, unitsOf, type ItemBox } from "./selection";
+import { isNoteKey, removedSelectionIds, selectedCardIds, selectedKeys, selectedReqCardIds, unitsOf, type ItemBox } from "./selection";
 import type { NoteMove, NoteMover } from "./useNotes";
 import { fitWidth as fitWidthOf } from "./text-fit";
 
@@ -49,7 +49,8 @@ const CLICK_SLOP = 4;
 interface Options extends GroupWrites {
   editable: boolean;
   selection: Selection;
-  select: (sel: Selection) => void;
+  /** A removal's answer: clears the selection only if it points at a removed id (`ui.deselectDeleted`). */
+  deselectDeleted: (deleted: readonly string[] | undefined) => void;
   setNodes: Dispatch<SetStateAction<CardNodeT[]>>;
   patchCard: (id: string, patch: Partial<Pick<CardData, "x" | "y" | "width">>) => void;
   /** Runs a write after every write still on its way for these cards, and counts it as pending for them. */
@@ -87,7 +88,7 @@ const rectOf = (n: CardNodeT): Rect => ({ x: n.position.x, y: n.position.y, w: c
 export function useGroupActions(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
-  const { editable, selection, select, setNodes, patchCard, enqueueGroup, versions, pending, removedHere, undo, occupied, viewRect } = o;
+  const { editable, selection, deselectDeleted, setNodes, patchCard, enqueueGroup, versions, pending, removedHere, undo, occupied, viewRect } = o;
   const { saveLayout, removeCards, placeCards, items, framesNow, patchFrames, frameRect, canNote, notes: noteMover, saveNoteMoves, reqs: reqMover } = o;
 
   /** The selected cards themselves on this canvas (not frames): several, or the one selected card. */
@@ -458,6 +459,8 @@ export function useGroupActions(o: Options) {
     const reqIds = selectedReqCardIds(selectedKeys(selection, all), all);
     const ids = [...selectedNodes().map((n) => n.id), ...reqIds];
     if (!editable || !ids.length) return;
+    // what this removal takes off the canvas in the browser: the answer clears the selection only if it points at it
+    const removedIds = removedSelectionIds(all.filter((b) => ids.includes(b.id)));
     enqueueGroup(ids, async () => {
       let result: WriteResult<unknown>;
       try {
@@ -472,7 +475,7 @@ export function useGroupActions(o: Options) {
       for (const id of ids) removedHere.current.set(id, versions.current.get(id) ?? 1);
       setNodes((ns) => ns.filter((n) => !ids.includes(n.id)));
       if (reqIds.length) reqMover.current?.drop(reqIds);
-      select(null);
+      deselectDeleted(removedIds);
       const u = undo();
       const n = ids.length;
       toast(
@@ -481,7 +484,7 @@ export function useGroupActions(o: Options) {
         u ? { label: "Undo", run: u.undo } : undefined,
       );
     });
-  }, [editable, items, selection, selectedNodes, enqueueGroup, removeCards, versions, removedHere, setNodes, select, undo, toast, reqMover]);
+  }, [editable, items, selection, selectedNodes, enqueueGroup, removeCards, versions, removedHere, setNodes, deselectDeleted, undo, toast, reqMover]);
 
   /**
    * “Add sources of selected entities” (PRD item 9): each entity's missing feeding source tables go beside its own card,

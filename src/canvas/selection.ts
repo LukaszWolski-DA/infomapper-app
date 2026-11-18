@@ -194,6 +194,16 @@ export function selectionDeleted(sel: Selection, deleted: ReadonlySet<string>): 
   }
 }
 
+/**
+ * The ids a removal on the canvas's queue took off this canvas in the browser (fix/late-selection-canvas): each item's
+ * own id (a card's, a requirement card's or a frame's) and the id its key names (the element or the requirement), so
+ * `selectionDeleted` finds a card, its row, the requirement and a multi-selection's key among them. Its answer clears
+ * the selection with these (`ui.deselectDeleted`), never `select(null)`.
+ */
+export function removedSelectionIds(items: readonly Pick<ItemBox, "id" | "key">[]): string[] {
+  return [...new Set(items.flatMap((i) => [i.id, i.key.slice(i.key.indexOf(":") + 1)]))];
+}
+
 /** Whether two selections are the same: the same kind naming the same rows (a multi-selection's keys in any order). */
 export function sameSelection(a: Selection, b: Selection): boolean {
   if (a === b) return true;

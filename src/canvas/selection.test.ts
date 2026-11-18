@@ -4,7 +4,7 @@ import { deletedIds } from "@/domain/changes";
 import { deleteAttribute } from "@/domain/commands/attribute";
 import { deleteEntity } from "@/domain/commands/entity";
 import { deleteMapping } from "@/domain/commands/mapping";
-import { afterLasso, allKeys, cardKey, fromKeys, lassoHits, rectBetween, selectedCardIds, selectedKeys, sameSelection, selectionAfterAnswer, selectionBounds, selectionDeleted, toggleCard, toggleItem, unitsOf, type ItemBox } from "./selection";
+import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, rectBetween, reqKey, selectedCardIds, selectedKeys, removedSelectionIds, sameSelection, selectionAfterAnswer, selectionBounds, selectionDeleted, toggleCard, toggleItem, unitsOf, type ItemBox } from "./selection";
 
 const cards: ItemBox[] = [
   { id: "c1", key: "entity:customer", rect: { x: 0, y: 0, w: 256, h: 200 } },
@@ -303,5 +303,43 @@ describe("selectionAfterAnswer", () => {
     expect(sameSelection({ t: "card", id: "x" }, { t: "frame", id: "x" })).toBe(false);
     expect(sameSelection({ t: "multi", keys: ["entity:a"] }, { t: "multi", keys: ["entity:a", "entity:b"] })).toBe(false);
     expect(sameSelection({ t: "bundle", id: "k" }, { t: "bundle", id: "k" })).toBe(true);
+  });
+});
+
+describe("the selection after a removal on the canvas's queue (fix/late-selection-canvas)", () => {
+  // Customer's card (item c1) removed from this canvas: the ids it removed in the browser
+  const removed = new Set(removedSelectionIds([{ id: "c1", key: "entity:customer" }]));
+
+  it("clears the removed card, one of its rows and a multi-selection holding it", () => {
+    expect(removed).toEqual(new Set(["c1", "customer"]));
+    expect(selectionDeleted({ t: "card", id: "c1" }, removed)).toBe(true);
+    expect(selectionDeleted({ t: "row", cardId: "c1", id: "phone" }, removed)).toBe(true);
+    expect(selectionDeleted({ t: "multi", keys: ["entity:customer", "entity:order"] }, removed)).toBe(true);
+  });
+
+  it("keeps a selection made meanwhile", () => {
+    expect(selectionDeleted({ t: "card", id: "c2" }, removed)).toBe(false);
+    expect(selectionDeleted({ t: "row", cardId: "c2", id: "total" }, removed)).toBe(false);
+    expect(selectionDeleted({ t: "multi", keys: ["entity:order", "source:items"] }, removed)).toBe(false);
+    expect(selectionDeleted({ t: "frame", id: "f1" }, removed)).toBe(false);
+    expect(selectionDeleted(null, removed)).toBe(false);
+  });
+
+  it("names a requirement card's requirement and a frame", () => {
+    const req = new Set(removedSelectionIds([{ id: "r1", key: reqKey("req-101") }]));
+    expect(selectionDeleted({ t: "req", id: "req-101" }, req)).toBe(true);
+    expect(selectionDeleted({ t: "req", id: "req-102" }, req)).toBe(false);
+    const frame = new Set(removedSelectionIds([{ id: "f1", key: frameKey("f1") }]));
+    expect(frame).toEqual(new Set(["f1"]));
+    expect(selectionDeleted({ t: "frame", id: "f1" }, frame)).toBe(true);
+    expect(selectionDeleted({ t: "card", id: "c1" }, frame)).toBe(false);
+  });
+
+  it("'Arrange into frames' clears only the selection it was sent with (selectionAfterAnswer with null)", () => {
+    const sent = { t: "card" as const, id: "c1" };
+    expect(selectionAfterAnswer({ t: "card", id: "c1" }, sent, null)).toBeNull();
+    expect(selectionAfterAnswer({ t: "card", id: "c2" }, sent, null)).toEqual({ t: "card", id: "c2" });
+    expect(selectionAfterAnswer({ t: "multi", keys: ["entity:a", "entity:b"] }, { t: "multi", keys: ["entity:b", "entity:a"] }, null)).toBeNull();
+    expect(selectionAfterAnswer(null, sent, null)).toBeNull();
   });
 });

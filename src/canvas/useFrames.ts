@@ -55,7 +55,7 @@ import { planLayout, planReframe, type LayoutChange, type PlanCard } from "./lay
 import type { Selection } from "./line-data";
 import type { NoteData } from "./note-data";
 import { CUT_SAVE, FreshWaits, PAGE_REFUSALS, SaveCuts, type CanvasSave } from "./save-cuts";
-import { rectBetween } from "./selection";
+import { frameKey, rectBetween, removedSelectionIds } from "./selection";
 import type { NoteMover } from "./useNotes";
 import { rowSaves } from "@/ui/row-saves";
 
@@ -148,6 +148,12 @@ interface Options {
   versions: MutableRefObject<Map<string, number>>;
   pending: MutableRefObject<Map<string, number>>;
   select: (sel: Selection) => void;
+  /** The selection as it is now, read when the person acts (fix/late-selection-canvas). */
+  selectionNow: () => Selection;
+  /** An answer's selection: only if the selection is still `sent`; answers whether it took (`ui.selectMade`). */
+  selectMade: (sent: Selection, made: Selection) => boolean;
+  /** A removal's answer: clears the selection only if it points at a removed id (`ui.deselectDeleted`). */
+  deselectDeleted: (deleted: readonly string[] | undefined) => void;
   undo: () => UndoHooks | null;
   writes: FrameWrites;
   /** Space held: a left drag pans. */
@@ -195,7 +201,7 @@ const boxOf = (f: FrameData, counts: ReadonlyMap<Uuid, number>): FrameBox => ({
 export function useFrames(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
-  const { editable, setNodes, patchCard, enqueueGroup, versions, pending, select, undo, writes, spaceDown, notes: noteMover, reqs: reqMover } = o;
+  const { editable, setNodes, patchCard, enqueueGroup, versions, pending, select, selectionNow, selectMade, deselectDeleted, undo, writes, spaceDown, notes: noteMover, reqs: reqMover } = o;
   /** The frames as saved (and as an editor changes them). */
   const [saved, setFrames] = useState<FrameData[]>(() => [...o.initialFrames]);
   /** Reviewers and readers: the frames collapsed or expanded in this tab only (item 11), by frame id. */
@@ -645,6 +651,7 @@ export function useFrames(o: Options) {
     async (rect: Rect) => {
       if (!editable) return;
       const cards = nodes().map((n) => ({ canvasItemId: n.id, expectedVersion: ver(n.id), height: cardHeight(n.data.card) }));
+      const sent = selectionNow();
       let result: WriteResult<Versions & { frameId: Uuid; claimed: number }>;
       try {
         result = await writes.createFrame({ x: rect.x, y: rect.y, width: rect.w, height: rect.h, cards });
@@ -661,13 +668,13 @@ export function useFrames(o: Options) {
       const frame: FrameData = { id: frameId, version: v[frameId] ?? 1, name: NEW_FRAME_NAME, kind: "free", conceptId: null, sourceSystemId: null, color: FREE_FRAME_COLORS[0], x: rect.x, y: rect.y, width: rect.w, height: rect.h, collapsed: false, createdAt: new Date().toISOString() };
       setFrames((fs) => (fs.some((f) => f.id === frameId) ? fs : [...fs, frame]));
       for (const id of Object.keys(v)) if (id !== frameId) patchCard(id, { frameId });
-      select({ t: "frame", id: frameId });
-      onCreated(frameId);
+      // a selection made while the create was on its way stays, and so do the panel and the focus (fix/late-selection-canvas)
+      if (selectMade(sent, { t: "frame", id: frameId })) onCreated(frameId);
       const u = undo();
       u?.noteSaved();
       toast("Frame added. Name it on the right. Drag cards in to add them.", "info", u ? { label: "Undo", run: u.undo } : undefined);
     },
-    [editable, nodes, ver, writes, toast, noteVersions, patchCard, select, onCreated, undo],
+    [editable, nodes, ver, writes, toast, noteVersions, patchCard, selectionNow, selectMade, onCreated, undo],
   );
 
   const createFrameAt = useCallback(
@@ -756,13 +763,14 @@ export function useFrames(o: Options) {
           patchCard(id, { frameId: null });
           versions.current.set(id, ver(id) + 1);
         }
-        select(null);
+        // the frame's selection only: one made while the delete was on its way stays (fix/late-selection-canvas)
+        deselectDeleted(removedSelectionIds([{ id: frameId, key: frameKey(frameId) }]));
         const u = undo();
         u?.noteSaved();
         toast(`Deleted the frame ${result.value.name}. Everything inside stays on the canvas.`, "info", u ? { label: "Undo", run: u.undo } : undefined);
       });
     },
-    [editable, membersOf, enqueueGroup, writes, ver, toast, patchCard, versions, select, undo],
+    [editable, membersOf, enqueueGroup, writes, ver, toast, patchCard, versions, deselectDeleted, undo],
   );
 
   const fitFrame = useCallback(
@@ -1023,6 +1031,7 @@ export function useFrames(o: Options) {
         return;
       }
       const frameIds = framesRef.current.map((f) => f.id);
+      const sent = selectionNow();
       enqueueGroup([...frameIds, ...all.map((n) => n.id)], async () => {
         let result: Awaited<ReturnType<FrameWrites["arrangeIntoFrames"]>>;
         try {
@@ -1042,14 +1051,15 @@ export function useFrames(o: Options) {
         for (const f of framesRef.current) if (f.kind !== "free" && !built.some((b) => b.id === f.id)) deletedHere.current.set(f.id, ver(f.id));
         setFrames((fs) => [...fs.filter((f) => f.kind === "free"), ...buildFrames(built)]);
         for (const c of cards) patchCard(c.id, { x: c.x, y: c.y, frameId: c.frameId });
-        select(null);
+        // cleared only while it is still the selection the arrange was sent with (fix/late-selection-canvas)
+        selectMade(sent, null);
         const u = undo();
         u?.noteSaved();
         setTimeout(fit, 0);
         toast(`Arranged the canvas into ${n} frames. Undo restores your previous layout.`, "info", u ? { label: "Undo", run: u.undo } : undefined);
       });
     },
-    [editable, nodes, toast, enqueueGroup, writes, ver, noteVersions, patchCard, select, undo],
+    [editable, nodes, toast, enqueueGroup, writes, ver, noteVersions, patchCard, selectionNow, selectMade, undo],
   );
 
   const viewOf = useCallback(
@@ -1099,6 +1109,7 @@ export function useFrames(o: Options) {
       const sized = (n: CardNodeT) => ({ canvasItemId: n.id, expectedVersion: ver(n.id), height: cardHeight(n.data.card) });
       const named = all.filter((n) => cardIds.includes(n.id));
       const others = fromCard ? all.filter((n) => !cardIds.includes(n.id) && n.data.card.frameId === null) : [];
+      const sent = selectionNow();
       enqueueGroup([...framesRef.current.map((f) => f.id), ...all.map((n) => n.id)], async () => {
         let result: Awaited<ReturnType<FrameWrites["putInNewFrame"]>>;
         try {
@@ -1113,8 +1124,8 @@ export function useFrames(o: Options) {
         const { frameId, kind, versions: v } = result.value;
         noteVersions(v);
         for (const id of Object.keys(v)) if (id !== frameId) patchCard(id, { frameId });
-        select({ t: "frame", id: frameId });
-        onCreated(frameId);
+        // a selection made while the write was on its way stays, and so do the panel and the focus (fix/late-selection-canvas)
+        if (selectMade(sent, { t: "frame", id: frameId })) onCreated(frameId);
         const u = undo();
         u?.noteSaved();
         const what = kind === "concept" ? "concept " : kind === "source_system" ? "source system " : "";
@@ -1125,7 +1136,7 @@ export function useFrames(o: Options) {
         );
       });
     },
-    [editable, nodes, ver, enqueueGroup, writes, toast, noteVersions, patchCard, select, onCreated, undo],
+    [editable, nodes, ver, enqueueGroup, writes, toast, noteVersions, patchCard, selectionNow, selectMade, onCreated, undo],
   );
 
   return {

@@ -97,6 +97,8 @@ interface Options {
   enqueue: (id: string, write: () => Promise<void>) => void;
   enqueueGroup: (ids: readonly string[], write: () => Promise<void>) => void;
   select: (sel: Selection) => void;
+  /** An answer's selection: only if the selection is still `sent`; answers whether it took (`ui.selectMade`). */
+  selectMade: (sent: Selection, made: Selection) => boolean;
   undo: () => UndoHooks | null;
   writes: NoteWrites;
   /** The cards and frames as the canvas shows them now (a dragged card at its node's place). */
@@ -118,7 +120,7 @@ interface Options {
 export function useNotes(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
-  const { canNote, versions, pending, enqueue, enqueueGroup, select, undo, writes } = o;
+  const { canNote, versions, pending, enqueue, enqueueGroup, select, selectMade, undo, writes } = o;
   const [saved, setNotes] = useState<NoteData[]>(() => [...o.initialNotes]);
   const [draft, setDraft] = useState<NoteData | null>(null);
   const [editing, setEditing] = useState<Uuid | null>(null);
@@ -368,15 +370,17 @@ export function useNotes(o: Options) {
             result = FAILED;
           }
           setDraft(null);
+          // the draft note's selection only: one made while the save was on its way stays (fix/late-selection-canvas)
+          const draftSelected = { t: "note" as const, id: DRAFT_NOTE };
           if (!result.ok) {
-            select(null);
+            selectMade(draftSelected, null);
             toast(result.message, "refusal");
             return;
           }
           const note = result.value.note;
           versions.current.set(note.id, note.version);
           setNotes((ns) => [...ns, note]);
-          select({ t: "note", id: note.id });
+          selectMade(draftSelected, { t: "note", id: note.id });
           undo()?.noteSaved();
         })();
         return;
@@ -389,7 +393,7 @@ export function useNotes(o: Options) {
       else if (leave === "drop") drafts.drop(id);
       else if (leave === "save") void saveText(id, text);
     },
-    [noteOf, writes, select, toast, versions, undo, drafts, saveText],
+    [noteOf, writes, select, selectMade, toast, versions, undo, drafts, saveText],
   );
 
   /** Escape in the note's editor: editing ends; a refused draft is dropped and the stored text shows ("Use this"). */
