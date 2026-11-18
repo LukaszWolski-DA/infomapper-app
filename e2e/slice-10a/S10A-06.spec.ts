@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, ids, lineMenu, loadModel, mappingLine, openCanvas, pointOnLine, recordToasts, rowNamed, signInAs, STALE, toasts } from "./helpers";
 
@@ -48,15 +49,15 @@ test("S10A-06: Ctrl+↓ on a row, then Ctrl+Z at once: the siblings' order is re
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), { x: -640, y: -480, zoom: 1 });
   const name = page.getByTestId("input-attribute-name");
-  await rowNamed(page, "Order Line", second).click();
+  await clickVisible(rowNamed(page, "Order Line", second));
   await name.fill(`${second}_a`);
   await name.press("Enter");
   await undoReady(page);
 
-  await rowNamed(page, "Order Line", first).click();
+  await clickVisible(rowNamed(page, "Order Line", first));
   await page.keyboard.press("Control+ArrowDown");
   await page.keyboard.press("Control+z");
-  await rowNamed(page, "Order Line", `${second}_a`).click();
+  await clickVisible(rowNamed(page, "Order Line", `${second}_a`));
   await name.fill(`${second}_b`);
   await name.press("Enter");
   await expect.poll(order).toEqual([first, `${second}_b`, ...start.slice(2)]);

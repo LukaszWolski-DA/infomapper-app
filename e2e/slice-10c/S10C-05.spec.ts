@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { attributeOf, canvasUrl, expectAttributeShown, expectToast, openCanvas, pasteAs, rawAttribute, rowNamed, signInAs } from "./helpers";
 
@@ -10,7 +11,7 @@ test("S10C-05: deleting an original asks a second click naming its copies; they 
   await pasteAs("Product", original);
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
-  await rowNamed(page, "Customer", "customer_id").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_id"));
   await expectAttributeShown(page, "Customer.customer_id");
   const panel = page.getByTestId("panel-attribute");
   const button = panel.getByTestId("button-delete-attribute");
@@ -27,7 +28,7 @@ test("S10C-05: deleting an original asks a second click naming its copies; they 
   await expect.poll(async () => (await rawAttribute(original.id))!.deleted_at).not.toBeNull();
 
   // the copy names its deleted original; its followed fields stay read-only, with Stop following
-  await rowNamed(page, "Order Line", "customer_id").click();
+  await clickVisible(rowNamed(page, "Order Line", "customer_id"));
   await expectAttributeShown(page, "Order Line.customer_id");
   await expect(panel.getByTestId("note-copied-from")).toContainText("Copied from Customer.customer_id, which was deleted.");
   await expect(panel.getByTestId("select-attribute-type")).toBeDisabled();
@@ -45,7 +46,7 @@ test("S10C-05: an attribute without mappings or copies is deleted at once, with 
   const copy = await pasteAs("Order Line", original);
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
-  await rowNamed(page, "Order Line", "customer_id").click();
+  await clickVisible(rowNamed(page, "Order Line", "customer_id"));
   await expectAttributeShown(page, "Order Line.customer_id");
   await page.getByTestId("panel-attribute").getByTestId("button-delete-attribute").click();
   await expectToast(page, "Attribute deleted");

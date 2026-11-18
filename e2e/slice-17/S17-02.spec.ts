@@ -2,6 +2,7 @@
 // removes both; linked ones are checked and disabled. "Link all attributes…" on an entity with an attribute already
 // linked adds the others only, one undo step. The same on a dimension. A reader sees neither.
 
+import { clickVisible } from "../canvas-click";
 import { test as starTest } from "../slice-15a/fixtures";
 import { expect, test } from "./fixtures";
 import {
@@ -33,7 +34,7 @@ test("S17-02: two requirements at once on an attribute, one undo removes both; l
   const email = attribute("Customer", "email");
   await signInAs(page, "Łukasz");
   await openCanvas(page, undefined, WHOLE_CO);
-  await row(page, "Customer", email.id).click();
+  await clickVisible(row(page, "Customer", email.id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
 
   // REQ-102 and REQ-103 are linked to email in the seed: checked and disabled, titled "Already linked"
@@ -86,7 +87,7 @@ starTest("S17-02: “Link all attributes…” on a dimension", async ({ page })
   const before = (await linksOf("REQ-210")).filter((k) => attributes.some((a) => a.id === k.attribute_id)).length;
   await signInAs(page, "Łukasz");
   await openCanvas(page, starUrl(), STAR_VIEW);
-  await headOf(page, "Dim Customer").click();
+  await clickVisible(headOf(page, "Dim Customer"));
   await expect(page.getByTestId("panel-entity")).toBeVisible();
   await linkFromPanel(page, ["REQ-210"], { all: true });
   await expectToast(page, `Linked ${attributes.length - before} attributes of Dim Customer to REQ-210.`);

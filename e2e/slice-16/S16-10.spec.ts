@@ -3,6 +3,7 @@
 // browser's search field, a panel's name field, the description editor, a link (a breadcrumb, a home tile) and selected
 // text it is not. The canvas's toolbox and a card's menu still open.
 
+import { clickVisible } from "../canvas-click";
 import type { Locator } from "@playwright/test";
 import { expect, test, type Page } from "./fixtures";
 import { cancelledAt, canvasUrl, headOf, openCanvas, openCanvasMenu, recordContextMenus, RETAIL, signInAs, WHOLE_CO } from "./helpers";
@@ -51,7 +52,7 @@ test("S16-10: the canvas page cancels the browser's menu on its own surfaces; te
   expect(await cancelledAt(page, await centreOf(tab)), "canvas tab").toBe(true);
   expect(await cancelledAt(page, await pointIn(page, page.getByTestId("bar-top"), "header, div")), "top bar").toBe(true);
   expect(await cancelledAt(page, await pointIn(page, page.getByTestId("nav-breadcrumbs"), "div, nav, ol, ul, li")), "breadcrumbs row").toBe(true);
-  await page.getByTestId("card-entity").filter({ hasText: "Customer" }).first().getByTestId("card-name").click();
+  await clickVisible(page.getByTestId("card-entity").filter({ hasText: "Customer" }).first().getByTestId("card-name"));
   const panel = page.getByTestId("panel-entity");
   await expect(panel).toBeVisible();
   expect(await cancelledAt(page, await pointIn(page, panel, "div", "a[href], button, input, textarea, select, .rt-view")), "the details panel").toBe(true);

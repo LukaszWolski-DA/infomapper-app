@@ -7,6 +7,7 @@
 //
 //   COMMITS=1 SIDE=branch npx playwright test e2e/slice-14a/S14A-13-commits.spec.ts
 
+import { clickVisible } from "../canvas-click";
 import fs from "node:fs";
 import type { Page } from "@playwright/test";
 import { updateNote } from "../../src/domain/commands/note";
@@ -69,7 +70,7 @@ test("S14A-13 commits: typing in a note on the canvas, its save, a refusal, a re
     const mark = box(page, note.id).getByTestId("note-not-saved");
     await phase("the mark clicked", async () => {
       await page.keyboard.press("Escape");
-      await mark.click();
+      await clickVisible(mark);
       await expect(page.getByTestId("panel-note").getByTestId("draft-conflict")).toBeVisible();
     });
     await phase("Use this", async () => {

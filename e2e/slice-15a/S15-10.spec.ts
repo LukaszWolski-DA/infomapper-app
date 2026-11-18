@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { createRelationship } from "../../src/domain/commands/relationship";
 import { CROSS_LEVEL_RELATIONSHIP_MESSAGE } from "../../src/domain/model/levels";
 import { expect, test } from "./fixtures";
@@ -13,8 +14,8 @@ test("S15-10: Customer to Fact Sales refused, also directly; Fact Sales to Dim P
   await openCanvas(page, starUrl(), STAR_VIEW);
   const before = (await cubeStore().model.load(SEED_IDS.wsRetailDwh)).relationships.length;
 
-  await card(page, "Customer").getByTestId("button-card-relate").click();
-  await card(page, "Fact Sales").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("button-card-relate"));
+  await clickVisible(card(page, "Fact Sales").getByTestId("card-name"));
   await expect.poll(() => toasts(page)).toContain(CROSS_LEVEL_RELATIONSHIP_MESSAGE);
   expect((await cubeStore().model.load(SEED_IDS.wsRetailDwh)).relationships.length).toBe(before);
 
@@ -23,8 +24,8 @@ test("S15-10: Customer to Fact Sales refused, also directly; Fact Sales to Dim P
   const fact = model.entities.find((e) => e.id === entityIdOf("sales"))!;
   expect(await refusalAs(SEED_IDS.userLukasz, (ctx, access) => createRelationship(ctx, access, { from: customer, to: fact }, { fromEntityId: customer.id, toEntityId: fact.id }))).toBe(CROSS_LEVEL_RELATIONSHIP_MESSAGE);
 
-  await card(page, "Fact Sales").getByTestId("button-card-relate").click();
-  await card(page, "Dim Product").getByTestId("card-name").click();
+  await clickVisible(card(page, "Fact Sales").getByTestId("button-card-relate"));
+  await clickVisible(card(page, "Dim Product").getByTestId("card-name"));
   await expect.poll(() => toasts(page)).toContain("Relationship added. Name it and set the cardinality on the right.");
   await expect.poll(async () => (await cubeStore().model.load(SEED_IDS.wsRetailDwh)).relationships.length).toBe(before + 1);
   const added = (await cubeStore().model.load(SEED_IDS.wsRetailDwh)).relationships.filter((r) => r.label === null || r.label === "");

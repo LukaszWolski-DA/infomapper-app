@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, emptySpot, openCanvas, signInAs, toolboxAt } from "./helpers";
 
@@ -20,7 +21,7 @@ test("S15-01: without InfoCube data the canvas has three tabs, no roles, no Info
   expect(items.filter((i) => /New (fact|dimension) here/.test(i))).toEqual([]);
   await page.keyboard.press("Escape");
 
-  await card(page, "Sales Order").getByTestId("card-name").click();
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await page.getByTestId("button-delete-entity").click();
   const rows = page.getByTestId("table-entity-impact").locator("tbody tr td:first-child");
   await expect(rows.first()).toBeVisible();

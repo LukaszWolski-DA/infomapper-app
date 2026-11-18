@@ -3,6 +3,7 @@
 // a click with a card selected and the details panel hidden clears the selection, shows the panel at its "Model checks"
 // group (opened if folded) and flashes it once; a line there selects its object and centres its card.
 
+import { clickVisible } from "../canvas-click";
 import { SEED_IDS } from "../../src/data/local/seed";
 import { expect, test } from "./fixtures";
 import { canvasCheckItems, canvasChecks, canvasUrl, card, hydrated, openCanvas, signInAs, statusChecks, WHOLE_CO } from "./helpers";
@@ -26,7 +27,7 @@ test("S20-05: the status bar's count, the panel's group and its lines", async ({
   await expect(canvasChecks(page)).toBeVisible();
   await canvasChecks(page).getByRole("button", { name: /Model checks/ }).click();
   await expect(canvasCheckItems(page).first()).toBeHidden();
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await expect(page.getByTestId("panel-entity")).toBeVisible();
   await togglePanel(page, "right");
   await expectHidden(page, "right");

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import type { Locator, Page } from "@playwright/test";
 import { readDb, writeDb } from "../../src/data/local/file";
 import { createMapping, updateMapping } from "../../src/domain/commands/mapping";
@@ -53,7 +54,7 @@ test("S10A-04: delete attribute (row menu), after its name in the panel", async 
   const a = model.attributes.find((x) => x.entity_id === entity("Order Line").id && !model.mappings.some((m) => m.attribute_id === x.id))!;
   await open(page, canvasUrl(), { x: -640, y: -480, zoom: 1 });
   const row = card(page, "Order Line").locator(`.row[data-row="${a.id}"]`);
-  await row.click();
+  await clickVisible(row);
   await typeAndLeave(page.getByTestId("input-attribute-name"), `${a.name}_x`);
   await menuOn(page, row, "Delete attribute");
   await expect.poll(async () => (await loadModel()).attributes.some((x) => x.id === a.id)).toBe(false); // the model leaves deleted rows out
@@ -87,7 +88,7 @@ test("S10A-04: move to the frame's concept (frame panel), after the entity's nam
   await makeFrame({ x: 472, y: 0, width: 304, height: 856 }, { name: "Area", concept: "Sales" }); // Customer, misplaced
   await open(page, canvasUrl(), FRAMED);
   const customer = (await ids()).entity("Customer");
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await typeAndLeave(page.getByTestId("input-entity-name"), "Client");
   const at = await namePoint(page, "Area");
   await page.mouse.click(at.x, at.y);
@@ -121,7 +122,7 @@ test("S10A-04: delete from model (card menu), after the entity's name in its pan
   const customer = (await ids()).entity("Customer");
   await open(page);
   const node = await cardOf(page, "Customer");
-  await node.getByTestId("card-name").click();
+  await clickVisible(node.getByTestId("card-name"));
   await typeAndLeave(page.getByTestId("input-entity-name"), "Client");
   await menuOn(page, node.locator(".c-head"), "Delete from model…");
   await page.getByTestId("button-confirm-delete-entity").click();
@@ -158,7 +159,7 @@ test("S10A-04: delete a source table (table panel), after the table's note", asy
 
 test("S10A-04: delete a working label (label panel), after its name", async ({ page }) => {
   await open(page, canvasUrl(), WHOLE_CO);
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await labelsField(page).getByTestId("button-label-open").filter({ hasText: "CR-23" }).click();
   await typeAndLeave(page.getByTestId("input-label-name"), "CR-24");
   await page.getByTestId("button-label-delete").click();
@@ -196,7 +197,7 @@ test("S10A-04: delete a concept with “move to” (left panel), after its name,
   const dialog = page.getByTestId("dialog-delete-concept");
   await dialog.getByTestId("select-move-to").selectOption({ label: "Sales" });
   await dialog.getByTestId("button-confirm-delete-concept").click();
-  await (await cardOf(page, "Customer")).getByTestId("card-name").click();
+  await clickVisible((await cardOf(page, "Customer")).getByTestId("card-name"));
   await typeAndLeave(page.getByTestId("input-entity-name"), "Client");
   await expect.poll(async () => (await loadModel()).entities.find((e) => e.id === customer.id)).toMatchObject({ name: "Client", concept_id: sales.id });
   expect((await loadModel()).concepts.some((c) => c.id === concept.id)).toBe(false);
@@ -229,7 +230,7 @@ test("S10A-04: a drop into another concept's frame with “Move to …” (D-05)
   const zoom = await zoomOf(page);
   await dragCardBy(page, "Sales Order", 408 * zoom, -528 * zoom);
   await page.getByTestId("button-concept-move").click();
-  await (await cardOf(page, "Sales Order")).getByTestId("card-name").click();
+  await clickVisible((await cardOf(page, "Sales Order")).getByTestId("card-name"));
   await typeAndLeave(page.getByTestId("input-entity-name"), "Order");
   await expect.poll(async () => (await loadModel()).entities.find((e) => e.id === salesOrder.id)).toMatchObject({ name: "Order", concept_id: customerConcept.id });
   await noConflict(page);

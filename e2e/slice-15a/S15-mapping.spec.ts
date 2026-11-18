@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { card, cubeStore, liveEntityNamed, openCanvas, signInAs, STAR_VIEW, starUrl } from "./helpers";
 
@@ -11,7 +12,7 @@ test("S15 mapping target: a fact's attribute offers no source column; it comes f
   await openCanvas(page, starUrl(), STAR_VIEW);
   const fact = (await liveEntityNamed("Fact Sales"))!;
 
-  await card(page, "Fact Sales").locator("[data-row]").filter({ hasText: "quantity" }).click();
+  await clickVisible(card(page, "Fact Sales").locator("[data-row]").filter({ hasText: "quantity" }));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await expect(page.getByTestId("fold-cube-comes-from")).toBeVisible();
   await expect(page.getByTestId("select-add-source-column")).toHaveCount(0);

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { attributeOf, canvasUrl, expectAttributeShown, holdAnswer, menuOn, openCanvas, pasteAs, rawAttribute, recordToasts, rowNamed, setLengthAs, signInAs, STALE, toasts } from "./helpers";
 
@@ -12,7 +13,7 @@ test("S10C-09: the original's length, then at once a copy deleted from its row's
   await signInAs(page, "Łukasz");
   await recordToasts(page);
   await openCanvas(page, canvasUrl());
-  await rowNamed(page, "Customer", "customer_id").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_id"));
   await expectAttributeShown(page, "Customer.customer_id");
   // the length's answer is held back 2 s (the server has written it): the copy's delete is started meanwhile
   const held = await holdAnswer(page, '"length":20');

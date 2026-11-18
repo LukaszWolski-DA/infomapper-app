@@ -2,6 +2,7 @@
 // not offer Fact Orders; a relationship between Fact Orders and Dim Order Flags (stored from the dimension, D-67) gives
 // the base hint; deleting Fact Sales names Fact Orders in the preview and clears its base; one undo restores both.
 
+import { clickVisible } from "../canvas-click";
 import { createRelationship } from "../../src/domain/commands/relationship";
 import { SEED_USERS } from "../../src/data/local/seed";
 import { TYPE_HINTS } from "../../src/modules/infocube/domain/keys";
@@ -32,7 +33,7 @@ test("S19-03: Aggregate of and Aggregated by; no cycle offered; the base hint; t
   await expect(baseSelect(page).locator("option")).toHaveText(["Not an aggregate"]);
 
   // the base's delete: the preview names Fact Orders, then Fact Orders has no base; one undo brings both back
-  await card(page, "Fact Sales").getByTestId("card-name").click();
+  await clickVisible(card(page, "Fact Sales").getByTestId("card-name"));
   await page.getByTestId("button-delete-entity").click();
   const dialog = page.getByTestId("dialog-delete-entity");
   const rows = dialog.getByTestId("table-entity-impact").locator("tbody tr");

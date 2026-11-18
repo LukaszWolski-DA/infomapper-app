@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { attributeOf, canvasUrl, expectAttributeShown, groupsOf, openCanvas, pasteAs, rawAttribute, rowNamed, signInAs } from "./helpers";
 
@@ -16,7 +17,7 @@ test("S10C-03: the original's type and Personal data reach every copy in one ste
 
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
-  await rowNamed(page, "Customer", "customer_id").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_id"));
   await expectAttributeShown(page, "Customer.customer_id");
   const panel = page.getByTestId("panel-attribute");
 
@@ -37,7 +38,7 @@ test("S10C-03: the original's type and Personal data reach every copy in one ste
   await expect.poll(async () => Promise.all([original.id, c1, c2].map(async (id) => (await rawAttribute(id))!.is_pii))).toEqual([true, true, true]);
 
   // the copy's panel: type and Personal data read-only, its own fields free
-  await rowNamed(page, "Order Line", "customer_id").click();
+  await clickVisible(rowNamed(page, "Order Line", "customer_id"));
   await expectAttributeShown(page, "Order Line.customer_id");
   await expect(panel.getByTestId("hint-follows")).toHaveText("Follows Customer.customer_id.");
   await expect(panel.getByTestId("select-attribute-type")).toBeDisabled();

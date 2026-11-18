@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { duplicateNameWarning } from "../../src/domain/commands/entity";
 import { expect, test } from "./fixtures";
 import { card, cubeStore, hydrated, openCanvas, recordToasts, SEED_IDS, signInAs, STAR_VIEW, starUrl, toasts, workspaceHome } from "./helpers";
@@ -13,7 +14,7 @@ test("S15-17: names repeat across levels without a warning, not within one; the 
   await hydrated(page);
 
   // Dim Customer renamed "Customer": the logical Customer is another level, no warning
-  await card(page, "Dim Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Dim Customer").getByTestId("card-name"));
   const name = page.getByTestId("input-entity-name");
   await name.fill("Customer");
   await name.press("Enter");

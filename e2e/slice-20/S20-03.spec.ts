@@ -3,6 +3,7 @@
 // titles; a mark appears with a write and goes with its undo; a collapsed card and a card below 40 % keep the header's
 // mark; alias mode keeps the marks; a reader sees the same marks. No element is added (classes and pseudo-elements).
 
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, expectMark, headLine, hydrated, markTitleOf, openCanvas, rowNamed, rowType, signInAs, undo, WHOLE_CO } from "./helpers";
 import { setCard } from "../slice-06a/helpers";
@@ -28,7 +29,7 @@ test("S20-03: the marks on the cards, their titles, a write and its undo, collap
   expect(await rowType(page, "Customer", "last_order_id").evaluate((el) => getComputedStyle(el, "::after").content)).toBe('"!"');
 
   // a write adds a mark (a second "order_number" in Sales Order: a duplicate name), its undo takes it away
-  await rowNamed(page, "Sales Order", "currency_code").click();
+  await clickVisible(rowNamed(page, "Sales Order", "currency_code"));
   const name = page.getByTestId("input-attribute-name");
   await name.fill("Order_Number");
   await name.press("Enter");

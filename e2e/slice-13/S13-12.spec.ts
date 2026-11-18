@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { updateAttribute } from "../../src/domain/commands/attribute";
 import { expect, test } from "./fixtures";
 import { asUser, attributeOf, canvasCommits, canvasUrl, conflictLine, FULL, hydrated, loadModel, openCanvas, rowNamed, SEED_IDS, settledCommits, signInAs, useThis } from "./helpers";
@@ -19,7 +20,7 @@ test("S13-12: typing and Use this add no canvas commit; a conflict's fresh page 
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), FULL);
   await hydrated(page);
-  await rowNamed(page, "Customer", "customer_id").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_id"));
   const panel = page.getByTestId("panel-attribute");
   const name = panel.getByTestId("input-attribute-name");
   await expect(name).toHaveValue("customer_id");

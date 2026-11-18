@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   archive,
@@ -62,8 +63,8 @@ test("S10A-07: the relate button clicked on the same card shows the new toast an
   const before = (await loadModel()).relationships.length;
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
-  await card(page, "Customer").getByTestId("button-card-relate").click();
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("button-card-relate"));
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await expectToast(page, SAME_CARD);
   await page.waitForTimeout(500);
   expect((await loadModel()).relationships.length).toBe(before);

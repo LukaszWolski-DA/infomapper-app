@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { RETAIL } from "../slice-01a/helpers";
 import { card, cubeEntities, cubeStore, entityIdOf, liveEntityNamed, openCanvas, signInAs, STAR_VIEW, starUrl } from "./helpers";
@@ -10,7 +11,7 @@ import { card, cubeEntities, cubeStore, entityIdOf, liveEntityNamed, openCanvas,
 test("S15-14: Dim Date's preview lists SCD type 0 and 2 facts; the delete takes its role, one undo brings it back", async ({ page }) => {
   await signInAs(page, "Łukasz");
   await openCanvas(page, starUrl(), STAR_VIEW);
-  await card(page, "Dim Date").getByTestId("card-name").click();
+  await clickVisible(card(page, "Dim Date").getByTestId("card-name"));
   await page.getByTestId("button-delete-entity").click();
   const dialog = page.getByTestId("dialog-delete-entity");
   const rows = dialog.getByTestId("table-entity-impact").locator("tbody tr");
