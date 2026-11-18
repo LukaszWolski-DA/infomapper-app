@@ -115,7 +115,10 @@ If these disagree, stop and ask. Do not resolve a conflict silently.
   performance), each with the files and functions behind it and a proposal. List the differences between the
   reference prototype and the app that the slice touches. No application code in step 1; Łukasz answers before step 2.
 - **One branch per slice** (`slice/00-skeleton`, …), small commits in Conventional Commits style
-  (`feat:`, `fix:`, `test:`, `docs:`, `chore:`). Never push to `main` directly.
+  (`feat:`, `fix:`, `test:`, `docs:`, `chore:`). Never push to `dev` or `main` directly.
+- **Branches (chore/dev-branch, 18 November 2026):** `dev` is the integration branch and the repository's default.
+  Every slice, `fix/` and `chore/` branch starts from `dev` and its pull request goes into `dev`; nothing merges into
+  `main` except `dev`, in a release (The slice cycle, 8). A hotfix path into `main` comes with production (slice D).
 - **Done means:** the PRD’s acceptance tests pass, `npm run lint`, `npm run typecheck` and `npm test` pass, the full
   run (Testing, "Test runs") passes, and you have described anything you assumed.
 - **When unsure, ask.** A question costs less than a wrong guess.
@@ -134,10 +137,10 @@ If these disagree, stop and ask. Do not resolve a conflict silently.
    `docs/prototype/` is replaced by the version accepted for the slice, under the same file name
    (`infomapper-prototype-with-sources.html`).
 4. **A defect in shared infrastructure is fixed outside slices** (the list in "Test runs"' exception): repairing a
-   defect found during a slice goes to its own `fix/…` branch from `main`, one thing per branch, with its own PR and its
-   own full run. The slice reports it and does not fix it. Changing shared infrastructure as a PRD plans it is allowed
+   defect found during a slice goes to its own `fix/…` branch from `dev`, one thing per branch, with its own PR into
+   `dev` and its own full run. The slice reports it and does not fix it. Changing shared infrastructure as a PRD plans it is allowed
    in a slice (the full path, 2).
-5. **CI early.** Open a draft PR for the slice's branch at step 2, so CI runs on every push. Never add the label
+5. **CI early.** Open a draft PR for the slice's branch into `dev` at step 2, so CI runs on every push. Never add the label
    `full-e2e` or start the E2E workflow unless the step or Łukasz says so. The exceptions are explicit: the single-file
    check for a failing test, and the full runs the "Test runs" rules require.
 6. **Stop rather than decide.** Stop and report when: a performance bar is missed (a gate, Testing, "When to measure";
@@ -147,9 +150,15 @@ If these disagree, stop and ask. Do not resolve a conflict silently.
    backup "Łukasz's test model" requires). KB is read only on a copy of a backup, printing counts only.
 7. **Closing.** The last step updates the docs and quotes every new or changed decision (D-, AD-) in full for Łukasz's
    approval; the full run goes ahead on the final commit without waiting for it (a later commit keeps the run valid as
-   "Test runs" allows). It ends with the manual acceptance steps. Merge and tag only on his command; that command's
-   prompt holds the merge and only what he asks for, and first checks that the approved decision texts are committed and
-   CI passed on the last commit, stopping if not.
+   "Test runs" allows). It ends with the manual acceptance steps. Merge into `dev` and tag only on his command; that
+   command's prompt holds the merge and only what he asks for, and first checks that the approved decision texts are
+   committed and CI passed on the last commit, stopping if not. The slice's tag (`slice-30`, …) goes on the merge commit
+   into `dev`.
+8. **A release** (chore/dev-branch): `dev` reaches `main` only in a release, on Łukasz's command: a pull request from
+   `dev` into `main`, merged with a merge commit (never a squash or a rebase, which would split the two histories). It
+   needs no full run of its own when `git diff --stat <tested>..dev` is empty, `<tested>` being the commit of the last
+   full run on what was merged into `dev`; otherwise one full run on `dev`'s head first. The release's tag goes on
+   `main`'s merge commit: `release-YYYY-MM-DD`, with `-2`, `-3` for a second or third release the same day.
 
 ## Architecture rules
 
@@ -453,9 +462,14 @@ local adapter no pool is made.
     tests). A failing test is run three times on its own to tell a flake from a bug: the single-file check below.
   - **Exception:** a step that touches shared infrastructure (undo and change groups, the save chain, the canvas's
     layers, the table registry, the local adapter) runs one full e2e run in that step, and its report says why.
-  - Before a merge: one full e2e run. It also counts for a later commit when the diff from the tested commit touches
-    only Markdown files in `docs/` and the repository root; the report shows it with `git diff --stat <tested>..HEAD`
-    (Łukasz, 7 November 2026).
+  - Before a merge into `dev`: one full e2e run, on a commit that already contains `dev`'s head (merge `dev` into the
+    branch first). It also counts for a later commit when the diff from the tested commit touches only Markdown files in
+    `docs/` and the repository root; the report shows it with `git diff --stat <tested>..HEAD` (Łukasz, 7 November 2026).
+    A release from `dev` into `main` needs none of its own under the same rule (The slice cycle, 8).
+  - **Required checks** (the rulesets on `dev` and `main`, chore/dev-branch): CI's `check` and Schema's `migrations` and
+    `smoke`. The E2E workflow's jobs are named `e2e-plan`, `e2e-part`, `e2e-report` and `e2e-check`, so that none shares
+    a name with a required check (a skipped job counts as passed). The full run stays a rule of this file, not a
+    required check.
   - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its nine parts
     (`e2e/parts.ts`) side by side on GitHub's Linux runners, each with its own fresh dev server, no retries; one job
     merges their reports. Start it by hand (`gh workflow run e2e.yml --ref <branch>`, or "Run workflow" on the Actions
@@ -534,7 +548,7 @@ local adapter no pool is made.
 | --- | --- | --- | --- |
 | 1 | `npm run dev` on the laptop | local (`.data/dev-db.json`, KB; `.data/demo-db.json`), the development sign-in | none needed |
 | 2 | `npm run dev:pg` on the laptop | Postgres on `infomapper-dev`, Supabase Auth | `.env.postgres.local` |
-| 3 | The Vercel preview of `slice/29-database-skeleton` | Postgres on `infomapper-dev`, Supabase Auth, read only | Vercel's Preview, scoped to the branch |
+| 3 | The Vercel preview of `dev` | Postgres on `infomapper-dev`, Supabase Auth, read only | Vercel's Preview, scoped to the branch |
 | 4 | Production (slice D) | its own Vercel project `infomapper-app` and Supabase `infomapper-prod` | – |
 
 Environments 2 and 3 share `infomapper-dev`: from slice B a write in one shows in the other, and a `pg:seed -- --reset`
@@ -545,9 +559,12 @@ changes what the preview shows. **Running against Postgres:** `npm run pg:check`
 - **Vercel project `infomapper-app-dev`** (Pro, `fra1` beside Supabase's Frankfurt, Fluid compute, Node.js 22.x set
   explicitly because Vercel's default is newer than `engines`). Production in slice D gets its own project,
   `infomapper-app`, and Supabase `infomapper-prod`.
-- **Only `slice/29-database-skeleton` deploys**, by two layers that say the same: `vercel.json`'s `git.deploymentEnabled`
-  and the project's Ignored Build Step. Why both: Vercel reads `vercel.json` from the commit it builds, so a branch
-  without the file would deploy.
+- **Only `dev` deploys** (chore/dev-branch; `slice/29-database-skeleton` until then), as a Preview, by two layers that
+  say the same: `vercel.json`'s `git.deploymentEnabled` and the project's Ignored Build Step. Why both: Vercel reads
+  `vercel.json` from the commit it builds, so a branch without the file would deploy. `dev` has a stable domain of its
+  own (a preview domain, so Standard Protection covers it). The project's Production Branch stays `main`, although the
+  repository's default is `dev`; `main` never deploys in this project. Making `dev` the Production Branch waits for
+  slice D.
 - **To preview another branch,** change three things together: `deploymentEnabled`, the Ignored Build Step's branch name
   and the variables' branch scope.
 - **Never delete the project's last Production deployment:** while none exists, Vercel classifies any build as

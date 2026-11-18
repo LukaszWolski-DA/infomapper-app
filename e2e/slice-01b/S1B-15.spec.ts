@@ -1,6 +1,7 @@
 // S1B-15 is about the process: CI on the pull request, and lint, typecheck, unit and all e2e suites passing three
 // times in a row. This test checks what can be checked from the repository: the workflow runs on pull requests and on
-// main with the same checks as `npm run lint`, `typecheck` and `test`, and every criterion of slice 1b has its test.
+// pushes to main and dev (since chore/dev-branch) with the same checks as `npm run lint`, `typecheck` and `test`, and
+// every criterion of slice 1b has its test.
 // That CI passed on PR #3 and that the three local runs passed is recorded in docs/prd/slice-01b-acceptance.md.
 
 import fs from "node:fs";
@@ -9,7 +10,7 @@ import { expect, test } from "./fixtures";
 test("S1B-15: CI passes on the pull request; lint, typecheck, unit and all e2e suites pass three times in a row", async () => {
   const ci = fs.readFileSync(".github/workflows/ci.yml", "utf8");
   expect(ci).toMatch(/^on:\s*\n\s+pull_request:/m);
-  expect(ci).toMatch(/push:\s*\n\s+branches: \[main\]/);
+  expect(ci).toMatch(/push:\s*\n\s+branches: \[main, dev\]/);
   const steps = [...ci.matchAll(/- run: (.+)/g)].map((m) => m[1]!.trim());
   expect(steps).toEqual(["npm ci", "npm run lint", "npm run typecheck", "npm test"]);
 

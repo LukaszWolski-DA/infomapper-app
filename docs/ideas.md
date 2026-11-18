@@ -1050,11 +1050,15 @@ slice.
   same reads). The thumbnail first (a whole `model.load` and five more reads for one canvas: 264 ms against 12 ms
   locally), then one read per page instead of 31 to 50 port calls and 73 to 116 statements, and the link guards' tables
   in one query each. Measured with `e2e/slice-29/S29-08-measure.spec.ts` against `docs/prd/slice-29-measurement.md`.
-- **A `dev` integration branch** (Łukasz, 17 November 2026): slices merge into `dev`, and `dev` into `main` for a
-  release; a `chore/` branch after slice 29, before slice B. It changes the slice cycle in CLAUDE.md (pull requests'
-  base, tags, where the full runs run) and the three hosting items (`vercel.json`'s `deploymentEnabled`, the Ignored Build
-  Step's branch, the variables' branch scope). `dev` stays a Preview, not the Production Branch, so Standard Protection
-  covers it; a stable domain can be assigned to the `dev` branch.
+- **`dev` as the Production Branch of `infomapper-app-dev`** (chore/dev-branch, for slice D; done there: the `dev`
+  integration branch, as a Preview). For: a stable domain without setup, Instant Rollback, no branch-scoped variables,
+  no "no Production deployment" trap (`dev` always has one), and the same shape as slice D's project with `main`. Against:
+  Standard Protection leaves a production domain public, so the project would need All Deployments (with Vercel
+  Authentication free on every plan, Vercel's docs of 15 September 2026; the note before said Standard Protection was the
+  reason to stay a Preview); the variables move from Preview to Production; "Production" would name the dev
+  environment; AD-22's bootstrap rule changes. `vercel.json` would still stop the other branches.
+- **A hotfix path into `main`** (slice D): a `hotfix/` branch from `main` into `main` with its own full run, then `main`
+  merged into `dev` at once. Until production exists everything goes through `dev`.
 - **`spikes/canvas-react-flow`** (optional): move its conclusions into `docs/decisions.md` (AD-24 has most of them) and
   remove the code; Vercel's import wizard detects it as a second Next.js app and offers a multi-service project.
 - **`localeCompare` with no locale:** the app sorts names by the runtime's default locale (probably en-US on Vercel,
