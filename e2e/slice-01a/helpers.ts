@@ -8,6 +8,7 @@ import type { WorkspaceModel } from "../../src/domain/types";
 import { E2E_DB } from "../config";
 
 export { SEED_IDS };
+export { clickVisible } from "../canvas-click";
 export { callActionDirectly, captureActionId, expectToast, newSession, signInAs } from "../slice-00/helpers";
 
 export const RETAIL = SEED_IDS.wsRetailDwh;
