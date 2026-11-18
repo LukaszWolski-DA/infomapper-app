@@ -1147,18 +1147,46 @@ the relationship's key in InfoCube's section (`KeySection`, `sections.tsx`): the
 Undo is pressed; both failed without the rule) and the rule's cases in `src/ui/field-draft.test.ts` (the undo's page in
 one commit with the save's, and another session's revert at a newer version).
 
-### S3B-06 failed once in slice 29 (cause not found)
+### S3B-06 failed once in slice 29 (a lost click in the test, fixed on fix/s3b06-context-label)
 
 In slice 29's full run after main was merged (run 44147585823, commit `ff98fd4`, 17 November 2026),
-`e2e/slice-03b/S3B-06.spec.ts` failed once:
-- **What failed:** a context element labeled directly on the live canvas should become a full card whose filter is
-  "all"; after 15 s the card was still a context card ("labeled").
-- **Alone:** it passed 3 of 3 (single-file check, run 44150698438, 28 to 32 s each).
-- **Cause:** not found. Slice 29 did not change the code it runs (the local adapter's live canvas and labels).
-- **Kept:** the run's trace, error and server log are in `.data/e2e-29-s3b06/` (git-ignored), as well as on the run's
-  page for 14 days.
-- **Next:** a step 1 diagnosis on its own `fix/` branch after slice 29 (CLAUDE.md, "A race in a test"). The cause may be in
-  the app, as it was for RP-07, S15-24 and S22-02.
+`e2e/slice-03b/S3B-06.spec.ts` failed once: a context element labeled directly on the live canvas stayed a context card
+("labeled"); alone it passed 3 of 3 (run 44150698438). **The cause was in the test** (CLAUDE.md, "A race in a test"):
+- **The lost click:** customers is placed with most of its name under the details panel, so Playwright's click scrolled
+  its centre into view by scrolling React Flow's `overflow:hidden` wrapper (94 px, `__playwright_scroll_left_` in the
+  trace). React Flow scrolls the wrapper back on its `scroll` event (`@xyflow/react`, `wrapperOnScroll`). In the failure
+  that came between the press (on the name) and the release (beside the card), so no `click` reached the card
+  (`CardNode.tsx` selects on `click`) or the pane; the mapping stayed selected and the label went to it again (the server
+  log: `addLabelAction` on the mapping, no write). Playwright checks the hit target on the press only.
+- **No app bug:** a real mouse never scrolls the wrapper, so a person clicks what is visible. Not one of the
+  late-selection sites (`src/canvas/selection.ts`): no answer selected anything.
+- **The fix:** the spec clicks the name at a visible point (`position: { x: 8, y: 8 }`), which Playwright scrolls into view
+  alone, so the wrapper never scrolls. The assertions are unchanged.
+- **The same hazard elsewhere** (not fixed here):
+  - **Seen in traces in slice 3b:** S3B-02 (line 21), S3B-03 (lines 72, 83), S3B-04 (lines 48, 75) and S3B-14 (line 36)
+    click a card or a row that the click scrolls into view. S3B-03's typing at line 64 also scrolls the wrapper, but it is
+    no hazard: the text goes to the focused editor.
+  - **Outside slice 3b, from the code only (low confidence):** about 102 card clicks without a position, 31 `clickCard`
+    calls and 62 row clicks through `rowNamed`, in 15 slice folders.
+- **Next** (Łukasz, 18 November 2026): a separate `fix/` branch after the late-selection sites. It adds a shared click
+  helper that clicks inside the intersection of the element's box and the canvas's visible column (not a fixed offset),
+  so no list of sites is needed.
+
+### S21-02 failed once on fix/s3b06-context-label (cause not found)
+
+In the first full run on fix/s3b06-context-label (run 44260398376, commit `0d97639`, 18 November 2026),
+`e2e/slice-21/S21-02.spec.ts` failed once in part 8:
+- **What failed:** after the redo, the test right-clicked a spot it had found empty and waited for the toolbox item
+  "New entity here", which never appeared (the 60 s test timeout at line 100). The menu that opened was the card menu
+  of "New entity", the entity the redo had brought back, not the canvas's toolbox.
+- **Alone:** it passed 3 of 3 (single-file check, run 44262671159). The second full run on the same commit passed
+  (run 44263118814).
+- **The scan:** React Flow's wrapper was never scrolled in the trace, so this is not S3B-06's lost click.
+- **Cause:** not found. A guess, not a diagnosis: the redone card was drawn at the spot after the test had read it as
+  empty.
+- **Kept:** the run's trace, error, server log and merged report are in `.data/e2e-s3b06fix-run44260398376/`
+  (git-ignored), as well as on the run's page for 14 days.
+- **Next:** a step 1 diagnosis on its own `fix/` branch (Łukasz decides when).
 
 ### S11-08 failed once: a save on its way when the next test reseeded (a bug in the local adapter and the fixtures, fixed on fix/write-after-reseed)
 

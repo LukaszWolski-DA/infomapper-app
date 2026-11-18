@@ -51,7 +51,7 @@ test("S3B-06: with the live canvas open, labeling in a panel brings the element 
   await expectCard(page, "customers");
 
   // customers labeled directly: full, filter all; one undo makes it context again
-  await card(page, "customers").getByTestId("card-name").click();
+  await card(page, "customers").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
   await typeLabel(page, "CR-23");
   await page.keyboard.press("Enter");
   await expect.poll(() => liveCards(live)).toContainEqual([customers, "full", "all"]);
