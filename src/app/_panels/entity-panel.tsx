@@ -80,11 +80,12 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   const saveDefinition = (html: string) => saveRow(e, (v) => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v, definition: html }));
 
   async function addAttribute() {
+    const sent = ui.selectionNow();
     const result = await run(() => addAttributeAction(p.workspaceId, { entityId: e.id }));
-    if (result.ok) {
-      ui.select(cardId ? { t: "row", cardId, id: result.value.attributeId } : { t: "element", kind: "attribute", id: result.value.attributeId });
-      setNameFocus(result.value.attributeId);
-    }
+    if (!result.ok) return;
+    const id = result.value.attributeId;
+    // a selection made while the add was on its way stays, and so does the focus (fix/late-selection-remaining)
+    if (ui.selectMade(sent, cardId ? { t: "row", cardId, id } : { t: "element", kind: "attribute", id })) setNameFocus(id);
   }
 
   return (

@@ -234,6 +234,8 @@ export function useCanvasHost({
         const { name } = o;
         // with its height the new card joins the frame it lands in (slice 2b)
         const placement = { canvasId, x: snap8(at.x), y: snap8(at.y), height: newCardHeight(0), frames: ui.frameRefs() };
+        // read when the create is sent, after the concept picker (fix/late-selection-remaining)
+        const sent = ui.selectionNow();
         const result = await run(() =>
           o.create
             ? (o.create.action(workspaceId, { ...into, placement }) as ReturnType<typeof createEntityAction>)
@@ -241,13 +243,14 @@ export function useCanvasHost({
         );
         if (!result.ok) return;
         const cardId = result.value.canvasItemId;
-        if (cardId) ui.select({ t: "card", id: cardId });
+        // a selection made while the create was on its way stays, and so do the panel and the focus
+        const took = !!cardId && ui.selectMade(sent, { t: "card", id: cardId });
         const where = `${"newConcept" in into ? "the new concept " : ""}${result.value.concept.name}${live ? `, labeled ${live.labelName}` : ""}`;
         if (name) toast(`Created ${result.value.name} in ${where}.`);
         else {
           // on a live canvas the new entity is labeled at once, without a question (PRD item 10)
           toast(`Created ${result.value.name} in ${where}. Type its name now; change the concept in the panel.`);
-          if (cardId) {
+          if (took) {
             openDetails();
             panels.setNameFocus(cardId);
           }
@@ -296,13 +299,13 @@ export function useCanvasHost({
   const relateToItself = useCallback(
     async (card: HostCard) => {
       if (!editable || card.kind !== "ent") return;
+      const sent = ui.selectionNow();
       const result = await run(
         () => createRelationshipAction(workspaceId, { fromEntityId: card.targetId, toEntityId: card.targetId }),
         "Relationship added. Name it and set the cardinality on the right.",
       );
-      if (!result.ok) return;
-      ui.select({ t: "rel", id: result.value.relationshipId });
-      openDetails();
+      // a selection made while the relationship was on its way stays, and the panel stays as it is
+      if (result.ok && ui.selectMade(sent, { t: "rel", id: result.value.relationshipId })) openDetails();
     },
     [editable, run, workspaceId, ui, openDetails],
   );
@@ -317,6 +320,7 @@ export function useCanvasHost({
       if (!editable || card.kind !== "ent") return;
       const name = ix.attribute.get(attributeId)?.name ?? "";
       const entity = ix.entity.get(card.targetId)?.name ?? "";
+      const sent = ui.selectionNow();
       const result = await run(
         () => pasteAttributeAction(workspaceId, { entityId: card.targetId, attributeId }),
         (v) => (v.nameTaken ? `Pasted “${name}” into ${entity}, which already has an attribute of that name.` : `Pasted “${name}” into ${entity}.`),
@@ -325,7 +329,8 @@ export function useCanvasHost({
         attributeClipboard.set(null);
         return;
       }
-      ui.select({ t: "row", cardId: card.id, id: result.value.attributeId });
+      // a selection made while the paste was on its way stays, and so do the panel and the focus
+      if (!ui.selectMade(sent, { t: "row", cardId: card.id, id: result.value.attributeId })) return;
       openDetails();
       panels.setNameFocus(result.value.attributeId);
     },
@@ -343,11 +348,12 @@ export function useCanvasHost({
     async (card: HostCard, below?: Uuid) => {
       if (!editable || card.kind !== "ent") return;
       const siblings = below ? (ix.attributesOf.get(card.targetId) ?? []) : [];
+      const sent = ui.selectionNow();
       const result = below
         ? await saveRows(siblings.map((a) => ({ id: a.id })), () => addAttributeAction(workspaceId, { entityId: card.targetId, below }))
         : await run(() => addAttributeAction(workspaceId, { entityId: card.targetId }));
-      if (!result.ok) return;
-      ui.select({ t: "row", cardId: card.id, id: result.value.attributeId });
+      // a selection made while the add was on its way stays, and so do the panel and the focus
+      if (!result.ok || !ui.selectMade(sent, { t: "row", cardId: card.id, id: result.value.attributeId })) return;
       openDetails();
       panels.setNameFocus(result.value.attributeId);
     },

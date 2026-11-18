@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useContext, useMemo, useState } from "react";
 import type { ActionResult } from "@/app/_lib/run-command";
 import { CanvasUiCtx } from "@/canvas/context";
+import type { Selection } from "@/canvas/line-data";
 import { importStateOf, STALE_REVIEW_FIELD, type ImportOutcome } from "@/domain/commands/import";
 import { planFingerprint } from "@/domain/import/compare";
 import { readDdl } from "@/domain/import/ddl";
@@ -46,7 +47,8 @@ export function ImportWizard({
   systemId?: string | null;
   onClose: () => void;
   /** After a successful import: the system it went into (the Sources tab shows it). */
-  onImported?: (outcome: ImportOutcome) => void;
+  /** `sent`: the selection when the import was sent (fix/late-selection-remaining). */
+  onImported?: (outcome: ImportOutcome, sent: Selection) => void;
 }) {
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
@@ -114,6 +116,7 @@ export function ImportWizard({
   async function importNow() {
     if (!plan || !target || sending) return;
     setSending(true);
+    const sent = ui.selectionNow();
     let result: ActionResult<ImportOutcome>;
     try {
       const response = await fetch(`/w/${workspaceId}/import`, {
@@ -150,7 +153,7 @@ export function ImportWizard({
     const undo = ui.undo();
     toast(`Imported into ${outcome.systemName}: ${outcome.summary}`, "info", undo ? { label: "Undo", run: undo.undo } : undefined);
     router.refresh();
-    onImported?.(outcome);
+    onImported?.(outcome, sent);
     onClose();
   }
 
