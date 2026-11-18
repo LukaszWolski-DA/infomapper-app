@@ -2,6 +2,7 @@
 // view-state bar) and follows Requirements with “Open notes on canvas {n}”, counting open notes only, as the prototype:
 // resolved ones never, hidden or shown. Customer & orders has two open notes and one resolved.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, DEMO_NOTES, noteEl, noteWithText, openCanvas, signInAs, viewBar, WHOLE_CO } from "./helpers";
 
@@ -30,9 +31,9 @@ test("S6A-07: the status bar counts the canvas's open notes and has no Focus chi
   await page.getByTestId("checkbox-show-resolved").uncheck();
   await expect(notes).toHaveText("Open notes on canvas 2");
   await page.getByTestId("checkbox-show-resolved").check();
-  await noteEl(page, DEMO_NOTES.free).getByTestId("button-note-resolve").click();
+  await clickVisible(noteEl(page, DEMO_NOTES.free).getByTestId("button-note-resolve"));
   await expect(notes).toHaveText("Open notes on canvas 1");
-  await noteEl(page, DEMO_NOTES.resolved).getByTestId("button-note-resolve").click();
+  await clickVisible(noteEl(page, DEMO_NOTES.resolved).getByTestId("button-note-resolve"));
   await expect(notes).toHaveText("Open notes on canvas 2");
 
   // after a reload the page's count and the canvas's agree; the reload waits until both statuses are stored, as a

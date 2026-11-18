@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { linkRequirement } from "../../src/domain/commands/requirement";
 import { expect, test } from "./fixtures";
 import { asPerson, ids, loadModel, loadRequirementLinks, mappingId, openCanvas, openEntityFromTree, requirementByKey, row, sectionRows, SEED_IDS, signInAs } from "./helpers";
@@ -16,7 +17,7 @@ test("S4A-07: indirect requirements: email shows REQ-102, REQ-103, REQ-105 direc
   await signInAs(page, "Łukasz");
   await openCanvas(page);
 
-  await row(page, "Customer", attribute("Customer", "email").id).click();
+  await clickVisible(row(page, "Customer", attribute("Customer", "email").id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await expect.poll(() => sectionRows(page)).toEqual(["REQ-102", "REQ-103", "REQ-105", "REQ-104 via mapping"]);
   await expect(page.locator('[data-testid="item-requirement"][data-via]').getByTestId("button-requirement-unlink")).toHaveCount(0);

@@ -3,6 +3,7 @@
 // page's own entry with nothing selected. The same card twice records one place; a deselection, a multi-selection and
 // view-state changes record none.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   AROUND,
@@ -44,7 +45,7 @@ test("S6B-02: five selections are five places, walked back in reverse; repeats, 
   await page.keyboard.press("Escape");
   await expectSelected(page, "none");
   await clickCard(page, "Customer");
-  await page.getByTestId("card-name").getByText("Sales Order", { exact: true }).click({ modifiers: ["Shift"] });
+  await clickVisible(page.getByTestId("card-name").getByText("Sales Order", { exact: true }), { modifiers: ["Shift"] });
   await page.getByTestId("button-focus").click();
   await page.locator('[data-testid="switch-layer"] [data-layer="mappings"]').click();
   await page.locator('[data-testid="switch-layer"] [data-layer="all"]').click();

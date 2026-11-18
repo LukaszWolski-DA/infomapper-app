@@ -4,6 +4,7 @@
 // deleting the requirement removes its cards from every canvas and one undo brings them back; selecting several takes
 // the card along in a group drag, undone in one step.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import {
   box,
@@ -98,7 +99,7 @@ test("S4B2-02: placed from the panel, moved on the grid and kept out of frames, 
   await openRequirement(page, "REQ-101");
   await page.getByTestId("button-requirement-card").click();
   await expect(reqCard(page, "REQ-101")).toBeVisible();
-  await reqCard(page, "REQ-101").getByTestId("card-name").click();
+  await clickVisible(reqCard(page, "REQ-101").getByTestId("card-name"));
   await expect(page.getByTestId("mark-selected-requirement")).toHaveCount(1);
   await key(page, "Delete");
   await expect(reqCard(page, "REQ-101")).toHaveCount(0);

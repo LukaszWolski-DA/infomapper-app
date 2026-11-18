@@ -3,6 +3,7 @@
 // tooltips, the canvas row and line marks (classes on the existing elements, AD-24), the table and column panels; the
 // full result again brings everything back and every mark goes. A mapping sent back to review shows its reason.
 
+import { clickVisible } from "../canvas-click";
 import { seedId } from "../../src/data/local/seed-model";
 import { mappingLine, row, treeItem } from "../slice-01a/helpers";
 import { expect, test } from "./fixtures";
@@ -61,7 +62,7 @@ test("S7A-10: the tree, the canvas and the panels mark what is missing from sour
   await expect(table.getByTestId("table-relationship")).toHaveText("cust_id → dbo.customersFK_customer_addresses_customers · missing");
 
   // the column panel (item 36)
-  await row(page, "customers", EMAIL).click();
+  await clickVisible(row(page, "customers", EMAIL));
   await expect(page.getByTestId("panel-source-column").getByTestId("tag-missing")).toHaveText(`Missing from source since ${since}`);
 
   // the full result: everything is back and loses its marks
@@ -71,7 +72,7 @@ test("S7A-10: the tree, the canvas and the panels mark what is missing from sour
   await expect(page.locator(".row.gone")).toHaveCount(0);
   await expect(page.locator("path.s.gone")).toHaveCount(0);
   await expect(page.getByTestId("tree-item").and(page.locator("[data-missing]"))).toHaveCount(0);
-  await row(page, "customers", EMAIL).click();
+  await clickVisible(row(page, "customers", EMAIL));
   await expect(page.getByTestId("panel-source-column")).toBeVisible();
   await expect(page.getByTestId("tag-missing")).toHaveCount(0);
 });
@@ -80,11 +81,11 @@ test("S7A-10: a mapping an import sent back to review shows the reason under its
   await openWizard(page);
   await reviewFile(page, { existing: "CRM" }, "crm.csv", sample("crm_snapshot_2026-10-20.csv"));
   await importNow(page, /^Imported into CRM: /);
-  await row(page, "customers", seedId(RETAIL, "column:customers.cust_no")).click();
+  await clickVisible(row(page, "customers", seedId(RETAIL, "column:customers.cust_no")));
   await page.getByTestId("panel-source-column").getByRole("button", { name: /Customer\.customer_number/ }).click();
   await expect(page.getByTestId("note-review-reason")).toHaveText("Sent back to review after a source change: business key column changed type, varchar(20) → varchar(25).");
   // a mapping in review without a reason (the seed's dob → birth_date, renamed by the import) shows none
-  await row(page, "customers", seedId(RETAIL, "column:customers.dob")).click();
+  await clickVisible(row(page, "customers", seedId(RETAIL, "column:customers.dob")));
   await page.getByTestId("panel-source-column").getByRole("button", { name: /Customer\.birth_date/ }).click();
   await expect(page.getByTestId("panel-mapping")).toBeVisible();
   await expect(page.getByTestId("note-review-reason")).toHaveCount(0);

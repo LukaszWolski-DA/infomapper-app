@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { expectToast, ids, loadModel, loadRequirementLinks, loadRequirements, openCanvas, openRequirement, requirementByKey, row, signInAs, tracesOf } from "./helpers";
 
@@ -28,7 +29,7 @@ test("S4A-10: deleting REQ-102: its toast, REQ-103 becomes top level, its links 
   // deleting email (it has mappings: a second click confirms) takes its three requirement links
   const emailLinks = async () => (await loadRequirementLinks()).filter((k) => k.attribute_id === email.id).length;
   expect(await emailLinks()).toBe(3);
-  await row(page, "Customer", email.id).click();
+  await clickVisible(row(page, "Customer", email.id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await page.getByTestId("button-delete-attribute").click();
   await page.getByTestId("button-delete-attribute").click();

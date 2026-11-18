@@ -4,6 +4,7 @@
 // missing to this canvas” places the rest beside the element, stacked, and then goes; the view fits when a placed card
 // falls outside it; a click on the name opens the requirement's panel.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import {
   box,
@@ -36,7 +37,7 @@ test("S4B2-04: “Place card” beside the element, or showing a card already he
 
   // the view fits when the placed card falls outside it: Customer at the left edge at 300 %
   await openCanvas(page, canvasUrl(), { x: 10 - 496 * 3, y: 10 - 40 * 3, zoom: 3 });
-  await row(page, "Customer", birth.id).click();
+  await clickVisible(row(page, "Customer", birth.id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await sectionRow(page, "REQ-105").getByTestId("button-requirement-place").click();
   await expectToast(page, "Placed 1 requirement card on this canvas.");
@@ -56,7 +57,7 @@ test("S4B2-04: “Place card” beside the element, or showing a card already he
 
   // “Place card” on a card already here: selects it and brings it into view
   await openCanvas(page, canvasUrl(), VIEW);
-  await row(page, "Customer", birth.id).click();
+  await clickVisible(row(page, "Customer", birth.id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await expect(sectionRow(page, "REQ-105")).toHaveAttribute("data-on-canvas", "true");
   await sectionRow(page, "REQ-105").getByTestId("button-requirement-place").click();

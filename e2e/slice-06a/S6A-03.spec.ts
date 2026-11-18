@@ -3,6 +3,7 @@
 // saved as one change; the toast “Showing everything on this canvas.” offers Undo when that change exists. On a live
 // canvas “Live: CR-23” and the Labeled filter stay. A reader's “Show all” counts and removes only what a reader may.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   AROUND,
@@ -40,7 +41,7 @@ test("S6A-03: “Show all” from two chips removes everything removable, the la
   await expect(showAll(page)).toHaveAttribute("title", "Remove everything that hides or fades things on this canvas");
 
   await page.getByTestId("checkbox-show-resolved").uncheck();
-  await card(page, "web_users").locator(".c-head .c-l2").click();
+  await clickVisible(card(page, "web_users").locator(".c-head .c-l2"));
   await page.getByTestId("button-focus").click();
   await page.locator('[data-testid="switch-layer"] [data-layer="relationships"]').click();
   await page.getByTestId("button-tool-hand").click();
@@ -80,7 +81,7 @@ test("S6A-03: on a live canvas “Show all” keeps “Live: CR-23” and the La
   await signInAs(page, "Łukasz");
   await openCanvas(page, liveUrl(live), { x: 0, y: 0, zoom: 0.6 });
 
-  await cardEl(page, "customers").getByTestId("button-card-filter").click();
+  await clickVisible(cardEl(page, "customers").getByTestId("button-card-filter"));
   await page.getByTestId("button-tool-hand").click();
   await expectChips(page, ["Live: CR-23", "1 card filtered", "Hand tool"]);
   await showAll(page).click();

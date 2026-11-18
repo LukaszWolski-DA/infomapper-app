@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   callActionDirectly,
@@ -32,7 +33,7 @@ test("S4A-06: linking from each of the five element panels (a toast per type); t
   await linkFromPanel(page, ["REQ-104"]);
   await expectToast(page, "Linked REQ-104 to the entity.");
   // attribute
-  await row(page, "Customer", email.id).click();
+  await clickVisible(row(page, "Customer", email.id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await linkFromPanel(page, ["REQ-104"]);
   await expectToast(page, "Linked REQ-104 to the attribute.");
@@ -65,7 +66,7 @@ test("S4A-06: linking from each of the five element panels (a toast per type); t
   expect((await loadRequirementLinks()).length).toBe(linksBefore);
 
   // “+ New requirement…” on email: REQ-106 linked to it, its panel open; one undo removes both
-  await row(page, "Customer", email.id).click();
+  await clickVisible(row(page, "Customer", email.id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await newRequirementFromPanel(page);
   await expect(page.getByTestId("input-req-key")).toHaveValue("REQ-106");
@@ -76,7 +77,7 @@ test("S4A-06: linking from each of the five element panels (a toast per type); t
   expect((await loadRequirementLinks()).length).toBe(linksBefore);
 
   // × in the element panel: REQ-102 off email; one undo brings it back
-  await row(page, "Customer", email.id).click();
+  await clickVisible(row(page, "Customer", email.id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await page.locator('[data-testid="item-requirement"][data-key="REQ-102"]').getByTestId("button-requirement-unlink").click();
   await expectToast(page, "Unlinked.");

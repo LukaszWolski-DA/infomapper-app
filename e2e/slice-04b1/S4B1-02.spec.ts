@@ -2,6 +2,7 @@
 // “via entity”; Customer shows REQ-101 directly and the attribute-linked ones “via attribute”; an attribute under a linked
 // mapping shows it “via mapping”; a table shows the column- and mapping-linked ones; indirect rows have no ×.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { ids, mappingId, openCanvas, openEntityFromTree, requirementLinkedTo, row, sectionRows, signInAs } from "./helpers";
 
@@ -16,13 +17,13 @@ test("S4B1-02: panels: email direct only plus via mapping, no via entity; Custom
   await openCanvas(page);
 
   // email: its own (REQ-102, REQ-103, REQ-105), then the mapping's; REQ-101 (on Customer) does not come down
-  await row(page, "Customer", attribute("Customer", "email").id).click();
+  await clickVisible(row(page, "Customer", attribute("Customer", "email").id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await expect.poll(() => sectionRows(page)).toEqual(["REQ-102", "REQ-103", "REQ-105", "REQ-106 via mapping"]);
   await expect(page.locator('[data-testid="item-requirement"][data-via]').getByTestId("button-requirement-unlink")).toHaveCount(0);
   await expect(page.locator('[data-testid="item-requirement"]:not([data-via])').getByTestId("button-requirement-unlink")).toHaveCount(3);
   // an attribute with no requirement of its own and none on its mappings: nothing from its entity
-  await row(page, "Customer", attribute("Customer", "segment_code").id).click();
+  await clickVisible(row(page, "Customer", attribute("Customer", "segment_code").id));
   await expect.poll(() => sectionRows(page)).toEqual([]);
 
   // Customer: REQ-101 directly, its attributes' requirements via attribute, the mapping's via mapping (in the
