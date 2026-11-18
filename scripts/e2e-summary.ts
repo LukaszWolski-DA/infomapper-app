@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
+type Annotation = { type: string; description?: string };
 type Result = { status: string; duration: number; error?: { message?: string } };
 type Test = { status: string; expectedStatus?: string; results: Result[] };
 type Spec = { title: string; file: string; line: number; tests: Test[] };
@@ -56,6 +57,19 @@ if (failed.length > 0) {
     const err = sp.tests.flatMap((t) => t.results).find((r) => r.error)?.error?.message;
     out.push(`| \`${sp.file}:${sp.line}\` | ${sp.title.replace(/\|/g, "\\|").slice(0, 120)} | ${firstLine(err).replace(/\|/g, "\\|")} |`);
   }
+  out.push("");
+}
+
+// the canvas scroll watch (fix/e2e-visible-clicks, e2e/canvas-scroll-watch.ts): report only, never a failure
+const scrolled = specs.flatMap((sp) =>
+  sp.tests.flatMap((t) => {
+    const a = [...((t as { annotations?: Annotation[] }).annotations ?? []), ...t.results.flatMap((r) => (r as { annotations?: Annotation[] }).annotations ?? [])].find((x) => x.type === "canvas-scroll");
+    return a ? [{ sp, text: a.description ?? "" }] : [];
+  }),
+);
+if (scrolled.length > 0) {
+  out.push(`### Canvas scrolls (the watch, report only): ${scrolled.length} tests`, "", "| File | Test | Scrolls |", "| --- | --- | --- |");
+  for (const { sp, text } of scrolled) out.push(`| \`${sp.file}:${sp.line}\` | ${sp.title.replace(/\|/g, "\\|").slice(0, 80)} | ${text.split(":")[0]!.replace(/\|/g, "\\|")} |`);
   out.push("");
 }
 
