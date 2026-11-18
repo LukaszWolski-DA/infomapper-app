@@ -4,8 +4,9 @@
 // scrolls them; a scroll there comes from Playwright scrolling an element into view (a click without a position, a
 // hover, a drag, a fill) or from the browser and the app (typing in a text field partly outside the canvas). React Flow
 // scrolls its wrapper back on a later frame, which is how a click got lost in S3B-06; nothing scrolls `.im-canvas` back,
-// so the canvas stays shifted on that page. `settle.ts`'s fixture fails a test with a scroll away from 0, except a named
-// exception (`EXCEPTIONS`), and adds an annotation `canvas-scroll` for every test with a scroll event. With each scroll
+// so the canvas stays shifted on that page. `settle.ts`'s fixture fails a test with a scroll away from 0, except by one
+// rule (`noteTyping`: the browser keeping a note's text cursor in view), and adds an annotation `canvas-scroll` for every
+// test with a scroll event. With each scroll
 // go the page's last input event before it, the focused element and the first events after it, so the cause can be told
 // without a trace. Canvas clicks go through `clickVisible` (`canvas-click.ts`), which never scrolls.
 
@@ -14,20 +15,29 @@ import type { Browser, BrowserContext, Page, TestInfo } from "@playwright/test";
 /** The annotation's type; `scripts/e2e-summary.ts` lists the tests that have one. */
 export const CANVAS_SCROLL = "canvas-scroll";
 
+/** The note's text box (`NoteLayer.tsx`), whose typing the browser keeps in view by scrolling React Flow's wrapper. */
+export const NOTE_TEXT = "input-note-text";
 /**
- * Scrolls a test may make, each named by its test file and the element, and recorded in docs/known-limitations.md.
- * Temporary: each goes when the app's own fix lands.
+ * How long after the note's text box lost the focus a scroll event still counts as its typing's: the browser scrolls
+ * while the caret moves and dispatches the event on a later frame, after Ctrl+Enter may have closed the editor.
  */
-export const EXCEPTIONS: readonly { file: string; on: "react-flow" | "im-canvas"; why: string }[] = [
-  {
-    file: "slice-03b/S3B-03.spec.ts",
-    on: "react-flow",
-    why: "typing a note's text keeps the caret in view by scrolling React Flow's wrapper (known-limitations.md, S3B-03's note typing)",
-  },
-];
+export const NOTE_LEFT_MS = 100;
 
 type PageEvent = { type: string; target: string; at: number };
-type Scroll = { kind: "scroll"; on: "react-flow" | "im-canvas"; left: number; top: number; at: number; before: PageEvent | null; focus: string; page: number };
+export type Scroll = {
+  kind: "scroll";
+  on: "react-flow" | "im-canvas";
+  left: number;
+  top: number;
+  at: number;
+  before: PageEvent | null;
+  focus: string;
+  /** Whether the focused element was the note's text box when the event came. */
+  noteFocus: boolean;
+  /** When the note's text box last lost the focus on that page (ms), or null. */
+  noteLeftAt: number | null;
+  page: number;
+};
 type Rec = Scroll | ({ kind: "event"; page: number } & PageEvent);
 
 const records = new WeakMap<BrowserContext, Rec[]>();
@@ -55,6 +65,14 @@ function pageScript(): void {
     return `${el.tagName.toLowerCase()}${cls ? "." + cls : ""}${ids.length ? " in " + ids.join(" < ") : ""}`;
   };
   let last: { type: string; target: string; at: number } | null = null;
+  let noteLeftAt: number | null = null;
+  document.addEventListener(
+    "focusout",
+    (e) => {
+      if (e.target instanceof Element && e.target.getAttribute("data-testid") === "input-note-text") noteLeftAt = Date.now();
+    },
+    true,
+  );
   let followUntil = 0;
   let moved = false;
   const KINDS = ["pointerdown", "pointerup", "click", "contextmenu", "dblclick", "keydown", "input", "focusin", "dragstart"];
@@ -93,6 +111,8 @@ function pageScript(): void {
         at,
         before: last && at - last.at < 2000 ? last : null,
         focus: describe(document.activeElement),
+        noteFocus: document.activeElement?.getAttribute("data-testid") === "input-note-text",
+        noteLeftAt,
       });
       followUntil = at + 1500;
       moved = false;
@@ -142,29 +162,45 @@ export function beginCanvasWatch(): void {
 
 const fileOf = (testInfo: TestInfo) => testInfo.file.replace(/\\/g, "/").split("/e2e/").pop()!;
 
+/** Whether a later scroll of the same element on the same page returned it to 0. */
+export const scrolledBack = (s: Scroll, scrolls: readonly Scroll[]): boolean =>
+  scrolls.some((o) => o !== s && o.page === s.page && o.on === s.on && o.at >= s.at && o.left === 0 && o.top === 0);
+
+/**
+ * The one scroll the watch allows: React Flow's wrapper scrolled while a note's text box has the focus (or lost it within
+ * `NOTE_LEFT_MS`), and scrolled back. `.im-canvas` never.
+ */
+export const noteTyping = (s: Scroll, scrolls: readonly Scroll[]): boolean =>
+  s.on === "react-flow" && (s.noteFocus || (s.noteLeftAt !== null && s.at >= s.noteLeftAt && s.at - s.noteLeftAt <= NOTE_LEFT_MS)) && scrolledBack(s, scrolls);
+
+/** Splits the scrolls away from 0 into those that fail the test and those `noteTyping` allows. */
+export function judgeScrolls(scrolls: readonly Scroll[]): { away: Scroll[]; excused: Scroll[] } {
+  const moved = scrolls.filter((s) => s.left !== 0 || s.top !== 0);
+  const excused = moved.filter((s) => noteTyping(s, scrolls));
+  return { away: moved.filter((s) => !excused.includes(s)), excused };
+}
+
 /** What the watch saw in the current test's contexts: each scroll away from 0 with its causes, and every scroll event. */
-export function canvasScrolls(since: number, file: string): { away: Scroll[]; excused: Scroll[]; events: number; describe: (s: Scroll) => string } {
+export function canvasScrolls(since: number): { away: Scroll[]; excused: Scroll[]; events: number; describe: (s: Scroll) => string } {
   const all = watched.flatMap((c) => records.get(c) ?? []);
   const scrolls = all.filter((r): r is Scroll => r.kind === "scroll");
-  const away = scrolls.filter((s) => s.left !== 0 || s.top !== 0);
-  const excused = away.filter((s) => EXCEPTIONS.some((x) => x.file === file && x.on === s.on));
+  const { away, excused } = judgeScrolls(scrolls);
   const describe = (s: Scroll) => {
     const after = all.filter((r) => r.kind === "event" && r.page === s.page && r.at >= s.at && r.at - s.at < 1500).slice(0, 3) as PageEvent[];
-    // scrolled back: a later scroll of the same element on the same page returned it to 0
-    const back = scrolls.some((o) => o.page === s.page && o.on === s.on && o.at >= s.at && o !== s && o.left === 0 && o.top === 0);
+    const back = scrolledBack(s, scrolls);
     const ev = (e: PageEvent) => `${e.type} ${e.target}`;
     return (
       `+${Math.round((s.at - since) / 100) / 10}s page ${s.page} ${s.on} ${s.left},${s.top} ${back ? "scrolled back" : "stayed"}` +
       ` | before: ${s.before ? ev(s.before) : "–"} | focus: ${s.focus || "–"} | after: ${after.map(ev).join("; ") || "–"}`
     );
   };
-  return { away: away.filter((s) => !excused.includes(s)), excused, events: scrolls.length, describe };
+  return { away, excused, events: scrolls.length, describe };
 }
 
-/** Records the watch's finding on the test and fails it for a scroll away from 0 that no exception names. */
+/** Records the watch's finding on the test and fails it for a scroll away from 0 that `noteTyping` does not allow. */
 export function finishCanvasWatch(since: number, testInfo: TestInfo): void {
   const file = fileOf(testInfo);
-  const { away, excused, events, describe } = canvasScrolls(since, file);
+  const { away, excused, events, describe } = canvasScrolls(since);
   watched = [];
   if (events === 0) return;
   const list = (xs: Scroll[]) => xs.slice(0, 8).map(describe).join(" || ") + (xs.length > 8 ? ` || … ${xs.length - 8} more` : "");
