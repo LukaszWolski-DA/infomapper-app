@@ -1121,19 +1121,25 @@ is held stays selected; with nothing clicked meanwhile the new mapping is select
   Checked by `e2e/fixes/late-selection-add-attribute.spec.ts`, `late-selection-new-entity.spec.ts`,
   `late-selection-new-requirement.spec.ts` and `late-selection-create-dimension.spec.ts` (each failed without the fix),
   and `src/canvas/selection-now.test.ts`.
-- **Not fixed here, next on fix/late-selection-canvas** (inside the canvas; `ModelCanvas` already re-renders on every
-  selection, so the reader is `ui.selectionNow()`, no new subscription): placing a card (`ModelCanvas`'s `place`,
-  behind the left panel's and the go-to links' placing and a new source table), "Place sources beside"
-  (`placeBeside`), placing requirement cards (`placeRequirementCardsBeside`), a new frame and "Put in a new frame"
-  (`useFrames.ts`, also focusing the frame's name through the host's `frameCreated`), and a new note's first save
-  (`useNotes.ts`, which replaces the draft note's selection; its refusal also clears the selection, `select(null)`,
-  missing from the first list). The note's case needs no slow network: leaving the editor by pressing another card
-  sends the save, and the click selects that card before the answer arrives (read, not measured).
-- **Answers that still clear the selection outside `ui.deselectDeleted`** (RP-07's twins on the canvas's queue, missing
-  from the first list; next on fix/late-selection-canvas): "Remove from this canvas" (`ModelCanvas`'s `remove`), a
-  requirement card's remove with `deselect` (`removeRequirementCard`), removing a selection (`GroupActions.ts`,
-  `removeSelection`), a frame's delete (`useFrames.ts`, `deleteFrame`) and "Arrange into frames"
-  (`arrangeIntoFrames`). Each knows the ids it removed in the browser.
+- **Fixed on fix/late-selection-canvas** (inside the canvas, the same rule: `sent` from `ui.selectionNow()` when the
+  person acts, after any question, so a click made while the write waits on the canvas's queue stays too; the view move,
+  `fitBounds` and the host's `frameCreated` (the panel, the frame's name focused) follow `ui.selectMade`; the toast
+  shows either way): placing a card (`ModelCanvas`'s `placeAt`, behind `place`, `addToCanvas`, the left panel's and
+  the go-to links' placing and a new source table), "Place sources beside" (`placeBeside`), placing requirement cards
+  (`placeRequirementCardsBeside`), a new frame and "Put in a new frame" (`useFrames.ts`: `createFrame`,
+  `putInNewFrame`), and a new note's first save (`useNotes.ts`: the saved note is selected only while the draft note
+  still is; its refusal clears the selection only while it still points at the draft note). **The note's case happened
+  in ordinary use**: its spec types a note and clicks another card, with no hold, and failed every time without the
+  fix (the blur sends the save and the click selects the card before the answer).
+- **The removals on the canvas's queue** (RP-07's twins, fixed on fix/late-selection-canvas): "Remove from this canvas"
+  (`ModelCanvas`'s `remove`), a requirement card's remove with `deselect` (`removeRequirementCard`), removing a
+  selection (`GroupActions.ts`, `removeSelection`) and a frame's delete (`useFrames.ts`, `deleteFrame`) clear the
+  selection only through `ui.deselectDeleted` with the ids they removed in the browser (each item's id and the id its
+  key names, `removedSelectionIds`), applied to the selection as it is when the answer arrives. "Arrange into frames"
+  (`arrangeIntoFrames`) clears it only while it is still the one it was sent with (`ui.selectMade(sent, null)`).
+  Checked by `e2e/fixes/late-selection-place-card.spec.ts`, `late-selection-new-frame.spec.ts`,
+  `late-selection-new-note.spec.ts` and `late-selection-remove-card.spec.ts` (each failed without the fix), and the
+  cases in `src/canvas/selection.test.ts`. **No site in this list is left unfixed.**
 - **No race:** a split (its answer selects nothing), the selections made on a click before any write (the tree, the
   go-to links, the checks, a requirement dropped from the left panel, "That mapping already exists"), and Focus's and a
   found row's selections. The app has no duplicate command.
