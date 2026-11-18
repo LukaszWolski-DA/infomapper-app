@@ -1,4 +1,5 @@
 import { clickVisible } from "../canvas-click";
+import { scrollsOnPurpose } from "../canvas-scroll-watch";
 import { expect, test } from "../slice-03b/fixtures";
 import { card, expectCard, expectToast, liveUrl, openCanvas, openLiveFor, rowNamed, signInAs, typeLabel } from "../slice-03b/helpers";
 import type { Page } from "@playwright/test";
@@ -56,6 +57,7 @@ test("visible clicks: a plain click on a card partly outside the canvas scrolls 
 
   // (1) a plain click scrolls React Flow's wrapper (which React Flow scrolls back later) or the canvas element around
   // it (which nothing scrolls back: the canvas stays shifted on that page), so the page is opened again afterwards
+  scrollsOnPurpose(test.info(), "case (1) shows that a plain click scrolls the canvas");
   await customersName(page).click();
   await expect.poll(scrolls).toBeGreaterThan(0);
   await openCanvas(page, liveUrl(live), { x: -200, y: 0, zoom: 0.8 });
