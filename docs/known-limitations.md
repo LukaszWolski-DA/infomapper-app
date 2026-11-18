@@ -1162,6 +1162,31 @@ In slice 29's full run after main was merged (run 44147585823, commit `ff98fd4`,
   late-selection sites (`src/canvas/selection.ts`): no answer selected anything.
 - **The fix:** the spec clicks the name at a visible point (`position: { x: 8, y: 8 }`), which Playwright scrolls into view
   alone, so the wrapper never scrolls. The assertions are unchanged.
+- **The same hazard elsewhere** (not fixed here):
+  - **Seen in traces in slice 3b:** S3B-02 (line 21), S3B-03 (lines 72, 83), S3B-04 (lines 48, 75) and S3B-14 (line 36)
+    click a card or a row that the click scrolls into view. S3B-03's typing at line 64 also scrolls the wrapper, but it is
+    no hazard: the text goes to the focused editor.
+  - **Outside slice 3b, from the code only (low confidence):** about 102 card clicks without a position, 31 `clickCard`
+    calls and 62 row clicks through `rowNamed`, in 15 slice folders.
+- **Next** (Łukasz, 18 November 2026): a separate `fix/` branch after the late-selection sites. It adds a shared click
+  helper that clicks inside the intersection of the element's box and the canvas's visible column (not a fixed offset),
+  so no list of sites is needed.
+
+### S21-02 failed once on fix/s3b06-context-label (cause not found)
+
+In the first full run on fix/s3b06-context-label (run 44260398376, commit `0d97639`, 18 November 2026),
+`e2e/slice-21/S21-02.spec.ts` failed once in part 8:
+- **What failed:** after the redo, the test right-clicked a spot it had found empty and waited for the toolbox item
+  "New entity here", which never appeared (the 60 s test timeout at line 100). The menu that opened was the card menu
+  of "New entity", the entity the redo had brought back, not the canvas's toolbox.
+- **Alone:** it passed 3 of 3 (single-file check, run 44262671159). The second full run on the same commit passed
+  (run 44263118814).
+- **The scan:** React Flow's wrapper was never scrolled in the trace, so this is not S3B-06's lost click.
+- **Cause:** not found. A guess, not a diagnosis: the redone card was drawn at the spot after the test had read it as
+  empty.
+- **Kept:** the run's trace, error, server log and merged report are in `.data/e2e-s3b06fix-run44260398376/`
+  (git-ignored), as well as on the run's page for 14 days.
+- **Next:** a step 1 diagnosis on its own `fix/` branch (Łukasz decides when).
 
 ### S11-08 failed once: a save on its way when the next test reseeded (a bug in the local adapter and the fixtures, fixed on fix/write-after-reseed)
 
