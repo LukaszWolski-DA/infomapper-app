@@ -155,10 +155,12 @@ If these disagree, stop and ask. Do not resolve a conflict silently.
    committed and CI passed on the last commit, stopping if not. The slice's tag (`slice-30`, …) goes on the merge commit
    into `dev`.
 8. **A release** (chore/dev-branch): `dev` reaches `main` only in a release, on Łukasz's command: a pull request from
-   `dev` into `main`, merged with a merge commit (never a squash or a rebase, which would split the two histories). It
-   needs no full run of its own when `git diff --stat <tested>..dev` is empty, `<tested>` being the commit of the last
-   full run on what was merged into `dev`; otherwise one full run on `dev`'s head first. The release's tag goes on
-   `main`'s merge commit: `release-YYYY-MM-DD`, with `-2`, `-3` for a second or third release the same day.
+   `dev` into `main`, merged with a merge commit (never a squash or a rebase, which would split the two histories).
+   Before it, `git log --no-merges dev..main` is empty: the only commits in `main` that `dev` lacks are the releases'
+   merge commits. It needs no full run of its own when `git diff --stat <tested>..dev` is empty, `<tested>` being the
+   commit of the last full run on what was merged into `dev`; otherwise one full run on `dev`'s head first. The
+   release's tag goes on `main`'s merge commit: `release-YYYY-MM-DD`, with `-2`, `-3` for a second or third release the
+   same day.
 
 ## Architecture rules
 
@@ -561,10 +563,10 @@ changes what the preview shows. **Running against Postgres:** `npm run pg:check`
   `infomapper-app`, and Supabase `infomapper-prod`.
 - **Only `dev` deploys** (chore/dev-branch; `slice/29-database-skeleton` until then), as a Preview, by two layers that
   say the same: `vercel.json`'s `git.deploymentEnabled` and the project's Ignored Build Step. Why both: Vercel reads
-  `vercel.json` from the commit it builds, so a branch without the file would deploy. `dev` has a stable domain of its
-  own (a preview domain, so Standard Protection covers it). The project's Production Branch stays `main`, although the
-  repository's default is `dev`; `main` never deploys in this project. Making `dev` the Production Branch waits for
-  slice D.
+  `vercel.json` from the commit it builds, so a branch without the file would deploy. `dev` is reached at its branch
+  address, `infomapper-app-dev-git-dev-lukaszs-projects-9ffbc132.vercel.app` (a preview domain, so Standard Protection
+  covers it). The project's Production Branch stays `main`, although the repository's default is `dev`; `main` never
+  deploys in this project. Making `dev` the Production Branch waits for slice D.
 - **To preview another branch,** change three things together: `deploymentEnabled`, the Ignored Build Step's branch name
   and the variables' branch scope.
 - **Never delete the project's last Production deployment:** while none exists, Vercel classifies any build as

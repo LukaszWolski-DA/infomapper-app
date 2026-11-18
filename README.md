@@ -130,7 +130,7 @@ is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at 
 | --- | --- | --- | --- |
 | 1 | `npm run dev` on the laptop | the local adapter (`.data/dev-db.json`, `.data/demo-db.json`), the development sign-in | `.env.local` (none needed) |
 | 2 | `npm run dev:pg` on the laptop | Postgres on `infomapper-dev`, Supabase Auth | `.env.postgres.local` (git-ignored), read only by `npm run dev:pg` and the Postgres scripts |
-| 3 | The Vercel preview of `dev` (its stable domain) | Postgres on `infomapper-dev`, Supabase Auth, read only | Vercel's Preview environment, scoped to that branch |
+| 3 | The Vercel preview of `dev` (its branch address, `infomapper-app-dev-git-dev-lukaszs-projects-9ffbc132.vercel.app`) | Postgres on `infomapper-dev`, Supabase Auth, read only | Vercel's Preview environment, scoped to that branch |
 | 4 | Production (slice D) | its own Vercel project `infomapper-app` and Supabase project `infomapper-prod` | – |
 
 - **The switch** is `INFOMAPPER_DATA` (`local` by default, `postgres` set by `npm run dev:pg`, the Postgres scripts, CI's
@@ -161,9 +161,10 @@ is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at 
   own project, `infomapper-app`, and Supabase `infomapper-prod`.
 - **Only `dev` deploys** (since chore/dev-branch; `slice/29-database-skeleton` before), as a Preview, by two layers that
   say the same: `vercel.json`'s `git.deploymentEnabled` and the project's Ignored Build Step. Why both: Vercel reads
-  `vercel.json` from the commit it builds, so a branch without the file would deploy. `dev` has a stable domain of its
-  own, a preview domain that Standard Protection covers. The project's Production Branch stays `main`, which never
-  deploys here; the repository's default branch is `dev`.
+  `vercel.json` from the commit it builds, so a branch without the file would deploy. `dev` is reached at its branch
+  address, `infomapper-app-dev-git-dev-lukaszs-projects-9ffbc132.vercel.app`, a preview domain that Standard Protection
+  covers. The project's Production Branch stays `main`, which never deploys here; the repository's default branch is
+  `dev`.
 - **To preview another branch,** change three things together: `deploymentEnabled`, the Ignored Build Step's branch name
   and the variables' branch scope.
 - **Never delete the project's last Production deployment.** While a project has none, Vercel classifies any build as
