@@ -23,6 +23,12 @@ import {
 
 const relationshipRow = (id: string) => async () => (await loadModel()).relationships.find((r) => r.id === id);
 
+/**
+ * "Customer & orders" at 70 %, with room above Customer for its loop and Sales Order in view: at `LOOP_VIEW` Sales Order
+ * lies below the canvas, and its click only worked because Playwright scrolled the canvas (fix/e2e-visible-clicks).
+ */
+const LOOP_AND_SALES_ORDER = { x: -150, y: 72, zoom: 0.7 };
+
 
 const field = (page: Page, label: string) => page.getByTestId("panel-relationship").locator("label").filter({ hasText: new RegExp(`^${label}$`) });
 
@@ -91,7 +97,7 @@ test("S10A-10: swap with equal cardinalities is refused with “Nothing to chang
 test("S10A-10: the self-relationship, then a card, then Back selects the self-relationship again without moving the view (D-38)", async ({ page }) => {
   const rel = await selfRelationship("Customer", { label: "refers" });
   await signInAs(page, "Łukasz");
-  await openCanvas(page, canvasUrl(), LOOP_VIEW);
+  await openCanvas(page, canvasUrl(), LOOP_AND_SALES_ORDER);
   await clickLine(page, rel.id);
   await clickCard(page, "Sales Order");
   await expectSelected(page, "entity:Sales Order");
