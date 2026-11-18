@@ -1194,21 +1194,21 @@ In slice 29's full run after main was merged (run 44147585823, commit `ff98fd4`,
   helper that clicks inside the intersection of the element's box and the canvas's visible column (not a fixed offset),
   so no list of sites is needed.
 
-### S21-02 failed once on fix/s3b06-context-label (cause not found)
+### S21-02 failed once on fix/s3b06-context-label (a spot read too early in the test, fixed on fix/s21-02-toolbox-menu)
 
 In the first full run on fix/s3b06-context-label (run 44260398376, commit `0d97639`, 18 November 2026),
-`e2e/slice-21/S21-02.spec.ts` failed once in part 8:
-- **What failed:** after the redo, the test right-clicked a spot it had found empty and waited for the toolbox item
-  "New entity here", which never appeared (the 60 s test timeout at line 100). The menu that opened was the card menu
-  of "New entity", the entity the redo had brought back, not the canvas's toolbox.
-- **Alone:** it passed 3 of 3 (single-file check, run 44262671159). The second full run on the same commit passed
-  (run 44263118814).
-- **The scan:** React Flow's wrapper was never scrolled in the trace, so this is not S3B-06's lost click.
-- **Cause:** not found. A guess, not a diagnosis: the redone card was drawn at the spot after the test had read it as
-  empty.
-- **Kept:** the run's trace, error, server log and merged report are in `.data/e2e-s3b06fix-run44260398376/`
-  (git-ignored), as well as on the run's page for 14 days.
-- **Next:** a step 1 diagnosis on its own `fix/` branch (Łukasz decides when).
+`e2e/slice-21/S21-02.spec.ts` failed once in part 8: after the redo, the test right-clicked a spot it had found empty and
+the card menu of the redone "New entity" opened instead of the canvas's toolbox (the 60 s timeout at line 100); alone it
+passed 3 of 3 (run 44262671159). **The cause was in the test** (CLAUDE.md, "A race in a test"):
+- **The spot read too early:** after the redo the test waited for the data file only, which has the rows before the
+  page draws them, then read the empty spot from the DOM (`emptySpot`). Its scan starts where the test had created the
+  entity, and redo brings the card back exactly there: the spot (900, 158) was read 9 ms after the answer, the card was
+  drawn about 220 ms later, and the right-click came after it. Locally 4 of 10 rounds read the spot before the card was
+  drawn and clicked before it too.
+- **No app bug:** the card returns where it was, with the fresh page the redo's answer brings; a right-click in that
+  moment opens the card's menu, and nothing breaks.
+- **The fix:** the spec waits for the "New entity" cards on the page after the redo and after Loyalty's create, before
+  each `emptySpot`. The data file's polls and the assertions are unchanged.
 
 ### S11-08 failed once: a save on its way when the next test reseeded (a bug in the local adapter and the fixtures, fixed on fix/write-after-reseed)
 
