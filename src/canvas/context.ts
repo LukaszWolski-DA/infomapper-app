@@ -435,11 +435,17 @@ export interface CanvasUiApi extends CanvasHandle {
    */
   deselectDeleted: (deleted: readonly string[] | undefined) => void;
   /**
+   * The selection as it is now (fix/late-selection-remaining), also between a click and the render that draws it.
+   * Read it as `sent` when an action is sent (after any question that comes first), never during a render.
+   */
+  selectionNow: () => Selection;
+  /**
    * After an answer that selects what it made (fix/late-selection-after-create): selects `made` only if the selection is
    * still `sent`, the one the action was sent with (`selectionAfterAnswer`). A selection the person made while the
-   * action was on its way stays. Read `sent` from `selection` when the action is sent, before awaiting it.
+   * action was on its way stays. Answers whether it took (fix/late-selection-remaining): the answer's other effects
+   * (the details panel, a name's focus, the view) follow it; its toast shows either way.
    */
-  selectMade: (sent: Selection, made: Selection) => void;
+  selectMade: (sent: Selection, made: Selection) => boolean;
   registerCanvas: (handle: CanvasHandle | null) => void;
   /** The active canvas tool, shared with the top bar's Entity tool button. */
   mode: CanvasMode;
@@ -474,7 +480,8 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   selection: null,
   select: noop,
   deselectDeleted: noop,
-  selectMade: noop,
+  selectionNow: () => null,
+  selectMade: () => false,
   fit: noop,
   shiftView: noop,
   place: async () => null,

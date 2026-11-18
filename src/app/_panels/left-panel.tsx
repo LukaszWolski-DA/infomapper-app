@@ -22,6 +22,7 @@ import { DotsIcon, itemClass, menuClass, sectionClass } from "@/app/w/[workspace
 import { readPreference, writePreference } from "@/canvas/CanvasProvider";
 import { CanvasUiCtx, CARD_DRAG_TYPE, REQ_DRAG_TYPE, type CardTarget } from "@/canvas/context";
 import { requirementDrag } from "@/canvas/requirement-drop";
+import { sameSelection } from "@/canvas/selection";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -174,21 +175,23 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
       return;
     }
     const placed = await ui.place(target, rows);
-    if (placed && hitId) ui.showRow(placed, hitId);
+    // the found row only while the placed card is still what is selected (fix/late-selection-remaining)
+    if (placed && hitId && sameSelection(ui.selectionNow(), { t: "card", id: placed })) ui.showRow(placed, hitId);
   };
 
   async function addEntity(c: TreeConcept) {
     unfold(conceptGroup(c.id));
     const spot = ui.freeSpot();
+    const sent = ui.selectionNow();
     const result = await run(() =>
       createEntityAction(workspaceId, { conceptId: c.id, placement: { canvasId, ...spot, height: newCardHeight(0), frames: ui.frameRefs() } }),
     );
     if (!result.ok) return;
     toast(`Created ${result.value.name} in ${c.name}. Type its name now; change the concept in the panel.`);
     const cardId = result.value.canvasItemId;
-    if (cardId) {
+    // a selection made while the create was on its way stays, and so do the panel and the focus
+    if (cardId && ui.selectMade(sent, { t: "card", id: cardId })) {
       openDetails();
-      ui.select({ t: "card", id: cardId });
       setNameFocus(cardId);
     }
   }
@@ -426,11 +429,12 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
 
   // ---- the Requirements tab (slice 4a) ----
   async function newRequirement() {
+    const sent = ui.selectionNow();
     const result = await run(() => createRequirementAction(workspaceId, {}));
-    if (!result.ok) return;
+    // a selection made while the create was on its way stays, and so do the panel and the focus
+    if (!result.ok || !ui.selectMade(sent, { t: "req", id: result.value.requirementId })) return;
     openDetails();
     setNameFocus(requirementNameFocus(result.value.requirementId));
-    ui.select({ t: "req", id: result.value.requirementId });
   }
   const newRequirementButton = editable && !searching && (
     <div className="mx-2 my-2.5">
@@ -553,13 +557,14 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
   }
   async function createIn(create: (typeof modules.creates)[number], into: { conceptId: string } | { newConcept: { name: string } }) {
     const spot = ui.freeSpot();
+    const sent = ui.selectionNow();
     const result = await run(() => create.action(workspaceId, { ...into, placement: { canvasId, ...spot, height: newCardHeight(0), frames: ui.frameRefs() } }) as Promise<CreateResult>);
     if (!result.ok) return;
     toast(`Created ${result.value.name} in ${"newConcept" in into ? "the new concept " : ""}${result.value.concept.name}. Type its name now; change the concept in the panel.`);
     const cardId = result.value.canvasItemId;
-    if (cardId) {
+    // a selection made while the create was on its way stays, and so do the panel and the focus
+    if (cardId && ui.selectMade(sent, { t: "card", id: cardId })) {
       openDetails();
-      ui.select({ t: "card", id: cardId });
       setNameFocus(cardId);
     }
   }

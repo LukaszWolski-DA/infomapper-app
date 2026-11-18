@@ -1379,10 +1379,13 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     while the delete was on its way stays unless the delete took it along. **A later delete** calls it, never
     `ui.select(null)` after its answer.
   - **The selection after a create** (fix/late-selection-after-create): an answer that selects what it made calls
-    `ui.selectMade(sent, made)` with `sent` read from `ui.selection` when the action is sent (the rule
-    `selectionAfterAnswer`, `src/canvas/selection.ts`): a selection made meanwhile stays. **A later write whose answer
-    selects its result** calls it, never `ui.select` after the answer; the sites not yet moved to it are listed in
-    `docs/known-limitations.md`.
+    `ui.selectMade(sent, made)` with `sent` read from `ui.selectionNow()` when the action is sent, after any question
+    that comes first (the rule `selectionAfterAnswer`, `src/canvas/selection.ts`): a selection made meanwhile stays.
+    Since fix/late-selection-remaining it answers whether it took, and the answer's other effects follow it: the
+    details panel, a name's focus and a view move happen only when it took; the toast shows either way. The provider
+    keeps the selection in one holder (`selection-now.ts`) that every `ui.select` goes through, so `selectionNow()` is
+    never behind a click. **A later write whose answer selects its result** calls it, never `ui.select` after the
+    answer; the sites not yet moved to it are listed in `docs/known-limitations.md`.
 
   **Slice 13 (D-66):**
   - **The draft:** a text field is uncontrolled and keeps what was typed (`useDraft` in `src/app/_panels/fields.tsx`; the

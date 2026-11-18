@@ -47,6 +47,7 @@ export function CreateDimensionDialog({ entityId, onClose }: { entityId: Uuid; o
     const height = newCardHeight(ticked.size + 1);
     const spot = original ? ui.besideSpot(original, height, "right", DIMENSION_GAP) : null;
     const placement = spot ? { canvasId: p.canvasId, ...spot, height, frames: ui.frameRefs() } : undefined;
+    const sent = ui.selectionNow();
     const result = await run(
       () => createDimensionFromAction(p.workspaceId, { entityId, ...(typed ? { name: typed } : {}), attributeIds: attributes.filter((a) => ticked.has(a.id)).map((a) => a.id), ...(placement ? { placement } : {}) }),
       (v) => v.toast,
@@ -56,10 +57,9 @@ export function CreateDimensionDialog({ entityId, onClose }: { entityId: Uuid; o
     onClose();
     if (result.value.warning) toast(result.value.warning);
     const cardId = result.value.canvasItemId;
-    if (cardId) {
-      ui.select({ t: "card", id: cardId });
-      ui.centerOn(cardId);
-    }
+    // the dialog closed with Escape while the create was on its way lets a click reach the canvas: a selection made
+    // meanwhile stays, and so does the view (fix/late-selection-remaining)
+    if (cardId && ui.selectMade(sent, { t: "card", id: cardId })) ui.centerOn(cardId);
   }
 
   return (

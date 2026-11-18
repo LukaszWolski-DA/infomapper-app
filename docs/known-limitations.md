@@ -1106,18 +1106,34 @@ is held stays selected; with nothing clicked meanwhile the new mapping is select
   drag between two entities (`canvas-host.tsx`, `relate`); a column dropped on a row, the D-48 choice's "add to this
   mapping", and a column dropped on an entity's header (`map-column.tsx`: `createDirect`, `confirm`, `dropOnEntity`);
   InfoCube's row drops, a mapping and "Create attribute and its mapping" on a header (`canvas-ext.tsx`).
-- **The same race, not fixed here** (the answer also opens the details panel, focuses the new name or moves the view,
-  which would have to follow the same rule: more than one call): "Relate to itself", "Paste attribute", "Add
-  attribute" and "Add attribute below" in a card's menus (`canvas-host.tsx`: `relateToItself`, `pasteInto`,
-  `addAttributeTo`); a new entity, fact or dimension from the canvas or its toolbox (`canvas-host.tsx`, `createEntityAt`)
-  and from the left panel's concept and Cube tab (`left-panel.tsx`: `addEntity`, `createIn`); the entity panel's "Add
-  attribute" (`entity-panel.tsx`); "New requirement" (`left-panel.tsx`). Inside the canvas, which reads the selection
-  through its own state and would need a reader that does not re-render `ModelCanvas`: placing a card (`ModelCanvas`'s
-  `place`, behind the left panel's and the go-to links' placing and a new source table), "Place sources beside"
-  (`placeBeside`), placing requirement cards, a new frame and "Put in a new frame" (`useFrames.ts`, also focusing the
-  frame's name), and a new note's first save (`useNotes.ts`, which replaces the draft note's selection).
-- **Behind a modal dialog** (no click reaches the canvas while it waits; only if the dialog is closed with Escape first):
-  "Create dimension from this…" (`create-dimension-dialog.tsx`) and an import's source system (`use-imported.ts`).
+- **Fixed on fix/late-selection-remaining** (the answer also opens the details panel, focuses the new name or moves the
+  view; these follow the selection: they happen only when `ui.selectMade` answers that it took, read with `sent` from
+  `ui.selectionNow()`; the toast shows either way): "Relate to itself", "Paste attribute", "Add attribute" and "Add
+  attribute below" in a card's menus (`canvas-host.tsx`: `relateToItself`, `pasteInto`, `addAttributeTo`); a new
+  entity, fact or dimension from the canvas or its toolbox (`canvas-host.tsx`, `createEntityAt`, `sent` read after the
+  concept picker) and from the left panel's concept and Cube tab (`left-panel.tsx`: `addEntity`, `createIn`); the entity
+  panel's "Add attribute" (`entity-panel.tsx`); "New requirement" in the left panel (`left-panel.tsx`) and in an element
+  panel's Requirements section (`requirements-section.tsx`, missing from the first list); the found row shown after its
+  entity's card is placed from the tree (`left-panel.tsx`, `open` → `ui.showRow`, missing from the first list: it runs
+  only while the placed card is still what is selected). Behind a modal dialog, closed with Escape while the write is on
+  its way: "Create dimension from this…" (`create-dimension-dialog.tsx`; the view moves only when it took) and an
+  import's source system (`use-imported.ts`, with `sent` from the wizard; the Sources tab and the panel follow it).
+  Checked by `e2e/fixes/late-selection-add-attribute.spec.ts`, `late-selection-new-entity.spec.ts`,
+  `late-selection-new-requirement.spec.ts` and `late-selection-create-dimension.spec.ts` (each failed without the fix),
+  and `src/canvas/selection-now.test.ts`.
+- **Not fixed here, next on fix/late-selection-canvas** (inside the canvas; `ModelCanvas` already re-renders on every
+  selection, so the reader is `ui.selectionNow()`, no new subscription): placing a card (`ModelCanvas`'s `place`,
+  behind the left panel's and the go-to links' placing and a new source table), "Place sources beside"
+  (`placeBeside`), placing requirement cards (`placeRequirementCardsBeside`), a new frame and "Put in a new frame"
+  (`useFrames.ts`, also focusing the frame's name through the host's `frameCreated`), and a new note's first save
+  (`useNotes.ts`, which replaces the draft note's selection; its refusal also clears the selection, `select(null)`,
+  missing from the first list). The note's case needs no slow network: leaving the editor by pressing another card
+  sends the save, and the click selects that card before the answer arrives (read, not measured).
+- **Answers that still clear the selection outside `ui.deselectDeleted`** (RP-07's twins on the canvas's queue, missing
+  from the first list; next on fix/late-selection-canvas): "Remove from this canvas" (`ModelCanvas`'s `remove`), a
+  requirement card's remove with `deselect` (`removeRequirementCard`), removing a selection (`GroupActions.ts`,
+  `removeSelection`), a frame's delete (`useFrames.ts`, `deleteFrame`) and "Arrange into frames"
+  (`arrangeIntoFrames`). Each knows the ids it removed in the browser.
 - **No race:** a split (its answer selects nothing), the selections made on a click before any write (the tree, the
   go-to links, the checks, a requirement dropped from the left panel, "That mapping already exists"), and Focus's and a
   found row's selections. The app has no duplicate command.

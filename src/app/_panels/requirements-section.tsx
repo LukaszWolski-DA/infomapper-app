@@ -50,11 +50,11 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
     if (link) void run(() => unlinkRequirementAction(p.workspaceId, { requirementLinkId: link.id, expectedVersion: link.version }), "Unlinked.", { undoable: true });
   };
   const newRequirement = async () => {
+    const sent = ui.selectionNow();
     const result = await run(() => createRequirementAction(p.workspaceId, { link: target }));
-    if (result.ok) {
-      setNameFocus(requirementNameFocus(result.value.requirementId));
-      p.goRequirement(result.value.requirementId);
-    }
+    // a selection made while the create was on its way stays, and so does the focus (fix/late-selection-remaining);
+    // the inspector's go-to for a requirement is this selection (`goRequirement`)
+    if (result.ok && ui.selectMade(sent, { t: "req", id: result.value.requirementId })) setNameFocus(requirementNameFocus(result.value.requirementId));
   };
   // the picker under its button (prototype openReqPick); `all`: "Link all attributes…" of this entity
   const openPicker = (button: HTMLElement, all: boolean) => {
