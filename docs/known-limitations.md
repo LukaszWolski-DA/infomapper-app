@@ -1209,6 +1209,9 @@ passed 3 of 3 (run 44262671159). **The cause was in the test** (CLAUDE.md, "A ra
   moment opens the card's menu, and nothing breaks.
 - **The fix:** the spec waits for the "New entity" cards on the page after the redo and after Loyalty's create, before
   each `emptySpot`. The data file's polls and the assertions are unchanged.
+- **The same race in reverse:** after the first undo the test clicked the card's old spot with the Entity tool, having
+  waited for the data file only; a card the page still drew there would take the click. The spec now waits for no
+  "New entity" card on the page before that click.
 
 ### S11-08 failed once: a save on its way when the next test reseeded (a bug in the local adapter and the fixtures, fixed on fix/write-after-reseed)
 
