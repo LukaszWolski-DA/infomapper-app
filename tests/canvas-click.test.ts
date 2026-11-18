@@ -30,6 +30,13 @@ describe("clickVisible's visible part", () => {
     expect(visiblePart({ x: 800, y: 450, width: 100, height: 20 }, column, [{ x: 712, y: 400, width: 216, height: 188 }])).toBeNull();
   });
 
+  it("takes an element thinner than 4 px when it is wholly in view, and only then (a card's width handle, S2A-05)", () => {
+    const handle = { x: 611, y: 146, width: 3.99, height: 123 };
+    expect(visiblePart(handle, column, [])).toEqual(handle);
+    expect(visiblePart({ ...handle, y: 580 }, column, [])).toBeNull(); // its lower part below the canvas
+    expect(visiblePart({ ...handle, x: 714 }, column, [{ x: 712, y: 200, width: 216, height: 20 }])).toBeNull(); // partly under the Overview
+  });
+
   it("intersects and subtracts boxes", () => {
     expect(intersect({ x: 0, y: 0, width: 10, height: 10 }, { x: 10, y: 0, width: 5, height: 5 })).toBeNull();
     expect(minus({ x: 0, y: 0, width: 10, height: 10 }, { x: 20, y: 20, width: 5, height: 5 })).toEqual([{ x: 0, y: 0, width: 10, height: 10 }]);

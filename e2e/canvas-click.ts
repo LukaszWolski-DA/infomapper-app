@@ -41,12 +41,18 @@ export function minus(a: Box, hole: Box): Box[] {
   return parts.filter((p) => p.width > 0 && p.height > 0);
 }
 
-/** The largest part of `element` inside `column` and outside every hole, if it is at least `MIN_VISIBLE` each way. */
+const same = (a: Box, b: Box) => Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5 && Math.abs(a.width - b.width) < 0.5 && Math.abs(a.height - b.height) < 0.5;
+
+/**
+ * The largest part of `element` inside `column` and outside every hole, if it is at least `MIN_VISIBLE` each way; an
+ * element thinner than that (a card's 4 px width handle) only when it is wholly in view.
+ */
 export function visiblePart(element: Box, column: Box, holes: readonly Box[]): Box | null {
   const inside = intersect(element, column);
   if (!inside) return null;
   let parts = [inside];
   for (const hole of holes) parts = parts.flatMap((p) => minus(p, hole));
+  if (parts.length === 1 && same(parts[0]!, element)) return element;
   const best = parts.filter((p) => p.width >= MIN_VISIBLE && p.height >= MIN_VISIBLE).sort((a, b) => b.width * b.height - a.width * a.height)[0];
   return best ?? null;
 }
@@ -55,7 +61,8 @@ const round = (b: Box | null) => (b ? `${Math.round(b.x)},${Math.round(b.y)} ${M
 
 /**
  * Clicks a canvas element (a card, a row, a frame, a note, a requirement card) at the centre of its visible part, without
- * scrolling. Fails with a message when no part of at least 4 × 4 px is visible in the canvas's column.
+ * scrolling. Fails with a message when no part of at least 4 × 4 px is visible in the canvas's column (an element smaller
+ * than that is clicked when it is wholly in view).
  */
 export async function clickVisible(target: Locator, options: ClickVisibleOptions = {}): Promise<void> {
   await target.waitFor({ state: "visible" });
