@@ -86,7 +86,7 @@ import { useRequirementIndex, type FadeData, type FadeNote } from "./fade-canvas
 import { requirementMarks, sameMark } from "./requirement-marks";
 import { useLasso } from "./Lasso";
 import SelectionOverlay from "./SelectionOverlay";
-import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, reqKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
+import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, removedSelectionIds, reqKey, sameSelection, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
 import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, REQ_CARD_DRAG_TYPE, REQ_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis, type RowDrag, type RowDragFrom, type RowDrop, type RowDropTarget, type NoteListItem } from "./context";
@@ -1158,6 +1158,8 @@ export function ModelCanvas({
           moveToConcepts = await askRef.current(conceptAsk([{ name: dropped!.name, from: concepts[own ?? ""]?.name ?? "–", to: concepts[q[0]!.conceptId]?.name ?? "–" }]));
         }
       }
+      // what was selected when the person acted, after the questions (fix/late-selection-canvas)
+      const sent = ui.selectionNow();
       let result: CanvasWriteResult<{ canvasItemId: string }>;
       try {
         const write = () => placeCard({ ...target, ...spot, height: h, frames: frameRefs(), ...(dropped ? { dragDrop: true } : {}), ...(moveToConcepts ? { moveToConcepts: true } : {}) });
@@ -1171,7 +1173,8 @@ export function ModelCanvas({
         return null;
       }
       const placed = result.value.canvasItemId;
-      select({ t: "card", id: placed });
+      // a selection made while the place was on its way stays, and so does the view
+      const took = ui.selectMade(sent, { t: "card", id: placed });
       if (live) {
         const u = ui.undo();
         toast(`${liveName} is now labeled ${live.labelName}.`, "info", u ? { label: "Undo", run: u.undo } : undefined);
@@ -1182,7 +1185,7 @@ export function ModelCanvas({
         return placed;
       }
       const box = { ...spot, w: CARD_W, h };
-      if (!inside(viewRect(), box)) centerOnRect(box);
+      if (took && !inside(viewRect(), box)) centerOnRect(box);
       if (clicked) toast(`Added 1 ${isEntity(target) ? "entity" : "source table"} to the canvas.`);
       return placed;
     },
@@ -1232,6 +1235,9 @@ export function ModelCanvas({
   const remove = useCallback(
     (cardId: string) => {
       if (live) return void removeLive(cardId);
+      const card = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card;
+      // what this remove takes off the canvas in the browser: the answer clears the selection only if it points at it
+      const removedIds = card ? removedSelectionIds([{ id: cardId, key: cardKey(card) }]) : [cardId];
       enqueue(cardId, async () => {
         let result: CanvasWriteResult<unknown>;
         try {
@@ -1245,12 +1251,12 @@ export function ModelCanvas({
         }
         removedHere.current.set(cardId, versions.current.get(cardId) ?? 1);
         setNodes((ns) => ns.filter((n) => n.id !== cardId));
-        select(null);
+        ui.deselectDeleted(removedIds);
         const undo = ui.undo();
         toast("Removed from this canvas. It stays in the model, with its mappings and on other canvases.", "info", undo ? { label: "Undo", run: undo.undo } : undefined);
       });
     },
-    [enqueue, removeCard, select, toast, ui, live, removeLive],
+    [enqueue, removeCard, toast, ui, live, removeLive, rf],
   );
 
   // ---- requirement cards: placing and removing (slice 4b-2, items 7 and 13) ----
@@ -1288,6 +1294,7 @@ export function ModelCanvas({
       const node = reqNodeOf(requirementId);
       if (!node || !editable) return;
       const cardId = node.id;
+      const removedIds = removedSelectionIds([{ id: cardId, key: reqKey(requirementId) }]);
       enqueue(cardId, async () => {
         let result: CanvasWriteResult<unknown>;
         try {
@@ -1300,12 +1307,12 @@ export function ModelCanvas({
           return;
         }
         reqMoverRef.current?.drop([cardId]);
-        if (options.deselect) select(null);
+        if (options.deselect) ui.deselectDeleted(removedIds);
         const undo = ui.undo();
         toast(`Removed ${node.data.card.key}'s card from this canvas. The requirement stays.`, "info", undo ? { label: "Undo", run: undo.undo } : undefined);
       });
     },
-    [reqNodeOf, editable, enqueue, removeCard, toast, select, ui],
+    [reqNodeOf, editable, enqueue, removeCard, toast, ui],
   );
 
   /** Feeding sources (left) or fed entities (right) beside a card, in one change (prototype placeNear, B-08). */
@@ -1329,6 +1336,7 @@ export function ModelCanvas({
       const a = besideAnchor({ x: anchor.position.x, y: anchor.position.y, w: cardWidth(anchor.data.card), h: cardHeight(anchor.data.card) }, block);
       const heights = missing.map((m) => newCardHeight(m.rows));
       const spots = besideSpots(a, side, heights, occupied());
+      const sent = ui.selectionNow();
       let result: CanvasWriteResult<{ canvasItemIds: string[] }>;
       try {
         result = await placeCards(missing.map((m, i) => ({ ...m.target, ...spots[i]!, height: heights[i]! })), frameRefs());
@@ -1339,10 +1347,12 @@ export function ModelCanvas({
         toast(result.message, "refusal");
         return;
       }
-      if (result.value.canvasItemIds.length === 1) select({ t: "card", id: result.value.canvasItemIds[0]! });
+      // one card placed is selected; a selection made meanwhile stays, and so does the view (fix/late-selection-canvas)
+      const made = result.value.canvasItemIds;
+      const took = made.length === 1 ? ui.selectMade(sent, { t: "card", id: made[0]! }) : sameSelection(ui.selectionNow(), sent);
       // Bring the new cards into view if they landed outside it.
       const placed = spots.map((p, i) => ({ ...p, w: CARD_W, h: heights[i]! }));
-      if (placed.some((r) => !inside(viewRect(), r))) {
+      if (took && placed.some((r) => !inside(viewRect(), r))) {
         const all = [a, ...placed];
         const x0 = Math.min(...all.map((r) => r.x)), y0 = Math.min(...all.map((r) => r.y));
         const x1 = Math.max(...all.map((r) => r.x + r.w)), y1 = Math.max(...all.map((r) => r.y + r.h));
@@ -1352,7 +1362,7 @@ export function ModelCanvas({
       const what = isEntity(missing[0]!.target) ? `entit${n === 1 ? "y" : "ies"}` : `source table${n === 1 ? "" : "s"}`;
       toast(`Added ${n} ${what} next to the selection.`);
     },
-    [rf, cardOf, toast, occupied, placeCards, select, viewRect, frameRefs, frameRectsNow, live, placeAt],
+    [rf, cardOf, toast, occupied, placeCards, ui, viewRect, frameRefs, frameRectsNow, live, placeAt],
   );
 
   // ---- frames (slice 2b) ----
@@ -1396,6 +1406,9 @@ export function ModelCanvas({
     versions,
     pending,
     select,
+    selectionNow: ui.selectionNow,
+    selectMade: ui.selectMade,
+    deselectDeleted: ui.deselectDeleted,
     undo: ui.undo,
     writes: frameWrites,
     spaceDown,
@@ -1448,6 +1461,7 @@ export function ModelCanvas({
     enqueue,
     enqueueGroup,
     select,
+    selectMade: ui.selectMade,
     undo: ui.undo,
     writes: noteWrites ?? NO_NOTE_WRITES,
     placesNow,
@@ -1642,11 +1656,13 @@ export function ModelCanvas({
         .filter(({ f }) => !f.collapsed)
         .map(({ r }) => ({ x: r.x, y: r.y - 30, w: r.w, h: r.h + 30 }));
       const spots = requirementCardSpots(anchor, viewRect(), heights, occupied(), frames);
+      const sent = ui.selectionNow();
       const ids = await placeReqCards(missing.map((id, i) => ({ requirementId: id, ...spots[i]! })));
       if (!ids) return;
-      if (ids.length === 1) select({ t: "req", id: missing[0]! });
+      // one card placed is selected; a selection made meanwhile stays, and so does the view (fix/late-selection-canvas)
+      const took = ids.length === 1 ? ui.selectMade(sent, { t: "req", id: missing[0]! }) : sameSelection(ui.selectionNow(), sent);
       const placed = spots.map((s, i) => ({ ...s, w: REQ_CARD.width, h: heights[i]! }));
-      if (placed.some((r) => !inside(viewRect(), r))) {
+      if (took && placed.some((r) => !inside(viewRect(), r))) {
         const all = anchor ? [anchor, ...placed] : placed;
         const x0 = Math.min(...all.map((r) => r.x)), y0 = Math.min(...all.map((r) => r.y));
         const x1 = Math.max(...all.map((r) => r.x + r.w)), y1 = Math.max(...all.map((r) => r.y + r.h));
@@ -1655,7 +1671,7 @@ export function ModelCanvas({
       const n = ids.length;
       toast(`Placed ${n} requirement card${n === 1 ? "" : "s"} on this canvas.`);
     },
-    [editable, requirementIndex, reqNodeOf, elementAnchor, viewRect, occupied, frameRectsNow, placeReqCards, select, rf, toast],
+    [editable, requirementIndex, reqNodeOf, elementAnchor, viewRect, occupied, frameRectsNow, placeReqCards, ui, rf, toast],
   );
   /** A requirement's card already here (the row's “Place card”): selected and brought into view (prototype showReqCard). */
   const showRequirementCard = useCallback(
@@ -1890,7 +1906,7 @@ export function ModelCanvas({
   const group = useGroupActions({
     editable,
     selection,
-    select,
+    deselectDeleted: ui.deselectDeleted,
     setNodes,
     patchCard,
     enqueueGroup,
