@@ -26,6 +26,7 @@ import {
 } from "./helpers";
 
 const toolboxItem = (page: Page, label: string) => page.getByTestId("menu-toolbox").getByTestId("toolbox-item").filter({ hasText: label });
+const newEntityCards = (page: Page) => page.getByTestId("card-entity").filter({ hasText: "New entity" });
 const live = async () => (await conceptsRaw()).filter((c) => c.deleted_at === null).length;
 const leaveName = async (page: Page) => {
   await page.getByTestId("input-entity-name").press("Escape");
@@ -62,6 +63,8 @@ test("S21-02: the create item, Enter as D-72, one undo step for the concept and 
   await leaveName(page);
   await undoButton(page).click();
   await expect.poll(async () => (await entitiesNamed("New entity")).length).toBe(0);
+  // the undone card off the page too: the click below reuses its spot
+  await expect(newEntityCards(page)).toHaveCount(0);
 
   // several matches: Enter does nothing
   await page.getByTestId("button-tool-entity").click();
@@ -93,6 +96,9 @@ test("S21-02: the create item, Enter as D-72, one undo step for the concept and 
   await redoButton(page).click();
   await expect.poll(async () => (await entitiesNamed("New entity")).length).toBe(1);
   await expect.poll(async () => (await liveConceptNamed("Fin ance"))?.id).toBe(finance.id);
+  // the data file has the rows before the page draws them: the redone card comes back where the spot below was empty
+  await expect(newEntityCards(page)).toHaveCount(1);
+  await expect(newEntityCards(page)).toBeVisible();
 
   // the toolbox's "New entity here" and a click on the create item
   const again = await emptySpot(page);
@@ -104,6 +110,9 @@ test("S21-02: the create item, Enter as D-72, one undo step for the concept and 
   await expect.poll(async () => (await liveConceptNamed("Loyalty"))?.color).toBe("#D85A30");
   await expect(page.getByTestId("input-entity-name")).toBeFocused();
   await leaveName(page);
+  // Loyalty's card on the page too, before the next empty spot is read
+  await expect(newEntityCards(page)).toHaveCount(2);
+  for (const card of await newEntityCards(page).all()) await expect(card).toBeVisible();
 
   // Escape with a name typed creates nothing
   const third = await emptySpot(page);
