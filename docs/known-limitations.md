@@ -1193,6 +1193,41 @@ In slice 29's full run after main was merged (run 44147585823, commit `ff98fd4`,
 - **Next** (Łukasz, 18 November 2026): a separate `fix/` branch after the late-selection sites. It adds a shared click
   helper that clicks inside the intersection of the element's box and the canvas's visible column (not a fixed offset),
   so no list of sites is needed.
+- **Fixed for every canvas click on fix/e2e-visible-clicks** (18 November 2026):
+  - **The helper:** `clickVisible(target, { button, clickCount, modifiers })` (`e2e/canvas-click.ts`, re-exported by slice
+    1a's helpers) reads the element's box, the canvas's (`area-canvas`, the column between the side panels) and the
+    Overview's, and clicks the centre of the largest visible part with `scroll: "none"` (Playwright 1.63): it never
+    scrolls, on a retry neither, and Playwright's own checks stay. For an element wholly in view the point is the one
+    Playwright clicked before. With less than 4 × 4 px visible it fails with a message, so a test whose element lies
+    outside the canvas changes its view instead: S10A-10's last test opens at 70 % (`LOOP_AND_SALES_ORDER`), where Sales
+    Order is in view; at `LOOP_VIEW` it lay below the canvas and its click worked only by scrolling it. Every direct canvas
+    click without a position (218 sites in 118 files, including slice 1a's `row()` and the 11 `{ x: 8, y: 8 }`
+    workarounds) and the helpers `clickCard`, `openEntity`, `openAttribute`, `deleteFromModel` and `cardMenuItem` use it.
+    `e2e/fixes/visible-clicks.spec.ts` shows the hazard on this entry's scene and the helper's three cases.
+  - **The watch** (`e2e/canvas-scroll-watch.ts`, run by `e2e/settle.ts` for every test): counts the scroll events of
+    `.react-flow` and `.im-canvas` in every page of every context of a test (`browser.newContext` included, so
+    `newSession`'s second person too) and **fails the test** for a scroll away from 0, with each scroll's element, offset,
+    whether it was scrolled back, and the input events around it. A test that scrolls on purpose says so
+    (`scrollsOnPurpose`, only `fixes/visible-clicks.spec.ts`); a named exception is in `EXCEPTIONS` (below).
+  - **`.im-canvas` is not scrolled back:** Playwright's scroll sometimes moves the canvas element around React Flow's
+    wrapper instead of the wrapper (96 to 107 px in S19-03, S20-07 and the new spec), and nothing scrolls it back: the
+    whole canvas stays shifted on that page, so a later click by coordinates aims beside what it read.
+  - **The real count:** in the first full run with the watch (run 44317374133, report only), about 20 clicks without a
+    position scrolled the canvas, in 10 tests (S1B-05, S1B-08, S1B-11, S1B-13, S3B-02, S3B-03, S4B2-04, S13-12, S19-03,
+    S20-07), out of about 330 such clicks; the rest hit elements wholly in view. S3B-04 and S3B-14 click in a second
+    person's page, which that run's watch did not see yet.
+
+### S3B-03's note typing scrolls React Flow's wrapper (a named exception in the canvas scroll watch)
+
+In S3B-03 (`e2e/slice-03b/S3B-03.spec.ts`, "writing a note"), the note is created at an empty spot near the canvas's
+right edge and its text is typed with the keyboard (`page.keyboard.type`, no scroll by Playwright). As the text grows,
+the browser keeps the caret in view by scrolling the nearest scrollable ancestor of the note's `textarea`, React Flow's
+`overflow:hidden` wrapper (`.react-flow`, 8 to 32 px across, four scroll events while typing; fix/e2e-visible-clicks,
+18 November 2026). React Flow scrolls it back each time; `.im-canvas` is not scrolled, so nothing stays shifted. A person
+typing there sees the same. **The watch excuses only this:** `EXCEPTIONS` in `e2e/canvas-scroll-watch.ts` names the
+test file and the element `react-flow`, nothing broader; the test's canvas clicks go through `clickVisible`. **Temporary:**
+the app's own fix goes on a `fix/` branch of its own (Łukasz decides); the exception goes with it. `overflow: clip` on
+`.im-canvas` would not stop this scroll: it is the wrapper inside it that scrolls.
 
 ### S21-02 failed once on fix/s3b06-context-label (a spot read too early in the test, fixed on fix/s21-02-toolbox-menu)
 
