@@ -58,6 +58,16 @@ jobs:
       # a test value for the local stack's demo accounts only
       INFOMAPPER_DEMO_PASSWORD: smoke-demo-password-29
     steps:
+      # fix/smoke-port-54322: the stack's ports (54321-54327, `supabase init`'s defaults) lie inside Linux's ephemeral
+      # port range (32768-60999), so an outgoing connection (e.g. an image pull) can hold one as its local port when
+      # Docker binds it. On 18 November 2026 the start failed three times with "failed to bind host port
+      # 0.0.0.0:54322/tcp: address already in use". Reserved ports are never handed out as ephemeral ones. The cause is an
+      # assumption: the diagnostic step below shows what held the port if it happens again (docs/known-limitations.md).
+      - name: Reserve the stack's ports (54320-54329) outside the ephemeral range
+        run: |
+          sudo sysctl -w net.ipv4.ip_local_reserved_ports=54320-54329
+          echo "ip_local_port_range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+          echo "ip_local_reserved_ports: $(cat /proc/sys/net/ipv4/ip_local_reserved_ports)"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -95,6 +105,12 @@ jobs:
       - run: npx playwright test --config playwright.pg.config.ts
         env:
           PG_SERVE: "1"
+      - name: On failure, show the port range and what holds the stack's ports
+        if: failure()
+        run: |
+          echo "ip_local_port_range: $(cat /proc/sys/net/ipv4/ip_local_port_range)"
+          echo "ip_local_reserved_ports: $(cat /proc/sys/net/ipv4/ip_local_reserved_ports)"
+          sudo ss -tanp | awk 'NR == 1 || /:5432[0-9][^0-9]/'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
