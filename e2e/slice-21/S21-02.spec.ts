@@ -63,6 +63,8 @@ test("S21-02: the create item, Enter as D-72, one undo step for the concept and 
   await leaveName(page);
   await undoButton(page).click();
   await expect.poll(async () => (await entitiesNamed("New entity")).length).toBe(0);
+  // the undone card off the page too: the click below reuses its spot
+  await expect(newEntityCards(page)).toHaveCount(0);
 
   // several matches: Enter does nothing
   await page.getByTestId("button-tool-entity").click();
