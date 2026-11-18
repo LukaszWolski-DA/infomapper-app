@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, expectToast, loadModel, openCanvas, SEED_IDS, signInAs, store, treeItem } from "./helpers";
 
@@ -10,7 +11,7 @@ test("S1A-10: deleting Customer shows the impact dialog (8 attributes, mappings 
 
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await page.getByTestId("button-delete-entity").click();
 
   const dialog = page.getByTestId("dialog-delete-entity");

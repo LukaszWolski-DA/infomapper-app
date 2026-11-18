@@ -2,6 +2,7 @@
 // show "Snapshot · Month-end"; Fact Sales' Dimensions list marks it; 2 · history hides the period, Snapshot shows it again
 // with its value; the delete preview names its history.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { card, cubeItem, cubeRow, historySeg, openBusMatrix, openEntity, openStar, periodField, relId, segment, signInAs, typeEntity } from "./helpers";
 
@@ -42,7 +43,7 @@ test("S19-05: Dim Product's snapshot in its panel, the Cube tab, the bus matrix,
   await expect.poll(async () => (await cubeRow(typeEntity("prod")))?.history).toBe("snapshot");
 
   // the delete preview, cancelled
-  await card(page, "Dim Product").getByTestId("card-name").click();
+  await clickVisible(card(page, "Dim Product").getByTestId("card-name"));
   await page.getByTestId("button-delete-entity").click();
   const del = page.getByTestId("dialog-delete-entity");
   await expect(del.getByTestId("table-entity-impact").locator("tbody tr").filter({ hasText: "history" })).toHaveText([/^Dimension\s*its history \(Snapshot · Month-end\) deleted$/]);

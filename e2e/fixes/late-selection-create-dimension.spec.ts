@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "../slice-15c/fixtures";
 import { card, cardMenuItem, hydrated, liveEntityNamed, openStar, signInAs } from "../slice-15c/helpers";
 import { viewportTransform } from "../slice-05a/helpers";
@@ -20,7 +21,7 @@ test("a card clicked after Escape while 'Create dimension' is on its way stays s
   await expect.poll(() => hold.held()).toBe(true);
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await card(page, "Fact Sales").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
+  await clickVisible(card(page, "Fact Sales").getByTestId("card-name"));
   await expect(page.getByTestId("input-entity-name")).toHaveValue("Fact Sales");
   const view = await viewportTransform(page);
 

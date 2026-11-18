@@ -2,6 +2,7 @@
 // disappear when it is turned off elsewhere (the toolbar, the card's buttons, the block, the overview panel, Esc).
 // Nothing on: no chips. A wide window, so no chip folds into “+{n}” (S6A-06 covers that).
 
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { AROUND, card, blockEl, chip, chipTexts, collapsedFrame, expectChips, openCanvas, canvasUrl, setCard, signInAs, viewBar, WHOLE_CO } from "./helpers";
 
@@ -47,10 +48,10 @@ test("S6A-01: chips appear in the prototype's order and wording and go when thei
   await expect(chip(page, "layer")).toHaveCount(0);
   await page.getByTestId("checkbox-show-resolved").check();
   await expect(chip(page, "notes-hidden")).toHaveCount(0);
-  await card(page, "Customer").getByTestId("button-card-filter").click(); // keys → all
+  await clickVisible(card(page, "Customer").getByTestId("button-card-filter")); // keys → all
   await expect(chip(page, "filtered")).toHaveText(/^1 card filtered/);
-  await card(page, "customers").getByTestId("button-card-collapse").click();
+  await clickVisible(card(page, "customers").getByTestId("button-card-collapse"));
   await expect(chip(page, "collapsed-cards")).toHaveCount(0);
-  await blockEl(page, "Orders").getByTestId("button-block-expand").click();
+  await clickVisible(blockEl(page, "Orders").getByTestId("button-block-expand"));
   await expectChips(page, ["1 card filtered"]);
 });

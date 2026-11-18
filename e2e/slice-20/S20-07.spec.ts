@@ -3,6 +3,7 @@
 // `?ext=cube_mapping:{id}` a dimensional mapping, each centred on its first card here. Each is a history place (Back and
 // Forward return to it), and an address whose object is gone says so with the places' words (GONE).
 
+import { clickVisible } from "../canvas-click";
 import { SEED_IDS } from "../../src/data/local/seed";
 import { expect, test } from "./fixtures";
 import { backButton, canvasUrl, card, cubeMappingId, demoEntity, demoRel, forwardButton, hydrated, openCanvas, recordToasts, signInAs, starUrl, toasts, WHOLE_CO } from "./helpers";
@@ -25,7 +26,7 @@ test("S20-07: the checks' arrival addresses, as history places, and gone objects
   await page.goto(`${starUrl()}?rel=${demoRel("country>address")}`);
   await hydrated(page);
   await expect(page.getByTestId("panel-relationship")).toContainText("Country and Customer Address");
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await expect(page.getByTestId("input-entity-name")).toHaveValue("Customer");
   await backButton(page).click();
   await expect(page.getByTestId("panel-relationship")).toContainText("Country and Customer Address");

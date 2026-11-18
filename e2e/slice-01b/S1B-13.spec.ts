@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, expectToast, ids, LEFT_AT_100, loadModel, openCanvas, pointOnLine, rowNamed, signInAs, toolboxAt } from "./helpers";
 
@@ -10,7 +11,7 @@ test("S1B-13: deleting a mapping or relationship is immediate with “Undo” in
   // a mapping, from its panel: one click, gone; “Undo” brings it back
   const birth = model.mappings.find((m) => m.attribute_id === attribute("Customer", "birth_date").id)!;
   const mappingLive = async () => (await loadModel()).mappings.some((m) => m.id === birth.id);
-  await rowNamed(page, "Customer", "birth_date").click();
+  await clickVisible(rowNamed(page, "Customer", "birth_date"));
   await page.getByTestId("list-attribute-mappings").getByRole("button").first().click();
   await page.getByTestId("button-delete-mapping").click();
   await expectToast(page, "Mapping deleted");
@@ -39,7 +40,7 @@ test("S1B-13: deleting a mapping or relationship is immediate with “Undo” in
   // an attribute with mappings still asks: the first click arms the button, the second deletes
   const email = attribute("Customer", "email");
   const attrLive = async () => (await loadModel()).attributes.some((a) => a.id === email.id);
-  await rowNamed(page, "Customer", "email").click();
+  await clickVisible(rowNamed(page, "Customer", "email"));
   const del = page.getByTestId("button-delete-attribute");
   await del.click();
   await expect(del).toHaveAttribute("data-armed", "true");
@@ -52,7 +53,7 @@ test("S1B-13: deleting a mapping or relationship is immediate with “Undo” in
 
   // without mappings it goes at once
   const segment = attribute("Customer", "segment_code");
-  await card(page, "Customer").locator(`[data-row="${segment.id}"]`).click();
+  await clickVisible(card(page, "Customer").locator(`[data-row="${segment.id}"]`));
   await page.getByTestId("button-delete-attribute").click();
   await expectToast(page, "Attribute deleted");
   await expect.poll(async () => (await loadModel()).attributes.some((a) => a.id === segment.id)).toBe(false);
@@ -74,7 +75,7 @@ test("S1B-13: deleting a mapping or relationship is immediate with “Undo” in
 
   // a new attribute (no mappings) goes at once from its toolbox
   const ids0 = new Set((await loadModel()).attributes.map((a) => a.id));
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await page.getByTestId("button-add-attribute").click();
   await expect.poll(async () => (await loadModel()).attributes.filter((a) => !ids0.has(a.id)).length).toBe(1);
   const fresh = (await loadModel()).attributes.find((a) => !ids0.has(a.id))!;

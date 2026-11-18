@@ -12,6 +12,7 @@
 // wait is after the test.
 
 import { test as base, type BrowserContext, type Page, type Request } from "@playwright/test";
+import { beginCanvasWatch, finishCanvasWatch, watchCanvasScrolls, watchNewContexts } from "./canvas-scroll-watch";
 
 /** How long the wait may take before the test goes on anyway, with a warning (a save held on purpose and never let go). */
 export const SETTLE_TIMEOUT_MS = 10_000;
@@ -103,10 +104,16 @@ export async function settleSaves(context: BrowserContext, timeout = SETTLE_TIME
 
 export const test = base.extend<{ settledSaves: void }>({
   settledSaves: [
-    async ({ context }, use, testInfo) => {
+    async ({ browser, context }, use, testInfo) => {
       trackPosts(context);
+      // the canvas scroll watch (fix/e2e-visible-clicks): every context of the test; a scroll of the canvas fails it
+      const since = Date.now();
+      beginCanvasWatch();
+      watchNewContexts(browser);
+      await watchCanvasScrolls(context);
       await use();
       if (!(await settleSaves(context))) console.warn(`[settle] ${testInfo.titlePath.join(" › ")}: a save was still on its way after ${SETTLE_TIMEOUT_MS} ms`);
+      finishCanvasWatch(since, testInfo);
     },
     { auto: true },
   ],

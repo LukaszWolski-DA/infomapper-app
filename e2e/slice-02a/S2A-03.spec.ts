@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import { box, canvasUrl, card, dragCardBy, expectToast, headPoint, ids, key, lineEnds, loadItems, mappingLine, openCanvas, screenPoint, signInAs, WHOLE, zoomOf } from "./helpers";
 
@@ -63,7 +64,7 @@ test("S2A-03: dragging one card of a three-card selection moves all three and th
 });
 
 async function select(page: Page, names: readonly string[]) {
-  await page.getByTestId("card-name").getByText(names[0]!, { exact: true }).click();
+  await clickVisible(page.getByTestId("card-name").getByText(names[0]!, { exact: true }));
   await page.keyboard.down("Shift");
   for (const n of names.slice(1)) {
     const at = await headPoint(page, n);

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import {
   canvasUrl,
@@ -162,7 +163,7 @@ test("S10A-08: the loop follows a card move, a width change and a collapsed card
   await expect.poll(async () => (await shape(page, rel.id, "Customer")).card.left).toBeGreaterThan(before.card.left + 40);
   expectLoopAt(await shape(page, rel.id, "Customer"));
 
-  await card(page, "Customer").getByTestId("handle-card-width").dblclick(); // fit width to names
+  await clickVisible(card(page, "Customer").getByTestId("handle-card-width"), { clickCount: 2 }); // fit width to names
   await expect.poll(async () => (await stored()).width).not.toBe(customer.width);
   const wide = await shape(page, rel.id, "Customer");
   expectLoopAt(wide);

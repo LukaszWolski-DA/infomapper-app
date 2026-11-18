@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "../slice-16/fixtures";
 import { canvasUrl, card, headOf, hydrated, loadItems, loadModel, openCanvas, signInAs, toolboxAt, WHOLE_CO } from "../slice-16/helpers";
 import { holdUntil } from "../slice-13/helpers";
@@ -24,13 +25,13 @@ test("a card clicked while 'Remove from this canvas' is on its way stays selecte
   await openCanvas(page, canvasUrl(), WHOLE_CO);
   await hydrated(page);
   const item = await customerItem();
-  await card(page, "Customer").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await expect(page.getByTestId("input-entity-name")).toHaveValue("Customer");
 
   const hold = await holdUntil(page, item.id);
   await removeCustomer(page);
   await expect.poll(() => hold.held()).toBe(true);
-  await card(page, "Sales Order").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await expect(page.getByTestId("input-entity-name")).toHaveValue("Sales Order");
 
   hold.release();
@@ -46,7 +47,7 @@ test("'Remove from this canvas' clears the selection of the removed card when no
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), WHOLE_CO);
   await hydrated(page);
-  await card(page, "Customer").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await expect(page.getByTestId("input-entity-name")).toHaveValue("Customer");
   await removeCustomer(page);
   await expect(card(page, "Customer")).toHaveCount(0);

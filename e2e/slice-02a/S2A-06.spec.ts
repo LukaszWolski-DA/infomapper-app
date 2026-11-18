@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, expectToast, headPoint, ids, lasso, loadItems, loadModel, openCanvas, signInAs, toolboxAt, WHOLE } from "./helpers";
 
@@ -26,7 +27,7 @@ test("S2A-06: with Customer and Sales Order selected and their sources taken off
   expect(left).toBeLessThan(sources.length);
 
   // select Customer and Sales Order and add the sources of both
-  await page.getByTestId("card-name").getByText("Customer", { exact: true }).click();
+  await clickVisible(page.getByTestId("card-name").getByText("Customer", { exact: true }));
   const at = await headPoint(page, "Sales Order");
   await page.keyboard.down("Shift");
   await page.mouse.click(at.x, at.y);
@@ -53,7 +54,7 @@ test("S2A-06: with Customer and Sales Order selected and their sources taken off
   // “Remove from this canvas” from the group's toolbox removes both; “Undo” in the toast brings them back
   const entitiesHere = async () => (await loadItems()).filter((i) => i.entity_id === entity("Customer").id || i.entity_id === entity("Sales Order").id).length;
   await page.keyboard.press("Escape");
-  await page.getByTestId("card-name").getByText("Customer", { exact: true }).click();
+  await clickVisible(page.getByTestId("card-name").getByText("Customer", { exact: true }));
   await page.keyboard.down("Shift");
   await page.mouse.click((await headPoint(page, "Sales Order")).x, (await headPoint(page, "Sales Order")).y);
   await page.keyboard.up("Shift");

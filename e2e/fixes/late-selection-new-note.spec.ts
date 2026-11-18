@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "../slice-16/fixtures";
 import { canvasUrl, card, emptySpot, hydrated, openCanvas, signInAs, toolboxAt, WHOLE_CO } from "../slice-16/helpers";
 import { loadNotes } from "../slice-03a/helpers";
@@ -20,7 +21,7 @@ test("a card clicked right after typing a new note stays selected when the note'
   await expect(page.getByTestId("input-note-text")).toBeFocused();
   await page.keyboard.type(TEXT);
 
-  await card(page, "Sales Order").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   // the answer has been applied: the note is stored and drawn
   await expect.poll(async () => !!(await savedNote())).toBe(true);
   await expect(page.locator(`[data-note="${(await savedNote())!.id}"]`)).toBeVisible();

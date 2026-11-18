@@ -2,6 +2,7 @@
 // unsaved edit, then the browser's back (onto the canvas's own entry, the card's selection being a place): the field is blurred when the traversal starts (the Navigation API's `navigate`
 // event), so the edit is saved; the browser's own blur at that moment would not reach the save.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, expectAt, expectSelected, loadModel, openCanvas, projectPath, signInAs, WHOLE_CO } from "./helpers";
 
@@ -13,7 +14,7 @@ test("S6B-08: an edit in a focused field is saved when Back leaves the page", as
   await expectAt(page, projectPath());
   await page.getByTestId("tile-canvas").filter({ hasText: "Customer & orders" }).click();
   await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-ready", "true");
-  await card(page, "Customer").locator(".c-head .c-l2").click();
+  await clickVisible(card(page, "Customer").locator(".c-head .c-l2"));
   const name = page.getByTestId("input-entity-name");
   await expect(name).toHaveValue("Customer");
   await name.click();

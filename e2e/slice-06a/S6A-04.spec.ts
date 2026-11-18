@@ -2,6 +2,7 @@
 // the first chip and has no ×; the context card's Labeled filter alone shows no filter chip (and no “Show all”); a chip
 // switched on comes after “Live”. On Customer & orders there is no live chip.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, cardEl, chip, chipOff, expectChips, ids, labelItem, liveUrl, openCanvas, openLiveFor, signInAs } from "./helpers";
 
@@ -27,7 +28,7 @@ test("S6A-04: a live canvas's chip comes first without ×, and its Labeled filte
 
   // another filter on the live canvas counts
   await page.keyboard.press("Escape");
-  await cardEl(page, "customers").getByTestId("button-card-filter").click();
+  await clickVisible(cardEl(page, "customers").getByTestId("button-card-filter"));
   await expectChips(page, ["Live: CR-23", "1 card filtered"]);
 
   await openCanvas(page, canvasUrl());

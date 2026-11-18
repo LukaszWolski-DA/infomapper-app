@@ -8,6 +8,7 @@
 //   - off after switching canvas (a tab in “Order management”) and after a reload (not saved).
 // “Show everything” (the view reset) does not exist in the application yet (the view-state bar, D-39): not tested.
 
+import { clickVisible } from "../canvas-click";
 import { targetLit, type LitTarget } from "../../src/domain/model/lit";
 import { AROUND, expectToast, makeFrame, namePoint, pointOnLine, rowNamed } from "../slice-02c/helpers";
 import { expect, test, type Page } from "./fixtures";
@@ -66,7 +67,7 @@ test("S4B1-06: Focus on from the toolbar and the menus, off from the chip; the l
 
   // a change of selection moves it: an attribute
   const email = attribute("Customer", "email");
-  await rowNamed(page, "Customer", "email").click();
+  await clickVisible(rowNamed(page, "Customer", "email"));
   await expect(page.getByTestId("layer-fade")).toHaveAttribute("data-fade", `focus:attribute:${email.id}`);
   await expect.poll(() => litCards(page)).toEqual(await expected({ t: "attribute", id: email.id }));
 
@@ -117,7 +118,7 @@ test("S4B1-06: Focus on from the toolbar and the menus, off from the chip; the l
   // a row's menu (a column)
   const customers = model.sourceTables.find((t) => t.name === "customers")!;
   const custId = model.sourceColumns.find((c) => c.name === "cust_id" && c.source_table_id === customers.id)!;
-  await rowNamed(page, "customers", "cust_id").click({ button: "right" });
+  await clickVisible(rowNamed(page, "customers", "cust_id"), { button: "right" });
   await page.getByTestId("toolbox-focus").click();
   await expect(page.getByTestId("layer-fade")).toHaveAttribute("data-fade", `focus:column:${custId.id}`);
   await expect.poll(() => litCards(page)).toEqual(await expected({ t: "column", id: custId.id }));

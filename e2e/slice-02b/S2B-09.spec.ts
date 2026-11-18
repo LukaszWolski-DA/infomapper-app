@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, expectToast, headPoint, item, loadFrames, loadModel, openCanvas, place, shiftClick, signInAs, toolboxAt, FRAMED } from "./helpers";
 
@@ -14,7 +15,7 @@ test("S2B-09: “Put in a new frame” on Customer and Customer Address makes a 
   };
   const select = async (a: string, b: string) => {
     await page.keyboard.press("Escape");
-    await card(page, a).getByTestId("card-name").click();
+    await clickVisible(card(page, a).getByTestId("card-name"));
     await shiftClick(page, await headPoint(page, b));
     await expect(page.getByTestId("selection-count")).toHaveText("2 items selected");
   };
@@ -55,7 +56,7 @@ test("S2B-09: “Put in a new frame” on Customer and Customer Address makes a 
 
   // one card, from the card panel: Sales Order gets a Sales concept frame
   await page.keyboard.press("Escape");
-  await card(page, "Sales Order").getByTestId("card-name").click();
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   const section = page.getByTestId("section-card-frame");
   await expect(section).toContainText("Not in a frame on this canvas.");
   await expect(page.getByTestId("button-card-put-in-frame")).toHaveText("Put in a new concept frame");
@@ -66,6 +67,6 @@ test("S2B-09: “Put in a new frame” on Customer and Customer Address makes a 
   expect((await item("Sales Order")).frame_id).toBe(salesFrame.id);
   // the card panel now names its frame
   await page.keyboard.press("Escape");
-  await card(page, "Sales Order").getByTestId("card-name").click();
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await expect(page.getByTestId("link-card-frame")).toContainText("Sales");
 });

@@ -5,6 +5,7 @@
 // Who cannot edit sees the filter and collapsed-card chips without ×, their tooltip saying why.
 // The filter and collapsed-card chips' × for editors (step 3's command, one undo step each): S6A-05.
 
+import { clickVisible } from "../canvas-click";
 import { SEED_IDS } from "../../src/data/local/seed";
 import { expect, test } from "./fixtures";
 import {
@@ -34,7 +35,7 @@ test("S6A-02: a chip's × does what its switch does, and the chips are reached w
 
   // resolved notes hidden from the overview panel (nothing selected), then Focus on Customer, so it fades the rest
   await page.getByTestId("checkbox-show-resolved").uncheck();
-  await card(page, "Customer").locator(".c-head .c-l2").click();
+  await clickVisible(card(page, "Customer").locator(".c-head .c-l2"));
   await page.getByTestId("button-focus").click();
   await page.locator('[data-testid="switch-layer"] [data-layer="mappings"]').click();
   await page.getByTestId("button-tool-hand").click();

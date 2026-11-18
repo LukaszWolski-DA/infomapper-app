@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import { canvasIn, card, cardNodes, expectToast, key, openCanvas, SEED_IDS, signInAs, store, WHOLE } from "./helpers";
 
@@ -20,7 +21,7 @@ test("S2A-11: Mappings hides the relationship lines and Relationships hides the 
   expect(await layerButton(page, "all").innerText()).toBe("All"); // short labels below 2100 px
 
   // a layout change first, so Ctrl+Z has something to undo
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("button-undo")).toBeEnabled();
 

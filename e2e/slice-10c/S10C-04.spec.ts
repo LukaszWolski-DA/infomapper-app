@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { attributeOf, backButton, canvasUrl, expectAttributeShown, openCanvas, pasteAs, rowNamed, signInAs } from "./helpers";
 
@@ -10,7 +11,7 @@ test("S10C-04: the original lists its copies and the copy names its original, ea
   await pasteAs("Product", original);
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
-  await rowNamed(page, "Customer", "customer_id").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_id"));
   await expectAttributeShown(page, "Customer.customer_id");
 
   const panel = page.getByTestId("panel-attribute");

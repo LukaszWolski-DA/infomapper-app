@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { archive, attributeOf, canvasUrl, FULL, hydrated, loadModel, openCanvas, openEntityFromTree, rowNamed, SEED_IDS, setEntityAlias, signInAs, undo } from "./helpers";
 
@@ -28,7 +29,7 @@ test("S11-01: Customer's and customer_id's aliases are saved in their panels, on
   await undo(page);
   await expect.poll(() => aliasOf("Customer")).toBeNull();
 
-  await rowNamed(page, "Customer", "customer_id").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_id"));
   const attributeField = page.getByTestId("panel-attribute").getByTestId("input-attribute-alias");
   await attributeField.fill("Numer klienta");
   await attributeField.press("Enter");

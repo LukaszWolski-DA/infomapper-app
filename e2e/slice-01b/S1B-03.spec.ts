@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { updateAttribute } from "../../src/domain/commands/attribute";
 import { expect, test, type Page } from "./fixtures";
 import { asLukasz, canvasUrl, card, dragTo, expectToast, ids, loadModel, openCanvas, rowNamed, signInAs } from "./helpers";
@@ -31,7 +32,7 @@ test("S1B-03: dropping order_line.price on the Order Line header creates attribu
   }
   // and a string's length
   await setPanelWidth(page, 340);
-  await rowNamed(page, "Order Line", "product_id").click();
+  await clickVisible(rowNamed(page, "Order Line", "product_id"));
   await page.getByTestId("select-attribute-type").selectOption("string");
   await expect(page.getByTestId("input-type-length")).toBeVisible();
   for (const width of [340, 280] as const) {

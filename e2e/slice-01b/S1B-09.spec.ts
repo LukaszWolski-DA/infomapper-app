@@ -8,6 +8,7 @@
 // Results go to test-results/S1B-09.json. C-09 is partly met on the development laptop (slice 1b decision); the
 // production-build measurement is in the Supabase slice (docs/known-limitations.md).
 
+import { clickVisible } from "../canvas-click";
 import { seedLargeData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";
 import { expect, test } from "./fixtures";
@@ -42,7 +43,7 @@ test("S1B-09: card width changes by dragging the edge and by “Fit width to nam
   await expect.poll(() => savedWidth(customerCard)).toBe(360);
 
   // double-click on the edge fits the width to the names (the default width here)
-  await card(page, "Customer").getByTestId("handle-card-width").dblclick();
+  await clickVisible(card(page, "Customer").getByTestId("handle-card-width"), { clickCount: 2 });
   await expectToast(page, "Fitted the card to its names.");
   await expect.poll(() => savedWidth(customerCard)).toBeLessThan(360);
   const fitted = await savedWidth(customerCard);

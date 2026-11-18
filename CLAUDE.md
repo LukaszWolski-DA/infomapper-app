@@ -494,6 +494,10 @@ local adapter no pool is made.
 - **A race in a test** (Łukasz, 9 November 2026): find its cause. The test waits for a state the user can observe
   (a text, a class, a count), never for a fixed time, and its assertions stay as they are. If the cause is in the
   application, fix it and report it as a bug, unless the cause is shared infrastructure (The slice cycle, 4).
+- **Canvas clicks in e2e** (fix/e2e-visible-clicks): a click on a canvas element goes through `clickVisible`
+  (`e2e/canvas-click.ts`), never a plain `click()`, which may scroll the canvas and lose the click. The canvas scroll
+  watch (`e2e/canvas-scroll-watch.ts`, run by `e2e/settle.ts`) fails a test that scrolls `.react-flow` or `.im-canvas`,
+  except by one rule, a note's typing (`docs/known-limitations.md`).
 - **When to measure** (Łukasz, 9 November 2026): a measuring sitting only in a slice that changes how the canvas is
   drawn (cards, lines, layers), as that slice's performance gate; otherwise the element guard, LayerTree and the commit
   counts are enough. The bench bars listed under "Commands" stay gates (they came from decided PRDs); a new bench has a

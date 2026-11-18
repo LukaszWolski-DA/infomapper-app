@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, emptySpot, headPoint, openCanvas, selectedNames, signInAs, WHOLE } from "./helpers";
 
@@ -13,7 +14,7 @@ test("S2A-02: Shift+click adds and removes cards; Ctrl+A selects every card on t
   };
 
   // a plain click selects one card; Shift+click adds two more
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await expect(page.getByTestId("panel-entity")).toBeVisible();
   await shiftClick("Sales Order");
   await shiftClick("customers");

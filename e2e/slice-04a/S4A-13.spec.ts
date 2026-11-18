@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import {
   canvasUrl,
@@ -50,7 +51,7 @@ test("S4A-13: the workspace Overview's “{covered} of {total} requirements cove
   const { attribute } = await ids();
   await openCanvas(page);
   await expect(page.getByTestId("status-requirements")).toHaveText("Requirements 5, covered 3");
-  await row(page, "Customer", attribute("Customer", "birth_date").id).click();
+  await clickVisible(row(page, "Customer", attribute("Customer", "birth_date").id));
   await page.getByTestId("list-attribute-mappings").getByText("customers.dob").click();
   await page.getByTestId("seg-mapping-status").getByRole("button", { name: "Approved", exact: true }).click();
   const dob = await mappingId("customers.dob", "Customer.birth_date");

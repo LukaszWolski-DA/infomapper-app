@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { createRelationship } from "../../src/domain/commands/relationship";
 import { moveOnCanvas } from "../../src/domain/commands/frame";
 import { expect, test, type Page } from "../slice-01b/fixtures";
@@ -54,7 +55,7 @@ async function deleteFromPanel(page: Page, entity: string, name: string) {
   const m = await loadModel();
   const a = (await liveAttributes(entity)).find((x) => x.name === name)!;
   const asks = m.mappings.some((x) => x.deleted_at === null && x.attribute_id === a.id) || m.attributes.some((x) => x.deleted_at === null && x.copied_from_attribute_id === a.id);
-  await rowNamed(page, entity, name).click();
+  await clickVisible(rowNamed(page, entity, name));
   const del = page.getByTestId("button-delete-attribute");
   await del.click();
   if (asks) {
@@ -110,7 +111,7 @@ test("with Focus on, the lit line follows the card's height too (an undo brings 
   await deleteFromPanel(page, "Customer", name);
 
   // Focus on Customer (a deleted selection would end it, so the height changes by an undo while Customer is selected)
-  await card(page, "Customer").locator(".c-head .c-l2").click({ button: "right" });
+  await clickVisible(card(page, "Customer").locator(".c-head .c-l2"), { button: "right" });
   await page.getByTestId("toolbox-focus").click();
   await expect(page.getByTestId("layer-fade")).toHaveCount(1);
   const lit = relLine(page, id, "layer-lit-lines");
@@ -149,7 +150,7 @@ test("a source table that grows under the Mapped filter moves the source line's 
   const mappedColumns = new Set(m.mappingInputs.filter((i) => i.deleted_at === null).map((i) => i.source_column_id));
   const column = m.sourceColumns.find((c) => c.source_table_id === table.id && c.deleted_at === null && !mappedColumns.has(c.id))!;
   const before = await bottomOf(page, "order_header");
-  await rowNamed(page, "Sales Order", "order_date").click();
+  await clickVisible(rowNamed(page, "Sales Order", "order_date"));
   await page.getByTestId("select-add-source-column").selectOption(column.id);
   await expect.poll(() => bottomOf(page, "order_header")).toBeGreaterThan(before);
   await expectOnBottom(page, line, "order_header", "end");

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, loadModel, openCanvas, signInAs } from "./helpers";
 
@@ -16,7 +17,7 @@ test("S1A-09: type check: a varchar(255) column into a string(100) attribute is 
 
   // email becomes string(100): customers.email_addr varchar(120) no longer fits either; web_users.email varchar(255)
   // has not fitted since slice 7a gave email its length 120 (step 1, answer 10), so one problem more, not two
-  await card(page, "Customer").locator(`[data-row="${email.id}"]`).click();
+  await clickVisible(card(page, "Customer").locator(`[data-row="${email.id}"]`));
   await page.getByTestId("input-type-length").fill("100");
   await page.getByTestId("input-type-length").press("Enter");
   await expect(card(page, "Customer").locator(`[data-row="${email.id}"]`)).toContainText("String(100)");

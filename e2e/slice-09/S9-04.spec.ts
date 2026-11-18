@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import type { Locator, Page } from "@playwright/test";
 import { columnId, openColumn, openList } from "../slice-07c/helpers";
 import { expect, test } from "./fixtures";
@@ -43,7 +44,7 @@ async function pressOther(seg: Locator): Promise<string> {
 
 test("S9-04: attribute: the name, then a flag", async ({ page }) => {
   await open(page, canvasUrl(), { x: -640, y: -480, zoom: 1 });
-  await rowNamed(page, "Order Line", "unit_price").click();
+  await clickVisible(rowNamed(page, "Order Line", "unit_price"));
   await typeAndLeave(page.getByTestId("input-attribute-name"), "unit_price_eur");
   await page.getByTestId("flags-attribute").getByRole("button", { name: "Personal data" }).click();
   await expect.poll(async () => (await loadModel()).attributes.find((a) => a.name === "unit_price_eur")?.is_pii).toBe(true);
@@ -52,7 +53,7 @@ test("S9-04: attribute: the name, then a flag", async ({ page }) => {
 
 test("S9-04: entity: the name, then the stereotype", async ({ page }) => {
   await open(page);
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await typeAndLeave(page.getByTestId("input-entity-name"), "Client");
   const stereotype = page.getByTestId("select-entity-stereotype");
   const next = await stereotype.locator("option:not(:checked)").first().getAttribute("value");

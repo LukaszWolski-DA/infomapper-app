@@ -2,6 +2,7 @@
 // when an entity is clicked in the left panel); it opens on its button and on each action that leads to details on
 // purpose, and stays open afterwards (remembered).
 
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import {
   AROUND,
@@ -58,7 +59,7 @@ test("S5A-04: selecting a card, a row, a line or an entity in the left panel lea
   await hideRight(page);
 
   await card(page, "Customer").locator(".c-head").click({ position: { x: 20, y: 10 } });
-  await rowNamed(page, "Customer", "email").click();
+  await clickVisible(rowNamed(page, "Customer", "email"));
   const mapping = model.mappings.find((m) => m.attribute_id === attribute("Customer", "birth_date").id)!;
   const p = await pointOnLine(page.getByTestId("layer-lines").locator(`[data-testid="line-mapping"][data-mapping="${mapping.id}"]`));
   await page.mouse.click(p.x, p.y);

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { box, DEMO_NOTES, noteEl, notePoint, noteWithText, openCanvas, signInAs, toolboxAt, undo, canvasUrl } from "./helpers";
 import type { Page } from "./fixtures";
@@ -68,7 +69,7 @@ test("S3A-07: a note's text is edited in place (Ctrl+Enter saves, Esc cancels), 
   await expect(n).toHaveAttribute("data-color", "blue");
 
   // resolved and reopened: its ✓, the toolbox, the panel; each one undo step
-  await n.getByTestId("button-note-resolve").click();
+  await clickVisible(n.getByTestId("button-note-resolve"));
   await expect.poll(async () => (await saved()).status).toBe("resolved");
   await expect(n).toHaveAttribute("data-status", "resolved");
   await undo(page);

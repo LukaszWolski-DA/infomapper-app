@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { buildWriteSet } from "../../src/domain/changes";
 import { updateEntity } from "../../src/domain/commands/entity";
 import { uuidv7 } from "../../src/domain/ids";
@@ -38,7 +39,7 @@ test("S4A-05: entity and attribute definitions open in the editor without “Ins
   await expect(page.getByTestId("dialog-rich-text")).toHaveCount(0);
 
   // an attribute's definition: the same editor, no template
-  await row(page, "Customer", attribute("Customer", "email").id).click();
+  await clickVisible(row(page, "Customer", attribute("Customer", "email").id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await expect(page.getByTestId("field-attribute-definition-view")).toHaveText("What this attribute means for the business. Click to write it.");
   await page.getByTestId("field-attribute-definition-view").click();

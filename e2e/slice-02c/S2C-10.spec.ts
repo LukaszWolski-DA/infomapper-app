@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   AROUND,
@@ -32,7 +33,7 @@ test("S2C-10: as Piotr (reviewer), collapsing and expanding work in his tab only
   const owner = await newSession(browser, "Łukasz");
   const o = owner.page;
   await openCanvas(o, canvasUrl(), FRAMED);
-  const collapseId = await captureActionId(o, () => frameEl(o, "People").getByTestId("button-frame-collapse").click());
+  const collapseId = await captureActionId(o, () => clickVisible(frameEl(o, "People").getByTestId("button-frame-collapse")));
   await expect.poll(async () => (await frameNamed("People"))!.collapsed).toBe(true);
   const allId = await captureActionId(o, () => o.locator('[data-testid="button-frames-collapse-all"]:visible').click());
   await expect.poll(async () => (await frameNamed("Tables"))!.collapsed).toBe(true);
@@ -56,9 +57,9 @@ test("S2C-10: as Piotr (reviewer), collapsing and expanding work in his tab only
   await expect(page.getByTestId("panel-mapping")).toBeVisible();
 
   // he collapses People (label button) and expands Tables (block's Expand): his tab only, nothing saved, no undo
-  await frameEl(page, "People").getByTestId("button-frame-collapse").click();
+  await clickVisible(frameEl(page, "People").getByTestId("button-frame-collapse"));
   await expect(blockEl(page, "People")).toBeVisible();
-  await blockEl(page, "Tables").getByTestId("button-block-expand").click();
+  await clickVisible(blockEl(page, "Tables").getByTestId("button-block-expand"));
   await expect(frameEl(page, "Tables")).toBeVisible();
   await expect(page.getByTestId("button-undo")).toBeDisabled();
   // Collapse all, in his tab (the canvas overview shows with nothing selected)

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { updateCanvasItem } from "../../src/domain/commands/canvas-item";
 import { updateEntity } from "../../src/domain/commands/entity";
 import { expect, test, type Page } from "./fixtures";
@@ -19,7 +20,7 @@ test("S1B-12: undo and redo: create, edit, move, reorder and delete are each und
   const attributesOfCustomer = async () => (await loadModel()).attributes.filter((a) => a.entity_id === customer.id).length;
 
   // create: a new attribute
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await page.getByTestId("button-add-attribute").click();
   await expect.poll(attributesOfCustomer).toBe(9);
   await expect(page.getByTestId("button-undo")).toBeEnabled();
@@ -32,7 +33,7 @@ test("S1B-12: undo and redo: create, edit, move, reorder and delete are each und
   await expect.poll(attributesOfCustomer).toBe(9);
 
   // edit: rename Customer (Ctrl+Y redoes too)
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await page.getByTestId("input-entity-name").fill("Client");
   await page.getByTestId("input-entity-name").press("Enter");
   const nameOf = async (id: string) => (await loadModel()).entities.find((e) => e.id === id)?.name;
@@ -67,7 +68,7 @@ test("S1B-12: undo and redo: create, edit, move, reorder and delete are each und
   // reorder: email one place up
   const orderOf = async () => (await loadModel()).attributes.filter((a) => a.entity_id === customer.id).sort((a, b) => a.sort_order - b.sort_order).map((a) => a.name);
   const before = await orderOf();
-  await rowNamed(page, "Client", "email").click();
+  await clickVisible(rowNamed(page, "Client", "email"));
   await page.keyboard.press("Control+ArrowUp");
   await expect.poll(orderOf).not.toEqual(before);
   const reordered = await orderOf();
@@ -81,7 +82,7 @@ test("S1B-12: undo and redo: create, edit, move, reorder and delete are each und
   // delete: the mapping into birth_date, at once from its panel
   const birth = model.mappings.find((m) => m.attribute_id === attribute("Customer", "birth_date").id)!;
   const live = async () => (await loadModel()).mappings.some((m) => m.id === birth.id);
-  await rowNamed(page, "Client", "birth_date").click();
+  await clickVisible(rowNamed(page, "Client", "birth_date"));
   await page.getByTestId("list-attribute-mappings").getByRole("button").first().click();
   await page.getByTestId("button-delete-mapping").click();
   await expect.poll(live).toBe(false);
@@ -108,7 +109,7 @@ test("S1B-12: undo and redo: create, edit, move, reorder and delete are each und
 
   // refused: Łukasz renames Sales Order, then Anna (another session) renames it again; Łukasz's undo is refused,
   // the step is dropped, and the next Ctrl+Z goes further back
-  await card(page, "Sales Order").getByTestId("card-name").click();
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await page.getByTestId("input-entity-name").fill("Order");
   await page.getByTestId("input-entity-name").press("Enter");
   await expect.poll(() => nameOf(salesOrder.id)).toBe("Order");

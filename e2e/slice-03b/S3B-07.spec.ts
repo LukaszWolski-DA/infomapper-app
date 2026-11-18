@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, contextOn, expectCard, ids, liveCards, liveUrl, openCanvas, openLiveFor, rowNamed, signInAs, typeLabel } from "./helpers";
 
@@ -12,7 +13,7 @@ test("S3B-07: labeling made on another canvas (and by the active context) change
 
   // on Customer & orders: CR-23 put on order_line.qty in its panel; the live canvas gets order_line as context
   await openCanvas(page, canvasUrl(), { x: -560, y: 40, zoom: 0.6 });
-  await rowNamed(page, "order_line", "qty").click();
+  await clickVisible(rowNamed(page, "order_line", "qty"));
   await typeLabel(page, "CR-23");
   await page.keyboard.press("Enter");
   await expect.poll(() => liveCards(live)).toContainEqual([table("order_line").id, "context", "labeled"]);
@@ -20,7 +21,7 @@ test("S3B-07: labeling made on another canvas (and by the active context) change
   // with the context on CR-23: renaming an attribute of Sales Order labels it; the live canvas gets Sales Order as context
   await contextOn(page, "CR-23");
   await openCanvas(page, canvasUrl(), { x: 0, y: -300, zoom: 0.8 });
-  await rowNamed(page, "Sales Order", "order_date").click();
+  await clickVisible(rowNamed(page, "Sales Order", "order_date"));
   const name = page.getByTestId("input-attribute-name");
   await name.fill("ordered_on");
   await name.press("Enter");

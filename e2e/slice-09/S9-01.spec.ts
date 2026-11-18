@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, groupsOf, loadModel, openCanvas, recordToasts, rowNamed, signInAs, toasts } from "./helpers";
 
@@ -7,7 +8,7 @@ test("S9-01: Precision, Tab, Scale, Enter at once in an attribute's panel: both 
   await recordToasts(page);
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), { x: -640, y: -480, zoom: 1 });
-  await rowNamed(page, "Order Line", "unit_price").click();
+  await clickVisible(rowNamed(page, "Order Line", "unit_price"));
   const panel = page.getByTestId("panel-attribute");
   await expect(panel).toHaveAttribute("data-version", String(before.version));
 

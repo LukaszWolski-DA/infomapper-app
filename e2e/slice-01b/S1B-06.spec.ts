@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, expectToast, ids, loadModel, openCanvas, signInAs, treeItem } from "./helpers";
 
@@ -9,9 +10,9 @@ test("S1B-06: relate from Customer to Country creates a relationship; the panel 
   await treeItem(page, "Country").click(); // not on this canvas yet: placed in a free spot in view
   await expect(card(page, "Country")).toBeVisible();
 
-  await card(page, "Customer").getByTestId("button-card-relate").click();
+  await clickVisible(card(page, "Customer").getByTestId("button-card-relate"));
   await expectToast(page, "Now click the entity to relate to. Esc cancels.");
-  await card(page, "Country").getByTestId("card-name").click();
+  await clickVisible(card(page, "Country").getByTestId("card-name"));
   await expectToast(page, "Relationship added. Name it and set the cardinality on the right.");
 
   const panel = page.getByTestId("panel-relationship");

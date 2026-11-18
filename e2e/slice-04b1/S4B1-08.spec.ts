@@ -3,6 +3,7 @@
 // Focus on from a card's menu (a reader's card menu offers it), REQ-105's coverage colours with Focus on; the data file
 // is the same afterwards.
 
+import { clickVisible } from "../canvas-click";
 import fs from "node:fs";
 import { E2E_DB } from "../config";
 import { expect, test } from "./fixtures";
@@ -15,14 +16,14 @@ for (const name of ["Piotr Wiśniewski", "Kasia Zielińska"] as const) {
     const before = fs.readFileSync(E2E_DB, "utf8");
 
     // the toolbar and the chip
-    await card(page, "Customer").locator(".c-head .c-l2").click();
+    await clickVisible(card(page, "Customer").locator(".c-head .c-l2"));
     await page.getByTestId("button-focus").click();
     await expect(page.getByTestId("layer-fade")).toHaveCount(1);
     await page.getByTestId("chip-focus-off").click();
     await expect(page.getByTestId("layer-fade")).toHaveCount(0);
 
     // a card's menu
-    await card(page, "Sales Order").locator(".c-head .c-l2").click({ button: "right" });
+    await clickVisible(card(page, "Sales Order").locator(".c-head .c-l2"), { button: "right" });
     await page.getByTestId("toolbox-focus").click();
     await expect(page.getByTestId("layer-fade")).toHaveCount(1);
 

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { removeFromCanvas } from "../../src/domain/commands/canvas-item";
 import { createMapping } from "../../src/domain/commands/mapping";
 import { expect, test, type Page } from "./fixtures";
@@ -36,7 +37,7 @@ test("S1B-11: “Add the N missing to this canvas” places Customer's missing s
 
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), { x: 300, y: 40, zoom: 0.6 });
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   const panel = page.getByTestId("panel-entity");
   await expect(panel.getByTestId("button-feed-all")).toHaveText("Add the 2 missing to this canvas");
   await panel.getByTestId("button-feed-all").click();
@@ -54,7 +55,7 @@ test("S1B-11: “Add the N missing to this canvas” places Customer's missing s
   await expect(panel.getByTestId("button-feed-all")).toHaveCount(0);
 
   // fed entities of a table go to its right: a single one clicked in the source table panel is placed there too
-  await card(page, "order_header").getByTestId("card-name").click();
+  await clickVisible(card(page, "order_header").getByTestId("card-name"));
   const tablePanel = page.getByTestId("panel-source-table");
   await expect(tablePanel.getByTestId("button-feed-all")).toHaveText("Add the 1 missing to this canvas");
   await tablePanel.getByRole("button").filter({ has: page.getByText("Sales Order", { exact: true }) }).click();

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, expectToast, loadModel, mappingLine, openCanvas, pickOption, signInAs, treeItem } from "./helpers";
 
@@ -31,7 +32,7 @@ test("S1A-07: from the left panel: create a concept, add an entity with “+”,
     await field.fill(attribute);
     await field.press("Enter");
     await expect(card(page, "Loyalty Account").locator("[data-row]").filter({ hasText: attribute })).toBeVisible();
-    await card(page, "Loyalty Account").getByTestId("card-name").click(); // back to the entity panel
+    await clickVisible(card(page, "Loyalty Account").getByTestId("card-name")); // back to the entity panel
   }
 
   // place a source table that is not on this canvas yet
@@ -42,7 +43,7 @@ test("S1A-07: from the left panel: create a concept, add an entity with “+”,
   await expect(card(page, "items")).toBeVisible();
 
   // a mapping from the attribute panel: items.item_code → Loyalty Account.points
-  await card(page, "Loyalty Account").locator("[data-row]").filter({ hasText: "points" }).click();
+  await clickVisible(card(page, "Loyalty Account").locator("[data-row]").filter({ hasText: "points" }));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await pickOption(page.getByTestId("select-add-source-column"), "item_code");
   await expectToast(page, /^Mapped items\.item_code to Loyalty Account\.points/);

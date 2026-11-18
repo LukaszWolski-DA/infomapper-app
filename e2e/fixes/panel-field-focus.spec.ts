@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "../slice-01b/fixtures";
 import { canvasUrl, card, loadModel, openCanvas, rowNamed, signInAs } from "../slice-01b/helpers";
 
@@ -14,7 +15,7 @@ async function tabAndSave(page: Page) {
 test("Tab from Precision to Scale: the focus stays in Scale after Precision is saved, and Scale takes what is typed", async ({ page }) => {
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), { x: -640, y: -480, zoom: 1 });
-  await rowNamed(page, "Order Line", "unit_price").click();
+  await clickVisible(rowNamed(page, "Order Line", "unit_price"));
   const precision = page.getByTestId("input-type-precision");
   const scale = page.getByTestId("input-type-scale");
 
@@ -38,7 +39,7 @@ test("Tab from Precision to Scale: the focus stays in Scale after Precision is s
 test("Tab from an entity's name to its alias: the focus stays on the alias after the name is saved", async ({ page }) => {
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   const name = page.getByTestId("input-entity-name");
 
   await name.fill("Client");

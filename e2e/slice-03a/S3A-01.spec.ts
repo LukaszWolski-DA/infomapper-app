@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { card, chipNames, labelNamed, labelsField, loadLinks, openCanvas, removeLabel, rowNamed, signInAs, typeLabel, undo, canvasUrl, WHOLE_CO } from "./helpers";
 
@@ -8,7 +9,7 @@ test("S3A-01: typing “cr 23” on Customer offers “Create “cr-23”” fir
   await openCanvas(page, canvasUrl(), WHOLE_CO);
 
   // Customer: the typed name comes first as “Create …”, normalised
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await expect(page.getByTestId("panel-entity")).toBeVisible();
   await typeLabel(page, "cr 23");
   const options = labelsField(page).locator("..").getByTestId("option-label");
@@ -32,7 +33,7 @@ test("S3A-01: typing “cr 23” on Customer offers “Create “cr-23”” fir
   await expect.poll(() => chipNames(page)).toEqual(["cr-23"]);
 
   // an attribute: “CR” suggests the existing label with its item count, below “Create “CR””
-  await rowNamed(page, "Customer", "email").click();
+  await clickVisible(rowNamed(page, "Customer", "email"));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await typeLabel(page, "CR");
   const existing = labelsField(page).locator("..").getByTestId("option-label").filter({ hasText: "cr-23" });

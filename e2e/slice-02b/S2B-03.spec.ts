@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   canvasUrl,
@@ -78,7 +79,7 @@ test("S2B-03: setting the frame to Concept “Sales” marks Customer as misplac
 
   // a group drop: Sales Order and Order Line (Sales) into the Customer concept frame ask once for both
   const soBefore = await item("Sales Order"), olBefore = await item("Order Line");
-  await card(page, "Sales Order").getByTestId("card-name").click();
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await shiftClick(page, await headPoint(page, "Order Line"));
   await expect(page.getByTestId("selection-count")).toHaveText("2 items selected");
   await dragCardBy(page, "Sales Order", 408 * zoom, -528 * zoom);

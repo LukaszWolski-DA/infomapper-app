@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { card, expectToast, labelNamed, labelsField, loadLinks, loadModel, openCanvas, rawDb, signInAs, canvasUrl, WHOLE_CO } from "./helpers";
 
@@ -10,7 +11,7 @@ test("S3A-04: the label panel lists what CR-23 marks by kind as links; renaming 
   const modelBefore = await loadModel();
 
   // open it from its chip on Customer
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await labelsField(page).getByTestId("button-label-open").filter({ hasText: "CR-23" }).click();
   const panel = page.getByTestId("panel-label");
   await expect(panel).toBeVisible();

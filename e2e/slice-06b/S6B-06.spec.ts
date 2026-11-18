@@ -4,6 +4,7 @@
 // card is no longer on this canvas.”, and Forward still works. A deleted canvas: Back onto it opens the project's first
 // canvas with the “moved” notice, as the app handles any visit (the background refresh after the traversal finds it gone).
 
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   backButton,
@@ -50,7 +51,7 @@ test("S6B-06: Back onto a card that left the canvas: no selection and a toast; F
   await clickCard(page, "Customer");
   await expectSelected(page, "entity:Customer");
   // the right-click selects customers again (a place), then it leaves the canvas
-  await card(page, "customers").locator(".c-head .c-l2").click({ button: "right" });
+  await clickVisible(card(page, "customers").locator(".c-head .c-l2"), { button: "right" });
   await page.getByTestId("menu-toolbox").getByTestId("toolbox-item").filter({ hasText: "Remove from this canvas" }).click();
   await expect(card(page, "customers")).toHaveCount(0);
 

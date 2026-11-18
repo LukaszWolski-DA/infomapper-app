@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import type { Browser } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { canvasUrl, expectToast, loadModel, openCanvas, recordToasts, rowNamed, signInAs, STALE, toasts } from "./helpers";
@@ -8,7 +9,7 @@ async function sessionOnUnitPrice(browser: Browser) {
   await recordToasts(page);
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), { x: -640, y: -480, zoom: 1 });
-  await rowNamed(page, "Order Line", "unit_price").click();
+  await clickVisible(rowNamed(page, "Order Line", "unit_price"));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   return page;
 }
@@ -42,7 +43,7 @@ test("S9-03: after a validation refusal the saves behind it are still sent", asy
   await recordToasts(page);
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), { x: -640, y: -480, zoom: 1 });
-  await rowNamed(page, "Order Line", "unit_price").click();
+  await clickVisible(rowNamed(page, "Order Line", "unit_price"));
 
   // a scale without a precision is refused; the name typed right after it is stored
   await page.getByTestId("input-type-scale").fill("2");

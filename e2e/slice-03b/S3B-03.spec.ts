@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   AROUND,
@@ -69,7 +70,7 @@ test("S3B-03: with CR-23 on, moving a card, resizing it, collapsing a frame, wri
   // deleting an attribute: not labeled (its own link goes with it)
   await openCanvas(page, canvasUrl(), { x: 0, y: 0, zoom: 1 });
   const segment = attribute("Customer", "segment_code");
-  await rowNamed(page, "Customer", "segment_code").click();
+  await clickVisible(rowNamed(page, "Customer", "segment_code"));
   await page.getByTestId("button-delete-attribute").click();
   await expectToast(page, "Attribute deleted");
   await expect.poll(async () => (await loadModel()).attributes.some((a) => a.id === segment.id)).toBe(false);
@@ -80,7 +81,7 @@ test("S3B-03: with CR-23 on, moving a card, resizing it, collapsing a frame, wri
   const order = async () => (await loadModel()).attributes.filter((a) => a.entity_id === first.entity_id).sort((a, b) => a.sort_order - b.sort_order).map((a) => a.id);
   const was = await order();
   const at = was.indexOf(first.id);
-  await rowNamed(page, "Customer", "first_name").click();
+  await clickVisible(rowNamed(page, "Customer", "first_name"));
   await page.keyboard.press("Alt+ArrowDown");
   await expect.poll(async () => (await order()).indexOf(first.id)).toBe(at + 1);
   await expect.poll(added).toEqual([first.id]);

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, contextOn, dragTo, expectToast, ids, labelNamed, lastGroup, linkedTo, loadModel, openCanvas, rowNamed, signInAs, undo, pickConcept } from "./helpers";
 
@@ -18,7 +19,7 @@ test("S3B-02: with CR-23 on, creating an entity, adding an attribute, renaming a
   // renaming an attribute labels it, in the same undo step; one undo takes name and label away
   const customerId = attribute("Customer", "customer_id");
   expect(await linkedTo("CR-23")).not.toContain(customerId.id);
-  await rowNamed(page, "Customer", "customer_id").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_id"));
   const name = page.getByTestId("input-attribute-name");
   await name.fill("customer_key");
   await name.press("Enter");
@@ -29,7 +30,7 @@ test("S3B-02: with CR-23 on, creating an entity, adding an attribute, renaming a
   await expect.poll(() => linkedTo("CR-23")).not.toContain(customerId.id);
 
   // adding an attribute labels the new attribute
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await page.getByTestId("button-add-attribute").click();
   const added = page.getByTestId("input-attribute-name");
   await added.fill("promo_code");
@@ -50,7 +51,7 @@ test("S3B-02: with CR-23 on, creating an entity, adding an attribute, renaming a
   // changing a mapping's rule labels the mapping
   const first = (await loadModel()).mappings.find((m) => m.attribute_id === attribute("Customer", "first_name").id)!;
   expect(await linkedTo("CR-23")).not.toContain(first.id);
-  await rowNamed(page, "Customer", "first_name").click();
+  await clickVisible(rowNamed(page, "Customer", "first_name"));
   await page.getByTestId("list-attribute-mappings").getByRole("button").first().click();
   const panel = page.getByTestId("panel-mapping");
   await panel.getByTestId("seg-mapping-kind").getByRole("button", { name: "Transformation" }).click();
@@ -64,8 +65,8 @@ test("S3B-02: with CR-23 on, creating an entity, adding an attribute, renaming a
   const salesOrder = entity("Sales Order");
   expect(await linkedTo("CR-23")).not.toContain(salesOrder.id);
   await openCanvas(page, canvasUrl(), { x: 0, y: 0, zoom: 0.6 });
-  await card(page, "Customer").getByTestId("button-card-relate").click();
-  await card(page, "Sales Order").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("button-card-relate"));
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await expect.poll(() => linkedTo("CR-23")).toContain(salesOrder.id);
   expect((await linkedTo("CR-23")).filter((id) => id === entity("Customer").id)).toHaveLength(1);
   await expectContextOnGroup();

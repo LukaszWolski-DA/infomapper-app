@@ -2,6 +2,7 @@
 // rule typed in a mapping's panel, then a click on another mapping's line, on a card or on the empty canvas, is saved
 // into that mapping, and never into what the click selects. InfoMapper's mapping panel and InfoCube's.
 
+import { clickVisible } from "../canvas-click";
 import { expect, type Page, test } from "./fixtures";
 import { canvasUrl, card, clickCubeLine, cubeLine, cubeMappingId, cubeMappingRow, emptySpot, freePoint, hydrated, openCanvas, openStar, signInAs, WHOLE_CO } from "./helpers";
 import { loadModel } from "../slice-01a/helpers";
@@ -25,7 +26,7 @@ test("S20-Q10: a rule left by a click elsewhere is saved into its own mapping", 
   // InfoMapper's mapping: three ways of leaving the rule
   const leaves: [string, () => Promise<void>][] = [
     ["another mapping", () => clickMapping(page, other)],
-    ["a card", () => card(page, "Order Line").getByTestId("card-name").click()],
+    ["a card", () => clickVisible(card(page, "Order Line").getByTestId("card-name"))],
     ["the empty canvas", async () => {
       const at = await emptySpot(page);
       await page.mouse.click(at.x, at.y);
@@ -48,7 +49,7 @@ test("S20-Q10: a rule left by a click elsewhere is saved into its own mapping", 
   const before = (await cubeMappingRow(customerKey))!.rule_expression;
   const cubeLeaves: [string, () => Promise<void>][] = [
     ["another mapping", () => clickCubeLine(page, customerKey)],
-    ["a card", () => card(page, "Dim Date").getByTestId("card-name").click()],
+    ["a card", () => clickVisible(card(page, "Dim Date").getByTestId("card-name"))],
     ["the empty canvas", async () => {
       const at = await emptySpot(page);
       await page.mouse.click(at.x, at.y);

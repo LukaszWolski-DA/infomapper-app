@@ -2,6 +2,7 @@
 // requirement is the Focus target or its scope contains the focused element itself (not a neighbour Focus lights); a lit
 // card has its hole in the veil; a trace line is lit (drawn again above the veil) only with both ends lit.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, card, dragCardBy, linkReq, loadModel, loadRequirementLinks, openCanvas, openRequirement, placeReqCards, reqCard, reqCardData, requirementByKey, signInAs, tracesOfCard, WHOLE } from "./helpers";
 
@@ -34,7 +35,7 @@ test("S4B2-07: requirement cards lit by their requirement or scope, their holes 
 
   // Focus on Customer: REQ-101 (Customer itself) and REQ-105 (its attributes) lit; REQ-104 faded, although Focus lights
   // the table customers, which REQ-104 is linked to (C: the scope must contain Customer itself)
-  await card(page, "Customer").locator(".c-head .c-l2").click();
+  await clickVisible(card(page, "Customer").locator(".c-head .c-l2"));
   await page.getByTestId("button-focus").click();
   await expect(veil(page)).toHaveCount(1);
   await expect.poll(() => hasHole(page, "REQ-101")).toBe(true);
@@ -46,7 +47,7 @@ test("S4B2-07: requirement cards lit by their requirement or scope, their holes 
 
   // Focus moves to Sales Order: REQ-104 lit, the others faded; its four attribute lines lit (Sales Order and Order Line
   // are lit), the one to customers not (that table is faded now)
-  await card(page, "Sales Order").locator(".c-head .c-l2").click();
+  await clickVisible(card(page, "Sales Order").locator(".c-head .c-l2"));
   await expect.poll(() => hasHole(page, "REQ-104")).toBe(true);
   expect(await hasHole(page, "REQ-101")).toBe(false);
   expect(await hasHole(page, "REQ-105")).toBe(false);

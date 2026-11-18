@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   card,
@@ -36,7 +37,7 @@ test("S3B-06: with the live canvas open, labeling in a panel brings the element 
   // label the mapping customers.cust_id → Customer.customer_id: customers comes as context, to the right of the content
   const customerId = attribute("Customer", "customer_id");
   expect((await loadModel()).mappings.some((m) => m.attribute_id === customerId.id)).toBe(true);
-  await rowNamed(page, "Customer", "customer_id").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_id"));
   await page.getByTestId("list-attribute-mappings").getByRole("button").first().click();
   await expect(page.getByTestId("panel-mapping")).toBeVisible();
   await typeLabel(page, "CR-23");
@@ -51,7 +52,7 @@ test("S3B-06: with the live canvas open, labeling in a panel brings the element 
   await expectCard(page, "customers");
 
   // customers labeled directly: full, filter all; one undo makes it context again
-  await card(page, "customers").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
+  await clickVisible(card(page, "customers").getByTestId("card-name"));
   await typeLabel(page, "CR-23");
   await page.keyboard.press("Enter");
   await expect.poll(() => liveCards(live)).toContainEqual([customers, "full", "all"]);
@@ -60,7 +61,7 @@ test("S3B-06: with the live canvas open, labeling in a panel brings the element 
   await expect.poll(() => liveCards(live)).toContainEqual([customers, "context", "labeled"]);
 
   // the mapping's label taken off: customers carries CR-23 nowhere any more and leaves, with the toast; undo brings it back
-  await rowNamed(page, "Customer", "customer_id").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_id"));
   await page.getByTestId("list-attribute-mappings").getByRole("button").first().click();
   await labelsField(page).getByTestId("chip-label").filter({ hasText: "CR-23" }).getByTestId("button-label-remove").click();
   await expectToast(page, "No longer labeled: customers.");

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   callActionDirectly,
@@ -45,7 +46,7 @@ test("S3B-04: a reviewer and a reader see no context switch; a write sent with a
   const owner0 = await newSession(browser, "Łukasz");
   const o0 = owner0.page;
   await openCanvas(o0, canvasUrl(), { x: 0, y: 0, zoom: 1 });
-  await rowNamed(o0, "Customer", model.attributes.find((a) => a.id === used.attribute_id)!.name).click();
+  await clickVisible(rowNamed(o0, "Customer", model.attributes.find((a) => a.id === used.attribute_id)!.name));
   await o0.getByTestId("list-attribute-mappings").getByRole("button").filter({ hasText: labelOf(used) }).click();
   const statusId = await captureActionId(o0, () => o0.getByTestId("panel-mapping").getByTestId("seg-mapping-status").getByRole("button", { name: "In review" }).click());
   // the write lands before its version is read below (with one draft, `draft` is `used`; slice 4b-2, step 4)
@@ -72,7 +73,7 @@ test("S3B-04: a reviewer and a reader see no context switch; a write sent with a
   await openCanvas(o, canvasUrl(), { x: 0, y: 0, zoom: 1 });
   await expect(o.getByTestId("button-context")).toContainText("Working on JIRA-481");
   await removeLabel("JIRA-481");
-  await rowNamed(o, "Customer", "first_name").click();
+  await clickVisible(rowNamed(o, "Customer", "first_name"));
   const name = o.getByTestId("input-attribute-name");
   await name.fill("given_name");
   await name.press("Enter");

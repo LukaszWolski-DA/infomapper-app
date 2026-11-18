@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   card,
@@ -67,7 +68,7 @@ test("S3B-10: dropping an entity on the live canvas asks; “Add CR-23” labels
   const only = await openLiveFor("LIVE-1");
   expect((await labelNamed("LIVE-1"))).toBeTruthy();
   await openCanvas(page, liveUrl(only), { x: 0, y: 0, zoom: 1 });
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await page.getByTestId("button-feed-all").click();
   await expectToast(page, "On a live canvas, add cards one at a time: each one gets the label first.");
   expect(await liveCards(only)).toHaveLength(1);

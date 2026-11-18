@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { addMappingInput } from "../../src/domain/commands/mapping";
 import { expect, test } from "./fixtures";
 import { asLukasz, canvasUrl, expectToast, ids, LEFT_AT_100, loadModel, openCanvas, rowNamed, signInAs } from "./helpers";
@@ -21,7 +22,7 @@ test("S1B-05: split turns a combined mapping into one mapping per input; merge t
   const panel = page.getByTestId("panel-mapping");
 
   // split
-  await rowNamed(page, "Customer", "customer_id").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_id"));
   await page.getByTestId("list-attribute-mappings").getByRole("button").first().click();
   await expect(panel.getByTestId("mapping-input")).toHaveCount(2);
   await panel.getByTestId("button-split-mapping").click();
@@ -35,7 +36,7 @@ test("S1B-05: split turns a combined mapping into one mapping per input; merge t
 
   // merge: Customer.email has two mappings (customers.email_addr and web_users.email); without a rule it is refused
   const email = attribute("Customer", "email");
-  await rowNamed(page, "Customer", "email").click();
+  await clickVisible(rowNamed(page, "Customer", "email"));
   await page.getByTestId("list-attribute-mappings").getByRole("button").first().click();
   await panel.getByTestId("button-merge-mappings").click();
   await panel.getByTestId("check-merge-mapping").first().check();

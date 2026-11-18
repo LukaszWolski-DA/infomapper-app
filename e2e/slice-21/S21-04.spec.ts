@@ -5,6 +5,7 @@
 // saved when the field was removed (its blur), or kept as a draft (`keep`). Also: a click on a logical row (a drag start
 // since slice 21) leaves the rule saved into its own mapping, as S20-Q10's three clicks.
 
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, card, freePoint, hydrated, loadModel, openCanvas, rowNamed, signInAs, WHOLE_CO } from "./helpers";
 import { mappingId, mappingLines } from "../slice-02c/helpers";
@@ -51,7 +52,7 @@ test("S21-04: a rule typed, its panel replaced while the field has the focus: th
   // a click on a logical row (it may start a drag since slice 21): the rule is saved into its own mapping
   await clickMapping(page, created);
   await page.getByTestId("input-mapping-rule").fill(`${typed} 2`);
-  await rowNamed(page, "Order Line", "quantity").click();
+  await clickVisible(rowNamed(page, "Order Line", "quantity"));
   await expect.poll(() => ruleOf(created)).toBe(`${typed} 2`);
   expect(await ruleOf(other)).toBeNull();
 });

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { callActionDirectly, canvasUrl, captureActionId, card, expectToast, loadItems, loadModel, newSession, openCanvas, RETAIL, SEED_IDS } from "./helpers";
 
@@ -20,14 +21,14 @@ test("S1A-11: as Piotr (reviewer): no edit controls except the mapping status; a
     await o.getByTestId("input-tree-name").press("Enter");
   });
   await expectToast(o, /Created the concept Owner concept/);
-  await card(o, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(o, "Customer").getByTestId("card-name"));
   const updateEntityId = await captureActionId(o, async () => {
     await o.getByTestId("input-entity-name").fill("Customer!");
     await o.getByTestId("input-entity-name").press("Enter");
   });
   await expect(card(o, "Customer!")).toBeVisible();
-  const collapseId = await captureActionId(o, () => card(o, "customers").getByTestId("button-card-collapse").click());
-  await card(o, "Customer!").locator(`[data-row="${draftAttribute}"]`).click();
+  const collapseId = await captureActionId(o, () => clickVisible(card(o, "customers").getByTestId("button-card-collapse")));
+  await clickVisible(card(o, "Customer!").locator(`[data-row="${draftAttribute}"]`));
   await o.getByTestId("list-attribute-mappings").getByRole("button").filter({ hasText: draftLabel }).click();
   const updateMappingId = await captureActionId(o, async () => {
     await o.locator("#f-note").fill("Owner note");
@@ -46,12 +47,12 @@ test("S1A-11: as Piotr (reviewer): no edit controls except the mapping status; a
   await page.getByTestId("tab-sources").click();
   await expect(page.getByTestId("button-new-source-table")).toHaveCount(0);
 
-  await card(page, "Customer!").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer!").getByTestId("card-name"));
   await expect(page.getByTestId("input-entity-name")).toHaveAttribute("readonly", "");
   await expect(page.getByTestId("select-entity-stereotype")).toBeDisabled();
   for (const id of ["button-add-attribute", "button-remove-card", "button-delete-entity"]) await expect(page.getByTestId(id)).toHaveCount(0);
 
-  await card(page, "Customer!").locator(`[data-row="${draftAttribute}"]`).click();
+  await clickVisible(card(page, "Customer!").locator(`[data-row="${draftAttribute}"]`));
   await expect(page.getByTestId("input-attribute-name")).toHaveAttribute("readonly", "");
   await expect(page.getByTestId("select-add-source-column")).toHaveCount(0);
   await expect(page.getByTestId("button-delete-attribute")).toHaveCount(0);

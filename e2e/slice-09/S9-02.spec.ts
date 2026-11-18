@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, groupsOf, loadModel, openCanvas, recordToasts, rowNamed, signInAs, toasts } from "./helpers";
 
@@ -7,7 +8,7 @@ test("S9-02: three saves of one attribute in a row, each before the page shows t
   await recordToasts(page);
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), { x: -640, y: -480, zoom: 1 });
-  await rowNamed(page, "Order Line", "unit_price").click();
+  await clickVisible(rowNamed(page, "Order Line", "unit_price"));
   const name = page.getByTestId("input-attribute-name");
 
   // each Enter saves; the next value is typed straight away, while the earlier saves are still on their way

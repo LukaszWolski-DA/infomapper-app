@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "../slice-16/fixtures";
 import { canvasUrl, card, emptySpot, hydrated, openCanvas, signInAs, toolboxAt, WHOLE_CO } from "../slice-16/helpers";
 import { holdUntil } from "../slice-13/helpers";
@@ -18,7 +19,7 @@ test("a card clicked while 'New frame here' is on its way stays selected, and th
   await toolboxAt(page, await emptySpot(page));
   await page.getByTestId("menu-toolbox").getByRole("menuitem", { name: "New frame here" }).click();
   await expect.poll(() => hold.held()).toBe(true);
-  await card(page, "Sales Order").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await expect(page.getByTestId("input-entity-name")).toHaveValue("Sales Order");
 
   hold.release();

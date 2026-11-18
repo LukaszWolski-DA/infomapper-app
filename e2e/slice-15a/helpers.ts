@@ -12,6 +12,7 @@ import type { WorkspaceAccess } from "../../src/domain/permissions";
 import { salesStarCanvasId, starId } from "../../src/modules/infocube/data/sales-star";
 import type { CubeEntity } from "../../src/modules/infocube/domain/types";
 import { E2E_DB } from "../config";
+import { clickVisible } from "../canvas-click";
 import { canvasUrl, RETAIL, SEED_IDS } from "../slice-01a/helpers";
 
 export * from "../slice-14b/helpers";
@@ -83,7 +84,7 @@ export async function grantLicence(organizationId: string = SEED_IDS.orgInfoMate
 
 /** Deletes an entity from the model through its panel and the impact dialog (one undo step on the server). */
 export async function deleteFromModel(page: Page, name: string): Promise<void> {
-  await page.locator(".react-flow__node").filter({ has: page.getByTestId("card-name").getByText(name, { exact: true }) }).getByTestId("card-name").click();
+  await clickVisible(page.locator(".react-flow__node").filter({ has: page.getByTestId("card-name").getByText(name, { exact: true }) }).getByTestId("card-name"));
   await page.getByTestId("button-delete-entity").click();
   const dialog = page.getByTestId("dialog-delete-entity");
   await page.getByTestId("table-entity-impact").waitFor();

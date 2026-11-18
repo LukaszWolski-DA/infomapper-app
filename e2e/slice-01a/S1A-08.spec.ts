@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, card, expectToast, loadModel, mappingLine, openCanvas, pickOption, signInAs } from "./helpers";
 
@@ -10,7 +11,7 @@ test("S1A-08: a mapping gets a second input: it becomes a transform and cannot b
 
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
-  await card(page, "Customer").locator(`[data-row="${firstName.id}"]`).click();
+  await clickVisible(card(page, "Customer").locator(`[data-row="${firstName.id}"]`));
   await page.getByTestId("list-attribute-mappings").getByRole("button").first().click();
   const panel = page.getByTestId("panel-mapping");
   await expect(panel.getByTestId("mapping-input")).toHaveCount(1);

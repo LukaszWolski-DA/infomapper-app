@@ -2,6 +2,7 @@
 // view of the tab's history.
 
 import { expect, type Page } from "./fixtures";
+import { clickVisible } from "../canvas-click";
 import { card, RETAIL, SEED_IDS } from "../slice-06a/helpers";
 
 export * from "../slice-06a/helpers";
@@ -52,4 +53,4 @@ export const selected = (page: Page) =>
 export const expectSelected = (page: Page, expected: string) => expect.poll(() => selected(page)).toBe(expected);
 
 /** Clicks a card's header (selects it). */
-export const clickCard = (page: Page, name: string) => card(page, name).locator(".c-head .c-l2").click();
+export const clickCard = (page: Page, name: string) => clickVisible(card(page, name).locator(".c-head .c-l2"));

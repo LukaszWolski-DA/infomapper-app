@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { card, chipNames, labelsField, loadLabels, loadLinks, mappingLine, openCanvas, pointOnLine, signInAs, typeLabel, canvasUrl, WHOLE_CO } from "./helpers";
 import type { Page } from "./fixtures";
@@ -14,22 +15,22 @@ test("S3A-02: a label goes on an entity, attribute, mapping, source table and so
   await openCanvas(page, canvasUrl(), WHOLE_CO);
 
   // an entity: a new label
-  await card(page, "Sales Order").getByTestId("card-name").click();
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await expect(page.getByTestId("panel-entity")).toBeVisible();
   await label(page, "JIRA-900");
 
   // an attribute, a table and a column of it: “jira-900” is the same label, not a new one
-  await card(page, "Sales Order").locator(".row[data-row]").first().click();
+  await clickVisible(card(page, "Sales Order").locator(".row[data-row]").first());
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await typeLabel(page, "jira-900");
   await expect(labelsField(page).locator("..").getByTestId("option-label").first()).toHaveAttribute("data-kind", "use");
   await page.keyboard.press("Enter");
   await expect.poll(() => chipNames(page)).toEqual(["JIRA-900"]);
 
-  await card(page, "order_header").getByTestId("card-name").click();
+  await clickVisible(card(page, "order_header").getByTestId("card-name"));
   await expect(page.getByTestId("panel-source-table")).toBeVisible();
   await label(page, "Jira-900");
-  await card(page, "order_header").locator(".row[data-row]").first().click();
+  await clickVisible(card(page, "order_header").locator(".row[data-row]").first());
   await expect(page.getByTestId("panel-source-column")).toBeVisible();
   await label(page, "JIRA-900");
 

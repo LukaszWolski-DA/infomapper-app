@@ -4,6 +4,7 @@
 // line. One undo each, from the home's Undo, takes it back; the page is reloaded once the undo's toast shows (its answer
 // has come), since a reload right after the click read the data before the undo's write (fix/s20-01-undo-reload).
 
+import { clickVisible } from "../canvas-click";
 import { expect, type Page, test } from "./fixtures";
 import { expectToast } from "../slice-00/helpers";
 import { canvasUrl, checkLines, groupCounts, hydrated, OM_HOME, openCanvas, openEntity, openStar, rowNamed, signInAs, undoButton, WHOLE_CO } from "./helpers";
@@ -32,7 +33,7 @@ test("S20-01: the demo's lines, and three changes with their undo", async ({ pag
   // Customer.segment_code to Integer: the approved direct feed into Dim Customer no longer fits (High, first)
   await openCanvas(page, canvasUrl(), WHOLE_CO);
   await hydrated(page);
-  await rowNamed(page, "Customer", "segment_code").click();
+  await clickVisible(rowNamed(page, "Customer", "segment_code"));
   await page.getByTestId("select-attribute-type").selectOption("integer");
   await expect(page.getByTestId("panel-attribute")).toHaveAttribute("data-version", "2");
   await home(page);
@@ -46,7 +47,7 @@ test("S20-01: the demo's lines, and three changes with their undo", async ({ pag
   // Sales Order.order_id deleted (its copies stay, D-63): both copies lost; the wrong way goes with the key
   await openCanvas(page, canvasUrl(), WHOLE_CO);
   await hydrated(page);
-  await rowNamed(page, "Sales Order", "order_id").click();
+  await clickVisible(rowNamed(page, "Sales Order", "order_id"));
   await page.getByTestId("button-delete-attribute").click();
   await page.getByTestId("button-delete-attribute").click();
   await expect(rowNamed(page, "Sales Order", "order_id")).toHaveCount(0);
