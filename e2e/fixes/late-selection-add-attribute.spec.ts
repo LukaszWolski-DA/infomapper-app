@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "../slice-16/fixtures";
 import { canvasUrl, card, headOf, hydrated, loadModel, openCanvas, signInAs, toolboxAt, WHOLE_CO } from "../slice-16/helpers";
 import { holdUntil } from "../slice-13/helpers";
@@ -24,7 +25,7 @@ test("a card clicked while 'Add attribute' is on its way stays selected, and no 
   await toolboxAt(page, await headPoint(page, "Customer"));
   await page.getByTestId("menu-toolbox").getByRole("menuitem", { name: "Add attribute", exact: true }).click();
   await expect.poll(() => hold.held()).toBe(true);
-  await card(page, "Sales Order").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await expect(page.getByTestId("input-entity-name")).toHaveValue("Sales Order");
 
   hold.release();

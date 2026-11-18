@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   box,
@@ -62,7 +63,7 @@ test("S2B-13: as Piotr (reviewer), frames can be selected, zoomed to and their c
   await expect(frameEl(o, "Area")).toHaveAttribute("data-selected", "true");
   const deleteId = await captureActionId(o, () => key(o, "Delete"));
   await expectToast(o, "Deleted the frame Area. Everything inside stays on the canvas.");
-  await card(o, "Order Line").getByTestId("card-name").click();
+  await clickVisible(card(o, "Order Line").getByTestId("card-name"));
   await shiftClick(o, await headPoint(o, "order_line"));
   const putId = await captureActionId(o, () => o.getByTestId("button-selection-put-in-frame").click());
   await expectToast(o, "Put 2 cards in a new frame.");

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   box,
@@ -52,7 +53,7 @@ test("S3A-08: a free note dropped in a frame moves with it and is hidden while i
   await toolboxAt(page, await namePoint(page, "Remarks"));
   await page.getByTestId("toolbox-frame-collapse").click();
   await expect(noteEl(page, DEMO_NOTES.free)).toHaveCount(0);
-  await page.getByTestId("block").getByTestId("button-block-expand").click();
+  await clickVisible(page.getByTestId("block").getByTestId("button-block-expand"));
   await expect(noteEl(page, DEMO_NOTES.free)).toHaveCount(1);
 
   // a pinned note follows order_line while it is dragged, linked by a dashed tether
@@ -87,7 +88,7 @@ test("S3A-08: a free note dropped in a frame moves with it and is hidden while i
   // order_line taken off the canvas: its other (resolved) note stays at its place as a free note
   const resolved = (await noteWithText(DEMO_NOTES.resolved))!;
   expect(resolved.pin_canvas_item_id).toBe(card1.id);
-  await card(page, "order_line").getByTestId("card-name").click();
+  await clickVisible(card(page, "order_line").getByTestId("card-name"));
   await page.getByTestId("button-remove-card").click();
   await expect.poll(async () => (await noteWithText(DEMO_NOTES.resolved))!.pin_canvas_item_id).toBeNull();
   expect((await noteWithText(DEMO_NOTES.resolved))!).toMatchObject({ x: card1.x + resolved.x, y: card1.y + resolved.y, frame_id: null });

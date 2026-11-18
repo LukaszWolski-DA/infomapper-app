@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   AROUND,
@@ -59,7 +60,7 @@ test("S2C-02: the cards of a collapsed frame cannot be hovered, lassoed, dropped
   await expect(page.getByTestId("popover-map-choice")).toHaveCount(0);
 
   // relating Sales Order to where Customer is hidden draws no relationship
-  await card(page, "Sales Order").getByTestId("button-card-relate").click();
+  await clickVisible(card(page, "Sales Order").getByTestId("button-card-relate"));
   await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-mode", "relate");
   await page.mouse.click(hiddenRow.x, hiddenRow.y);
   await page.waitForTimeout(500);
@@ -94,7 +95,7 @@ test("S2C-02: a hidden card selected from the left panel is selected, shows its 
   expect({ x: customer1.x, y: customer1.y, v: customer1.version }).toEqual({ x: customer0.x, y: customer0.y, v: customer0.version });
 
   // a click on its row in the block: the frame expands and the card is selected
-  await blockEl(page, "Customer").locator(`[data-member="${customer0.id}"]`).click();
+  await clickVisible(blockEl(page, "Customer").locator(`[data-member="${customer0.id}"]`));
   await expect.poll(() => isCollapsed("Customer")).toBe(false);
   await expect(frameEl(page, "Customer")).toBeVisible();
   await expect(card(page, "Customer")).toBeVisible();
@@ -105,12 +106,12 @@ test("S2C-02: collapsing a frame takes its cards out of a selection of several (
   await makeFrame(AROUND.customer, { name: "Area" });
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), FRAMED);
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await shiftClick(page, await headPoint(page, "Sales Order"));
   await shiftClick(page, await headPoint(page, "Order Line"));
   await expect(page.getByTestId("selection-count")).toHaveText("3 items selected");
 
-  await frameEl(page, "Area").getByTestId("button-frame-collapse").click();
+  await clickVisible(frameEl(page, "Area").getByTestId("button-frame-collapse"));
   await expect.poll(() => isCollapsed("Area")).toBe(true);
   await expect(page.getByTestId("selection-count")).toHaveText("2 items selected");
   expect(await selectedNames(page)).toEqual(["Order Line", "Sales Order"]);

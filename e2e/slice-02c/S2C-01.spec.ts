@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { blockHeight } from "../../src/domain/model/frames";
 import { expect, test, type Page } from "./fixtures";
 import {
@@ -37,7 +38,7 @@ test("S2C-01: a collapsed frame shows its block with kind, card count, six membe
   expect(chips.length).toBeGreaterThan(0);
 
   // the label's collapse button
-  await frameEl(page, "Everything").getByTestId("button-frame-collapse").click();
+  await clickVisible(frameEl(page, "Everything").getByTestId("button-frame-collapse"));
   await expectToast(page, collapsedToast("Everything"));
   await expect.poll(() => isCollapsed("Everything")).toBe(true);
   const block = blockEl(page, "Everything");
@@ -88,8 +89,8 @@ test("S2C-01: collapse and expand by the label button and the block's Expand, by
   await openCanvas(page, canvasUrl(), FRAMED);
 
   // the label's button, the block's “Expand”
-  await step(page, true, () => frameEl(page, "Area").getByTestId("button-frame-collapse").click(), before);
-  await step(page, false, () => blockEl(page, "Area").getByTestId("button-block-expand").click(), before);
+  await step(page, true, () => clickVisible(frameEl(page, "Area").getByTestId("button-frame-collapse")), before);
+  await step(page, false, () => clickVisible(blockEl(page, "Area").getByTestId("button-block-expand")), before);
   // each was one undo step: Ctrl+Z collapses again, a second Ctrl+Z expands (after an undo the page may lag the
   // data: wait until it shows each state, so the next collapse is sent with the frame's latest version)
   await key(page, "Control+z");

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { placeOnCanvas } from "../../src/domain/commands/canvas-item";
 import { expect, test, type Page } from "./fixtures";
 import { asLukasz, box, canvasUrl, card, ids, LEFT_AT_100, lineEnds, loadModel, mappingLine, openCanvas, RETAIL, rowNamed, SEED_IDS, signInAs, store } from "./helpers";
@@ -19,7 +20,7 @@ test("S1B-08: Ctrl+↑ moves an attribute up, Ctrl+Shift+↓ to the bottom; pane
   await openCanvas(page, canvasUrl(), LEFT_AT_100);
 
   // Ctrl+↑ on email: one place up; the moved row flashes
-  await rowNamed(page, "Customer", "email").click();
+  await clickVisible(rowNamed(page, "Customer", "email"));
   await page.keyboard.press("Control+ArrowUp");
   await expect(page.getByTestId("row-moved")).toHaveCount(1);
   const up = ["customer_id", "customer_number", "first_name", "email", "last_name", "birth_date", "segment_code", "created_at"];
@@ -41,7 +42,7 @@ test("S1B-08: Ctrl+↑ moves an attribute up, Ctrl+Shift+↓ to the bottom; pane
   await expect.poll(() => cardOrder(page)).toEqual(bottom);
 
   // dragging in the entity panel's attribute list: created_at onto the upper half of customer_id → first
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   const items = page.getByTestId("attribute-order-item");
   const target = await box(items.filter({ hasText: "customer_id" }));
   await items.filter({ hasText: "created_at" }).dragTo(items.filter({ hasText: "customer_id" }), { targetPosition: { x: 40, y: target.height / 4 } });

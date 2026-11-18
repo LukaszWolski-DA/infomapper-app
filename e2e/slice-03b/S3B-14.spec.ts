@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   callActionDirectly,
@@ -33,7 +34,7 @@ test("S3B-14: as Piotr (reviewer) and as a reader: they can go to an existing li
   await treeItem(o, "Order Line").click();
   const labelFor = await captureActionId(o, () => o.getByTestId("button-live-yes").click());
   await expectCard(o, "Order Line");
-  await card(o, "Order Line").getByTestId("card-name").click();
+  await clickVisible(card(o, "Order Line").getByTestId("card-name"));
   await o.keyboard.press("Delete");
   const removeFrom = await captureActionId(o, () => o.getByTestId("button-live-yes").click());
   await expectCard(o, "Order Line", 0);
@@ -71,7 +72,7 @@ test("S3B-14: as Piotr (reviewer) and as a reader: they can go to an existing li
     await page.mouse.click(head.x + 20, head.y + 10, { button: "right" });
     await expect(page.getByTestId("menu-toolbox").getByRole("menuitem", { name: /unlabel/ }), who).toHaveCount(0);
     await page.keyboard.press("Escape");
-    await card(page, "Customer").getByTestId("card-name").click();
+    await clickVisible(card(page, "Customer").getByTestId("card-name"));
     await page.keyboard.press("Delete");
     await page.waitForTimeout(500);
     await expect(page.getByTestId("dialog-live-question"), who).toHaveCount(0);

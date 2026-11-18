@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import { canvasIn, card, expectToast, key, openCanvas, openCanvasMenu, SEED_IDS, signInAs, store, WHOLE } from "./helpers";
 
@@ -23,7 +24,7 @@ test("S2A-10: background and grid change per canvas, are drawn, survive a reload
   await expectDrawn(page, "grey", "rgb(232, 236, 240)", "dots");
 
   // a layout change first, so Ctrl+Z has something to undo
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("button-undo")).toBeEnabled();
 

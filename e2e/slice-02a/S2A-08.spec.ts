@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { setCanvasLook } from "../../src/domain/commands/canvas";
 import { updateCanvasItem } from "../../src/domain/commands/canvas-item";
 import { moveOnCanvas } from "../../src/domain/commands/frame";
@@ -50,7 +51,7 @@ test("S2A-08: “Duplicate layout” creates “Customer & orders (copy)” in t
   await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-grid", "lines");
   await expect(page.getByTestId("switch-layer").locator('[data-layer="mappings"]')).toHaveAttribute("aria-pressed", "true");
   // the model is shared: an entity renamed on the copy is renamed on the original
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await page.getByTestId("input-entity-name").fill("Client");
   await page.getByTestId("input-entity-name").press("Enter");
   await expect.poll(async () => (await loadModel()).entities.find((e) => e.id === entity("Customer").id)!.name).toBe("Client");

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import {
   callActionDirectly,
@@ -51,7 +52,7 @@ test("S2A-13: as Piotr (reviewer): lasso, Ctrl+A, Hand tool and layer buttons wo
   const owner = await newSession(browser, "Łukasz");
   const o = owner.page;
   await openCanvas(o, canvasIn(om, here), WHOLE);
-  await o.getByTestId("card-name").getByText("Customer", { exact: true }).click();
+  await clickVisible(o.getByTestId("card-name").getByText("Customer", { exact: true }));
   await shiftClick(o, "Sales Order");
   const moveId = await captureActionId(o, () => dragCardBy(o, "Sales Order", 40, 20));
   await toolboxAt(o, await headPoint(o, "Customer"));
@@ -66,10 +67,10 @@ test("S2A-13: as Piotr (reviewer): lasso, Ctrl+A, Hand tool and layer buttons wo
   await o.getByTestId("toast").getByTestId("toast-action").click();
   await expectToast(o, "Undone: Remove 8 cards");
   await expect(o.locator(".react-flow__node-card")).toHaveCount(7);
-  await card(o, "web_users").getByTestId("card-name").click();
+  await clickVisible(card(o, "web_users").getByTestId("card-name"));
   await o.getByTestId("button-remove-card").click();
   await expect(o.locator(".react-flow__node-card")).toHaveCount(6);
-  await o.getByTestId("card-name").getByText("Customer", { exact: true }).click();
+  await clickVisible(o.getByTestId("card-name").getByText("Customer", { exact: true }));
   await shiftClick(o, "Sales Order");
   const sourcesId = await captureActionId(o, () => o.getByTestId("button-selection-sources").click());
   await expect(o.locator(".react-flow__node-card")).toHaveCount(7);

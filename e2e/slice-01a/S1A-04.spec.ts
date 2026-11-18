@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import { box, canvasUrl, card, HEADER_MIDDLE, lineEnds, loadItems, loadModel, mappingLine, openCanvas, signInAs } from "./helpers";
 
@@ -24,20 +25,20 @@ test("S1A-04: collapsing a card and filtering rows re-anchors hidden rows' lines
   expect((await headerEnds(page)).every((e) => !e.atHeader)).toBe(true);
 
   // collapsed: header only, every line of the card ends at the header
-  await customers.getByTestId("button-card-collapse").click();
+  await clickVisible(customers.getByTestId("button-card-collapse"));
   await expect(customers).toHaveAttribute("data-collapsed", "true");
   await expect(customers.locator("[data-row]")).toHaveCount(0);
   await expect.poll(async () => (await headerEnds(page)).every((e) => e.atHeader)).toBe(true);
 
-  await customers.getByTestId("button-card-collapse").click();
+  await clickVisible(customers.getByTestId("button-card-collapse"));
   await expect(customers).not.toHaveAttribute("data-collapsed", "true");
   await expect.poll(async () => (await headerEnds(page)).every((e) => !e.atHeader)).toBe(true);
 
   // filter "Unmapped": the mapped rows are hidden, so all lines of the card go to the header; "Mapped" brings them back
-  await customers.getByTestId("button-card-filter").click(); // all → mapped
+  await clickVisible(customers.getByTestId("button-card-filter")); // all → mapped
   await expect(customers).toHaveAttribute("data-filter", "mapped");
   await expect.poll(async () => (await headerEnds(page)).every((e) => !e.atHeader)).toBe(true);
-  await customers.getByTestId("button-card-filter").click(); // mapped → unmapped
+  await clickVisible(customers.getByTestId("button-card-filter")); // mapped → unmapped
   await expect(customers).toHaveAttribute("data-filter", "unmapped");
   await expect.poll(async () => (await headerEnds(page)).every((e) => e.atHeader)).toBe(true);
 

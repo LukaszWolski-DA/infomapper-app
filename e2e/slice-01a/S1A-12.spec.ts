@@ -1,9 +1,10 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, card, expectToast, loadModel, newSession, openCanvas, RETAIL, SEED_IDS } from "./helpers";
 
 async function openMapping(page: Page, attributeId: string) {
   await openCanvas(page, canvasUrl());
-  await card(page, "Customer").locator(`[data-row="${attributeId}"]`).click();
+  await clickVisible(card(page, "Customer").locator(`[data-row="${attributeId}"]`));
   await page.getByTestId("list-attribute-mappings").getByRole("button").first().click();
   return page.getByTestId("panel-mapping");
 }

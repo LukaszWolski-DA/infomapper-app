@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   callActionDirectly,
@@ -44,7 +45,7 @@ test("S3A-13: as Piotr (reviewer) notes can be written and labels only read; as 
   const owner = await newSession(browser, "Łukasz");
   const o = owner.page;
   await openCanvas(o, canvasUrl(), VIEW);
-  await card(o, "order_line").getByTestId("card-name").click();
+  await clickVisible(card(o, "order_line").getByTestId("card-name"));
   await typeLabel(o, "OWNER-1");
   const ids: Record<string, string> = {};
   ids.addLabel = await captureActionId(o, () => o.keyboard.press("Enter"));
@@ -68,7 +69,7 @@ test("S3A-13: as Piotr (reviewer) notes can be written and labels only read; as 
   await o.keyboard.type("Owner note");
   ids.createNote = await captureActionId(o, () => o.keyboard.press("Control+Enter"));
   await expect.poll(async () => (await noteWithText("Owner note")) !== undefined).toBe(true);
-  ids.updateNote = await captureActionId(o, () => noteEl(o, DEMO_NOTES.free).getByTestId("button-note-resolve").click());
+  ids.updateNote = await captureActionId(o, () => clickVisible(noteEl(o, DEMO_NOTES.free).getByTestId("button-note-resolve")));
   const p = await notePoint(o, DEMO_NOTES.free);
   ids.moveNote = await captureActionId(o, () => dragBetween(o, p, { x: p.x + 16, y: p.y + 16 }));
   await click(o, await notePoint(o, DEMO_NOTES.free));
@@ -121,7 +122,7 @@ test("S3A-13: as Piotr (reviewer) notes can be written and labels only read; as 
   const piotr = await newSession(browser, "Piotr Wiśniewski");
   const pp = piotr.page;
   await openCanvas(pp, canvasUrl(), WHOLE_CO);
-  await card(pp, "customers").getByTestId("card-name").click();
+  await clickVisible(card(pp, "customers").getByTestId("card-name"));
   await expect(labelsField(pp).getByTestId("chip-label")).toHaveCount(1);
   await expect(labelsField(pp).getByTestId("input-label")).toHaveCount(0);
   await expect(labelsField(pp).getByTestId("button-label-remove")).toHaveCount(0);
@@ -164,7 +165,7 @@ test("S3A-13: as Piotr (reviewer) notes can be written and labels only read; as 
   await expect(kp.getByTestId("input-note-panel-text")).toHaveAttribute("readonly", "");
   await expect(kp.getByTestId("button-note-delete")).toHaveCount(0);
   // a card's Notes section: the list, no “Add a note”; no Labels input
-  await card(kp, "order_line").getByTestId("card-name").click();
+  await clickVisible(card(kp, "order_line").getByTestId("card-name"));
   const ordline = await item("order_line");
   const pinnedHere = (await loadNotes()).filter((n) => n.pin_canvas_item_id === ordline.id).length;
   expect(pinnedHere).toBeGreaterThan(0);

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { placeOnCanvas } from "../../src/domain/commands/canvas-item";
 import { expect, test } from "./fixtures";
 import { asLukasz, box, canvasIn, card, expectToast, ids, loadItems, openCanvas, SEED_IDS, signInAs, store, WHOLE } from "./helpers";
@@ -18,17 +19,17 @@ test("S2A-12: Customer's “On canvases” lists both canvases it is on (the tes
   // Order lines & products remembers a view far away from Customer
   await openCanvas(page, canvasIn(om, lines), { x: 0, y: 0, zoom: 1 });
   await openCanvas(page, canvasIn(c360, SEED_IDS.canvasCustomerOrders), WHOLE);
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   const list = page.getByTestId("list-on-canvases").getByTestId("item-on-canvas");
   await expect(list).toHaveCount(2);
   expect(await list.allInnerTexts()).toEqual(["Customer & orders\nthis canvas", "Order lines & products\nin Order management"]);
   // a source table too: order_line is on both canvases
-  await card(page, "order_line").getByTestId("card-name").click();
+  await clickVisible(card(page, "order_line").getByTestId("card-name"));
   await expect(page.getByTestId("panel-source-table")).toBeVisible();
   expect(await list.allInnerTexts()).toEqual(["Customer & orders\nthis canvas", "Order lines & products\nin Order management"]);
 
   // a click opens the other canvas in its project, with Customer selected and in view
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await list.filter({ hasText: "Order lines & products" }).click();
   await expectToast(page, "Switched to the project Order management.");
   await expect(page).toHaveURL(new RegExp(`/p/${om}/c/${lines}$`)); // the address keeps no query

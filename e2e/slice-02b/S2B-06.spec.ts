@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test, type Page } from "./fixtures";
 import {
   card,
@@ -42,7 +43,7 @@ test("S2B-06: inside a frame, Shift + drag draws an adding lasso; the middle but
   const { frame, start } = await openArea(page);
 
   // Shift + drag from an empty spot inside the frame around Customer adds it to the selection (web_users)
-  await card(page, "web_users").getByTestId("card-name").click();
+  await clickVisible(card(page, "web_users").getByTestId("card-name"));
   await dragBetween(page, await screenPoint(page, { x: 480, y: 16 }), await screenPoint(page, { x: 768, y: 330 }), { shift: true });
   await expect(page.getByTestId("selection-count")).toHaveText("2 items selected");
   expect(await selectedNames(page)).toEqual(["Customer", "web_users"]);

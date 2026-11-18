@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { card, expectCard, expectToast, ids, linkedTo, liveCards, liveUrl, openCanvas, openLiveFor, signInAs, toolboxAt, undo } from "./helpers";
 
@@ -29,7 +30,7 @@ test("S3B-11: removing a directly labeled card that also has labeled rows asks t
   // web_users, here as context through one mapping: Delete asks the second question; the mapping's label comes off and
   // the card leaves
   const before = await linkedTo("CR-23");
-  await card(page, "web_users").getByTestId("card-name").click();
+  await clickVisible(card(page, "web_users").getByTestId("card-name"));
   await page.keyboard.press("Delete");
   await expect(page.getByTestId("text-live-question")).toHaveText("web_users is here because 1 mapping carries CR-23. Take the label off it?");
   await expect(page.getByTestId("button-live-yes")).toHaveText("Remove from 1 mapping");

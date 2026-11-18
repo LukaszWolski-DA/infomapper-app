@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { createNote, moveNote } from "../../src/domain/commands/note";
 import { expect, test } from "./fixtures";
 import {
@@ -53,7 +54,7 @@ test("S3A-09: a card's header shows its pinned notes; card and frame panels list
   await expect(headerCount(page, "customers")).toHaveCount(0);
 
   // the card panel's Notes: first line, open or resolved
-  await card(page, "order_line").getByTestId("card-name").click();
+  await clickVisible(card(page, "order_line").getByTestId("card-name"));
   const here = page.getByTestId("section-notes").getByTestId("item-note-here");
   await expect(here).toHaveCount(2);
   await expect(here.filter({ hasText: DEMO_NOTES.pinned })).toContainText("open");
@@ -75,7 +76,7 @@ test("S3A-09: a card's header shows its pinned notes; card and frame panels list
   await toolboxAt(page, await namePoint(page, "Remarks"));
   await page.getByTestId("toolbox-frame-collapse").click();
   await expect(blockEl(page, "Remarks").getByTestId("block-chip").last()).toHaveText("2 notes");
-  await page.getByTestId("block").getByTestId("button-block-expand").click();
+  await clickVisible(page.getByTestId("block").getByTestId("button-block-expand"));
   await expect(page.getByTestId("block")).toHaveCount(0);
 
   // the overview: the open notes as links, and the checkbox

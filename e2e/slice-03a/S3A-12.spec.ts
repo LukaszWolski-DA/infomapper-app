@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { card, ids, key, labelNamed, loadLinks, openCanvas, rawDb, signInAs, canvasUrl, WHOLE_CO } from "./helpers";
 
@@ -12,7 +13,7 @@ test("S3A-12: deleting Customer soft-deletes its label links and those of its at
 
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), WHOLE_CO);
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await page.getByTestId("button-delete-entity").click();
   await page.getByTestId("button-confirm-delete-entity").click();
   await expect.poll(async () => (await rawDb()).entity.find((e) => e.id === customer.id)!.deleted_at).not.toBeNull();

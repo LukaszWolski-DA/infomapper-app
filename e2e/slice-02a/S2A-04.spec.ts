@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, expectToast, headPoint, ids, key, loadItems, openCanvas, signInAs, WHOLE } from "./helpers";
 
@@ -16,7 +17,7 @@ test("S2A-04: arrow keys move the selection by 8 px, with Shift by 32 px; five q
 
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), WHOLE);
-  await page.getByTestId("card-name").getByText("Customer", { exact: true }).click();
+  await clickVisible(page.getByTestId("card-name").getByText("Customer", { exact: true }));
   const at = await headPoint(page, "web_users");
   await page.keyboard.down("Shift");
   await page.mouse.click(at.x, at.y);

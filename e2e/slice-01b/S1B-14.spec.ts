@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import {
   callActionDirectly,
@@ -29,16 +30,16 @@ test("S1B-14: a reviewer gets no drag, relate, tool or reorder actions, and can 
   const o = owner.page;
   await openCanvas(o, canvasUrl(), { x: -150, y: 0, zoom: 0.7 });
   const relateId = await captureActionId(o, async () => {
-    await card(o, "Customer").getByTestId("button-card-relate").click();
-    await card(o, "Sales Order").getByTestId("card-name").click();
+    await clickVisible(card(o, "Customer").getByTestId("button-card-relate"));
+    await clickVisible(card(o, "Sales Order").getByTestId("card-name"));
   });
   await expectToast(o, "Relationship added. Name it and set the cardinality on the right.");
   const reorderId = await captureActionId(o, async () => {
-    await rowNamed(o, "Customer", "email").click();
+    await clickVisible(rowNamed(o, "Customer", "email"));
     await o.keyboard.press("Control+ArrowUp");
   });
   await expect(o.getByTestId("row-moved")).toHaveCount(1);
-  const widthId = await captureActionId(o, async () => card(o, "Customer").getByTestId("handle-card-width").dblclick());
+  const widthId = await captureActionId(o, async () => clickVisible(card(o, "Customer").getByTestId("handle-card-width"), { clickCount: 2 }));
   await openCanvas(o, canvasUrl(), LEFT_AT_100);
   const fromColumnId = await captureActionId(o, () => dragTo(o, rowNamed(o, "customers", "segment"), card(o, "Customer").locator(".c-head")));
   await expect.poll(async () => (await loadModel()).attributes.some((a) => a.entity_id === customer.id && a.name === "segment")).toBe(true);
@@ -60,9 +61,9 @@ test("S1B-14: a reviewer gets no drag, relate, tool or reorder actions, and can 
   await expect(page.getByTestId("popover-map-choice")).toHaveCount(0);
   await expect(page.getByTestId("line-draft")).toHaveCount(0);
   // Ctrl+↑ on an attribute does nothing
-  await rowNamed(page, "Customer", "customer_number").click();
+  await clickVisible(rowNamed(page, "Customer", "customer_number"));
   await page.keyboard.press("Control+ArrowUp");
-  await card(page, "Customer").getByTestId("card-name").click();
+  await clickVisible(card(page, "Customer").getByTestId("card-name"));
   await expect(page.getByTestId("attribute-order-item")).toHaveCount(0);
   await expect(page.getByTestId("button-feed-all")).toHaveCount(0);
   // the toolbox has no editing actions: on the canvas only what selects or moves the view (slice 2a adds “Select all”

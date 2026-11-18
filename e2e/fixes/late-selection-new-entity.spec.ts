@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "../slice-16/fixtures";
 import { canvasUrl, card, hydrated, loadModel, openCanvas, signInAs, WHOLE_CO } from "../slice-16/helpers";
 import { holdUntil } from "../slice-13/helpers";
@@ -18,7 +19,7 @@ test("a card clicked while a new entity from the left panel is on its way stays 
   const hold = await holdUntil(page, '"conceptId"');
   await page.getByTestId("button-concept-add").first().click();
   await expect.poll(() => hold.held()).toBe(true);
-  await card(page, "Sales Order").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await expect(page.getByTestId("input-entity-name")).toHaveValue("Sales Order");
 
   hold.release();

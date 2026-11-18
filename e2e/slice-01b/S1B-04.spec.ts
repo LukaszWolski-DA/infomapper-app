@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "./fixtures";
 import { canvasUrl, expectToast, ids, LEFT_AT_100, loadModel, openCanvas, pickOption, rowNamed, signInAs } from "./helpers";
 
@@ -6,7 +7,7 @@ test("S1B-04: “Map to an attribute” in the column panel creates the mapping"
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), LEFT_AT_100);
 
-  await rowNamed(page, "customers", "segment").click();
+  await clickVisible(rowNamed(page, "customers", "segment"));
   const panel = page.getByTestId("panel-source-column");
   await expect(panel).toBeVisible();
   await pickOption(panel.getByTestId("select-map-to-attribute"), "segment_code");

@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { arrange, type ArrangeMode } from "../../src/canvas/arrange";
 import { expect, test, type Page } from "./fixtures";
 import { box, canvasUrl, card, closeToolbox, expectDrawnAt, expectToast, headPoint, ids, key, loadItems, openCanvas, rowNamed, signInAs, toolboxAt, WHOLE, zoomOf } from "./helpers";
@@ -81,14 +82,14 @@ test("S2A-05: the group toolbox offers the actions of item 7; Align left, Align 
   for (const n of GROUP) await expect.poll(async () => Math.round((await box(card(page, n).locator("[data-card]"))).width / zoom), n).toBe(256);
   for (const [k, n] of GROUP.entries()) {
     await page.keyboard.press("Escape");
-    await card(page, n).getByTestId("handle-card-width").dblclick();
+    await clickVisible(card(page, n).getByTestId("handle-card-width"), { clickCount: 2 });
     await expect.poll(async () => (await items())[k]!.width, n).toBe(fitted[k]);
   }
 });
 
 async function selectGroup(page: Page) {
   await page.keyboard.press("Escape");
-  await page.getByTestId("card-name").getByText(GROUP[0], { exact: true }).click();
+  await clickVisible(page.getByTestId("card-name").getByText(GROUP[0], { exact: true }));
   await page.keyboard.down("Shift");
   for (const n of GROUP.slice(1)) {
     const at = await headPoint(page, n);

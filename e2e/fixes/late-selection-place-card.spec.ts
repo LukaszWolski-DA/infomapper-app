@@ -1,3 +1,4 @@
+import { clickVisible } from "../canvas-click";
 import { expect, test } from "../slice-16/fixtures";
 import { canvasUrl, card, hydrated, loadModel, openCanvas, signInAs, treeItem, viewportTransform, WHOLE_CO } from "../slice-16/helpers";
 import { holdUntil } from "../slice-13/helpers";
@@ -17,7 +18,7 @@ test("a card clicked while a card placed from the left panel is on its way stays
   const hold = await holdUntil(page, items.id);
   await treeItem(page, "items").click();
   await expect.poll(() => hold.held()).toBe(true);
-  await card(page, "Sales Order").getByTestId("card-name").click({ position: { x: 8, y: 8 } });
+  await clickVisible(card(page, "Sales Order").getByTestId("card-name"));
   await expect(page.getByTestId("input-entity-name")).toHaveValue("Sales Order");
   const view = await viewportTransform(page);
 
