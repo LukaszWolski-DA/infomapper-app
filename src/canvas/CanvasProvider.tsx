@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ReactFlowProvider } from "@xyflow/react";
 import { CanvasUiCtx, type CanvasHandle, type CanvasHost, type CanvasMode, type CanvasUiApi, type Notation, type UndoHooks } from "./context";
 import type { Selection } from "./line-data";
-import { selectionAfterAnswer, selectionDeleted } from "./selection";
+import { selectionHolder } from "./selection-now";
 import { NO_NOTE_DRAFTS } from "./note-drafts";
 
 const OVERVIEW_KEY = "infomapper:overview";
@@ -38,7 +38,9 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
   const [overviewOpen, setOverviewOpen] = useState(true);
   const [hideResolved, setHideResolvedState] = useState(false);
   const [notation, setNotationState] = useState<Notation>("ie");
-  const [selection, select] = useState<Selection>(null);
+  const [selection, setSelection] = useState<Selection>(null);
+  // the selection as it is now: every select goes through the holder, React's state follows (fix/late-selection-remaining)
+  const [holder] = useState(() => selectionHolder(setSelection));
   const handle = useRef<CanvasHandle | null>(null);
   const host = useRef<CanvasHost | null>(null);
   const undo = useRef<UndoHooks | null>(null);
@@ -88,15 +90,12 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       notation,
       setNotation,
       selection,
-      select,
+      select: holder.select,
+      selectionNow: holder.now,
       // the selection as it is when the answer arrives, not as the delete's caller saw it
-      deselectDeleted: (deleted) => {
-        if (!deleted?.length) return;
-        const gone = new Set(deleted);
-        select((current) => (selectionDeleted(current, gone) ? null : current));
-      },
+      deselectDeleted: holder.deselectDeleted,
       // the selection as it is when the answer arrives, compared with the one the action was sent with
-      selectMade: (sent, made) => select((current) => selectionAfterAnswer(current, sent, made)),
+      selectMade: holder.selectMade,
       fit: () => handle.current?.fit(),
       shiftView: (dx) => handle.current?.shiftView(dx),
       place: (target, rows, options) => handle.current?.place(target, rows, options) ?? Promise.resolve(null),
@@ -172,7 +171,7 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       hideResolved,
       setHideResolved,
     }),
-    [overviewOpen, toggleOverview, notation, setNotation, selection, mode, flash, flashRow, layoutKey, hideResolved, setHideResolved],
+    [overviewOpen, toggleOverview, notation, setNotation, selection, holder, mode, flash, flashRow, layoutKey, hideResolved, setHideResolved],
   );
 
   return (
