@@ -41,8 +41,11 @@ env:
   TZ: Europe/Warsaw
   NEXT_TELEMETRY_DISABLED: "1"
 
+# The jobs are named e2e-* so that no check shares a name with ci.yml's `check` or schema.yml's `migrations` and
+# `smoke`, which the rulesets on `dev` and `main` require: a skipped job counts as passed for a required check.
 jobs:
   plan:
+    name: e2e-plan
     if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'full-e2e'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -97,6 +100,7 @@ jobs:
           echo "Single-file check: ${list[*]}, $ROUNDS rounds, commit $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
 
   part:
+    name: e2e-part
     needs: plan
     if: needs.plan.outputs.mode == 'full'
     runs-on: ubuntu-latest
@@ -153,6 +157,7 @@ jobs:
           exit 1
 
   report:
+    name: e2e-report
     needs: [plan, part]
     # not after a cancel (a newer full run of the same branch replaced this one)
     if: ${{ !cancelled() && needs.plan.outputs.mode == 'full' }}
@@ -204,6 +209,7 @@ jobs:
           exit 1
 
   check:
+    name: e2e-check
     needs: plan
     if: needs.plan.outputs.mode == 'check'
     runs-on: ubuntu-latest
