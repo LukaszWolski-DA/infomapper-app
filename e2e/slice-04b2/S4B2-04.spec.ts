@@ -35,8 +35,9 @@ test("S4B2-04: “Place card” beside the element, or showing a card already he
   const birth = model.attributes.find((a) => a.entity_id === customer.id && a.name === "birth_date")!;
   await signInAs(page, "Łukasz");
 
-  // the view fits when the placed card falls outside it: Customer at the left edge at 300 %
-  await openCanvas(page, canvasUrl(), { x: 10 - 496 * 3, y: 10 - 40 * 3, zoom: 3 });
+  // the view fits when the placed card falls outside it: Customer at the left edge at 300 %, 360 px higher so that
+  // birth_date's row is in view (below the canvas it was clicked only by scrolling the canvas: fix/e2e-visible-clicks)
+  await openCanvas(page, canvasUrl(), { x: 10 - 496 * 3, y: 10 - 40 * 3 - 360, zoom: 3 });
   await clickVisible(row(page, "Customer", birth.id));
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
   await sectionRow(page, "REQ-105").getByTestId("button-requirement-place").click();
