@@ -1876,3 +1876,13 @@ whether its order is read anywhere, and a rule where it is.
 Docker is not on Łukasz's laptop, so the contract suite's Postgres side and the smoke set on Supabase's local stack run in
 the Schema workflow only (L6); locally the suite runs on the local adapter, and the smoke set runs against `npm run dev:pg`
 or the preview.
+
+### The smoke job's Supabase ports are reserved (fix/smoke-port-54322)
+
+On 18 November 2026 the Schema workflow's `smoke` job failed three times in about 46 attempts when `supabase start` bound
+the database's port: "failed to bind host port 0.0.0.0:54322/tcp: address already in use". The stack's ports
+(54321-54327) lie inside Linux's ephemeral port range (32768-60999), so an outgoing connection, such as one of the image
+pulls just before, can hold one as its local port. The job now reserves 54320-54329 first
+(`net.ipv4.ip_local_reserved_ports`) and prints the range and the reservation. The cause is an assumption: if the start
+fails again, the step "On failure, show the port range and what holds the stack's ports" lists the sockets on 5432x.
+The `migrations` job's service uses 5432, below the range, and is unchanged.
