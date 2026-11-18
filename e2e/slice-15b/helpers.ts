@@ -2,6 +2,7 @@
 // panels' InfoCube sections (a fact's, a dimension's, an attribute's, a relationship's key), and a relationship's pill.
 
 import type { Locator, Page } from "@playwright/test";
+import { clickVisible } from "../canvas-click";
 import { RETAIL } from "../slice-01a/helpers";
 import { starId } from "../../src/modules/infocube/data/sales-star";
 import { card, cubeStore, openCanvas, rowNamed, STAR_VIEW, starUrl } from "../slice-15a/helpers";
@@ -38,13 +39,13 @@ export const openStar = (page: Page) => openCanvas(page, starUrl(), STAR_VIEW);
 
 /** Opens an entity's panel by its card's name. */
 export async function openEntity(page: Page, name: string): Promise<void> {
-  await card(page, name).getByTestId("card-name").click();
+  await clickVisible(card(page, name).getByTestId("card-name"));
   await page.getByTestId("panel-entity").waitFor();
 }
 
 /** Opens an attribute's panel by its row on a card. */
 export async function openAttribute(page: Page, cardName: string, rowName: string): Promise<void> {
-  await rowNamed(page, cardName, rowName).click();
+  await clickVisible(rowNamed(page, cardName, rowName));
   await page.getByTestId("panel-attribute").waitFor();
 }
 

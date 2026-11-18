@@ -8,6 +8,7 @@ import { uuidv7 } from "../../src/domain/ids";
 import type { WorkspaceAccess } from "../../src/domain/permissions";
 import { starId } from "../../src/modules/infocube/data/sales-star";
 import type { CubeMapping, CubeMappingInput } from "../../src/modules/infocube/domain/types";
+import { clickVisible } from "../canvas-click";
 import { card, RETAIL, SEED_IDS } from "../slice-01a/helpers";
 import { cubeStore } from "../slice-15a/helpers";
 import { model } from "../slice-15b/helpers";
@@ -143,7 +144,7 @@ export async function expectCubePanelAt(page: Page, mappingId: string): Promise<
 
 /** The toolbox of a card's header (a right-click on its name) and one of its items by its text. */
 export async function cardMenuItem(page: Page, cardName: string, label: string): Promise<Locator> {
-  await card(page, cardName).getByTestId("card-name").click({ button: "right" });
+  await clickVisible(card(page, cardName).getByTestId("card-name"), { button: "right" });
   const menu = page.getByTestId("menu-toolbox");
   await menu.waitFor();
   return menu.getByRole("menuitem", { name: label, exact: true });
