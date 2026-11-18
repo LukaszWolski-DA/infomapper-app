@@ -1064,3 +1064,6 @@ slice.
   stored in. Not now: it would reorder KB.
 - **Part 9's heap peaks** (1,717 and 1,825 MB in slice 29's full runs): recut the e2e parts on a `chore/` branch when the
   median of three full runs reaches about 2 GB.
+- **`overflow: clip` on `.im-canvas`** (fix/e2e-visible-clicks): `.im-canvas` is `overflow: hidden`, so a programmatic
+  scroll (Playwright's scroll into view did it in e2e) can shift the whole canvas, and nothing scrolls it back. With
+  `overflow: clip` it could not scroll at all. Only programmatic scrolls could shift it, and none in the app does today.
