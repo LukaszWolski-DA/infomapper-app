@@ -1078,3 +1078,12 @@ slice.
 - **`overflow: clip` on `.im-canvas`** (fix/e2e-visible-clicks): `.im-canvas` is `overflow: hidden`, so a programmatic
   scroll (Playwright's scroll into view did it in e2e) can shift the whole canvas, and nothing scrolls it back. With
   `overflow: clip` it could not scroll at all. Only programmatic scrolls could shift it, and none in the app does today.
+
+## Delete a source system with its tables, in one step (slice 30's measurement, for Łukasz to decide)
+
+The app has no delete for a source system: its panel (`system-panel.tsx`) has its counts, "Re-import…", its changes and
+its imports, and the source commands (`src/domain/commands/source.ts`) delete a table, not a system. Today a system goes
+only by Undo of its import while that is still in the person's history (slice 30's measurement removed its test system
+this way, 26 steps down), or by deleting its tables one by one, which leaves the system itself. The idea: "Delete
+{system}…" in its panel, with its impact (tables, columns, mappings that read them, open changes to resolve) and one
+undo step.

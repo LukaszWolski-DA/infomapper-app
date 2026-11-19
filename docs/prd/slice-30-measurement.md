@@ -4,6 +4,21 @@ The writes on Postgres on `dev`'s Vercel preview, measured from Łukasz's laptop
 slice 29's read measurement (`docs/prd/slice-29-measurement.md`). **Figures only (DB7): no threshold was set
 beforehand; Łukasz decides.** The one proposal is AD-38's `lock_timeout` (below), as L7 asked.
 
+## Decided (Łukasz, 19 November 2026)
+
+1. **Decided: the test system goes by Undo.** Remove "Synth 1795092803262" from the demo's "Retail Co – DWH" through
+   the app on `dev`'s preview, as Łukasz's demo account, whose history it is: Undo steps 113 down to 89 (the
+   measurement's renames and card moves), then step 88, "Import synth.csv", reading each step's label before its Undo
+   and stopping at any difference or refusal. Then take Product's card off "Customer & orders" (the entity kept), and
+   time one rename as a check. Nothing else. (The app has no delete for a source system: the first wording, "in its
+   panel, one step", followed this report's first version, which was wrong; `docs/ideas.md` has the idea.) Done:
+   "The cleanup", below.
+2. **Decided: `lock_timeout` 15 s**, without a 30,000-column import. It is built in the read fixes slice (the next
+   one), with AD-38's text changed there; no fix branch now.
+3. **Decided: the measuring spec's two flaws** (Playwright's polling steps, the first load counted as the refresh) are
+   fixed in the read fixes slice, which measures the writes again.
+4. **Decided: Vercel's runtime logs are not needed**; the read fixes slice measures the server's split again.
+
 ## How it was measured
 
 - **The preview:** `dev`'s branch address, `infomapper-app-dev-git-dev-lukaszs-projects-9ffbc132.vercel.app`, serving
@@ -32,8 +47,8 @@ beforehand; Łukasz decides.** The one proposal is AD-38's `lock_timeout` (below
   frame, from the indicator's `data-state` (action to "Saved", and "Saving…" to "Saved"); the page's record counts as a
   refresh only when it changed (waiting up to 2 s for it, outside the timed span); the card moved is Product's, whose
   header is in view (in the copy's runs the first `.react-flow__node` lay under the top bar, where a drag moves
-  nothing). The spec's own figures are kept beside them. **Proposal:** a `fix/` branch for the spec (outside this
-  chore, on Łukasz's OK).
+  nothing). The spec's own figures are kept beside them. Proposed: a `fix/` branch for the spec. **Decided** (3, above):
+  fixed in the read fixes slice, which measures the writes again.
 
 ## S30-13: warm medians of 10 (2 discarded first)
 
@@ -59,6 +74,7 @@ rename and the move are the first load's.
   (`timing {"route":"write",…}`, `{"route":"undo",…}`), in Vercel's runtime logs: **not read** (no Vercel token without
   Łukasz's decision, slice 29). Łukasz can read them in the dashboard (project → Logs, filter `timing`, 12:51:13 to
   12:52:26 UTC for this table, 12:55:17 to 12:57:38 UTC for the next) and paste the lines; they hold numbers only.
+  **Decided** (4, above): not needed; the read fixes slice measures the server's split again.
 
 After the import (12:55 UTC; the same workspace with 10,036 columns, below):
 
@@ -120,6 +136,9 @@ at about 3,030 ms) to the answer, about 2.8 s, which matches `apply`.
 
 ## AD-38's `lock_timeout` (now 10 s, provisional): proposal
 
+**Decided** (2, above): **15 s**, without a 30,000-column import, built in the read fixes slice with AD-38's text
+changed there.
+
 **Proposal: 15 s.** Reasons:
 - The import's transaction held the lock 2.76 s for 10,000 columns. The import takes at most 30,000 column rows (`MAX_IMPORT_ROWS`, `src/domain/import/standard.ts`): at the
   same rate a full import holds it about 8.3 s, so 10 s would leave only about 20 % room. That estimate comes from one
@@ -137,14 +156,17 @@ at about 3,030 ms) to the answer, about 2.8 s, which matches `apply`.
 All writes were in the demo's "Retail Co – DWH" (no other workspace has a change event after 12:38 UTC; never KB, no
 `pg:seed`). The runs (with the copy's trial runs, 12:41 to 12:50 UTC, which failed on the off-screen drag) wrote 14,200
 change events there:
-- **Left, live:** the system **"Synth 1795092803262"** with its 1,000 tables, 10,000 columns, 1,000 classification
-  links, 999 source relationships and their key columns, and its import row (the spec's plan). It slows every page and
-  every write in the workspace (above). It is the 26th step from the top of Łukasz's undo history there (S30-13's second
-  run came after it), so the top bar's Undo reaches it only after 25 other steps. To remove it: delete the system in
-  its panel (one undo step), or `pg:seed -- --reset` on Łukasz's OK (it resets the preview's data and histories too).
-- **Left, live:** **Product's card on "Customer & orders"** (608, 840), placed by the repository's spec at 12:38:33: its
-  first click on "Product" in the Model tab added the entity to the canvas, as the tree does for an entity that is not
-  there ("click to add"). Not a bug; a side effect of the spec.
+- **Left by the runs, removed in the cleanup (below):** the system **"Synth 1795092803262"** with its 1,000 tables,
+  10,000 columns, 1,000 classification links, 999 source relationships and their key columns, and its import row (the
+  spec's plan). It slowed every page and every write in the workspace (above). It was the 26th step from the top of
+  Łukasz's undo history there (S30-13's second run came after it). **Correction:** the first version of this report
+  said the system could be deleted in its panel in one undo step. The app has no delete for a source system (its panel,
+  `system-panel.tsx`, has its counts, "Re-import…", its changes and its imports; the source commands, `source.ts`,
+  delete a table, not a system): it goes only by Undo of its import while that is still in the history, by deleting its
+  tables one by one (which leaves the system), or by `pg:seed -- --reset`.
+- **Left by the runs, removed in the cleanup:** **Product's card on "Customer & orders"** (608, 840), placed by the
+  repository's spec at 12:38:33: its first click on "Product" in the Model tab added the entity to the canvas, as the
+  tree does for an entity that is not there ("click to add"). Not a bug; a side effect of the spec.
 - **Back as before:** Product's name (renamed 73 times, back to "Product"), Customer's (Anna, 12 times, back to
   "Customer"); the moved cards (38 moves, an even number per run, back and forth by 40 px).
 - **Left as deleted rows:** 38 attributes added to Product and undone (soft-deleted, with their create and delete
@@ -152,6 +174,36 @@ change events there:
 - **Undo histories:** Łukasz 39 steps and Anna 12 in that workspace; the redo step Łukasz had there before the run went
   with the first new write.
 - **Not made:** no workspace of the spec's own (nothing to soft-delete).
+
+## The cleanup (decision 1, 19 November 2026)
+
+Through the app on `dev`'s preview, signed in as Łukasz's demo account, on "Customer & orders" in "Retail Co – DWH",
+with a scratchpad spec (not committed). Before each Undo the top step of Łukasz's undo list was read (`undo_step`, read
+only) and compared with the expected position and label; after it, the top bar's indicator showed "Saved", the toast
+named the step, and the step had left the undo list for the redo list (which records the revert's own change group).
+
+| Undos | Steps | Label | Result |
+| --- | --- | --- | --- |
+| 1 | 113 | Rename entity | Saved, "Undone: Rename entity" |
+| 2 to 13 | 112 down to 101 | Move card | each Saved, "Undone: Move card" (605 to 2,610 ms; Undo 3 not timed) |
+| 14 to 25 | 100 down to 89 | Rename entity | each Saved, "Undone: Rename entity" (629 to 752 ms) |
+| 26 | 88 | Import synth.csv | Saved, "Undone: Import synth.csv" (5,373 ms) |
+
+Every label matched and no Undo was refused. The run stopped twice on the scratchpad spec's own checks, not on the app,
+and went on from the next step after the database was read: after Undo 1 (it looked for the same change group in the
+redo list) and during Undo 3 (the toast's element was reused with the same text, so the spec never saw it; the step had
+been undone, the toast read "Undone: Move card").
+
+Then, read back:
+- **The system "Synth 1795092803262" is gone:** soft-deleted, no live table, column or source relationship of it; the
+  Sources tab does not show it.
+- **Product is named "Product"**, and the one card the measurement had moved besides Product's own is back in place
+  (every `canvas_item` with a change event after 12:38 UTC, against its position before its first one).
+- **Product's card is off "Customer & orders"** (412 ms to "Saved"); the entity Product is kept.
+- **The check:** one rename (Customer to "Customer (check)") took **391 ms** to "Saved" and the rename back 341 ms,
+  against 365 ms (307 to 386) before the import and 523 ms after it: the workspace's pages are back to their usual weight.
+- **Undo histories now:** Łukasz's redo list is empty (the card's removal cleared it, so the import cannot be redone); his
+  undo list has the measurement's earlier steps up to step 87 and three new ones (the card's removal and the two renames).
 
 Raw samples: `.data/measure/s30/` (git-ignored): `s30-13-2026-11-19T12-39-12-902Z.json` (the spec as written),
 `s30-13-precise-2026-11-19T12-52-26-707Z.json`, `s30-05-precise-2026-11-19T12-53-42-806Z.json`,
