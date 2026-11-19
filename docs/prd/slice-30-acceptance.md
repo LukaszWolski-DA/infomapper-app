@@ -1031,3 +1031,14 @@ the demo's "Retail Co – DWH", never KB.
     one step.
 12. **Afterwards:** the entity's name and definition as you want them (Product); the import undone. Nothing in KB was
     touched.
+
+### Checks (on `05fd339`)
+
+- CI (`check`) and Schema (`migrations`; `smoke` with the smoke writes on Supabase's local stack: 14 passed, the
+  measurement specs skipped) passed.
+- **The full run:** [run 44511289154](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/44511289154) on
+  `05fd339`, which contains `dev`'s head (`6da6c05`): 844 passed (slice 30's five specs added), 0 failed, 0 flaky, 16
+  skipped; wall-clock 22 min 29 s. Why: the top bar, the save chain (`rowSaves`, `run`) and the canvas's writes are
+  shared. Parts (time, heap peak): 1 11.9 min, 969 MB; 2 9.2 min, 1,145 MB; 3 6.9 min, 1,235 MB; 4 8.9 min, 1,056 MB;
+  5 12.0 min, 1,206 MB; 6 10.8 min, 1,230 MB; 7 10.2 min, 1,108 MB; 8 8.1 min, 1,480 MB; 9 14.8 min, 1,450 MB (it now
+  holds slice 30's folder, as the recut rule says). Later commits touch only `docs/`.
