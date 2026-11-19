@@ -657,3 +657,28 @@ includes the indicator's texts by kind (L5) and the editor's single bar (F16).
 - **L8 (Q3).** The explicit sorts in the domain as Q3's table lists them; the loader moving a crowded millisecond's
   overflow into the next millisecond (so seed rows keep their order); four-eyes' tie between two people's groups in one
   millisecond accepted?
+
+### Łukasz's answers (19 November 2026)
+
+All as step 1 recommended.
+
+- **L1.** Decided: under the lock, a write is refused when the actor's role differs in any way from what the command
+  checked (F7: `runCommand` passes the access it checked; `apply` compares).
+- **L2.** Decided: (d), the browser gzips the import's request and the route inflates it, capped at today's 25 MB; no
+  Storage. The PRD's "imports through Storage" is replaced by this everywhere (B1's wording and AD-31's proposed
+  amendment at the closing). The import itself is step 3.
+- **L3.** Decided: `undo_step` rows are hard-deleted when they leave the history (step 3).
+- **L4.** Decided: (a), the slice's branch deploys beside `dev`. Łukasz sets Vercel up before step 4; `vercel.json`
+  changes in step 4.
+- **L5.** Decided: the indicator's tooltips by kind of failure and the 30 s "no answer" limit, as Q6 proposes (step 4).
+- **L6.** Decided: "People are added by an administrator on this server for now." as the tooltip and the line under
+  the disabled "Add person".
+- **L7.** Decided: a `lock_timeout` in `apply` with the busy refusal as proposed; a provisional value in step 2, the
+  final value after S30-05's figures.
+- **L8.** Decided: the explicit sorts in the domain as Q3's table lists them; the loader moves a crowded millisecond's
+  overflow into the next millisecond; two people's groups in one millisecond accepted (a known limitation at the
+  closing).
+- **Also decided:** F3 (the history port split, step 3), F5 (six counts as one pure rule in the domain, checked by both
+  adapters), F6 (count after the rows), F8 (write phases), F9 (an update never writes a row's time column back), F13
+  (write specs only on the local stack in CI, never against the preview), F16 (one pair in the editor, step 4), Q8 (no
+  store revision).
