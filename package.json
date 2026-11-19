@@ -26,7 +26,9 @@
     "pg:migrate": "tsx scripts/pg-migrate.ts",
     "pg:seed": "tsx scripts/pg-seed.ts",
     "pg:accounts": "tsx scripts/pg-accounts.ts",
-    "pg:kb": "tsx scripts/pg-kb.ts"
+    "pg:kb": "tsx scripts/pg-kb.ts",
+    "pg:backup": "tsx scripts/pg-kb.ts --backup",
+    "pg:restore": "tsx scripts/pg-kb.ts --restore"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",

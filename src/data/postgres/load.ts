@@ -16,7 +16,7 @@
 
 import type { AnyRow, StoreSchema } from "../rows";
 import type { Queryable } from "./pool";
-import { timeColumnOf } from "./tables";
+import { readTable, timeColumnOf } from "./tables";
 
 export interface LoadReport {
   /** Per table: the rows given and the rows the database holds after the load. */
@@ -308,6 +308,47 @@ export async function replaceOrganization(
     if (wrong.length) throw new Error(`Counts differ, nothing was written: ${wrong.map((c) => `${c.table} ${c.given} given, ${c.stored} stored`).join("; ")}`);
     await db.query("commit");
     return { counts, peopleKept: existingPeople, removed, crowded };
+  } catch (e) {
+    await db.query("rollback").catch(() => undefined);
+    throw e;
+  }
+}
+
+/**
+ * One organization's rows as the store reads them (slice 31, C2.1: `pg:backup`), from one state of the data (a read-only
+ * REPEATABLE READ transaction): its organization, its organization rows except `organization_access` (never in a
+ * backup, as never in a copy), every row of its workspaces (soft-deleted rows included; the undo history, the store's own
+ * table, left out) in the stored order, and the people its rows name without their Supabase link (`shaped`). Tables
+ * without a row are left out. The local file's shape around it is the caller's.
+ */
+export async function readOrganization(db: Queryable, schema: StoreSchema, organizationId: string): Promise<Record<string, AnyRow[]>> {
+  await db.query("begin transaction isolation level repeatable read read only");
+  try {
+    const columns = await databaseColumns(db);
+    if (!(await db.query("select 1 from organization where id = $1", [organizationId])).rows.length) throw new Error("The database has no such organization: nothing was read.");
+    const workspaces = (await db.query<{ id: string }>("select id from workspace where organization_id = $1", [organizationId])).rows.map((r) => r.id);
+    const out: Record<string, AnyRow[]> = {};
+    for (const table of Object.keys(schema.rules)) {
+      if (table === "organization_access") continue;
+      const how = ownership(table, columns.get(table) ?? new Set());
+      if (how === "person") continue;
+      const read =
+        how === "workspace"
+          ? { where: "workspace_id = any($1::uuid[])", params: [workspaces] }
+          : how === "organization"
+            ? { where: "organization_id = $1", params: [organizationId] }
+            : { where: "id = $1", params: [organizationId] };
+      const rows = await readTable(db, schema, table, read);
+      if (rows.length) out[table] = rows;
+    }
+    const named = new Set<string>();
+    for (const [table, rows] of Object.entries(out)) {
+      const refs = Object.entries(schema.rules[table]?.foreignKeys ?? {}).filter(([, target]) => target === "app_user").map(([c]) => c);
+      for (const r of rows) for (const c of refs) if (typeof r[c] === "string") named.add(r[c] as string);
+    }
+    if (named.size) out.app_user = await readTable(db, schema, "app_user", { where: "id = any($1::uuid[])", params: [[...named]] });
+    await db.query("commit");
+    return out;
   } catch (e) {
     await db.query("rollback").catch(() => undefined);
     throw e;

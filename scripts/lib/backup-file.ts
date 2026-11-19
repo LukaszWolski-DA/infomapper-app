@@ -1,5 +1,5 @@
-// A local data file read only from a copy of a backup (slice 31, T2, F9; CLAUDE.md: "KB is read only on a copy of a
-// backup"): the path must lie under `.data/backups/` and is never `dev-db.json`; the file is copied to a temporary file
+// A local data file read only from a copy of a backup (slice 31, T2, F9; CLAUDE.md: Łukasz's model "is read only on a
+// copy of a backup"): the path must lie under `.data/backups/` and is never `dev-db.json`; the file is copied to a temporary file
 // first and only the copy is read, then removed. The rows are upgraded to the current format in memory with the local
 // adapter's own upgrade (`upgradeDb`), never written back; a newer or an unknown format is refused.
 import fs from "node:fs";
@@ -59,4 +59,20 @@ export function readBackupCopy(given: string | undefined, root = process.cwd()):
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** The folder of the database's backups (C2.1), git-ignored with `.data/`. */
+export const BACKUPS_PG = path.join(".data", "backups", "pg");
+
+/** A new backup's path: `kb-<yyyymmdd-hhmm>.json`, with the seconds when that minute has one already. */
+export function backupName(at: Date, folder = BACKUPS_PG): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  const stem = `kb-${at.getFullYear()}${p(at.getMonth() + 1)}${p(at.getDate())}-${p(at.getHours())}${p(at.getMinutes())}`;
+  const first = path.join(folder, `${stem}.json`);
+  return fs.existsSync(first) ? path.join(folder, `${stem}${p(at.getSeconds())}.json`) : first;
+}
+
+/** Rows in the local file's shape: the current format and every table of the store, empty where none (C2.1). */
+export function localFileOf(rows: Readonly<Record<string, readonly unknown[]>>, schema: { rules: Readonly<Record<string, unknown>> }): Record<string, unknown> {
+  return { format: DEV_DB_FORMAT, ...Object.fromEntries(Object.keys(schema.rules).map((t) => [t, rows[t] ?? []])) };
 }

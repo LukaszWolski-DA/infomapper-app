@@ -1,9 +1,9 @@
-// The contract of KB's copy (slice 31, S31-10, F6): a local data file copied into Postgres one organization at a time
-// (`replaceOrganization`, as `npm run pg:kb` does) reads the same on both adapters. Demo data only: never KB.
+// The contract of the copy of Łukasz's model (slice 31, S31-10, F6): a local data file copied into Postgres one organization at a time
+// (`replaceOrganization`, as `npm run pg:kb` does) reads the same on both adapters. Demo data only: never his model.
 //
 // - The file: the demo and "Performance test" built in memory (`seedRows`), then, through the domain's commands on the
 //   local adapter, an import into a new system and a re-import that raises changes to resolve, so `change_event`,
-//   `source_import` and `source_change` hold rows (the seed has none of them, and KB has all three: step 1's counts).
+//   `source_import` and `source_change` hold rows (the seed has none of them, and his model has all three: step 1's counts).
 //   It is read back as `pg:kb` reads a backup (`upgradedFrom`); its organizations' passwords are left out of the local
 //   side, as the copy leaves them out.
 // - Postgres: a database of its own on the contract server (`{name}_copy`), the migrations applied, every organization of
@@ -31,10 +31,10 @@ import { SEED_IDS } from "@/data/local/seed";
 import { createLocalDataStore } from "@/data/local/store";
 import type { DataStore } from "@/data/ports";
 import { pgClientConfig } from "@/data/postgres/config";
-import { loadRows, placeAll, replaceOrganization } from "@/data/postgres/load";
+import { loadRows, placeAll, readOrganization, replaceOrganization } from "@/data/postgres/load";
 import { getPool } from "@/data/postgres/pool";
 import { createPostgresDataStore } from "@/data/postgres/store";
-import { upgradedFrom } from "../../scripts/lib/backup-file";
+import { localFileOf, upgradedFrom } from "../../scripts/lib/backup-file";
 import { organizationRows, type Tables } from "../../scripts/lib/organization-rows";
 import { resetRefusal } from "../../scripts/lib/seed-organizations";
 import { seedRows } from "../../scripts/lib/seed-rows";
@@ -106,7 +106,7 @@ async function copyDatabase(): Promise<string> {
   return url.toString();
 }
 
-describe.runIf(!!CONTRACT_DB)("KB's copy on Postgres: one organization at a time, read as the local adapter reads the file (S31-10)", () => {
+describe.runIf(!!CONTRACT_DB)("the copy on Postgres: one organization at a time, read as the local adapter reads the file (S31-10)", () => {
   let dir: string;
   let file: DevDb;
   let tables: Tables;
@@ -216,7 +216,7 @@ describe.runIf(!!CONTRACT_DB)("KB's copy on Postgres: one organization at a time
     expect(await resetRefusal(client)).toBeNull();
     const org = retailOrg();
     const renamed = rowsOf(org);
-    const standIn = { ...renamed, organization: renamed.organization!.map((o) => ({ ...o, name: "A stand-in for KB" })) };
+    const standIn = { ...renamed, organization: renamed.organization!.map((o) => ({ ...o, name: "A stand-in for a copied organization" })) };
     await copy(org, standIn);
     const refusal = await resetRefusal(client);
     expect(refusal).toContain("1 organization the seed does not make");
@@ -241,5 +241,51 @@ describe.runIf(!!CONTRACT_DB)("KB's copy on Postgres: one organization at a time
     const foreign = { ...rows, entity: [...rows.entity!, placed.entity!.find((e) => !workspacesOf(org).includes(e.workspace_id as string))!] };
     await expect(copy(org, foreign)).rejects.toThrow("belongs to a workspace not given");
     expect(await everything()).toBe(before);
+  }, 300_000);
+
+  it("backs up one organization, and a restore after a change gives the backup's rows and counts; the others and their undo steps stay (C2.1)", async () => {
+    const org = retailOrg();
+    const [ws] = workspacesOf(org);
+    const [otherWs] = workspacesOf(otherOrg());
+    const backup = await readOrganization(client, STORE_SCHEMA, org);
+    expect(backup.organization_access).toBeUndefined();
+    expect(backup.app_user!.every((u) => !("auth_user_id" in u))).toBe(true);
+    // the backup holds what the copy wrote: the organization's rows of the file, table by table
+    const copied = rowsOf(org);
+    for (const table of new Set([...Object.keys(copied), ...Object.keys(backup)])) expect(backup[table]?.length ?? 0, table).toBe(copied[table]?.length ?? 0);
+    const text = JSON.stringify(localFileOf(backup, STORE_SCHEMA));
+
+    // changes online: a rename, an undo step of each organization
+    const person = tables.organization_member!.find((m) => m.organization_id === org)!.user_id as string;
+    await client.query("update project set name = 'Changed after the backup' where workspace_id = $1", [ws]);
+    for (const [w, g] of [[ws, "01a1d0ff-0000-7000-8000-000000000011"], [otherWs, "01a1d0ff-0000-7000-8000-000000000012"]]) {
+      await client.query("insert into undo_step (workspace_id, user_id, list, position, change_group_id, label, created_at) values ($1, $2, 'undo', 1, $3, 'Step', now())", [w, person, g]);
+    }
+    const otherBefore = await readOrganization(client, STORE_SCHEMA, otherOrg());
+
+    // the restore: pg:restore's path, the backup read as a file
+    const restored = placeAll(upgradedFrom(text).db as unknown as Record<string, unknown>).tables as Tables;
+    const report = await replaceOrganization(client, STORE_SCHEMA, org, organizationRows(restored, org, STORE_SCHEMA), { placed: true });
+    expect(report.removed.undo_step).toBe(1);
+    expect(await readOrganization(client, STORE_SCHEMA, org)).toEqual(backup);
+    expect(await count("select count(*) as n from undo_step where workspace_id = $1", [ws])).toBe(0);
+    expect(await count("select count(*) as n from undo_step where workspace_id = $1", [otherWs])).toBe(1);
+    expect(await readOrganization(client, STORE_SCHEMA, otherOrg())).toEqual(otherBefore);
+    await client.query("delete from undo_step");
+    expectReadsEqual(await readEverything(store, file));
+  }, 300_000);
+
+  it("a backup reads the same on both adapters: the local adapter over the backup's file, Postgres after it is copied in again", async () => {
+    const org = retailOrg();
+    const backup = upgradedFrom(JSON.stringify(localFileOf(await readOrganization(client, STORE_SCHEMA, org), STORE_SCHEMA))).db;
+    const backupFile = path.join(dir, "backup.json");
+    fs.writeFileSync(backupFile, JSON.stringify(backup));
+    const local = await readEverything(createLocalDataStore(backupFile, STORE_SCHEMA), backup);
+    await replaceOrganization(client, STORE_SCHEMA, org, organizationRows(placeAll(backup as unknown as Record<string, unknown>).tables as Tables, org, STORE_SCHEMA), { placed: true });
+    const pg = await readEverything(store, backup);
+    const mine = workspacesOf(org);
+    const names = Object.keys(local).filter((n) => mine.some((w) => n.includes(w)));
+    expect(names.length).toBeGreaterThan(50);
+    for (const name of names) expect.soft(pg[name], name).toEqual(local[name]);
   }, 300_000);
 });
