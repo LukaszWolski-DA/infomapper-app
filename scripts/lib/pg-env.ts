@@ -52,3 +52,28 @@ export function targetName(url: string): string {
     return "(unreadable connection string)";
   }
 }
+
+/**
+ * The refusal of a target that is not `infomapper-dev` (slice 31, F10; until slice D), or null: the database is
+ * `postgres` on the Supabase project `SUPABASE_URL` names (its reference in the session pooler's user name,
+ * `postgres.<reference>`, or the direct host `db.<reference>.supabase.co`), and the server's name is `dev`. No project
+ * reference is written in the repository; nothing of the values is in the message.
+ */
+export function devTargetRefusal(values: { migrationUrl: string; supabaseUrl: string | undefined; serverName: string | undefined }): string | null {
+  const refused = "The target is not infomapper-dev (INFOMAPPER_MIGRATION_URL, SUPABASE_URL and INFOMAPPER_SERVER_NAME must name it): nothing was changed.";
+  if (values.serverName !== "dev" || !values.supabaseUrl) return refused;
+  try {
+    const host = new URL(values.supabaseUrl).hostname;
+    const m = /^([a-z0-9]+)\.supabase\.co$/.exec(host);
+    if (!m) return refused;
+    const reference = m[1]!;
+    const db = new URL(values.migrationUrl);
+    if (db.pathname !== "/postgres") return refused;
+    const user = decodeURIComponent(db.username);
+    const pooled = user === `postgres.${reference}` && /\.pooler\.supabase\.com$/.test(db.hostname);
+    const direct = user === "postgres" && db.hostname === `db.${reference}.supabase.co`;
+    return pooled || direct ? null : refused;
+  } catch {
+    return refused;
+  }
+}

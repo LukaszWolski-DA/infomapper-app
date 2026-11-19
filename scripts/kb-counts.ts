@@ -13,28 +13,16 @@
 //   npx tsx scripts/kb-counts.ts .data/backups/kb-count-copy.json
 //   Remove-Item .data\backups\kb-count-copy.json
 import fs from "node:fs";
-import path from "node:path";
 import { STORE_SCHEMA } from "../src/compose/tables";
 import { upgradeDb } from "../src/data/local/file";
 import { DEV_DB_FORMAT, type DevDb } from "../src/data/local/schema";
 import { timeColumnOf } from "../src/data/postgres/tables";
 import { uuidv7 } from "../src/domain/ids";
+import { backupPath } from "./lib/backup-file";
 import { seedRows } from "./lib/seed-rows";
 
 type Row = Record<string, unknown>;
 type Tables = Record<string, Row[]>;
-
-/** The file given, refused unless it lies under `.data/backups/` and is not the local file itself. */
-export function backupPath(given: string | undefined, root = process.cwd()): string {
-  if (!given) throw new Error("Give a file under .data/backups/ (a copy of a backup), never .data/dev-db.json.");
-  if (path.basename(given).toLowerCase() === "dev-db.json") throw new Error("Never .data/dev-db.json: give a copy of a backup.");
-  const backups = fs.realpathSync(path.join(root, ".data", "backups"));
-  const real = fs.realpathSync(path.resolve(root, given));
-  const rel = path.relative(backups, real);
-  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) throw new Error("The file must lie under .data/backups/.");
-  if (path.basename(real).toLowerCase() === "dev-db.json") throw new Error("Never .data/dev-db.json: give a copy of a backup.");
-  return real;
-}
 
 const tablesOf = (db: object): Tables =>
   Object.fromEntries(Object.entries(db).filter(([k, v]) => k !== "format" && Array.isArray(v))) as Tables;
