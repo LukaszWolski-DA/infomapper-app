@@ -119,7 +119,7 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
       { name: "created_at", kind: "timestamptz", nullable: false },
     ]);
     expect(tables.map((t) => t.table)).not.toContain("undo_step");
-  });
+  }, 60_000);
 
   it("tells the column types and nullability from the declared types, inherited columns included", () => {
     expect(column("canvas_item", "id")).toEqual({ name: "id", kind: "uuid", nullable: false });

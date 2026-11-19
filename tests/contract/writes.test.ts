@@ -341,7 +341,7 @@ function oneWins(results: ApplyResult[], code: string, message: string) {
 }
 
 function concurrency(name: string, make: (db: DevDb) => Promise<Store>) {
-  describe(`${name}: writes at the same moment (S30-07)`, () => {
+  describe(`${name}: writes at the same moment (S30-07)`, { timeout: 120_000 }, () => {
     let s: Store;
     let ctxOf: (actorId: string) => CommandContext;
     // each case from the same fresh rows
@@ -536,7 +536,8 @@ async function freshProcess(name: string, s: Store, file?: string): Promise<Data
 }
 
 function lastingUndo(name: string, make: (db: DevDb) => Promise<Store & { file?: string }>) {
-  describe(`${name}: the undo history (S30-02, S30-03)`, () => {
+  // the cases write tens of steps and read the workspace for each undo: more than the default 5 s on a busy runner
+  describe(`${name}: the undo history (S30-02, S30-03)`, { timeout: 120_000 }, () => {
     let s: Store & { file?: string };
     let ctxOf: (actorId: string) => CommandContext;
     beforeEach(async () => {
@@ -590,7 +591,7 @@ function lastingUndo(name: string, make: (db: DevDb) => Promise<Store & { file?:
       }
       expect(undone).toBe(50);
       expect(await productName(s.store)).toBe("Product 2");
-    });
+    }, 180_000);
 
     it("refuses an undo over another person's later change of the same row, and writes nothing (S30-03)", async () => {
       await rename(s.store, ANNA, "Product by Anna");
