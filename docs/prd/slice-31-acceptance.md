@@ -40,8 +40,8 @@ were not opened. Everything below comes from the code, the migrations, the docs 
 ### Q2. KB's counts before the copy
 
 A read-only count script, run by Łukasz on a copy of his newest backup; it prints counts and schema names only (no
-names, no content, no e-mail, no id). **Proposal:** `scripts/kb-counts.ts`, added in its own small commit on this branch
-on Łukasz's OK (it is not application code and writes nothing), or as step 2's first commit.
+names, no content, no e-mail, no id). **Decided:** `scripts/kb-counts.ts`, added in its own commit on this branch before step 2 (`a3c72ad`; it is not
+application code and writes nothing).
 
 **What it reads:** only the path it is given, which must be a file under `.data/backups/` and not named `dev-db.json`
 (it refuses otherwise); it never opens `.data/dev-db.json`. It parses the JSON, upgrades a copy **in memory** with
@@ -69,7 +69,122 @@ $b = Get-ChildItem .data\backups\dev-db-*.json | Sort-Object LastWriteTime | Sel
 ```
 
 If the newest backup is older than Łukasz's last change in KB, a fresh backup first (CLAUDE.md, "Łukasz's test model").
-Its output pasted into this document by Łukasz plans step 2's tests and the measurement.
+**Run on Łukasz's command (19 November 2026, 17:36).** `scripts/kb-counts.ts` came in its own commit (`a3c72ad`). No dev
+server served this checkout: no node process, and nothing listening on 3000, 3001, 3200, 3300 or 3400. A fresh backup was
+made: `.data/backups/dev-db-20261119-1736.json`, also as `kb-model-latest.json`. The SHA-256 of `.data/dev-db.json` was
+`f2b60e19c457190d878f7052a331a84dcfb4e6fdfd32978a5e3b16d4816de20a` before the backup, after it and after the count, and
+both backups have the same SHA-256. The script ran on a temporary copy of that backup,
+`.data/backups/kb-count-copy.json`, which was removed afterwards. Its output, counts and schema names only:
+
+```text
+File: 6,679,171 bytes; format 17, in memory 17.
+The upgrade in memory made rows: none.
+Organizations: 3; named KB: 1.
+KB's workspaces: 1 (0 deleted).
+
+Rows per table: KB live / KB deleted / other organizations' / the demo's Retail Co – DWH
+  app_user                           0       0   (6 people)       0
+  attribute                        190      10           68      72
+  attribute_input                    0       0            0       3
+  canvas                             7       7            4       3
+  canvas_item                       87      35           19      25
+  change_event                    3752       0            0       0
+  classification                    19       0           57      19
+  classification_link               17       9           20      10
+  concept                            4       1            8       4
+  cube_entity                        6       3            0       7
+  cube_mapping                      54       6            0      19
+  cube_mapping_input                54       7            0      19
+  cube_measure                       9       0            0       6
+  document_definition                1       0            0       3
+  entity                            29       4           12      13
+  frame                              2       4            0       0
+  label                              2       0            2       2
+  label_link                         4       1            6       6
+  mapping                           97      10           28      14
+  mapping_input                     97      10           28      14
+  note                               3       1            3       3
+  organization                       1       0            2       0
+  organization_access                1       0            2       0
+  organization_licence               2       0            0       0
+  organization_member                1       0            5       0
+  project                            1       1            4       2
+  project_canvas                     7       0            5       4
+  relationship                      32       2           10      12
+  requirement                        0       3            5       6
+  requirement_link                   0       1           13      16
+  source_change                     29       0            0       0
+  source_column                     97      74           72      36
+  source_import                      9       0            0       0
+  source_relationship               15       6            4       2
+  source_relationship_column        15       6            4       2
+  source_system                      2       0            6       3
+  source_table                      12       5           12       6
+  stereotype                         5       0           15       5
+  workspace                          1       0            3       1
+  workspace_member                   1       0            8       4
+KB's rows as JSON: about 6,435,396 bytes.
+
+Fields in KB's rows that no seed row uses: change_event (no seed rows: after_image, before_image, change_group_id, context_label_id, id, object_id, object_type, occurred_at, operation, user_id, workspace_id); source_change (no seed rows: created_at, created_by, deleted_at, detail, id, kind, mapping_id, object_label, resolution, resolved_at, resolved_by, severity, source_column_id, source_import_id, source_system_id, source_table_id, status, updated_at, updated_by, version, workspace_id); source_import (no seed rows: changes_high, changes_raised, channel, columns_changed, columns_missing, columns_new, columns_renamed, created_at, created_by, deleted_at, id, relationships_new, source_label, source_system_id, tables_new, updated_at, updated_by, version, workspace_id).
+
+People:
+  KB's organization members: 1; members of KB's workspaces: 1.
+  People KB's rows name: 1; not in app_user: 0.
+  Of them, not KB's organization members: 0; not members of a KB workspace: 0.
+  Of them, members of another organization in the file: 0.
+  Of them, with an e-mail equal to a demo person's: 0.
+  Of them, with an e-mail not in lower case: 0.
+
+Foreign keys from KB's rows to rows outside KB (people left out): none.
+
+Time columns (KB's rows): values not in ISO milliseconds / the most rows in one millisecond / milliseconds with more than 999
+  source_table.created_at               0       5     0
+  source_column.created_at              0      72     0
+  source_relationship.created_at        0       8     0
+  source_relationship_column.created_at      0       8     0
+  source_change.created_at              0       5     0
+  classification.created_at             0      19     0
+  classification_link.created_at        0       8     0
+  canvas_item.created_at                0       3     0
+  frame.created_at                      0       2     0
+  change_event.occurred_at              0      99     0
+  stereotype.created_at                 0       5     0
+
+KB's organization_access rows: 1; licences: 2.
+Change events of KB's password with a value other than the marker: 0.
+```
+
+**What the counts mean:**
+- **Q3:** the file is at format 17 already, and the upgrade in memory makes no row. The ids are stable from one copy to
+  the next.
+- **F1:** KB's rows name one person, KB's only member. That person is in `app_user`, belongs to no other organization,
+  and has no demo person's e-mail. By Łukasz's decision, step 2 builds only the stop (with its test); the mapping is not
+  built.
+- **S31-02:** KB has no demo person as a member, so the demo accounts cannot see it after a copy.
+- **Section 3 (fields without a column):** none. Three tables have no seed row to compare with: `change_event`,
+  `source_change` and `source_import`. Their fields were checked against the migrations by hand, and every field has a
+  column (`source_import`'s `changes_raised` and `changes_high` came by `alter table`). Step 2's copy checks it again
+  against the database (`strayFields`).
+- **Cross references:** no foreign key leads from KB's rows to a row outside KB.
+- **T3 (the stored order):** no time value is outside the domain's ISO form. The most rows in one millisecond is 99
+  (`change_event.occurred_at`), and no millisecond holds more than 999. `spreadCrowded` moves nothing, and every row keeps
+  its time to the millisecond.
+- **Q4:** KB has one `organization_access` row, which is not copied, and no change event holds a password value other
+  than the marker. Its two licences are copied (InfoCube and InfoDocumenter: KB has facts, dimensions and a document).
+- **KB's size against the demo:**
+  - KB is one workspace. Against the demo's "Retail Co – DWH" it has 29 live entities to 13, 190 attributes to 72, 97
+    mappings and 54 dimensional mappings to 14 and 19, 97 live columns to 36, 7 canvases to 3 and 87 cards to 25.
+  - That is about two to three times the demo's largest workspace and well below "Performance test" (100 cards).
+  - KB also has 3,752 change events, which the demo's seed has none of. Its rows are about 6.4 MB as JSON, almost all of
+    it those events' images.
+  - The editor's snapshot does not carry the change events. Whether a canvas page reads them on Postgres is one thing
+    the measurement on KB will show: a module's four-eyes reads the page's change events.
+- **Step 2, from these counts (beyond the plan below):** the demo's seed has no row in `change_event`, `source_change`
+  or `source_import`, so neither the seed loader nor the contract suite has ever loaded or compared those tables'
+  reads on Postgres with rows in them. KB has all three. Step 2's copy test therefore builds demo data that has them:
+  an import and a re-import through the domain's commands (`importSources`) into a demo workspace, which writes
+  imports, changes to resolve and change events, before the file is written and copied (F6). The reads of
+  `tests/contract/reads.test.ts` then compare those tables on both adapters.
 
 ### Q3. The upgrade in memory
 
@@ -312,9 +427,17 @@ e-mail is in no committed file.
   full run on the final commit (merging `dev` first). Merge and tag on Łukasz's command; the measurement on KB as a
   `chore/` PR after it (S31-06).
 
-## Questions for Łukasz
+## Decisions on step 1 (Łukasz, 19 November 2026)
 
-1. Q2's count script: add it now in its own commit (so you can run it before step 2), or as step 2's first commit?
-2. F1: if Q2 finds people of KB's rows whose e-mail is a demo person's, map them to the online person, or leave them out?
-3. Q8: the reset's guard by "an organization the seed does not make" (no marker), as proposed?
-4. F11: no full run in step 3 (one before the merge), or keep the PRD's?
+Claude took the technical calls on Łukasz's behalf, as agreed; they are quoted for his approval at the closing.
+
+- **F1 to F12:** accepted as proposed above.
+- **Question 2 (F1):** decided after the counts. If no person named by KB's rows has a demo person's e-mail, step 2 builds
+  only the stop. If some have, the copy maps them to the online person, in every column that refers to `app_user`, and
+  leaves the change images as written. Leaving them out is not an option, because of the foreign keys. **The counts
+  found none, so only the stop is built.**
+- **Question 3 (Q8):** yes. The reset's guard refuses while the database holds any organization the seed does not make:
+  no marker, and no name of KB in the repository.
+- **Question 4 (F11):** no full run in step 3, and one full run before the merge (step 5).
+- **Question 1 (Q2):** the count script was added now, in its own commit on `slice/31-kb-copy`, before step 2 (`a3c72ad`),
+  and was run on Łukasz's command (Q2 above).
