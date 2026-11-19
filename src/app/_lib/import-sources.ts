@@ -3,9 +3,7 @@ import { revalidatePath } from "next/cache";
 import { importSources, importStateOf, type ImportOutcome } from "@/domain/commands/import";
 import { runCommand, type ActionResult } from "./run-command";
 
-/** Bytes one upload may have: the largest text an import takes (`MAX_IMPORT_TEXT`) and the review's choices around it. */
-export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-export const TOO_LARGE = "The file is too large for one import. Split it by database or schema.";
+export { MAX_INFLATED_BYTES, MAX_UPLOAD_BYTES, TOO_LARGE, UPLOAD_TYPE } from "@/ui/import-upload";
 
 /**
  * An import (slice 7a): the route handler's write, as a server action's (AD-23): the signed-in user, the workspace's

@@ -1,5 +1,7 @@
 // Slice 7a, step 4: the import's upload route (src/app/w/[workspaceId]/import/route.ts) before the wizard uses it
 // (step 5). S7A-04's write through the server, S7A-12's refusal, P8, and a body larger than the proxy's default 10 MB.
+// Slice 30 (L2): the body is gzipped JSON, as the wizard sends it: its compressed size against Vercel's 4.5 MB, its
+// inflated size against today's 25 MB.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -12,7 +14,9 @@ import { readStandard } from "../../src/domain/import/standard";
 import { E2E_DB } from "../config";
 import { loadModel, RETAIL, signInAs } from "../slice-01a/helpers";
 import { expect, test } from "./fixtures";
-import { archive } from "./helpers";
+import { randomBytes } from "node:crypto";
+import { UPLOAD_TYPE } from "../../src/ui/import-upload";
+import { archive, postImport } from "./helpers";
 
 const sample = (name: string) => fs.readFileSync(path.resolve("src", "domain", "import", "samples", name), "utf8");
 
@@ -25,7 +29,7 @@ async function inputFor(text: string, target: ImportTarget, name: string) {
 }
 
 const post = async (page: Page, data: unknown) => {
-  const response = await page.request.post(`/w/${RETAIL}/import`, { data });
+  const response = await postImport(page, RETAIL, data);
   return { status: response.status(), body: await response.json() };
 };
 
@@ -81,7 +85,7 @@ test("P8 (route): a review that no longer matches the system writes nothing and 
   expect(await createLocalDataStore(E2E_DB).model.listImports(RETAIL)).toEqual([]);
 });
 
-test("the upload: a body above the proxy's default 10 MB arrives whole; above 25 MB it is refused", async ({ page }) => {
+test("the upload: a text above the proxy's default 10 MB arrives whole; above 25 MB inflated, or 4.4 MB compressed, it is refused", async ({ page }) => {
   test.setTimeout(120_000);
   await signInAs(page, "Łukasz");
   // about 12 MB of rows: more than one import takes, so the server answers with the row limit, having read it all
@@ -90,6 +94,14 @@ test("the upload: a body above the proxy's default 10 MB arrives whole; above 25
   expect(Buffer.byteLength(text)).toBeGreaterThan(10 * 1024 * 1024);
   const { body } = await post(page, { target: { newName: "Big" }, channel: "file", sourceLabel: "big.csv", text, scope: ["x"], compare: "schemas", renames: [], fingerprint: "x" });
   expect(body).toMatchObject({ ok: false, message: "The file has 150,000 rows; one import takes up to 30,000. Split it by database or schema." });
-  const huge = await page.request.post(`/w/${RETAIL}/import`, { data: { text: "x".repeat(26 * 1024 * 1024) } });
-  expect(huge.status()).toBe(413);
+  // a small body that inflates past 25 MB
+  const huge = await post(page, { text: "x".repeat(26 * 1024 * 1024) });
+  expect(huge.status).toBe(413);
+  expect(huge.body).toMatchObject({ ok: false, message: "The file is too large for one import. Split it by database or schema." });
+  // a compressed body above the limit (bytes that do not compress), refused before it is inflated
+  const dense = await page.request.post(`/w/${RETAIL}/import`, { data: randomBytes(4_500_000), headers: { "content-type": UPLOAD_TYPE } });
+  expect(dense.status()).toBe(413);
+  // plain JSON, as before slice 30, is not read
+  const plain = await page.request.post(`/w/${RETAIL}/import`, { data: { text: "database,schema,table,column,data_type" } });
+  expect(plain.status()).toBe(415);
 });
