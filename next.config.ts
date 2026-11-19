@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
   // the build's file tracing cannot see; every server route may open a connection, so every one carries the file (on
   // Vercel a function holds only its traced files).
   outputFileTracingIncludes: { "/**": ["./src/data/postgres/supabase-ca.crt"] },
+  // fix/dev-action-logging: the development server logs every Server Function call with its arguments by default (a
+  // sign-in's password included, slice 31's acceptance). Not `logging: false`: the request lines and the browser's
+  // warnings stay, and a failing e2e run's server.log is read for them (tests/dev-logging.test.ts).
+  logging: { serverFunctions: false },
   experimental: {
     turbopackFileSystemCacheForDev: !e2eServer,
     // The proxy (src/proxy.ts) buffers request bodies up to this size; an import's upload may be up to 25 MB (slice 7a,
