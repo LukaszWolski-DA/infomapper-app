@@ -1120,3 +1120,14 @@ config (`playwright.pg.config.ts`) runs `testDir: "e2e/slice-29"` only, and that
 out of the local full run (`POSTGRES_ONLY_FOLDERS`); its helpers (`e2e/slice-29/helpers.ts`: Supabase sign-in, queries
 on the app's database) are the smoke's. `e2e/slice-30/` is a local folder of the full run. Moving the two specs would
 mean a second Postgres-only folder in both lists; they keep slice 29's folder, named `S30-…`.
+
+### Checks (on `924a989`, the closing's commit)
+
+- CI (`check`) and Schema (`migrations`, `smoke`) passed.
+- **The full run:** [run 44517265542](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/44517265542) on
+  `924a989`, which contains `dev`'s head (`6da6c05`): 844 passed, 0 failed, 0 flaky, 16 skipped; wall-clock 16 min 8 s.
+  Parts (time, heap peak): 1 9.3 min, 1,033 MB; 2 7.4 min, 1,412 MB; 3 7.8 min, 1,131 MB; 4 8.1 min, 1,249 MB; 5 9.6 min,
+  1,400 MB; 6 11.9 min, 1,174 MB; 7 7.8 min, 1,308 MB; 8 7.9 min, 1,438 MB; 9 12.5 min, 1,442 MB. Later commits touch
+  only Markdown in `docs/` (`git diff --stat 924a989..HEAD`).
+- **PR 80** is out of draft, its description updated; not merged. The merge into `dev` and the tag `slice-30` wait for
+  Łukasz's approval of the decisions above and his command.
