@@ -513,3 +513,8 @@ during the acceptance:
   conflict.
 - The docs: `decisions.md` (AD-31 amended again, AD-39 new, AD-38's note on `lock_timeout`), CLAUDE.md, README,
   `known-limitations.md`, `ideas.md`; `data-model-v2.md` unchanged (no field without a column, Q1).
+- CI's `check` and Schema's `migrations` and `smoke` pass on `ec4a2a6`.
+- **The full run:** E2E run 44621548760 on `ec4a2a6` (which contains `dev`'s head `d5926a3`): 844 passed, 0 failed,
+  0 flaky, 16 skipped; 15 min 6 s wall-clock. Parts (minutes, the server's heap peak, one server start each): 1: 9.3,
+  1,217 MB; 2: 7.6, 1,412 MB; 3: 6.6, 1,360 MB; 4: 10.2, 1,024 MB; 5: 12.1, 1,144 MB; 6: 10.6, 1,668 MB; 7: 8.9,
+  1,249 MB; 8: 7.3, 1,421 MB; 9: 9.7, 1,807 MB. This commit after it touches Markdown in `docs/` only.
