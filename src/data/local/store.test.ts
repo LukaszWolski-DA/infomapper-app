@@ -267,7 +267,10 @@ describe("applying a write set", () => {
     const { actor, access } = await accessOf("lukasz", "Retail Co – DWH");
     const ws = access.workspace.id;
     const shared = (await store.canvases.list(ws)).find((c) => c.name === "Customer & orders")!;
-    const [link] = await store.canvases.listLinksOfCanvas(ws, shared.id);
+    // slice 30 (F5): D-28's counts are checked inside the write, so the link removed is one whose project keeps a canvas
+    const links = await store.canvases.listLinksOfCanvas(ws, shared.id);
+    const counts = await Promise.all(links.map(async (l) => (await store.canvases.listLinksOfProject(ws, l.project_id)).length));
+    const link = links.find((_, i) => counts[i]! > 1);
     expect(await store.apply(buildWriteSet(ctxFor(actor.id), ws, [{ kind: "remove", table: "project_canvas", before: link! }]))).toEqual({ ok: true });
     expect(await store.canvases.listLinksOfCanvas(ws, shared.id)).toHaveLength(1);
     expect(await store.changeEvents.list(ws)).toMatchObject([{ operation: "delete", object_id: shared.id, before_image: link, after_image: null }]);
