@@ -851,3 +851,56 @@ At that ratio the 4.4 MB limit holds about 43 MB of such text, so the 25 MB infl
   heap peak): 1 7.8 min, 1,261 MB; 2 7.4 min, 1,382 MB; 3 9.8 min, 1,165 MB; 4 7.0 min, 1,193 MB; 5 8.3 min, 1,739 MB;
   6 13.5 min, 1,243 MB; 7 6.7 min, 1,392 MB; 8 8.2 min, 1,335 MB; 9 13.9 min, 1,407 MB. Later commits touch only
   `docs/`.
+
+---
+
+## Step 4: the screen, the check on dev:pg, the measurement prepared (19 November 2026)
+
+Step 3 accepted (Łukasz, 19 November 2026).
+
+- **L4.** Decided, changed to (b): Łukasz's acceptance runs on `npm run dev:pg` on the laptop before the merge; the
+  measurement (S30-05, S30-13) runs on `dev`'s preview after the merge. No `vercel.json` change; the Ignored Build Step
+  stays on `dev` only (Łukasz set it back). After the merge Łukasz adds one plain Preview variable for `dev`:
+  `INFOMAPPER_SERVER_NAME=dev`.
+- **"Add person" online.** Decided: the whole box disabled (the fields too, not only Continue), with L6's line under
+  it. Temporary: a known limitation that the people slice removes when it brings a working way to add people online.
+
+### Step 3's question: the two timeouts and parts 6 and 9
+
+**The two tests `bedb0da` gave a timeout** are Vitest unit tests (`npm test`, CI's `check`), not e2e specs: they are in
+no full run. Both were new in step 3, so `dev`'s runs have neither.
+
+| Test | CI `82ceaa4` | CI `bedb0da` | Schema `bedb0da` (Postgres) | The laptop, all 193 files at once |
+| --- | --- | --- | --- | --- |
+| `writes.test.ts`, "keeps the last 50 steps" (local adapter) | 3,665 ms | 2,669 ms | 2,182 ms (Postgres's own case) | 5,329 ms: over Vitest's 5 s |
+| `compare-schema.test.ts`, "reads the tables only the Postgres adapter has" | 1,330 ms | 839 ms | – | 5,186 ms: over Vitest's 5 s |
+
+**The cause:** the work each test does, on a laptop running 193 test files side by side. The first records 52 steps and
+undoes 50, each a write that rewrites the local file of the demo and "Performance test" plus a `loadForUndo` read: about
+100 file writes. The second builds a TypeScript program over `src/data/postgres/undo-history.ts` and its imports, as the
+schema check does. Neither waits for anything: the timeout is Vitest's budget for a test's own work, so CLAUDE.md's rule
+on waiting for a state (an e2e rule) is not touched. Alone on the laptop both run under 5 s.
+
+**Parts 6 and 9 of 44500070325** are slower because their runners were, not the app. Every folder of a part moves
+together (the tests' own durations, summed per folder from each run's `report.json`):
+
+| Folder | 44343842242 (`dev`, chore/dev-branch) | 44398359250 (`dev`, fix/smoke-port) | 44487217521 (step 2) | 44500070325 (step 3) |
+| --- | --- | --- | --- | --- |
+| slice-10a | 174 s | 198 s | 180 s | 250 s |
+| slice-10b | 46 | 52 | 48 | 66 |
+| slice-10c | 66 | 71 | 65 | 92 |
+| slice-11 | 58 | 63 | 57 | 85 |
+| slice-12a | 75 | 77 | 70 | 102 |
+| slice-12b | 39 | 39 | 38 | 56 |
+| slice-13 | 91 | 99 | 84 | 124 |
+| **part 6** | **549** | **599** | **542** | **775** |
+| slice-22 to slice-28 (**part 9**) | **814** | **649** | **683** | **803** |
+
+- Part 6's seven folders are all 30 to 45 % slower in 44500070325, among them slice-10b (source lines) and slice-12b
+  (thumbnails), which use neither undo nor the import. In the same run, part 7's folders (slice-14a to slice-15d) are
+  faster than in every other run. A whole part moving one way is the runner it got.
+- Part 9 in 44500070325 equals `dev`'s run 44343842242 (803 s against 814 s); 44487217521 was the fast one.
+- **The app did not become slower:** the folders that exercise undo, the history port and the import are as fast as on
+  `dev` or faster in 44500070325: slice-01b (undo's first specs) 114 s against 129 and 140; slice-12a (the homes' Undo, a
+  project's delete) 102 s, inside part 6's slowdown; slice-07a (the import through the gzipped route) 128 s against 134
+  and 138.
