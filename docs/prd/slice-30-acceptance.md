@@ -1042,3 +1042,9 @@ the demo's "Retail Co – DWH", never KB.
   shared. Parts (time, heap peak): 1 11.9 min, 969 MB; 2 9.2 min, 1,145 MB; 3 6.9 min, 1,235 MB; 4 8.9 min, 1,056 MB;
   5 12.0 min, 1,206 MB; 6 10.8 min, 1,230 MB; 7 10.2 min, 1,108 MB; 8 8.1 min, 1,480 MB; 9 14.8 min, 1,450 MB (it now
   holds slice 30's folder, as the recut rule says). Later commits touch only `docs/`.
+
+### Łukasz's acceptance on dev:pg (19 November 2026)
+
+Łukasz added `INFOMAPPER_SERVER_NAME=dev` to `.env.postgres.local`, migrated `infomapper-dev` (`undo_step`), ran the
+manual acceptance above on `npm run dev:pg` and accepted it ("Działa, przeszło moje testy"). The dev server is stopped.
+Next: step 5, the closing; the measurement (S30-05, S30-13) on `dev`'s preview after the merge.
