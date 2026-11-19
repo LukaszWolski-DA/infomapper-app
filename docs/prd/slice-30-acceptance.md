@@ -682,3 +682,89 @@ All as step 1 recommended.
   adapters), F6 (count after the rows), F8 (write phases), F9 (an update never writes a row's time column back), F13
   (write specs only on the local stack in CI, never against the preview), F16 (one pair in the editor, step 4), Q8 (no
   store revision).
+
+---
+
+## Step 2: the writes (19 November 2026)
+
+### What was built
+
+- **`apply` on Postgres** (`src/data/postgres/write.ts`): one transaction per write set on one connection, READ
+  COMMITTED; `set local lock_timeout = '10s'` (L7, provisional); the organization's row `for update` when the write can
+  break a count across workspaces (`needsOrganizationLock`: a `workspace_member` or `organization_member` write) or makes
+  a workspace, then the workspace's row `for update`; the access read again (L1); the rows in three phases (F8: removes and
+  soft deletes, inserts in the tables' key order, other updates), one statement per table and phase through
+  `json_populate_recordset`, a key written twice in a later statement; versioned rows only from the version read, link and
+  other unversioned rows only from the whole row read (times compared in milliseconds, F10); an update never sets the time
+  column (F9); inserts and change events stamped by place (`stampPlaces`); a field no column holds refused loudly; the
+  counts after the rows; the database's `23505`, `23503`, `23514`, `23502` mapped to the local adapter's refusals,
+  `55P03` to the busy refusal.
+- **The count rules** (`src/domain/commands/count-rules.ts`, F5, F6): `countChecks` (which checks a write set needs),
+  `countRefusal` (the refusal on the state after the write), `needsOrganizationLock`; the six rules with the commands'
+  messages (D-28's two now constants in `canvas.ts`). The local adapter's three recounts are replaced by it; Postgres
+  reads, per check, only the rows it needs.
+- **The access read again** (`src/domain/commands/access-check.ts`, `src/app/_lib/checked-access.ts`): `runCommand`
+  builds the command with a store that records the workspace's archive, the actor's role and organization role as first
+  read, and passes them to `apply` (`ApplyOptions.access`); `undoAction` passes its own. Any difference refuses: the role
+  with "Your role in {workspace} changed meanwhile, so nothing was saved." (`forbidden`), archived meanwhile with the
+  archive's refusal, unarchived meanwhile as stale, the workspace gone as not found. Both adapters check before the rows.
+- **The explicit sorts** (Q3, L8): `byCreation` (`workspace-model.ts`) for relationships, source relationships, cards
+  (`buildCards`) and frames (`buildFrames`); source tables by name, database, schema; source columns by ordinal, then
+  name; `byTabOrder` ends with the canvas id; four-eyes' last editor by time, then the change group's id (`laterOrSame`,
+  `mapping-rules.ts`); the table panel's relationship list by name.
+- **The loader's overflow** (L8): `spreadCrowded` (`load.ts`) moves a crowded millisecond's rows past the 999th into the
+  following milliseconds, 999 a millisecond (the loader counts place 999 as crowded); `apply` never moves a time.
+- **Read-only gone on Postgres:** `DataStore.readOnly`, `ShellData.workspace.readOnly`, `READ_ONLY_SERVER_TEXT`,
+  `READ_ONLY_SERVER_MESSAGE`, the home's `banner-read-only` and the indicator's "Read only" for the server are gone;
+  standing, creates and switches follow the role and the archive only. `ShellData.server.kind` (`local` or `online`)
+  keeps what online still lacks: no "New organization…" (D-58's note), "Add person" disabled.
+- **"Add person" online** (B5, L6): the box shows, its Continue is disabled with "People are added by an administrator
+  on this server for now." as its tooltip and as a line under it (`text-add-person-online`); both actions refuse online
+  (`forbidden`, the same text).
+- **Tests:** `tests/contract/writes.test.ts` (S30-10: a scenario of 25 steps on both adapters, answers and every read
+  compared; S30-07: seven concurrency cases, on the local adapter in `npm test` and on Postgres in the Schema workflow,
+  each from fresh rows); `tests/contract/shared.ts` (the rows, the reads and the Postgres preparation, moved from
+  `reads.test.ts`); unit tests `count-rules.test.ts` and `access-check.test.ts`; the loader's overflow in
+  `reads.test.ts`.
+
+### Where step 2 differs from the plan, or assumed something
+
+- **`count-rules.ts` is in `src/domain/commands/`, not `src/domain/model/`:** it uses the commands' messages
+  (`LAST_OWNER`, `LAST_PROJECT_MESSAGE`, D-28's), which live there.
+- **Creation order is `created_at` with a stable sort, not `(created_at, id)`:** the seed's rows share one time and their
+  ids are hashes, so an id tie-break would reorder the demo's cards, frames and lines on both adapters (F2 of slice 29,
+  where the same sort was tried and withdrawn). With the stable sort, ties keep the stored order, which is the file's
+  locally and the write set's place on Postgres (and, past the 999th, the key: monotonic ids for the app's rows).
+- **The busy refusal's code is `invalid`, not `unexpected`:** a store's refusal is a `DomainError`, whose codes have no
+  `unexpected`. `invalid` behaves as Q6 proposed: the draft stays editable, nothing is cut, no fresh page; an undo keeps
+  its step.
+- **`org_membership`** refuses the racing removal as stale (it is built again from fresh data and then removes the
+  organization row with the last workspace), rather than adding the row's removal inside the adapter.
+- **`for update`, as the step asked**, not step 1's proposed `for no key update`.
+- **No undo on Postgres until step 3:** its history is still empty there (`undoHistory.update` keeps nothing, `get`
+  answers none), so Undo is off online and a recorded step is dropped. Before this step `update` threw (unreachable
+  then).
+- **The seven local test files were not moved:** their write tests drive the local file (its format, its stamp, its
+  queue), so they stay; the contract suite covers the port's write behaviour on both adapters with its own cases.
+- **Not checked on Supabase itself:** `set local lock_timeout` and `for update` through the transaction pooler. CI's
+  Postgres is plain; the first write on the preview (step 4) shows them.
+- **"Add person":** the inputs stay usable; only Continue (the start of an addition) is disabled.
+
+### Earlier tests changed, with their reasons
+
+- `src/data/local/store.test.ts`, "removes a link row with a null after image": it removed a link that left its project
+  with no canvas, which D-28 forbids and the local adapter now refuses inside the write (F5); it removes a link whose
+  project keeps another canvas.
+- `tests/contract/reads.test.ts`: the read-only refusal case (S29-03) goes; the rows are spread as the loader spreads them
+  (L8); the shared pieces moved to `shared.ts`.
+- `e2e/slice-29/S29-03.spec.ts` removed (the read-only refusal no longer exists; step 4's smoke writes replace it, on the
+  local stack only, F13).
+- `e2e/slice-29/S29-06.spec.ts`: no "Read only", no banner, standing `full`, the new-project tile shown; it still only
+  reads, so it can run against the preview.
+
+### The branch's Preview variables (L4, for Łukasz before step 4; names only)
+
+Step 1's report said four; there are five today, and step 4 adds a sixth:
+- Secret: `INFOMAPPER_DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`;
+- plain: `INFOMAPPER_DATA`, `INFOMAPPER_TIMING`, and from step 4 `INFOMAPPER_SERVER_NAME` (Q7).
+Each scoped to `slice/30-database-writes`, beside the existing entries for `dev`.
