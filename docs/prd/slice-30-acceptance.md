@@ -840,3 +840,14 @@ At that ratio the 4.4 MB limit holds about 43 MB of such text, so the 25 MB infl
   compressed body (413) and plain JSON (415).
 - `e2e/slice-07a/S7A-14-counts.spec.ts`: posts gzipped JSON.
 - `scripts/bench-import-write.ts`, `scripts/bench-thumbnails.ts`: the new port (benches, not tests).
+
+### Checks (on `bedb0da`)
+
+- CI (`check`) and Schema (`migrations`: the schema check with `undo_step`, 44 tables, RLS on every one, and the contract
+  suite on Postgres, the undo history's four cases included; `smoke`) passed.
+- **The full run:** [run 44500070325](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/44500070325) on
+  `bedb0da`, which contains `dev`'s head (`6da6c05`): 839 passed, 0 failed, 0 flaky, 16 skipped; wall-clock 16 min
+  38 s. Why: undo and its history, `runCommand` and the local adapter's write are shared infrastructure. Parts (time,
+  heap peak): 1 7.8 min, 1,261 MB; 2 7.4 min, 1,382 MB; 3 9.8 min, 1,165 MB; 4 7.0 min, 1,193 MB; 5 8.3 min, 1,739 MB;
+  6 13.5 min, 1,243 MB; 7 6.7 min, 1,392 MB; 8 8.2 min, 1,335 MB; 9 13.9 min, 1,407 MB. Later commits touch only
+  `docs/`.
