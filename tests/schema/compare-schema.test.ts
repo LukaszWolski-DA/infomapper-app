@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareSchemas, NOT_IN_DOMAIN_YET, tablesFromPg, type PgColumnRow, type TableShape } from "./compare-schema";
-import { domainTables } from "./domain-tables";
+import { domainTables, POSTGRES_ONLY_FILE } from "./domain-tables";
 
 const pg = (table_name: string, column_name: string, data_type: string, nullable = false): PgColumnRow => ({
   table_name,
@@ -105,6 +105,21 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
     );
     for (const t of NOT_IN_DOMAIN_YET) expect(tables.map((x) => x.table)).not.toContain(t);
   });
+
+  it("reads the tables only the Postgres adapter has (slice 30: undo_step)", () => {
+    const own = domainTables(POSTGRES_ONLY_FILE, "PostgresOnlyTables");
+    expect(own.map((t) => t.table)).toEqual(["undo_step"]);
+    expect(own[0]!.columns).toEqual([
+      { name: "workspace_id", kind: "uuid", nullable: false },
+      { name: "user_id", kind: "uuid", nullable: false },
+      { name: "list", kind: "text", nullable: false },
+      { name: "position", kind: "number", nullable: false },
+      { name: "change_group_id", kind: "uuid", nullable: false },
+      { name: "label", kind: "text", nullable: false },
+      { name: "created_at", kind: "timestamptz", nullable: false },
+    ]);
+    expect(tables.map((t) => t.table)).not.toContain("undo_step");
+  }, 60_000);
 
   it("tells the column types and nullability from the declared types, inherited columns included", () => {
     expect(column("canvas_item", "id")).toEqual({ name: "id", kind: "uuid", nullable: false });

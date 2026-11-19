@@ -1057,6 +1057,13 @@ slice.
   Authentication free on every plan, Vercel's docs of 15 September 2026; the note before said Standard Protection was the
   reason to stay a Preview); the variables move from Preview to Production; "Production" would name the dev
   environment; AD-22's bootstrap rule changes. `vercel.json` would still stop the other branches.
+- **Undo reads the whole workspace** (slice 30, F2): every Ctrl+Z reads every undoable table with its deleted rows
+  (`loadForUndo`, about 35 statements on Postgres); for the read fixes slice, read only the rows the step's events name
+  and their parents and children. Slice 30's measurement gives its figure (S30-13, Undo).
+- **The lock timeout's value** (slice 30, L7): 10 s until S30-05's figures on `dev`'s preview; then a value, and whether
+  a large import should take its lock later or in parts.
+- **"Explicit orders where an order means something"** (below) was done in slice 30 for the lists that are drawn or
+  decide something (AD-12's note); the first project in the top bar still comes from the stored order.
 - **A hotfix path into `main`** (slice D): a `hotfix/` branch from `main` into `main` with its own full run, then `main`
   merged into `dev` at once. Until production exists everything goes through `dev`.
 - **`spikes/canvas-react-flow`** (optional): move its conclusions into `docs/decisions.md` (AD-24 has most of them) and

@@ -16,9 +16,18 @@ const renderRecord = cache((): Record => newTimingRecord());
 
 setTimingSource(() => scoped.getStore() ?? renderRecord());
 
-/** Runs `work` with its own record; hands the record's summary to `report` when it is done. */
+/**
+ * Runs `work` with its own record; hands the record's summary to `report` when it is done. Inside another `withTiming`
+ * (slice 30: the import's route around its write's `runCommand`) it writes to that record, so the outer one counts all.
+ */
 export async function withTiming<T>(work: () => Promise<T>, report: (summary: TimingSummary, result: T) => void): Promise<T> {
   if (!isTimingOn()) return work();
+  const outer = scoped.getStore();
+  if (outer) {
+    const result = await work();
+    report(timingSummary(outer), result);
+    return result;
+  }
   const record = newTimingRecord();
   const result = await scoped.run(record, work);
   report(timingSummary(record), result);
@@ -27,7 +36,14 @@ export async function withTiming<T>(work: () => Promise<T>, report: (summary: Ti
 
 /** The `Server-Timing` header of a summary (route handlers only: a page cannot set headers, F15). */
 export const serverTimingHeader = (s: TimingSummary): string =>
-  [`db;dur=${s.statementMs};desc="${s.calls} calls, ${s.statements} statements"`, `wait;dur=${s.waitMs}`, `read;dur=${s.readMs}`, `total;dur=${s.totalMs}`].join(", ");
+  [
+    `db;dur=${s.statementMs};desc="${s.calls} calls, ${s.statements} statements"`,
+    `wait;dur=${s.waitMs}`,
+    `read;dur=${s.readMs}`,
+    // slice 30: a write's lock wait and transaction, when the request wrote
+    ...(s.applyMs ? [`lock;dur=${s.lockWaitMs}`, `apply;dur=${s.applyMs}`] : []),
+    `total;dur=${s.totalMs}`,
+  ].join(", ");
 
 /**
  * The page's record as hidden JSON (`data-testid="im-timing"`), for the measuring spec; nothing is drawn. Placed last in

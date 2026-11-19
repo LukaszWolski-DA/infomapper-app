@@ -1,12 +1,13 @@
 // Repository interfaces (AD-19). The app talks to stored data only through these.
-// Adapters: the local JSON file (src/data/local, AD-29) and, since slice 29, Postgres for reads (src/data/postgres).
+// Adapters: the local JSON file (src/data/local, AD-29) and Postgres (src/data/postgres; reads since slice 29, writes since slice 30).
 // Every read of workspace data takes the workspace id and filters on it. Soft-deleted rows are never returned.
 
 import type { WriteSet } from "@/domain/changes";
+import type { CheckedAccess } from "@/domain/commands/access-check";
 import type { WorkspaceRows } from "@/domain/commands/undo";
 import type { DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
-import type { UndoHistory } from "@/domain/model/undo-history";
+import type { HistoryChange, UndoState, UndoStep } from "@/domain/model/undo-history";
 import type { MappingLog } from "@/domain/model/mapping-rules";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type {
@@ -178,24 +179,37 @@ export interface ChangeEventRepository {
 }
 
 /**
- * The undo history of each person in each workspace (slice 1b). In memory on the server for now; it comes into the
- * database with Supabase. Steps whose change group is no longer in the change log (fresh demo data) are left out.
+ * The undo history of each person in each workspace (slice 1b; split in slice 30, F3, F4). The local adapter keeps it in
+ * memory (Q4 (a)); Postgres stores it (`undo_step`). A step is recorded, undone or redone only with its write, through
+ * `apply`'s `history`; these calls read it, and drop a step that can no longer be reverted. Steps whose change group is no
+ * longer in the change log (fresh demo data) are left out.
  */
 export interface UndoHistoryRepository {
-  get(workspaceId: Uuid, userId: Uuid): Promise<UndoHistory>;
-  /** Changes the history in one step, so two writes at the same moment cannot lose a step. */
-  update(workspaceId: Uuid, userId: Uuid, change: (history: UndoHistory) => UndoHistory): Promise<UndoHistory>;
+  /** What the pages show: is there something to undo, to redo. Never reads a step's events. */
+  state(workspaceId: Uuid, userId: Uuid): Promise<UndoState>;
+  /** The step undo (or redo) reverts next, with its change group's events, or null. */
+  next(workspaceId: Uuid, userId: Uuid, mode: "undo" | "redo"): Promise<UndoStep | null>;
+  /** Drops the step `changeGroupId` if it is still the next one of `mode` (a refused revert, slice 1b). */
+  drop(workspaceId: Uuid, userId: Uuid, mode: "undo" | "redo", changeGroupId: Uuid): Promise<void>;
 }
 
 export type ApplyResult = { ok: true } | { ok: false; error: DomainError };
 
-export interface DataStore {
+/** How a write set is applied (slice 30). */
+export interface ApplyOptions {
   /**
-   * The store takes no writes (slice 29, Q5): `apply` refuses every write set with code `archived` and
-   * `READ_ONLY_SERVER_MESSAGE`, and the pages show the workspace read-only (`ShellData.workspace.readOnly`). The Postgres
-   * adapter until slice B; absent on the local adapter.
+   * The access the command was checked with (B3, L1): inside the write, before its rows, the store reads the actor's
+   * role and the workspace's archive again and refuses when either differs (`accessChangedRefusal`).
    */
-  readOnly?: boolean;
+  access?: CheckedAccess;
+  /**
+   * The person's undo history as this write changes it (slice 30, F4): written with the rows, in the same transaction on
+   * Postgres and in the same serialised write locally. The write set's change group is the step recorded or the revert.
+   */
+  history?: HistoryChange;
+}
+
+export interface DataStore {
   users: UserRepository;
   organizations: OrganizationRepository;
   workspaces: WorkspaceRepository;
@@ -220,5 +234,5 @@ export interface DataStore {
    * Applies the rows and change events of one command together or not at all (AD-13). Refuses a stale version,
    * unknown ids, duplicate keys and broken rules with the same error a database would cause.
    */
-  apply(writeSet: WriteSet): Promise<ApplyResult>;
+  apply(writeSet: WriteSet, options?: ApplyOptions): Promise<ApplyResult>;
 }

@@ -85,7 +85,12 @@ segment labels, long-text labels per section; hints under an option that is tick
 it. Slice 29 (AD-37) is the database program's walking skeleton (AD-31 as amended): a Postgres adapter that reads every
 port as the local adapter does and refuses every write (the pages then read only), Supabase Auth with a password per
 person, the Supabase project `infomapper-dev`, a protected Vercel preview in `fra1`, a timing record and the first
-measurement; the local adapter stays for development, the demo and the full e2e run.
+measurement; the local adapter stays for development, the demo and the full e2e run. Slice 30 (AD-38) is slice B,
+the writes: Postgres writes each command in one transaction with the workspace's lock (`for no key update`, a lock
+timeout and its busy refusal), the access read again and six count rules checked inside the write on both adapters;
+the undo history lasts on Postgres (`undo_step`; the local adapter keeps it in memory); the import's upload is gzipped
+by the browser; the top bar has a save indicator and a server badge (D-84); "Add person" is disabled online until the
+people slice (D-58's note).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -171,7 +176,7 @@ src/domain   pure TypeScript: types, commands, validation, business rules. No Re
              Since slice 27 also the canvas's pure drawing rules (`src/domain/canvas/`: cards, geometry, text widths,
              lines and their routes, frames, requirement cards, traces), which `src/canvas` re-exports.
 src/data     repository interfaces and their adapters: the local JSON-file adapter (AD-29) and, since slice 29, the
-             Postgres adapter (reads only until slice B, AD-37).
+             Postgres adapter (AD-37; writes since slice 30, AD-38).
              Only this layer touches stored data.
 src/app      Next.js App Router routes, server actions, route handlers, screens.
 src/ui       shared UI components (shadcn/ui based).
@@ -432,23 +437,47 @@ local adapter no pool is made.
   (`readTransaction`). The rows go through the shared rules in `src/data/rows.ts` (a module's defaults and upgrades;
   the local adapter re-exports them) and the sorts in `src/data/order.ts`. **A later port** gets its read on both
   adapters and its case in `tests/contract/reads.test.ts`, never a rule of its own in SQL.
-- **The stored order** (AD-12's note, `data-model-v2.md`): `tables.ts` orders a table by its time column, then its
-  key; the loader stamps a row's place in the file into the column's microseconds (`load.ts`, `stampPlaces`); the pool
-  reads `timestamptz` truncated to milliseconds (`config.ts`). The local adapter keeps its file's order.
+- **The stored order** (AD-12's notes, `data-model-v2.md`): `tables.ts` orders a table by its time column, then its
+  key; the loader stamps a row's place in the file into the column's microseconds (`load.ts`, `stampPlaces`) and moves
+  a crowded millisecond's overflow into the following milliseconds (`spreadCrowded`, slice 30); `apply` stamps a write
+  set's inserts by place and never sets a time column on an update; the pool reads `timestamptz` truncated to
+  milliseconds (`config.ts`). The local adapter keeps its file's order. **Where an order means something, the domain
+  sorts** (`byCreation` in `workspace-model.ts`, `laterOrSame` in `mapping-rules.ts`): a later list that is drawn or
+  decides something sorts in the domain too.
 - **Types and TLS** (`config.ts`): `numeric` and `bigint` as numbers, the connection string's `sslmode` dropped and
   the server verified against `supabase-ca.crt` (traced into every route by `next.config.ts`). The pool
   (`pool.ts`): 5 connections, 5 s idle, `attachDatabasePool` on Vercel, the transaction pooler, never a named statement.
-- **Writes:** `apply` refuses every write set with code `archived` and `READ_ONLY_SERVER_MESSAGE` until slice B, so
-  every client rule for a read-only refusal applies; `DataStore.readOnly` gives `ShellData.workspace.readOnly`
-  (standing none, no creates, the indicator's "Read only", the home's banner, `READ_ONLY_SERVER_TEXT`).
+- **Writes** (slice 30, AD-38): `src/data/postgres/write.ts` (`applyWriteSet`): one transaction per write set; the
+  locks (`needsOrganizationLock`: the organization's row first, then the workspace's, `for no key update`;
+  `LOCK_TIMEOUT` 10 s, provisional, then `BUSY_MESSAGE` with code `invalid`); the access read again
+  (`ApplyOptions.access`, recorded by `recordingStore` in `src/app/_lib/checked-access.ts`, compared by
+  `accessChangedRefusal`); the three write phases (removes and soft deletes, inserts in key order, updates); the change
+  events and the undo history (`ApplyOptions.history`); the count rules (`countChecks`, `countRefusal` in
+  `src/domain/commands/count-rules.ts`, which the local adapter runs too); the database's errors as the local adapter's
+  refusals. **A later count rule** goes into `count-rules.ts`, checked by both adapters inside their write.
+  **A later write** goes through `runCommand` or passes its checked access and history to `apply` as undo does.
   `app_user.auth_user_id` is never handed out with a person's row (`POSTGRES_ONLY` in `tables.ts`).
+- **The undo history** (slice 30, D-59's note): the port's `state` (the pages), `next` and `drop` (undo), and
+  `HistoryChange` through `apply`; on Postgres `undo_step` (`src/data/postgres/undo-history.ts`,
+  `POSTGRES_ONLY_TABLES`: the store's own table, which the schema check and the registry guard know apart from the
+  domain's); on the local adapter in memory (`withChange`).
+- **The import's upload** (slice 30, L2): `src/ui/import-upload.ts` (gzipped JSON, `MAX_UPLOAD_BYTES` 4.4 MB compressed,
+  `MAX_INFLATED_BYTES` 25 MB), the route `src/app/w/[workspaceId]/import/route.ts` (`application/gzip` only,
+  `maxDuration` 300).
+- **The server and the save state** (slice 30, D-84): `ShellData.server` (`local`, or `online` with
+  `INFOMAPPER_SERVER_NAME`); the store `src/ui/save-state.ts` (`reportSave`, `reportedAll`, `failureText`), fed by
+  `rowSaves`, `useAction`'s `run` (`read: true` for a preview), undo and redo, `ModelCanvas`'s action props and the
+  import; the pair `src/app/_components/save-indicator.tsx` (`group-save`; `AppShell`'s `savePair` is off on the
+  document editor's page, whose bar draws it). **A later write the page sends outside these** calls `reportSave`.
 - **Sign-in on Postgres** (AD-04's note): `src/app/_lib/supabase.ts` (`supabaseServer`: the request's cookies first, so
   no page is prerendered; only the sign-in and sign-out actions pass `write: true`), the proxy's `postgresProxy`
   (`getClaims`, never on `THUMBNAIL_PATH`), `getSession`'s `postgresSession` (`users.getByAuthUserId`, every organization
   unlocked), `/sign-in`'s `AccountSignInForm` and `signInWithAccountAction`.
-- **The timing record** (`INFOMAPPER_TIMING=1` only): `src/data/timing.ts` (`timedStore`, the pool's timed clients)
-  and `src/app/_lib/timing.tsx` (`withTiming` for a route or an action, React's `cache` for a page, `TimingRecord` at a
-  page's end, `serverTimingHeader`). Numbers only. **A later page to measure** puts `<TimingRecord />` last.
+- **The timing record** (`INFOMAPPER_TIMING=1` only): `src/data/timing.ts` (`timedStore`, the pool's timed clients;
+  since slice 30 `countWrite`, a write's lock wait and transaction) and `src/app/_lib/timing.tsx` (`withTiming` for a
+  route or an action, nested ones counting into the outer record; React's `cache` for a page, `TimingRecord` at a
+  page's end, `serverTimingHeader`). Writes, undo, redo and the import log one line of numbers each. Numbers only.
+  **A later page to measure** puts `<TimingRecord />` last.
 - **The data:** `npm run pg:seed` builds the demo and "Performance test" in memory (`scripts/lib/seed-rows.ts`) and
   loads them with `loadRows` (one transaction, the database's own key order, a field no column holds refused, counts
   checked); it never reads a JSON file, so never KB.
@@ -488,7 +517,11 @@ local adapter no pool is made.
     the schema check, the contract suite with Postgres (a second database of its container; `INFOMAPPER_CONTRACT_DB`,
     localhost only, since the suite empties it) and the smoke job (Supabase's local stack, Postgres and Auth only; a
     production build; `playwright.pg.config.ts`). CI never connects to `infomapper-dev`. The smoke set needs no
-    `e2e/settle.ts`: it never reseeds and its writes are refused.
+    `e2e/settle.ts`: it never reseeds. Since slice 30 the contract suite has the writes too (`tests/contract/writes.test.ts`,
+    in its own database `{name}_writes`: every kind of write on both adapters, the count rules and the undo history under
+    concurrent writes), and the smoke set writes (`S30-smoke-writes.spec.ts`), **only against a database on this machine**
+    (F13): against `dev:pg` or the preview those specs skip. Slice 30's measurement (`S30-measure.spec.ts`, `MEASURE=1`)
+    runs on `dev`'s preview; the Postgres-only specs stay in `e2e/slice-29` (the config's `testDir`, `POSTGRES_ONLY_FOLDERS`).
   - **The single-file check:** `gh workflow run e2e.yml --ref <branch> -f files="e2e/<folder>/<spec>.ts ..." -f
     rounds=3`: `rounds` jobs side by side, each with its own fresh dev server, each running the files once (paths under
     `e2e/` only, checked before a server starts).
@@ -550,12 +583,15 @@ local adapter no pool is made.
 | --- | --- | --- | --- |
 | 1 | `npm run dev` on the laptop | local (`.data/dev-db.json`, KB; `.data/demo-db.json`), the development sign-in | none needed |
 | 2 | `npm run dev:pg` on the laptop | Postgres on `infomapper-dev`, Supabase Auth | `.env.postgres.local` |
-| 3 | The Vercel preview of `dev` | Postgres on `infomapper-dev`, Supabase Auth, read only | Vercel's Preview, scoped to the branch |
+| 3 | The Vercel preview of `dev` | Postgres on `infomapper-dev`, Supabase Auth; writes from `dev`'s first deployment with slice 30 | Vercel's Preview, scoped to the branch |
 | 4 | Production (slice D) | its own Vercel project `infomapper-app` and Supabase `infomapper-prod` | – |
 
-Environments 2 and 3 share `infomapper-dev`: from slice B a write in one shows in the other, and a `pg:seed -- --reset`
-changes what the preview shows. **Running against Postgres:** `npm run pg:check`, `pg:migrate` (the only way to migrate
-`infomapper-dev`), `schema:check -- --existing`, `pg:seed`, `pg:accounts`, `dev:pg`.
+Environments 2 and 3 share `infomapper-dev`: since slice 30 a write in one shows in the other, and a
+`pg:seed -- --reset` changes what the preview shows (the undo histories too). The server badge reads
+`INFOMAPPER_SERVER_NAME` (`dev` in `.env.postgres.local` and in `dev`'s Preview variables). **Running against Postgres:**
+`npm run pg:check`, `pg:migrate` (the only way to migrate `infomapper-dev`; slice 30 added `undo_step`),
+`schema:check -- --existing`, `pg:seed`, `pg:accounts`, `dev:pg`; `npx tsx scripts/pg-lock-check.ts` checks the
+writes' lock and a count rule there in a workspace of its own.
 
 **Hosting rules** (AD-22's note):
 - **Vercel project `infomapper-app-dev`** (Pro, `fra1` beside Supabase's Frankfurt, Fluid compute, Node.js 22.x set
@@ -613,6 +649,8 @@ npx tsx scripts/pg-snapshot-size.ts    # the editor's snapshot per workspace aga
 npx tsx scripts/preview-probe.ts <preview> [paths]   # a protected preview's status, redirect and regions (bypass header)
 npx playwright test --config playwright.pg.config.ts   # the smoke set on Postgres: against dev:pg, or PG_BASE_URL=<preview>
 MEASURE=1 PG_BASE_URL=<preview> npx playwright test --config playwright.pg.config.ts S29-08   # slice 29's measurement (LOCAL_DB=<file> against measure:start)
+MEASURE=1 PG_BASE_URL=<dev's preview> npx playwright test --config playwright.pg.config.ts S30-measure   # slice 30: the writes (S30-13) and a 10,000-column import (S30-05), INFOMAPPER_TIMING=1 on the preview
+npx tsx scripts/pg-lock-check.ts       # slice 30: the writes' lock, the lock timeout and a count rule through .env.postgres.local's database (a workspace of its own, soft-deleted at the end)
 npm run build            # production build (npm start serves it; no dev sign-in, no local data)
 npm run measure:build    # measurement-only production build in .next-measure (AD-31)
 npm run measure:start    # serve it on http://127.0.0.1:3300 with INFOMAPPER_MEASURE=1 (local adapter, dev sign-in)

@@ -86,11 +86,15 @@ Slice 29 is the database program's walking skeleton (AD-37), with no change to h
 - Supabase Auth with a password per person;
 - the Supabase project `infomapper-dev` and a protected Vercel preview in Frankfurt;
 - a timing record per request and the first measurement ([slice 29's figures](docs/prd/slice-29-measurement.md)).
+Slice 30 makes Postgres take writes (AD-38): each write in one transaction with the workspace's lock, the access read
+again and six count rules checked inside it on both adapters; a lasting undo history on Postgres (`undo_step`, D-59's
+note); imports gzipped by the browser to fit a Vercel function's request; a save indicator and a server badge in the top
+bar (D-84); and "Add person" disabled online until the people slice (D-58's note).
 Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md), [slice 9](docs/prd/slice-09-acceptance.md), [slice 10a](docs/prd/slice-10a-acceptance.md), [slice 10b](docs/prd/slice-10b-acceptance.md), [slice 10c](docs/prd/slice-10c-acceptance.md), [slice 11](docs/prd/slice-11-acceptance.md), [slice 12a](docs/prd/slice-12a-acceptance.md), [slice 12b](docs/prd/slice-12b-acceptance.md), [slice 13](docs/prd/slice-13-acceptance.md), [slice 14a](docs/prd/slice-14a-acceptance.md), [slice 14b](docs/prd/slice-14b-acceptance.md), [slice 15](docs/prd/slice-15-acceptance.md) (15a to 15d), [slice 16](docs/prd/slice-16-acceptance.md), [slice 17](docs/prd/slice-17-acceptance.md), [slice 18](docs/prd/slice-18-acceptance.md), [slice 19](docs/prd/slice-19-acceptance.md), [slice 20](docs/prd/slice-20-acceptance.md), [slice 21](docs/prd/slice-21-acceptance.md), [slice 22](docs/prd/slice-22-acceptance.md), [slice 23](docs/prd/slice-23-acceptance.md), [slice 24](docs/prd/slice-24-acceptance.md), [slice 25](docs/prd/slice-25-acceptance.md), [slice 26](docs/prd/slice-26-acceptance.md), [slice 27](docs/prd/slice-27-acceptance.md), [slice 28](docs/prd/slice-28-acceptance.md), [slice 29](docs/prd/slice-29-acceptance.md).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md), [slice 9](docs/prd/slice-09-acceptance.md), [slice 10a](docs/prd/slice-10a-acceptance.md), [slice 10b](docs/prd/slice-10b-acceptance.md), [slice 10c](docs/prd/slice-10c-acceptance.md), [slice 11](docs/prd/slice-11-acceptance.md), [slice 12a](docs/prd/slice-12a-acceptance.md), [slice 12b](docs/prd/slice-12b-acceptance.md), [slice 13](docs/prd/slice-13-acceptance.md), [slice 14a](docs/prd/slice-14a-acceptance.md), [slice 14b](docs/prd/slice-14b-acceptance.md), [slice 15](docs/prd/slice-15-acceptance.md) (15a to 15d), [slice 16](docs/prd/slice-16-acceptance.md), [slice 17](docs/prd/slice-17-acceptance.md), [slice 18](docs/prd/slice-18-acceptance.md), [slice 19](docs/prd/slice-19-acceptance.md), [slice 20](docs/prd/slice-20-acceptance.md), [slice 21](docs/prd/slice-21-acceptance.md), [slice 22](docs/prd/slice-22-acceptance.md), [slice 23](docs/prd/slice-23-acceptance.md), [slice 24](docs/prd/slice-24-acceptance.md), [slice 25](docs/prd/slice-25-acceptance.md), [slice 26](docs/prd/slice-26-acceptance.md), [slice 27](docs/prd/slice-27-acceptance.md), [slice 28](docs/prd/slice-28-acceptance.md), [slice 29](docs/prd/slice-29-acceptance.md), [slice 30](docs/prd/slice-30-acceptance.md).
 
 ## Getting started
 
@@ -130,14 +134,16 @@ is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at 
 | --- | --- | --- | --- |
 | 1 | `npm run dev` on the laptop | the local adapter (`.data/dev-db.json`, `.data/demo-db.json`), the development sign-in | `.env.local` (none needed) |
 | 2 | `npm run dev:pg` on the laptop | Postgres on `infomapper-dev`, Supabase Auth | `.env.postgres.local` (git-ignored), read only by `npm run dev:pg` and the Postgres scripts |
-| 3 | The Vercel preview of `dev` (its branch address, `infomapper-app-dev-git-dev-lukaszs-projects-9ffbc132.vercel.app`) | Postgres on `infomapper-dev`, Supabase Auth, read only | Vercel's Preview environment, scoped to that branch |
+| 3 | The Vercel preview of `dev` (its branch address, `infomapper-app-dev-git-dev-lukaszs-projects-9ffbc132.vercel.app`) | Postgres on `infomapper-dev`, Supabase Auth; it takes writes from `dev`'s first deployment with slice 30 | Vercel's Preview environment, scoped to that branch |
 | 4 | Production (slice D) | its own Vercel project `infomapper-app` and Supabase project `infomapper-prod` | – |
 
 - **The switch** is `INFOMAPPER_DATA` (`local` by default, `postgres` set by `npm run dev:pg`, the Postgres scripts, CI's
   Postgres jobs and Vercel). It is never in `.env.local`, which Next.js loads for `npm run dev`. The two never mix: on
   Postgres the local adapter and its files refuse to start; on the local adapter no connection is opened.
-- **Environments 2 and 3 share `infomapper-dev`.** Fine while writes are refused (slice A). From slice B, a write in one
-  shows in the other, and a `pg:seed -- --reset` from the laptop changes what the preview shows at once.
+- **Environments 2 and 3 share `infomapper-dev`.** Since slice 30 a write in one shows in the other, and a
+  `pg:seed -- --reset` from the laptop changes what the preview shows at once (the undo histories too).
+- **The server badge** says `Online · {INFOMAPPER_SERVER_NAME}` on Postgres (`dev` in `.env.postgres.local` and in
+  `dev`'s Preview variables), `Local` on the local adapter.
 - **Running against Postgres:** put the values in `.env.postgres.local` (the names are in `.env.example`), then
   `npm run pg:check`, `npm run pg:migrate`, `npm run schema:check -- --existing`, `npm run pg:seed` (`-- --reset` to start
   over), `npm run pg:accounts`, `npm run dev:pg`. The demo people sign in with their e-mail addresses (the table above)
@@ -176,7 +182,8 @@ is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at 
   "multi-service" project with a prompt for a `services` key. Import a standalone project (root `./`, Next.js) and ignore
   the prompt.
 - **Variables:** Preview only, scoped to the branch. The database URL (the transaction pooler), `SUPABASE_URL` and
-  `SUPABASE_PUBLISHABLE_KEY` as Secret; `INFOMAPPER_DATA=postgres` and `INFOMAPPER_TIMING=1` as plain values.
+  `SUPABASE_PUBLISHABLE_KEY` as Secret; `INFOMAPPER_DATA=postgres`, `INFOMAPPER_TIMING=1` and (slice 30)
+  `INFOMAPPER_SERVER_NAME=dev` as plain values.
   - **Never in Vercel:** `SUPABASE_SECRET_KEY` (it bypasses Row Level Security; only the accounts script needs it),
     `INFOMAPPER_MIGRATION_URL` (the scripts' only) and `INFOMAPPER_DEMO_PASSWORD`.
   - The Protection Bypass for Automation secret lives only in `.env.postgres.local`
@@ -253,13 +260,14 @@ is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at 
 | `npm run schema:check` | Applies `supabase/migrations/` to a Postgres and compares the schema with the domain's tables (AD-31; CI runs it); `-- --existing` compares a migrated database and applies nothing, and requires Row Level Security on every table (slice 29) |
 | `npm run dev:pg` | The laptop's dev server on `infomapper-dev` (environment 2, `.env.postgres.local`) on http://localhost:3000 |
 | `npm run pg:check` | One parameterized query through the transaction pooler with full TLS verification (`-- --migration`: the session pooler) |
-| `npm run pg:migrate` | Applies the migrations `infomapper-dev` has not had yet (`-- --dry-run` lists them); the only way to migrate it |
+| `npm run pg:migrate` | Applies the migrations `infomapper-dev` has not had yet (`-- --dry-run` lists them); the only way to migrate it (slice 30: `undo_step`) |
+| `npx tsx scripts/pg-lock-check.ts` | Slice 30: the writes' lock and a count rule through `.env.postgres.local`'s database, in a workspace of its own that it soft-deletes at the end (timings and answers only) |
 | `npm run pg:seed` | The demo and "Performance test" into Postgres in one transaction, counts checked (`-- --reset` empties every table first; never a JSON file) |
 | `npm run pg:accounts` | A Supabase Auth account per person with `INFOMAPPER_DEMO_PASSWORD`, linked by `auth_user_id` (after `pg:seed`) |
 | `npx tsx scripts/pg-auth-check.ts` | Checks Auth on `infomapper-dev`: the Data API off, sign-ups off, the admin API, sign-in, `getClaims` (statuses only) |
 | `npx tsx scripts/pg-snapshot-size.ts` | The editor's snapshot per workspace through the Postgres adapter: its bytes against Vercel's 4.5 MB |
 | `npx tsx scripts/preview-probe.ts <preview> [paths]` | A protected preview's status, redirect and regions, with the bypass header |
-| `npx playwright test --config playwright.pg.config.ts` | The smoke set on Postgres (`e2e/slice-29`): against `npm run dev:pg`, or `PG_BASE_URL=<preview>` (the bypass header, no traces); `PG_SERVE=1` in CI. `MEASURE=1 … S29-08` is the measurement (`docs/prd/slice-29-measurement.md`) |
+| `npx playwright test --config playwright.pg.config.ts` | The smoke set on Postgres (`e2e/slice-29`): against `npm run dev:pg`, or `PG_BASE_URL=<preview>` (the bypass header, no traces); `PG_SERVE=1` in CI. `MEASURE=1 … S29-08` is the measurement (`docs/prd/slice-29-measurement.md`); `MEASURE=1 … S30-measure` slice 30's writes (S30-05, S30-13). The smoke writes (`S30-smoke-writes`) run only against a database on this machine |
 
 **Tests per step** (CLAUDE.md, "Testing"): after each step the specs of what it touched plus CI, a full run in a step
 that touches shared infrastructure, and one full run before a merge (it also counts for a later commit whose diff
@@ -280,7 +288,7 @@ files are never subset or otherwise changed; the folder's `README.md` lists thei
 | Folder | What's in it |
 | --- | --- |
 | `src/domain` | Pure TypeScript: types, commands, permissions, validation, business rules |
-| `src/data` | Repository interfaces (`ports.ts`) and adapters (`local/`, the JSON file; `postgres/`, reads only since slice 29); the only layer that touches stored data |
+| `src/data` | Repository interfaces (`ports.ts`) and adapters (`local/`, the JSON file; `postgres/`, reads since slice 29 and writes since slice 30); the only layer that touches stored data |
 | `src/app` | Next.js App Router routes, server actions, screens |
 | `src/ui` | Shared UI components (shadcn/ui, toasts) |
 | `src/canvas` | The modeling canvas (React Flow, AD-24): cards, line layer, Overview, geometry |

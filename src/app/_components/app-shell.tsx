@@ -36,6 +36,7 @@ export async function AppShell({
   project,
   tools,
   trail,
+  savePair = true,
   children,
 }: {
   shell: ShellData;
@@ -44,12 +45,14 @@ export async function AppShell({
   tools?: ReactNode;
   /** A workspace page's breadcrumbs after the workspace (slice 25's document pages); else "Workspace home". */
   trail?: Trail;
+  /** The top bar's save indicator and badge (slice 30); off where the page draws them in its own bar (F16). */
+  savePair?: boolean;
   children: ReactNode;
 }) {
   if (!project) {
     return (
       <div className="flex h-dvh min-h-0 flex-col bg-im-panel text-im-ink">
-        <TopBar shell={shell} tools={tools} />
+        <TopBar shell={shell} tools={tools} savePair={savePair} />
         <Breadcrumbs shell={shell} trail={trail} />
         <main className="min-h-0 flex-1 overflow-auto">{children}</main>
       </div>

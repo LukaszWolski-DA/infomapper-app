@@ -2,11 +2,13 @@
 // disk: P10, the app has none), and the data the import writes, read back from the e2e data file.
 
 import fs from "node:fs";
+import { gzipSync } from "node:zlib";
 import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 import { createLocalDataStore } from "../../src/data/local/store";
 import { buildWriteSet } from "../../src/domain/changes";
 import { uuidv7 } from "../../src/domain/ids";
+import { UPLOAD_TYPE } from "../../src/ui/import-upload";
 import { E2E_DB } from "../config";
 import { canvasUrl, expectToast, loadModel, openCanvas, RETAIL, SEED_IDS, signInAs } from "../slice-01a/helpers";
 
@@ -14,6 +16,11 @@ export { asPerson, setFourEyes } from "../slice-04a/helpers";
 export { canvasUrl, expectToast, loadModel, openCanvas, RETAIL, SEED_IDS, signInAs };
 
 export const store = () => createLocalDataStore(E2E_DB);
+
+/** POST to the upload route as the wizard does since slice 30 (L2): the input as gzipped JSON. */
+export async function postImport(page: Page, workspaceId: string, data: unknown) {
+  return page.request.post(`/w/${workspaceId}/import`, { data: gzipSync(Buffer.from(JSON.stringify(data))), headers: { "content-type": UPLOAD_TYPE } });
+}
 
 /** A test file's text (src/domain/import/samples/). */
 export const sample = (name: string) => fs.readFileSync(path.resolve("src", "domain", "import", "samples", name), "utf8");

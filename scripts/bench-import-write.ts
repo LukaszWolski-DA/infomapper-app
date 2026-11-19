@@ -29,7 +29,7 @@ import { buildPlan, importSummary, type ImportTarget } from "../src/domain/impor
 import { readStandard } from "../src/domain/import/standard";
 import { uuidv7 } from "../src/domain/ids";
 import { changeLabel } from "../src/domain/model/change-label";
-import { afterUndo, nextUndo, recordChange } from "../src/domain/model/undo-history";
+import type { HistoryChange } from "../src/domain/model/undo-history";
 import type { WorkspaceAccess } from "../src/domain/permissions";
 import { fivePercent, syntheticStandard } from "./lib/import-synthetic";
 
@@ -46,7 +46,7 @@ async function accessOf(store: DataStore): Promise<WorkspaceAccess> {
 }
 
 /** runCommand's steps for one write. */
-async function serverWrite<T>(store: DataStore, build: (ctx: CommandContext, access: WorkspaceAccess) => Promise<CommandResult<T>>, revert = false): Promise<WriteSet> {
+async function serverWrite<T>(store: DataStore, build: (ctx: CommandContext, access: WorkspaceAccess) => Promise<CommandResult<T>>, revert = false, history?: (writeSet: WriteSet) => HistoryChange): Promise<WriteSet> {
   const ctx: CommandContext = { actorId: USER, now: new Date().toISOString(), newId: () => uuidv7() };
   const access = await accessOf(store);
   const result = await build(ctx, access);
@@ -60,7 +60,8 @@ async function serverWrite<T>(store: DataStore, build: (ctx: CommandContext, acc
     if (!completed.ok) throw new Error(completed.error.message);
     writeSet = completed.writeSet;
   }
-  const applied = await store.apply(writeSet);
+  // slice 30 (F4): the history with its write
+  const applied = await store.apply(writeSet, history ? { history: history(writeSet) } : {});
   if (!applied.ok) throw new Error(applied.error.message);
   return writeSet;
 }
@@ -73,15 +74,18 @@ async function importFile(store: DataStore, text: string, target: ImportTarget, 
     const scope = read.tables.map((t) => t.key);
     const plan = buildPlan(state.model, read, target, { scope: new Set(scope), compare: "schemas", renames: new Map() });
     return importSources(ctx, access, state, { target, channel: "file", sourceLabel: name, text, scope, compare: "schemas", renames: [], fingerprint: planFingerprint(plan) });
-  });
-  await store.undoHistory.update(WS, USER, (h) => recordChange(h, { changeGroupId: writeSet.changeGroupId, label: changeLabel(writeSet.events), events: writeSet.events }));
+  }, false, (w) => ({ userId: USER, kind: "record", label: changeLabel(w.events) }));
   return writeSet;
 }
 
 async function undoLast(store: DataStore): Promise<void> {
-  const step = nextUndo(await store.undoHistory.get(WS, USER))!;
-  const writeSet = await serverWrite(store, async (ctx, access) => revertChangeGroup(ctx, access, { events: step.events, rows: await store.model.loadForUndo(WS) }, "undo"), true);
-  await store.undoHistory.update(WS, USER, (h) => afterUndo(h, { changeGroupId: writeSet.changeGroupId, label: step.label, events: writeSet.events }));
+  const step = (await store.undoHistory.next(WS, USER, "undo"))!;
+  await serverWrite(store, async (ctx, access) => revertChangeGroup(ctx, access, { events: step.events, rows: await store.model.loadForUndo(WS) }, "undo"), true, () => ({
+    userId: USER,
+    kind: "undone",
+    stepGroupId: step.changeGroupId,
+    label: step.label,
+  }));
 }
 
 async function moveACard(store: DataStore, dx: number): Promise<void> {

@@ -12,11 +12,8 @@ export interface DomainError {
 /** A stale version (AD-12). The refusal's answer brings the fresh page (slice 13), so there is nothing to reload. */
 export const STALE_VERSION_MESSAGE = "Someone changed this meanwhile.";
 export const ARCHIVED_MESSAGE = "This workspace is archived, so it is read-only.";
-/**
- * A server whose store takes no writes (slice 29, Q5: the Postgres adapter until slice B). Refused with the archive's code,
- * so every client rule for a read-only refusal applies (the fresh page, the kept draft, the cut saves).
- */
-export const READ_ONLY_SERVER_MESSAGE = "This server is read-only for now, so nothing was saved.";
+/** A write that waited longer than the lock timeout for its workspace (slice 30, L7): code `invalid`, the draft kept. */
+export const BUSY_MESSAGE = "The workspace is busy saving a large change. Try again in a moment.";
 
 export function domainError(code: DomainErrorCode, message: string, fields?: Record<string, string>): DomainError {
   return fields ? { code, message, fields } : { code, message };

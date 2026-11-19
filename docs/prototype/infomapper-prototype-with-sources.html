@@ -875,6 +875,24 @@ body.wsmode #dtabs{display:none}
 .umenu-role{padding:6px 10px;font-size:12.5px;line-height:1.45;max-width:280px}
 .umenu-role b{font-weight:600}
 @media (max-width:1500px){.userbtn .rl{display:none} .userbtn{padding:0 3px} .projbtn{max-width:128px;padding:0 5px}}
+/* slice 30 (database B): the save indicator and the server badge, in the top bar's right corner, before the details panel's button */
+.savest{display:inline-flex;align-items:center;justify-content:flex-end;gap:4px;min-width:66px;height:30px;font-size:12px;color:var(--ink-3);white-space:nowrap;flex:none;opacity:0;transition:opacity .6s}
+.savest svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.savest.ing,.savest.ok,.savest.err{opacity:1;transition:none}
+.savest.ok.fade{opacity:0;transition:opacity .6s}
+.savest.err{color:var(--warn);font-weight:500;cursor:help}
+.srvb{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border:1px solid var(--line);border-radius:11px;font-size:11.5px;color:var(--ink-2);white-space:nowrap;flex:none;cursor:default}
+.srvb i{width:7px;height:7px;border-radius:50%;background:var(--ink-3);flex:none}
+.srvb.dev i{background:var(--physical)}
+.srvb .ss{display:none}
+@media (max-width:1500px){.srvb .sf{display:none} .srvb .ss{display:inline} .savest{min-width:58px}}
+/* room for them: up to 2,100 px wide the four tools (Hand, Entity, Note, Frame) show their icons only, as below 1,880 px
+   (their letters and tooltips stay); up to 1,600 px the brand is hidden, as below 1,300 px; where the bar is still too narrow, the three path names shorten further, to 56 px each */
+@media (max-width:2100px){.tb .hide-s.hide-m{display:none}}
+@media (max-width:1600px){.brand{display:none}}
+.bar .projbtn{min-width:56px}
+.projbtn span{min-width:0}
+.umenu-proto{padding:4px 10px 2px;font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em}
 
 /* creating entities and concepts from the left panel */
 .tgrp-wrap{position:sticky;top:0;z-index:2;display:flex;align-items:center;background:var(--panel)}
@@ -1564,6 +1582,8 @@ table.dt.drels{margin-top:1mm}
     <button class="tb" id="zIn" title="Zoom in"><svg class="i" viewBox="0 0 16 16"><path d="M3.5 8h9M8 3.5v9"/></svg></button>
     <button class="tb" id="zFit" title="Fit everything on screen (F)"><svg class="i" viewBox="0 0 16 16"><path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5"/></svg></button>
   </div>
+  <span class="savest" id="saveSt" role="status" aria-live="polite"></span>
+  <span class="srvb" id="srvB"><i></i><span class="sf">Local</span><span class="ss">Local</span></span>
   <button class="tb" id="tRight" title="Show or hide the details panel"><svg class="i" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M10 2.5v11"/></svg></button>
   <button class="userbtn" id="tUser" aria-haspopup="menu"><span class="av" id="userAv">Ł</span><span class="rl" id="userRole">Owner</span></button>
 </header>
@@ -2274,17 +2294,17 @@ function mutate(fn) {
   autoLabel(before);
   undoStack.push(before); if (undoStack.length > 150) undoStack.shift();
   redoStack = [];
-  rebuild();
+  rebuild(); SAVE.begin(before);
 }
 function doUndo() {
   if (!undoStack.length) return;
   if (!cubeOn() && dimsAdded(S, JSON.parse(undoStack[undoStack.length - 1]))) { toast(CUBE_OFF, false, true); return; }   // U1: the step stays
-  redoStack.push(snap()); setS(JSON.parse(undoStack.pop())); fixSel(); rebuild(); toast("Undone");
+  redoStack.push(snap()); setS(JSON.parse(undoStack.pop())); fixSel(); rebuild(); toast("Undone"); SAVE.begin();
 }
 function doRedo() {
   if (!redoStack.length) return;
   if (!cubeOn() && dimsAdded(S, JSON.parse(redoStack[redoStack.length - 1]))) { toast(CUBE_OFF, false, true); return; }
-  undoStack.push(snap()); setS(JSON.parse(redoStack.pop())); fixSel(); rebuild(); toast("Redone");
+  undoStack.push(snap()); setS(JSON.parse(redoStack.pop())); fixSel(); rebuild(); toast("Redone"); SAVE.begin();
 }
 function fixSel() {
   idx();
@@ -3520,11 +3540,11 @@ function endPointer(ev, cancelled) {
   }
   if (d.type === "note") {
     const n = noteById(d.id);
-    if (d.moved) { if (!n.pin) afterNoteDrop(n); undoStack.push(d.before); redoStack = []; rebuild(); }
+    if (d.moved) { if (!n.pin) afterNoteDrop(n); undoStack.push(d.before); redoStack = []; rebuild(); SAVE.begin(d.before); }
     else if (!cancelled) select({t:"note", id:d.id});
     return;
   }
-  if (d.type === "cresize") { if (d.moved) { afterCardDrop(d.kind, d.id); undoStack.push(d.before); redoStack = []; rebuild(); } return; }
+  if (d.type === "cresize") { if (d.moved) { afterCardDrop(d.kind, d.id); undoStack.push(d.before); redoStack = []; rebuild(); SAVE.begin(d.before); } return; }
   if (d.type === "rqlink") {
     $("#rqtmp")?.remove(); d.tgt?.classList.remove("rq-tgt"); document.body.classList.remove("rqlinking");
     if (cancelled) return;
@@ -3534,15 +3554,15 @@ function endPointer(ev, cancelled) {
     return;
   }
   if (d.type === "rq") {
-    if (d.moved) { undoStack.push(d.before); redoStack = []; rebuild(); } else if (!cancelled) select({t:"req", id:d.rid});
+    if (d.moved) { undoStack.push(d.before); redoStack = []; rebuild(); SAVE.begin(d.before); } else if (!cancelled) select({t:"req", id:d.rid});
     return;
   }
-  if (d.type === "nresize") { if (d.moved) { undoStack.push(d.before); redoStack = []; rebuild(); } return; }
+  if (d.type === "nresize") { if (d.moved) { undoStack.push(d.before); redoStack = []; rebuild(); SAVE.begin(d.before); } return; }
   if (d.type === "group") {
     if (d.moved) {
       const asks = [];
       d.items.filter(it => it.k && !it.inFrame).forEach(it => afterCardDrop(it.k, it.id, asks));
-      undoStack.push(d.before); redoStack = []; rebuild(); askConcepts(asks);
+      undoStack.push(d.before); redoStack = []; rebuild(); SAVE.begin(d.before); askConcepts(asks);
     } else if (!cancelled) select(selFromKey(d.press));
     return;
   }
@@ -3551,16 +3571,16 @@ function endPointer(ev, cancelled) {
     if (!d.moved && !cancelled && !d.keepSel) { V.suggest = false; select(null); } else save(); }
   else if (d.type === "card") {
     d.el.classList.remove("dragging");
-    if (d.moved) { afterCardDrop(d.kind, d.id); undoStack.push(d.before); redoStack = []; rebuild(); }
+    if (d.moved) { afterCardDrop(d.kind, d.id); undoStack.push(d.before); redoStack = []; rebuild(); SAVE.begin(d.before); }
     else if (!cancelled) select({t: d.kind === "ent" ? "entity" : "source", id:d.id});
   }
   else if (d.type === "frame") {
-    if (d.moved) { undoStack.push(d.before); redoStack = []; rebuild(); }
+    if (d.moved) { undoStack.push(d.before); redoStack = []; rebuild(); SAVE.begin(d.before); }
     else if (!cancelled) select({t:"frame", id:d.id});
   }
   else if (d.type === "member") { if (!cancelled) { const [k, id] = d.m.split(":");
     mutate(() => { frameById(d.f).collapsed = false; V.sel = {t: k === "ent" ? "entity" : "source", id}; }); centerOn(k, id); } }
-  else if (d.type === "fresize") { if (d.moved) { afterResize(frameById(d.id)); undoStack.push(d.before); redoStack = []; rebuild(); } }
+  else if (d.type === "fresize") { if (d.moved) { afterResize(frameById(d.id)); undoStack.push(d.before); redoStack = []; rebuild(); SAVE.begin(d.before); } }
   else if (d.type === "mkframe") {
     $("#mkf").hidden = true; if (cancelled) return;
     const r = d.r && d.r.w > 40 && d.r.h > 40 ? d.r : {x:d.w0.x - 240, y:d.w0.y - 160, w:480, h:320};
@@ -5974,7 +5994,7 @@ $("#navbar").addEventListener("click", ev => {
     V.focus = false; V.layer = "all"; CV().layer = "all"; CV().hideRels = {}; V.hideResolved = false; setTool(null); if (V.sel?.t === "req") V.sel = null;
     ["ent", "src"].forEach(k => Object.values(CV()[k]).forEach(L => { if ((L.f && L.f !== "all" && !(CV().live && L.f === "labeled")) || L.c) { layout = true; if (!(CV().live && L.f === "labeled")) L.f = "all"; L.c = false; } }));
     (CV().frames || []).forEach(f => { if (f.collapsed) { layout = true; f.collapsed = false; } });
-    if (layout) { undoStack.push(before); redoStack = []; }
+    if (layout) { undoStack.push(before); redoStack = []; SAVE.begin(before); }
     rebuild(); toast("Showing everything on this canvas.", layout);
   }
 });
@@ -6443,6 +6463,45 @@ cmenu.addEventListener("click", ev => {
 }, true);
 
 
+/* ---------- slice 30 (database B): the save indicator and the server badge ----------
+   Every write shows "Saving…", then "Saved", which fades; a refused or failed write shows "Not saved", which stays until the
+   next save, with the reason and what to do in its tooltip, and a toast. The badge names the server: "Local" (the local
+   adapter, a file on the laptop) or "Online · dev" (Postgres, infomapper-dev, the dev branch's preview); production in slice D.
+   Prototype only: the user menu switches the server and makes the next change fail, which takes the change back. */
+const SAVE = (() => {
+  const ICON = {ok:'<svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg>',
+    err:'<svg viewBox="0 0 16 16"><path d="M8 2l6 11H2z"/><path d="M8 6.5v3M8 11.3v.2"/></svg>'};
+  const SRV = {local:{l:"Local", s:"Local", t:"Local server: changes are saved in a file on this computer (development and the demo)."},
+    dev:{l:"Online · dev", s:"dev", t:"Online, development server: changes are saved in the database infomapper-dev, for everyone in this workspace. Not production."}};
+  const HINT = "Your last change was not saved: the server did not answer. It was taken back here; make it again. If this repeats, check your connection and reload the page.";
+  let t1 = 0, t2 = 0, t3 = 0, failNext = false, srv = "local", cur = {cls:"", html:"", title:""};
+  /* the top bar's indicator and badge, and the document editor's own pair in its top bar (drawn again with the editor) */
+  function paint() {
+    document.querySelectorAll(".savest").forEach(e => { e.className = "savest" + (cur.cls ? " " + cur.cls : ""); e.innerHTML = cur.html; e.title = cur.title; });
+    const s = SRV[srv]; document.querySelectorAll(".srvb").forEach(b => { b.className = "srvb " + srv; b.title = s.t; b.querySelector(".sf").textContent = s.l; b.querySelector(".ss").textContent = s.s; });
+  }
+  function show(cls, html, title) { cur = {cls, html, title:title || ""}; paint(); }
+  function begin(before) {
+    clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+    const fail = failNext && before !== undefined; if (fail) failNext = false;
+    show("ing", "Saving…");
+    t1 = setTimeout(() => {
+      if (fail) {
+        if (undoStack[undoStack.length - 1] === before) { undoStack.pop(); setS(JSON.parse(before)); fixSel(); rebuild(); }
+        show("err", ICON.err + "Not saved", HINT);
+        toast("Not saved: the server did not answer. Your change was taken back.", false, true);
+        return;
+      }
+      show("ok", ICON.ok + "Saved");
+      t2 = setTimeout(() => { show("ok fade", ICON.ok + "Saved"); t3 = setTimeout(() => show("", ""), 700); }, 1800);
+    }, 450);
+  }
+  const slots = () => `<span class="savest${cur.cls ? " " + cur.cls : ""}" role="status" aria-live="polite" title="${esc(cur.title)}">${cur.html}</span><span class="srvb ${srv}" title="${esc(SRV[srv].t)}"><i></i><span class="sf">${SRV[srv].l}</span><span class="ss">${SRV[srv].s}</span></span>`;
+  return {begin, paint, slots, srv:() => srv, other:() => SRV[srv === "local" ? "dev" : "local"].l, failArmed:() => failNext,
+    toggleSrv() { srv = srv === "local" ? "dev" : "local"; paint(); }, armFail() { failNext = !failNext; }};
+})();
+SAVE.paint();
+
 /* ---------- user indicator: role in this workspace, colour-coded by what it allows ---------- */
 const ROLE_CAN = {Owner:"You can do everything here, including deleting or transferring the workspace.", Admin:"You can edit the model, approve, invite people and change settings.",
   Modeler:"You can edit the model and canvases. Approving is for reviewers and admins.", Reviewer:"You can approve mappings and requirements and add notes, but not edit the model.", Reader:"You can only read this workspace."};
@@ -6459,7 +6518,8 @@ $("#tUser").addEventListener("click", ev => {
   const w = curWs(), me = w.members.find(m => m.you) || {}, r = $("#tUser").getBoundingClientRect();
   cmenu.innerHTML = `<div class="umenu-id"><b>${esc(ROOT.user.name)}</b><span>${esc(ROOT.user.email)}</span></div>
 <div class="umenu-role">In <b>${esc(w.name)}</b> you are <b>${esc(me.role || "")}</b>${me.guest ? `, a guest from ${esc(me.guest)}` : ""}.<br>${w.archived ? "The workspace is archived, so everything is read-only." : esc(ROLE_CAN[me.role] || "")}</div>
-<hr><button data-um="people"><span>People and roles</span></button><button data-um="ws"><span>Workspace home</span></button><hr><button data-um="out"><span>Sign out</span></button>`;
+<hr><button data-um="people"><span>People and roles</span></button><button data-um="ws"><span>Workspace home</span></button><hr><button data-um="out"><span>Sign out</span></button>
+<hr><div class="umenu-proto">Prototype only</div><button data-um="srv"><span>Show the server as ${esc(SAVE.other())}</span></button><button data-um="fail"><span>${SAVE.failArmed() ? "Don't fail the next change" : "Make the next change fail to save"}</span></button>`;
   ctxItems = [{}]; cmenu.hidden = false;
   const m = cmenu.getBoundingClientRect(); cmenu.style.left = Math.max(8, r.right - m.width) + "px"; cmenu.style.top = (r.bottom + 6) + "px";
 });
@@ -6467,6 +6527,8 @@ cmenu.addEventListener("click", ev => {
   const u = ev.target.closest("[data-um]"); if (!u) return; closeCtx();
   if (u.dataset.um === "people") { V.wsTab = "people"; goWsHome(); }
   else if (u.dataset.um === "ws") goWsHome();
+  else if (u.dataset.um === "srv") { SAVE.toggleSrv(); toast(`The badge shows ${SAVE.srv() === "dev" ? "Online · dev" : "Local"}. Prototype only.`); }
+  else if (u.dataset.um === "fail") { SAVE.armFail(); toast(SAVE.failArmed() ? "The next change will fail to save. Prototype only." : "The next change will save as usual."); }
   else toast("Signing out is not part of the prototype.");
 }, true);
 
@@ -10126,7 +10188,7 @@ ${admin ? `<label class="btn sm">${w.clientLogo ? "Replace" : "Upload"}<input ty
   const cur = () => W().defs.find(d => d.id === ST.defId);
   function openEditor(id) { ST.defId = id; ST.sel = "doc"; ST.addOpen = false; ST.zoom = "fit"; box.hidden = false; document.body.classList.add("dedit-on"); drawEditor(); }
   function closeEditor() { box.hidden = true; document.body.classList.remove("dedit-on"); ST.defId = null; renderWsHome(); }
-  function touch(fn, keepFocus) { const d = cur(); if (!d || !can.edit(d)) { toast(whyNot.edit(d)); drawEditor(); return; } fn(d); d.updated = nowT(); save();
+  function touch(fn, keepFocus) { const d = cur(); if (!d || !can.edit(d)) { toast(whyNot.edit(d)); drawEditor(); return; } fn(d); d.updated = nowT(); save(); SAVE.begin();
     if (keepFocus) { clearTimeout(ST.dirtyT); ST.dirtyT = setTimeout(() => { drawPreview(); keepView(drawLeft); }, 500); } else keepView(drawEditor); }
   /* a change redraws the panels; the scroll positions, and the field being edited, stay where they were */
   const focusKey = a => { const at = [...a.attributes].filter(x => x.name.startsWith("data-")).map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join(""); return at ? a.tagName.toLowerCase() + at : null; };
@@ -10144,7 +10206,7 @@ ${admin ? `<label class="btn sm">${w.clientLogo ? "Replace" : "Upload"}<input ty
 <div class="de-title"><input class="de-name" data-dprop="name" value="${esc(d.name)}" ${ro} aria-label="Document name"><div class="de-url">infomapper.app/${esc(snake(w.name).replace(/_/g, "-"))}/docs/${esc(d.id.slice(5))}</div></div>
 <span class="de-badge ${d.shared ? "sh" : ""}">${d.shared ? "Shared" : "Private"}</span>${ro ? `<span class="de-badge ro">Read only</span>` : ""}
 <span class="sp" style="flex:1"></span><span class="de-busy" id="de-busy" hidden>Laying out pages…</span><span class="de-zoom"><select data-de="pages" aria-label="Preview pages" title="Auto: real pages while they lay out quickly, otherwise the quick sheet until you update them. Exact: real pages after every change. Quick: one sheet per page break, at once."><option value="auto" ${(ST.pages || "auto") === "auto" && window.Paged ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Auto</option><option value="exact" ${ST.pages === "exact" ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Exact pages</option><option value="quick" ${ST.pages === "quick" || !window.Paged ? "selected" : ""}>Quick preview</option></select></span><span class="de-zoom"><select data-de="zoom" aria-label="Preview zoom"><option value="fit">Fit width</option><option value="0.75">75 %</option><option value="1">100 %</option></select></span>
-<button class="btn sm" data-de="print" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Print / PDF</button><button class="btn sm pri" data-de="gen" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Generate version</button><button class="tb de-tog" data-de="togr" aria-pressed="${!PANELS.hidden("r")}" title="Show or hide the options panel" aria-label="Options panel"><svg class="i" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M10 2.5v11"/></svg></button></div>
+<button class="btn sm" data-de="print" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Print / PDF</button><button class="btn sm pri" data-de="gen" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Generate version</button>${SAVE.slots()}<button class="tb de-tog" data-de="togr" aria-pressed="${!PANELS.hidden("r")}" title="Show or hide the options panel" aria-label="Options panel"><svg class="i" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M10 2.5v11"/></svg></button></div>
 ${ro ? `<div class="de-ro">${esc(whyNot.edit(d))}${can.create() ? ` <button class="btn sm" data-de="dup">Duplicate as my document</button>` : ""}</div>` : ""}
 <div class="de-body${PANELS.cls()}" id="de-body" style="${PANELS.style()}"><div class="de-left" id="de-left" ${PANELS.hidden("l") ? "inert" : ""}></div><div class="de-mid" id="de-mid"></div><div class="de-right" id="de-right" ${PANELS.hidden("r") ? "inert" : ""}></div><div class="de-rz l" data-rz="l" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Width of the sections panel" title="Drag to widen; double-click for the default width"></div><div class="de-rz r" data-rz="r" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Width of the options panel" title="Drag to widen; double-click for the default width"></div></div>`;
     box.querySelector('[data-de="zoom"]').value = String(ST.zoom);

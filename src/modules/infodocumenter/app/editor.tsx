@@ -17,6 +17,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { SavePair, type ServerKind } from "@/app/_components/save-indicator";
 import { useAction } from "@/app/_components/use-action";
 import { DOCUMENT_SECTION_TYPES, documentStateFor } from "@/app/_lib/document-sections";
 import { Fold, Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
@@ -129,6 +130,8 @@ export interface EditorProps {
   optionContext: OptionContext;
   /** Slice 27: the person (their panels' cookie) and the layout the server read from it (slice 28: with the hidden flags). */
   userId: string;
+  /** The server the save pair names (slice 30, F16: the editor's own bar shows the pair, the top bar does not). */
+  server: ServerKind;
   panels: DocPanels;
   /** The workspace's documentation language: what a document without its own follows (Q8). */
   workspaceLanguage: DocLanguage;
@@ -153,7 +156,7 @@ const readMode = (): PreviewMode => {
 export const TYPING_PAUSE_MS = 500;
 
 export function DocumentEditor(props: EditorProps) {
-  const { workspaceId, document: doc, types, rights, archived, author, authorMember, projects, concepts, date, testHooks, dimensional, optionContext, workspaceLanguage, userId, panels } = props;
+  const { workspaceId, document: doc, types, rights, archived, author, authorMember, projects, concepts, date, testHooks, dimensional, optionContext, workspaceLanguage, userId, panels, server } = props;
   const bodyRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLElement>(null);
   const docPanels = useDocPanels(userId, panels);
@@ -403,6 +406,7 @@ export function DocumentEditor(props: EditorProps) {
         <button type="button" className={smallButton} data-testid="button-print" disabled={!built} onClick={() => preview.current?.print()}>
           {EDITOR_TEXTS.print}
         </button>
+        <SavePair server={server} />
         <PanelToggle side="right" panels={docPanels} />
       </div>
       {notice ? (

@@ -74,7 +74,8 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
   /** Missing columns last (slice 7a, item 35), otherwise in physical order. */
   const listed = [...columns].sort((a, b) => Number(!!a.missing_since) - Number(!!b.missing_since) || a.ordinal - b.ordinal);
   /** Relationships from and to the table: they go with it (slice 7a, D-47). */
-  const tableRelationships = p.ix.relationshipsOf.get(t.id) ?? [];
+  // slice 30 (Q3): by name; one name twice keeps creation order
+  const tableRelationships = [...(p.ix.relationshipsOf.get(t.id) ?? [])].sort((a, b) => a.name.localeCompare(b.name));
   const relationships = tableRelationships.length;
   const system = p.ix.model.sourceSystems.find((s) => s.id === t.source_system_id);
   const feeds = fedEntities(p.ix, t.id);

@@ -84,7 +84,8 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
     .list.filter((c) => !isDataVault(c) || access.workspace.dv2_mode)
     .map((c) => ({ key: registerKey(c), name: c.name, scope: c.scope, own: !isBuiltin(c) }));
   return (
-    <AppShell shell={shell} trail={trail(workspaceId, doc, false)}>
+    // F16 (slice 30): the editor draws the save pair in its own bar, so the top bar leaves it out
+    <AppShell shell={shell} trail={trail(workspaceId, doc, false)} savePair={false}>
       {/* the Formal template's serif, on this page only (slice 26, step 4) */}
       <div className={`${plexSerif.variable} h-full`}>
         <DocumentEditor
@@ -111,6 +112,7 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
           date={today()}
           testHooks={areTestHooksOn()}
           userId={shell.user.id}
+          server={shell.server}
           panels={parseDocPanelsCookie((await cookies()).get(docPanelsCookieName(shell.user.id))?.value)}
           dimensional={dimensionalLevelOn(access.workspace)}
           workspaceLanguage={access.workspace.doc_language}

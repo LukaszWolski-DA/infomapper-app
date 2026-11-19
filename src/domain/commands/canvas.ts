@@ -174,6 +174,10 @@ export function addCanvasToProject(
   };
 }
 
+/** D-28's two counts (also checked inside the write, `count-rules.ts`, slice 30). */
+export const CANVAS_NEEDS_PROJECT_MESSAGE = "A canvas belongs to at least one project.";
+export const PROJECT_NEEDS_CANVAS_MESSAGE = "This project would have no canvas left.";
+
 /**
  * Takes a canvas out of one project. The canvas itself stays (D-28): a canvas always belongs to at least one
  * project, and a project keeps at least one canvas, so removing never deletes a canvas.
@@ -190,10 +194,10 @@ export function removeCanvasFromProject(
   const link = state.canvasLinks.find((l) => l.canvas_id === canvas.id && l.project_id === project.id);
   if (!linked || !link) return fail(domainError("not_found", `This canvas is not in ${project.name}.`));
   if (state.canvasLinks.filter((l) => l.canvas_id === canvas.id).length < 2) {
-    return fail(domainError("invalid", "A canvas belongs to at least one project."));
+    return fail(domainError("invalid", CANVAS_NEEDS_PROJECT_MESSAGE));
   }
   if (state.projectLinks.filter((l) => l.project_id === project.id).length < 2) {
-    return fail(domainError("invalid", "This project would have no canvas left."));
+    return fail(domainError("invalid", PROJECT_NEEDS_CANVAS_MESSAGE));
   }
   return {
     ok: true,

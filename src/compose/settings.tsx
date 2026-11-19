@@ -16,7 +16,7 @@ export async function settingsBoxes(store: DataStore, access: WorkspaceAccess) {
     getDataStore(STORE_SCHEMA).modules.list(workspace.id, "document_definition"),
   ]);
   // slice 29 (Q5): no switch on a server that takes no writes
-  const canSwitch = !store.readOnly && can(access, "workspace.edit_settings");
+  const canSwitch = can(access, "workspace.edit_settings");
   const organizationName = organization?.name ?? "";
   return (
     <>

@@ -10,7 +10,7 @@ import { readStandard } from "../../src/domain/import/standard";
 import { approvedMapping } from "../slice-04b1/helpers";
 import { syntheticStandard } from "../../scripts/lib/import-synthetic";
 import { expect, test } from "./fixtures";
-import { filterCount, loadModel, openWizard, RETAIL, reviewFile, signInAs } from "./helpers";
+import { filterCount, loadModel, openWizard, postImport, RETAIL, reviewFile, signInAs } from "./helpers";
 
 const TABLES = 160;
 const KEYED = [139, 159]; // in schema s19, the last one: past the first 100 cards in any order
@@ -24,9 +24,7 @@ test("S7A-14 (counts): a review rendered in parts counts every change and every 
   const scope = read.tables.map((t) => t.key);
   const choices = { scope: new Set(scope), compare: "schemas" as const, renames: new Map() };
   const plan = buildPlan(importStateOf(await loadModel()).model, read, { newName: "Synth" }, choices);
-  const response = await page.request.post(`/w/${RETAIL}/import`, {
-    data: { target: { newName: "Synth" }, channel: "file", sourceLabel: "synth.csv", text, scope, compare: "schemas", renames: [], fingerprint: planFingerprint(plan) },
-  });
+  const response = await postImport(page, RETAIL, { target: { newName: "Synth" }, channel: "file", sourceLabel: "synth.csv", text, scope, compare: "schemas", renames: [], fingerprint: planFingerprint(plan) });
   expect((await response.json()).ok).toBe(true);
 
   const model = await loadModel();

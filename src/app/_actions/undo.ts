@@ -17,20 +17,12 @@ import { revertChangeGroup } from "@/domain/commands/undo";
 import { changeCanvasId } from "@/domain/model/change-label";
 import { canvasAfterStep } from "@/domain/model/next-canvas";
 import { uuidv7 } from "@/domain/ids";
-import {
-  afterRedo,
-  afterUndo,
-  dropNextRedo,
-  dropNextUndo,
-  nextRedo,
-  nextUndo,
-  refusedStepMessage,
-  type UndoHistory,
-} from "@/domain/model/undo-history";
+import { refusedStepMessage } from "@/domain/model/undo-history";
 import { rememberGoneProject } from "../_lib/gone-project";
 import { rememberNextCanvas } from "../_lib/next-canvas";
 import { withLiveCanvases, type ActionResult } from "../_lib/run-command";
 import { getSession } from "../_lib/session";
+import { withTiming } from "../_lib/timing";
 import { lockedRefusal } from "../_lib/unlock";
 
 export interface UndoState {
@@ -47,7 +39,6 @@ export interface UndoOutcome extends UndoState {
   versions: Record<string, number>;
 }
 
-const stateOf = (h: UndoHistory): UndoState => ({ canUndo: h.undo.length > 0, canRedo: h.redo.length > 0 });
 const NOTHING = { undo: "Nothing to undo.", redo: "Nothing to redo." } as const;
 
 /** Undoes (or redoes) the signed-in person's last step in the workspace. */
@@ -56,6 +47,14 @@ export async function undoAction(
   mode: "undo" | "redo",
   open?: { projectId: string; canvasId: string },
 ): Promise<ActionResult<UndoOutcome>> {
+  // slice 30 (S30-13): with INFOMAPPER_TIMING=1 one log line of numbers (no id, name or value)
+  return withTiming(
+    () => revert(workspaceId, mode, open),
+    (summary, r) => console.log(`timing ${JSON.stringify({ route: mode, ok: r.ok, ...summary })}`),
+  );
+}
+
+async function revert(workspaceId: string, mode: "undo" | "redo", open?: { projectId: string; canvasId: string }): Promise<ActionResult<UndoOutcome>> {
   const session = await getSession();
   if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
   const { user } = session;
@@ -68,13 +67,12 @@ export async function undoAction(
   const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
 
   try {
-    const history = await store.undoHistory.get(workspace.id, user.id);
-    const step = mode === "undo" ? nextUndo(history) : nextRedo(history);
+    const step = await store.undoHistory.next(workspace.id, user.id, mode);
     if (!step) return { ok: false, code: "invalid", message: NOTHING[mode] };
-    /** The step is still the next one: a second Ctrl+Z on its way does not drop or move a different one. */
-    const isNext = (h: UndoHistory) => (mode === "undo" ? nextUndo(h) : nextRedo(h))?.changeGroupId === step.changeGroupId;
+    // a dropped or moved step is the one read here only while it is still the next one: a second Ctrl+Z on its way
+    // drops or moves no other (the port compares, slice 30)
     const drop = async () => {
-      await store.undoHistory.update(workspace.id, user.id, (h) => (isNext(h) ? (mode === "undo" ? dropNextUndo(h) : dropNextRedo(h)) : h));
+      await store.undoHistory.drop(workspace.id, user.id, mode, step.changeGroupId);
       revalidatePath("/", "layout");
       return { ok: false as const, code: "conflict" as const, message: refusedStepMessage(mode, step.label) };
     };
@@ -86,17 +84,18 @@ export async function undoAction(
     // or redo never links the working context or labels a card it brings back (`revert`)
     const result = await withLiveCanvases(ctx, store, user, reverted.writeSet, { revert: true });
     if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message };
-    const applied = await store.apply(result.writeSet);
+    // slice 30 (B3, L1): the access this undo was checked with, read again inside the write
+    const checked = { userId: user.id, workspace: { id: workspace.id, name: workspace.name, archived: workspace.archived_at !== null, role: access.member?.role ?? null } };
+    // slice 30 (F4): the step moves to the other list with its revert, in the same write
+    const history = { userId: user.id, kind: mode === "undo" ? ("undone" as const) : ("redone" as const), stepGroupId: step.changeGroupId, label: step.label };
+    const applied = await store.apply(result.writeSet, { access: checked, history });
     if (!applied.ok) {
       // Changed between reading and writing: the same as changed afterwards.
-      return applied.error.code === "stale_version" || applied.error.code === "conflict" || applied.error.code === "not_found"
+      return (applied.error.code === "stale_version" || applied.error.code === "conflict" || applied.error.code === "not_found")
         ? drop()
         : { ok: false, code: applied.error.code, message: applied.error.message };
     }
-    const revert = { changeGroupId: result.writeSet.changeGroupId, label: step.label, events: result.writeSet.events };
-    const next = await store.undoHistory.update(workspace.id, user.id, (h) =>
-      isNext(h) ? (mode === "undo" ? afterUndo(h, revert) : afterRedo(h, revert)) : h,
-    );
+    const state = await store.undoHistory.state(workspace.id, user.id);
     if (open && typeof open.projectId === "string" && typeof open.canvasId === "string") {
       const links = await store.canvases.listLinksOfProject(workspace.id, open.projectId);
       const next = canvasAfterStep(open, links, step.events);
@@ -108,7 +107,7 @@ export async function undoAction(
     revalidatePath("/", "layout");
     const canvasId = changeCanvasId(step.events);
     const canvas = canvasId ? await store.canvases.get(workspace.id, canvasId) : null;
-    return { ok: true, value: { label: step.label, canvas: canvas ? { id: canvas.id, name: canvas.name } : null, versions: writtenVersions(result.writeSet.writes), ...stateOf(next) } };
+    return { ok: true, value: { label: step.label, canvas: canvas ? { id: canvas.id, name: canvas.name } : null, versions: writtenVersions(result.writeSet.writes), ...state } };
   } catch (e) {
     console.error("Undo failed:", e instanceof Error ? `${e.name}: ${e.message}` : "unknown error");
     return { ok: false, code: "unexpected", message: "Something went wrong. Nothing was changed." };

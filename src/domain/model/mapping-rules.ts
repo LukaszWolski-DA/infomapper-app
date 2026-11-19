@@ -49,6 +49,14 @@ export interface MappingLog {
 export const MAPPING_LOG: MappingLog = { mapping: "mapping", input: "mapping_input", content: ["kind", "rule_expression"] };
 
 /**
+ * Whether `e` is the later of two change events, or as late (slice 30, Q3, L8): by time, then, for two change groups in
+ * one millisecond, by the group's id (UUID v7: the later group within one server process; across instances the tie is
+ * accepted, a known limitation). Events of one group share a person, so their order among themselves never matters.
+ */
+export const laterOrSame = (e: ChangeEvent, than: ChangeEvent): boolean =>
+  e.occurred_at > than.occurred_at || (e.occurred_at === than.occurred_at && e.change_group_id >= than.change_group_id);
+
+/**
  * Who last changed what a mapping does: its inputs, kind or rule (AD-06). Read from the change log, because no column
  * records it (Łukasz, 3 October 2026). Status and note changes do not count. Without any such event (seeded data),
  * the mapping's creator is the author.
@@ -57,7 +65,7 @@ export function lastContentEditor(mapping: { id: Uuid; created_by: Uuid }, event
   let last: ChangeEvent | null = null;
   for (const e of events) {
     if (!isContentChange(mapping.id, e, log)) continue;
-    if (!last || e.occurred_at >= last.occurred_at) last = e;
+    if (!last || laterOrSame(e, last)) last = e;
   }
   return last?.user_id ?? mapping.created_by;
 }

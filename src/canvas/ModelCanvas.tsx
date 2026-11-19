@@ -48,6 +48,7 @@ import "@xyflow/react/dist/style.css";
 import "./canvas.css";
 import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
+import { reportedAll } from "@/ui/save-state";
 import { track } from "@/ui/leave-guard";
 import { rowSaves } from "@/ui/row-saves";
 import { applyNames, shownText, visibleRows, withClips, type CanvasNames, type CardData } from "./card-data";
@@ -322,14 +323,14 @@ export function ModelCanvas({
   names: pageNames = NO_NAMES,
   lines: allLines,
   editable,
-  saveCard,
-  placeCard,
-  placeCards,
-  removeCard,
-  removeCards,
+  saveCard: saveCardSent,
+  placeCard: placeCardSent,
+  placeCards: placeCardsSent,
+  removeCard: removeCardSent,
+  removeCards: removeCardsSent,
   frames: initialFrames,
   concepts,
-  frameWrites,
+  frameWrites: frameWritesSent,
   entityConcepts = NO_CONCEPTS,
   focusCardId,
   focusLabelId,
@@ -342,14 +343,34 @@ export function ModelCanvas({
   fadeData,
   notes: initialNotes = NO_NOTES,
   readAt = null,
-  noteWrites,
+  noteWrites: noteWritesSent,
   canNote = false,
   userName = "",
-  live = null,
+  live: liveSent = null,
   requirementCards: initialReqCards = NO_REQ_CARDS,
-  placeRequirementCards,
-  linkRequirement,
+  placeRequirementCards: placeRequirementCardsSent,
+  linkRequirement: linkRequirementSent,
 }: ModelCanvasProps) {
+  // slice 30: the top bar's save state follows the canvas's own writes, its action props wrapped once
+  const { saveCard, placeCard, placeCards, removeCard, removeCards, placeRequirementCards, linkRequirement } = useMemo(
+    () =>
+      reportedAll(
+        {
+          saveCard: saveCardSent,
+          placeCard: placeCardSent,
+          placeCards: placeCardsSent,
+          removeCard: removeCardSent,
+          removeCards: removeCardsSent,
+          placeRequirementCards: placeRequirementCardsSent,
+          linkRequirement: linkRequirementSent,
+        },
+        "canvas",
+      ),
+    [saveCardSent, placeCardSent, placeCardsSent, removeCardSent, removeCardsSent, placeRequirementCardsSent, linkRequirementSent],
+  );
+  const frameWrites = useMemo(() => reportedAll(frameWritesSent, "canvas"), [frameWritesSent]);
+  const noteWrites = useMemo(() => (noteWritesSent ? reportedAll(noteWritesSent, "canvas") : noteWritesSent), [noteWritesSent]);
+  const live = useMemo(() => (liveSent ? { ...liveSent, ...reportedAll({ labelElement: liveSent.labelElement, removeCard: liveSent.removeCard }, "canvas") } : liveSent), [liveSent]);
   const ui = useContext(CanvasUiCtx);
   const flashRowNow = ui.flashRow;
   const lookApi = useCanvasLook();

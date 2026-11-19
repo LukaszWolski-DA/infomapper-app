@@ -29,7 +29,7 @@ export function NoteToolButton() {
         <path d="M3 2.5h10v7.5l-3.5 3.5H3z" />
         <path d="M13 10H9.5v3.5" />
       </svg>
-      <span className="hidden min-[1881px]:inline">Note</span>
+      <span className="hidden min-[2101px]:inline">Note</span>
     </button>
   );
 }

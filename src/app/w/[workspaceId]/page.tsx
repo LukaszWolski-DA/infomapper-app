@@ -8,7 +8,7 @@ import { AppShell } from "@/app/_components/app-shell";
 import { GoneNotice } from "@/app/_components/gone-notice";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { projectHref, workspaceHref } from "@/app/_lib/paths";
-import { READ_ONLY_SERVER_TEXT, ROLE_LABEL } from "@/app/_lib/roles";
+import { ROLE_LABEL } from "@/app/_lib/roles";
 import { loadShell } from "@/app/_lib/shell";
 import { thumbnailHrefs } from "@/app/_lib/thumbnails";
 import { workspaceStats } from "@/app/_panels/stats";
@@ -40,7 +40,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     store.model.load(workspaceId),
     store.requirements.list(workspaceId),
     store.requirements.listLinks(workspaceId),
-    store.undoHistory.get(workspaceId, shell.user.id),
+    store.undoHistory.state(workspaceId, shell.user.id),
   ]);
   const orgMemberships = await store.organizations.listMembershipsOfUsers(members.map((m) => m.user_id));
   const organizations = await Promise.all(
@@ -55,7 +55,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const moduleTab = moduleTabs.find((t) => t.id === tab);
   const archived = shell.workspace.archived;
   // slice 29 (Q5): a server that takes no writes offers no change, as an archive does
-  const canHere = (action: Parameters<typeof can>[1]) => !shell.workspace.readOnly && can(access, action);
+  const canHere = (action: Parameters<typeof can>[1]) => can(access, action);
   const isOwner = shell.role === "owner";
   const isAdmin = isOwner || shell.role === "admin";
   const roleLabel = ROLE_LABEL[shell.role] + (shell.guest ? " · guest" : "");
@@ -105,7 +105,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
 
   // Undo and Redo, buttons and keys, on the person's history of the workspace (slice 12a, D-65)
   return (
-    <UndoProvider workspaceId={workspaceId} state={{ canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 }}>
+    <UndoProvider workspaceId={workspaceId} state={history}>
     <AppShell shell={shell} tools={<UndoButtons />}>
       {query.gone === "project" && <GoneNotice message="That project no longer exists." />}
       {/* slice 25 (step 4b): a module's page the person can no longer open sent them back here */}
@@ -130,10 +130,6 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               {isOwner && (
                 <UnarchiveButton workspaceId={workspace.id} workspaceName={workspace.name} version={workspace.version} />
               )}
-            </Banner>
-          ) : shell.workspace.readOnly ? (
-            <Banner tone="info" testId="banner-read-only">
-              {READ_ONLY_SERVER_TEXT}
             </Banner>
           ) : shell.standing !== "full" ? (
             <Banner tone="info" testId="banner-role">
@@ -290,7 +286,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                   ))}
                 </tbody>
               </table>
-              {managesPeople && <AddPersonBox workspaceId={workspace.id} />}
+              {managesPeople && <AddPersonBox workspaceId={workspace.id} online={shell.server.kind === "online"} />}
               {organizationAccess && <OrganizationAccessBox workspaceId={workspace.id} link={organizationAccess.link} version={organizationAccess.version} />}
               <H3>What each role can do</H3>
               <table className="w-full border-collapse text-[13px]">

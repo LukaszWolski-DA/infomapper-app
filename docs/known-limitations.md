@@ -6,6 +6,8 @@ Things we know are not fully right yet, accepted for now, with what has to happe
 
 ### "At least one canvas" can race (slice 0)
 
+**Closed in slice 30:** checked inside the write on both adapters by one domain rule (`src/domain/commands/count-rules.ts`): the local adapter in its serialised write, Postgres in the write's transaction under the workspace's lock (AD-38), with concurrency tests on both (`tests/contract/writes.test.ts`). The text below is kept as it was written.
+
 Removing a canvas from a project is refused when the canvas would belong to no project, or the project would have no
 canvas left (D-28). The command checks this against links read just before the write; the local adapter then
 re-checks versions, keys and references inside its serialised write, but not this count. Two removals at the same
@@ -34,6 +36,8 @@ round the domain, or a file edited by hand, could leave an entity on a code the 
 
 ### The last owner under concurrent writes (slice 8; fixed in the local adapter)
 
+**Closed in slice 30:** checked inside the write on both adapters by one domain rule (`src/domain/commands/count-rules.ts`): the local adapter in its serialised write, Postgres in the write's transaction under the workspace's lock (AD-38), with concurrency tests on both (`tests/contract/writes.test.ts`). The text below is kept as it was written.
+
 A workspace keeps at least one owner. The domain counts the owners from what the command read; two owners removing or
 demoting each other at the same moment write different `workspace_member` rows, which no version check sees. The local
 adapter counts the owners again inside its serialised write and refuses the second write ("{workspace} needs at least
@@ -45,6 +49,8 @@ concurrent demotions).
 
 ### The last project under concurrent writes (slice 12a; fixed in the local adapter)
 
+**Closed in slice 30:** checked inside the write on both adapters by one domain rule (`src/domain/commands/count-rules.ts`): the local adapter in its serialised write, Postgres in the write's transaction under the workspace's lock (AD-38), with concurrency tests on both (`tests/contract/writes.test.ts`). The text below is kept as it was written.
+
 A workspace keeps at least one project (D-65). The domain counts the live projects from what the command read, and an
 undo refuses a revert that would leave none; but two people deleting the last two projects at the same moment, or a
 delete and an undo of "Create project", each count before the other writes. The local adapter counts the live projects
@@ -55,6 +61,8 @@ deletes).
 - **The database slice (last, AD-31):** the same check in the write's transaction, as for the last owner.
 
 ### InfoCube off with facts or dimensions under concurrent writes (slice 15a; fixed in the local adapter)
+
+**Closed in slice 30:** checked inside the write on both adapters by one domain rule (`src/domain/commands/count-rules.ts`): the local adapter in its serialised write, Postgres in the write's transaction under the workspace's lock (AD-38), with concurrency tests on both (`tests/contract/writes.test.ts`). The text below is kept as it was written.
 
 InfoCube is turned off only while the workspace has no facts or dimensions, and while it is off nothing creates or
 brings back one (C-7 as changed on 4 November 2026). The settings command counts the facts and dimensions from what it
@@ -78,6 +86,9 @@ created after the page read the data (`readAt`) stay, and the versions the canva
 - **What is left:** the model's content on cards (names, rows, label marks) and everything else on the page is taken
   as it comes. A late page can show it older for a moment; a newer page follows, because every model write refreshes
   the page.
+- **Slice 30 (Q8): no store revision.** Another person's writes never send this browser a page, so several people do not
+  make a late page more likely; a page's separate reads may show another person's concurrent write half until the next
+  fresh page, which a store revision would not change either.
 - **Candidate for the database slice (last, AD-31): a store revision.** Each page and each write result would carry the
   store's revision (a number that grows with every change group), and the canvas would ignore a page older than the
   newest revision it has seen. That covers everything on the page in one place, not only rows with a version, and
@@ -675,6 +686,9 @@ those keep every text that reaches 4.5:1 on a plain card at 4.5:1 under them (st
 ## Undo history (slice 1b)
 
 ### The undo history lives in server memory
+
+**Postgres: closed in slice 30** (`undo_step`, written in each write's transaction; it survives a restart, a new
+deployment and several instances). **The local adapter keeps it in memory** (slice 30, Q4 (a)), as the text below says.
 
 Each person's undo history in a workspace (the last 50 steps, slice 1b PRD item 12) is kept in the
 memory of the server process, as the PRD asks for now. It is lost when the server restarts (and, in development, when
@@ -1859,11 +1873,22 @@ there. **Later:** slice D's production project replaces it.
 
 ### Read only: the document editor still offers its controls
 
+**Closed in slice 30:** the Postgres adapter writes, so no server is read only any more; the text below is kept as it was
+written.
+
 On a server that takes no writes the pages offer no change (standing none, no creates, no switches), except the document
 editor: its controls stay, and each save is refused with "This server is read-only for now, so nothing was saved." with
 the draft kept (slice 13's rules; S29-03). Accepted by Łukasz for slice A; slice B's writes remove it.
 
 ### More than 1,000 rows in one millisecond are ordered by key
+
+**Slice 30 (L8):** the seed loader now moves a crowded millisecond's rows past the 999th into the following
+milliseconds, so the seed keeps the file's order; `apply` stamps a write set's rows by their place and falls back to
+the key past the 999th, which keeps the write set's order for the app's own rows; where an order means something the
+domain sorts explicitly (AD-12's note). Step 1's table of tables and reads is `docs/prd/slice-30-acceptance.md`, Q3.
+**What is left:** two people's change groups written in the same millisecond on two server instances are ordered by key,
+so the four-eyes rule's "last editor" between them is one of the two, not always the later (accepted by Łukasz, L8).
+The text below is kept as it was written.
 
 The stored order's microseconds hold 1,000 places per millisecond (AD-12's note). The seed gives `source_column`'s 1,521
 rows one millisecond, so the 522 after the 999th are ordered by key on Postgres; only `loadForUndo` returns them in that
@@ -1886,3 +1911,40 @@ pulls just before, can hold one as its local port. The job now reserves 54320-54
 (`net.ipv4.ip_local_reserved_ports`) and prints the range and the reservation. The cause is an assumption: if the start
 fails again, the step "On failure, show the port range and what holds the stack's ports" lists the sockets on 5432x.
 The `migrations` job's service uses 5432, below the range, and is unchanged.
+
+## The writes on Postgres (slice 30)
+
+### "Add person" is disabled online until the people slice
+
+On the Postgres adapter the People tab's "Add a person" box shows with every field and its Continue disabled, and the
+line "People are added by an administrator on this server for now." under it (B5, L6); the server refuses the action
+too. A person made there would have no Supabase Auth account and could never sign in. People are made by script
+(`npm run pg:accounts`). Changing a role and removing a person work online. **Later:** the people slice (invitations,
+after slice C) brings a working way to add people online and removes this. The local adapter keeps the box as it was.
+
+### The save indicator: what it does not follow
+
+The top bar's indicator (slice 30, Q6) follows every write a workspace's pages send: the save chain, `run`, undo and
+redo, the canvas's writes and the import's upload. It does not follow the start page's forms (creating an organization,
+signing in) and the local adapter's "New organization…" dialog, which have their own `run` and no top bar of their own
+while they write; a page's state starts empty after a reload. Between two writes of one page, "Not saved" shows until
+the next write starts ("Saving…", the prototype's `begin()`), not until the next one succeeds.
+
+### The server badge names any online server by its variable
+
+`Online · dev` comes from `INFOMAPPER_SERVER_NAME=dev` (Q7); another value shows as `Online · {value}` with a generic
+tooltip, and none as `Online`. Production's badge is slice D's decision.
+
+### The lock timeout is provisional
+
+A write waits at most 10 s for its workspace's lock (`LOCK_TIMEOUT`, L7), then is refused as busy ("The workspace is busy
+saving a large change. Try again in a moment.", code `invalid`: the draft stays editable). The value is set again after
+S30-05's measurement of a large import on `dev`'s preview.
+
+### A check workspace in infomapper-dev
+
+`scripts/pg-lock-check.ts` (slice 30, step 4) made the workspace "Slice 30 lock check" in the demo's InfoMate on
+`infomapper-dev` for its checks and soft-deleted it at the end: its rows (the workspace, its member, two projects, a
+canvas, the built-in classifications and stereotypes, their change events) stay in the tables, hidden everywhere. A
+`pg:seed -- --reset` (on Łukasz's OK) removes them.
+

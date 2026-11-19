@@ -76,7 +76,7 @@ async function projectHome(store: DataStore, ws: Uuid, projectId: Uuid, thumbs: 
   const canvasIds = links.map((l) => l.canvas_id);
   // page.tsx
   const [model, items, labels, labelLinks, pins, notes, frames, , requirements, requirementLinks, sourceChanges] = await timed(t, "page reads", () =>
-    Promise.all([store.model.load(ws), store.canvasItems.list(ws), store.labels.list(ws), store.labels.listLinks(ws), store.labels.listPins(ws), store.notes.list(ws), store.frames.list(ws), store.canvases.list(ws), store.requirements.list(ws), store.requirements.listLinks(ws), store.model.listChanges(ws), store.undoHistory.get(ws, USER)]),
+    Promise.all([store.model.load(ws), store.canvasItems.list(ws), store.labels.list(ws), store.labels.listLinks(ws), store.labels.listPins(ws), store.notes.list(ws), store.frames.list(ws), store.canvases.list(ws), store.requirements.list(ws), store.requirements.listLinks(ws), store.model.listChanges(ws), store.undoHistory.state(ws, USER)]),
   );
   await timed(t, "stats", () => projectStats(model, items, canvasIds));
   const itemsOf = (ids: readonly Uuid[]) => items.filter((i) => ids.includes(i.canvas_id));
@@ -100,7 +100,7 @@ async function workspaceHome(store: DataStore, ws: Uuid, p8: boolean, t: Timings
   const shell = await timed(t, "shell reads", () => shellReads(store, ws));
   const [, , , model, requirements, requirementLinks] = await timed(t, "page reads", async () => {
     await store.workspaces.get(ws);
-    return Promise.all([store.workspaces.listMembers(ws), store.users.list(), store.projects.list(ws), store.model.load(ws), store.requirements.list(ws), store.requirements.listLinks(ws), store.undoHistory.get(ws, USER)]);
+    return Promise.all([store.workspaces.listMembers(ws), store.users.list(), store.projects.list(ws), store.model.load(ws), store.requirements.list(ws), store.requirements.listLinks(ws), store.undoHistory.state(ws, USER)]);
   });
   await timed(t, "stats and requirement index", () => {
     workspaceStats(model);

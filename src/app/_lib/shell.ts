@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { getDataStore } from "@/data";
+import { getDataStore, isPostgresMode } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { can, checkCreateWorkspace, isArchived, isGuest } from "@/domain/permissions";
 import type { AppUser, Workspace, WorkspaceMember, WorkspaceRole } from "@/domain/types";
@@ -19,8 +19,12 @@ export interface ShellData {
   /** `locked`: not yet unlocked in this session; choosing it asks for its password once (slice 8, item 5). */
   organizations: { id: Uuid; name: string; guest: boolean; workspaceCount: number; firstWorkspaceId: Uuid | null; locked: boolean }[];
   /** `infocube`: the workspace's InfoCube switch (slice 20: the home's model checks name the module's topics). */
-  /** `readOnly`: the server takes no writes (slice 29, Q5: the Postgres adapter until slice B); shown like an archive. */
-  workspace: { id: Uuid; name: string; archived: boolean; readOnly: boolean; infocube: boolean };
+  workspace: { id: Uuid; name: string; archived: boolean; infocube: boolean };
+  /**
+   * Which server the page runs on (slice 30): `online` on Postgres, where people and organizations are made by script
+   * until the people slice (no "New organization…", "Add person" disabled, B5).
+   */
+  server: { kind: "local" } | { kind: "online"; name: string | null };
   /** Workspaces of the current organization the user is a member of. */
   workspaces: { id: Uuid; name: string; archived: boolean; role: WorkspaceRole }[];
   role: WorkspaceRole;
@@ -127,7 +131,6 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
 
   const homeOrgIds = new Set(myOrgMemberships.map((m) => m.organization_id));
   const archived = isArchived(workspace);
-  const readOnly = !!store.readOnly;
   return {
     user: {
       id: user.id,
@@ -147,19 +150,20 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
         locked: !unlocked.has(o.id),
       };
     }),
-    workspace: { id: workspace.id, name: workspace.name, archived, readOnly, infocube: !!workspace.infocube },
+    workspace: { id: workspace.id, name: workspace.name, archived, infocube: !!workspace.infocube },
+    // Q7: the badge's value, from the adapter and a plain variable naming the database environment (`dev`)
+    server: isPostgresMode() ? { kind: "online", name: process.env.INFOMAPPER_SERVER_NAME?.trim() || null } : { kind: "local" },
     workspaces: workspacesHere.map((w, i) => ({ id: w.id, name: w.name, archived: isArchived(w), role: roles[i]!.role })),
     role: member.role,
     guest: isGuest(workspace, user.id, myOrgMemberships),
-    standing: standingOf(member.role, archived || readOnly),
+    standing: standingOf(member.role, archived),
     project,
     projects: projectRows,
     canvas,
     page: where.canvasId ? "canvas" : where.projectId ? "project" : "workspace",
     canCreateWorkspace:
-      !readOnly &&
       checkCreateWorkspace(organization.id, myOrgMemberships.find((m) => m.organization_id === organization.id) ?? null) === null,
-    canCreateProject: !readOnly && can({ workspace, member }, "project.create"),
+    canCreateProject: can({ workspace, member }, "project.create"),
   };
 }
 

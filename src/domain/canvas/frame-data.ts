@@ -5,6 +5,7 @@
 
 import type { Uuid } from "@/domain/ids";
 import { FREE_FRAME_COLORS, isMisplaced, shapeOf } from "@/domain/model/frames";
+import { byCreation } from "@/domain/model/workspace-model";
 import type { Frame, FrameKind, WorkspaceModel } from "@/domain/types";
 import type { CardData } from "./card-data";
 
@@ -49,7 +50,9 @@ export function frameColor(frame: Pick<FrameData, "kind" | "conceptId" | "color"
 
 /** The frames of one canvas, smallest last, so a smaller frame lying on a bigger one is drawn above it. */
 export function buildFrames(frames: readonly Frame[]): FrameData[] {
-  return frames
+  // slice 30 (Q3): frames in creation order, which is the drawing order
+  return [...frames]
+    .sort(byCreation)
     .map((f) => ({
       id: f.id,
       version: f.version,

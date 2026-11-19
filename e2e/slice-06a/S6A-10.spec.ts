@@ -2,7 +2,8 @@
 // the working context on (its widest state), both panels shown, at 2,560, 2,100, 1,880, 1,600, 1,536, 1,300,
 // 1,201, 1,200, 1,101, 1,100, 1,000 and 800 px: no control reaches past the bar or under another, nothing scrolls; the layer switch,
 // the working context, undo, zoom, both panel buttons and the user indicator are always there; the prototype's steps
-// (short labels up to 2,100, icon-only tools up to 1,880, no brand up to 1,300); the names' check boxes in “More” up to
+// (short labels up to 2,100, icon-only tools up to 1,880, no brand up to 1,300; since slice 30 the Hand, Entity, Note
+// and Frame tools icon-only up to 2,100 and no brand up to 1,600, and the save pair always there); the names' check boxes in “More” up to
 // 1,300 px (slice 11); Focus and the notation in “More” up to 1,200 px, the Entity, Frame, Note and Hand tools too up to 1,100 px, each reachable there. The measured widths are
 // printed (the step's table).
 
@@ -10,7 +11,7 @@ import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, contextOn, openCanvas, signInAs, WHOLE_CO } from "./helpers";
 
 const WIDTHS = [2560, 2100, 1880, 1600, 1536, 1300, 1201, 1200, 1101, 1100, 1000, 800];
-const ALWAYS = ["button-toggle-left", "switch-layer", "button-context", "group-undo", "group-zoom", "button-toggle-right", "indicator-user"];
+const ALWAYS = ["button-toggle-left", "switch-layer", "button-context", "group-undo", "group-zoom", "group-save", "button-toggle-right", "indicator-user"];
 const FOCUS_AND_NOTATION = ["button-focus", "switch-notation"];
 const TOOLS = ["button-tool-entity", "button-tool-frame", "button-tool-note", "button-tool-hand"];
 
@@ -58,13 +59,13 @@ test("S6A-10: nothing in the top bar is cut off from 2,560 to 800 px; what does 
     for (const id of ALWAYS) expect(s.ids, `${width}: ${id}`).toContain(id);
     // the prototype's steps
     expect(await page.locator('[data-testid="switch-layer"] [data-layer="all"]').innerText(), `${width}: layer label`).toBe(width > 2100 ? "Everything" : "All");
-    expect(s.brand, `${width}: brand`).toBe(width > 1300);
+    expect(s.brand, `${width}: brand`).toBe(width > 1600);
     // the names' check boxes (slice 11): in the bar above 1,300 px, in “More” up to it, and “More” with them
     (width > 1300 ? expect(s.ids, `${width}: names`) : expect(s.ids, `${width}: names in More`).not).toContain("switch-names");
     if (width > 1200) {
       for (const id of [...FOCUS_AND_NOTATION, ...TOOLS]) expect(s.ids, `${width}: ${id}`).toContain(id);
       (width > 1300 ? expect(s.ids, `${width}: no More`).not : expect(s.ids, `${width}: More`)).toContain("button-more-tools");
-      expect((await page.getByTestId("button-tool-hand").innerText()).trim(), `${width}: Hand's label`).toBe(width > 1880 ? "Hand" : "");
+      expect((await page.getByTestId("button-tool-hand").innerText()).trim(), `${width}: Hand's label`).toBe(width > 2100 ? "Hand" : "");
     } else {
       for (const id of FOCUS_AND_NOTATION) expect(s.ids, `${width}: ${id} in More`).not.toContain(id);
       for (const id of TOOLS) (width > 1100 ? expect(s.ids, `${width}: ${id}`) : expect(s.ids, `${width}: ${id} in More`).not).toContain(id);

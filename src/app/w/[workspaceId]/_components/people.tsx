@@ -15,7 +15,7 @@ import {
   type AddPersonFormInput,
 } from "@/app/_actions/people";
 import { useAction } from "@/app/_components/use-action";
-import { ROLE_LABEL } from "@/app/_lib/roles";
+import { ADD_PERSON_ONLINE_TEXT, ROLE_LABEL } from "@/app/_lib/roles";
 import type { RemovePersonPreview } from "@/domain/commands/people";
 import type { WorkspaceRole } from "@/domain/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
@@ -36,8 +36,12 @@ function FieldMessage({ text }: { text?: string }) {
   ) : null;
 }
 
-/** "Add a person" (item 10): name, e-mail and role, then the summary (F11) with Back and Add. */
-export function AddPersonBox({ workspaceId }: { workspaceId: string }) {
+/**
+ * "Add a person" (item 10): name, e-mail and role, then the summary (F11) with Back and Add. `online` (slice 30, B5): the
+ * box shows with every field and Continue disabled, the reason as Continue's tooltip and as a line under it (L6), until
+ * the people slice brings a way to add people online (a known limitation).
+ */
+export function AddPersonBox({ workspaceId, online = false }: { workspaceId: string; online?: boolean }) {
   const { run, pending } = useAction();
   const empty: AddPersonFormInput = { workspaceId, name: "", email: "", role: "modeler" };
   const [form, setForm] = useState(empty);
@@ -47,7 +51,7 @@ export function AddPersonBox({ workspaceId }: { workspaceId: string }) {
   const review = async (e: FormEvent) => {
     e.preventDefault();
     setErrors({});
-    const r = await run(() => previewAddPersonAction(form));
+    const r = await run(() => previewAddPersonAction(form), undefined, { read: true });
     if (r.ok) setSummary(r.value.summary);
     else if (r.fields) setErrors(r.fields);
   };
@@ -60,13 +64,14 @@ export function AddPersonBox({ workspaceId }: { workspaceId: string }) {
   };
 
   return (
-    <div className={boxClass} data-testid="box-add-person">
+    <div className={boxClass} data-testid="box-add-person" data-disabled={online || undefined}>
       <h4 className="m-0 mb-2 text-[13.5px] font-semibold">Add a person</h4>
       {summary === null ? (
         <form onSubmit={review} noValidate className="flex flex-wrap items-start gap-2">
           <label className="block min-w-[180px] flex-1">
             <input
               data-testid="input-add-person-name"
+              disabled={online}
               aria-label="Name"
               placeholder="Name"
               autoComplete="off"
@@ -79,6 +84,7 @@ export function AddPersonBox({ workspaceId }: { workspaceId: string }) {
           <label className="block min-w-[240px] flex-1">
             <input
               data-testid="input-add-person-email"
+              disabled={online}
               aria-label="E-mail"
               placeholder="name@company.com"
               autoComplete="off"
@@ -90,6 +96,7 @@ export function AddPersonBox({ workspaceId }: { workspaceId: string }) {
           </label>
           <select
             data-testid="select-add-person-role"
+              disabled={online}
             aria-label="Role"
             className={inputClass}
             value={form.role}
@@ -101,9 +108,20 @@ export function AddPersonBox({ workspaceId }: { workspaceId: string }) {
               </option>
             ))}
           </select>
-          <button type="submit" data-testid="button-add-person-continue" className={btnClass} disabled={pending}>
+          <button
+            type="submit"
+            data-testid="button-add-person-continue"
+            className={btnClass}
+            disabled={pending || online}
+            title={online ? ADD_PERSON_ONLINE_TEXT : undefined}
+          >
             Continue
           </button>
+          {online && (
+            <p data-testid="text-add-person-online" className="m-0 w-full text-[12.5px] text-im-ink-3">
+              {ADD_PERSON_ONLINE_TEXT}
+            </p>
+          )}
         </form>
       ) : (
         <>
@@ -240,7 +258,7 @@ export function OrganizationAccessBox({ workspaceId, link, version }: { workspac
   const review = async (e: FormEvent) => {
     e.preventDefault();
     setErrors({});
-    const r = await run(() => previewOrganizationPasswordAction({ password, passwordAgain }));
+    const r = await run(() => previewOrganizationPasswordAction({ password, passwordAgain }), undefined, { read: true });
     if (r.ok) setConfirming(true);
     else if (r.fields) setErrors(r.fields);
   };

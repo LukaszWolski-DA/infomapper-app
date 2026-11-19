@@ -19,6 +19,7 @@ import { CORE_UNDO_TABLES, OUTSIDE_UNDO, UNDOABLE_TABLES, isUndoable, revertChan
 import { access, attribute, canvas, canvasItem, concept, entity, ids, link, makeCtx, mapping, mappingInput, project, relationship, sourceColumn, sourceSystem, sourceTable } from "@/domain/__fixtures__/domain";
 import type { Entity } from "@/domain/types";
 import { typeColumns, type CubeEntity } from "@/modules/infocube/domain/types";
+import { POSTGRES_ONLY_TABLES } from "@/data/postgres/undo-history";
 import { NOT_IN_DOMAIN_YET } from "./schema/compare-schema";
 
 const MIGRATIONS = path.resolve(__dirname, "../supabase/migrations");
@@ -30,6 +31,8 @@ function migratedTables(): string[] {
     for (const m of readFileSync(path.join(MIGRATIONS, f), "utf8").matchAll(/^create table (\w+)/gim)) names.add(m[1]!);
   }
   for (const t of NOT_IN_DOMAIN_YET) names.delete(t);
+  // slice 30: the store's own bookkeeping on Postgres (`undo_step`): outside the domain, the local file and undo
+  for (const t of POSTGRES_ONLY_TABLES) names.delete(t);
   return [...names].sort();
 }
 

@@ -267,7 +267,10 @@ describe("applying a write set", () => {
     const { actor, access } = await accessOf("lukasz", "Retail Co – DWH");
     const ws = access.workspace.id;
     const shared = (await store.canvases.list(ws)).find((c) => c.name === "Customer & orders")!;
-    const [link] = await store.canvases.listLinksOfCanvas(ws, shared.id);
+    // slice 30 (F5): D-28's counts are checked inside the write, so the link removed is one whose project keeps a canvas
+    const links = await store.canvases.listLinksOfCanvas(ws, shared.id);
+    const counts = await Promise.all(links.map(async (l) => (await store.canvases.listLinksOfProject(ws, l.project_id)).length));
+    const link = links.find((_, i) => counts[i]! > 1);
     expect(await store.apply(buildWriteSet(ctxFor(actor.id), ws, [{ kind: "remove", table: "project_canvas", before: link! }]))).toEqual({ ok: true });
     expect(await store.canvases.listLinksOfCanvas(ws, shared.id)).toHaveLength(1);
     expect(await store.changeEvents.list(ws)).toMatchObject([{ operation: "delete", object_id: shared.id, before_image: link, after_image: null }]);
@@ -336,14 +339,15 @@ describe("undo (slice 1b)", () => {
     const ws = access.workspace.id;
     const r = createProject(ctxFor(actor.id), access, { workspaceId: ws, name: "Finance" });
     if (!r.ok) throw new Error(r.error.message);
-    await store.apply(r.writeSet);
+    // slice 30 (F4): a step is recorded with its write
+    await store.apply(r.writeSet, { history: { userId: actor.id, kind: "record", label: "Create project" } });
     const step = { changeGroupId: r.writeSet.changeGroupId, label: "Create project", events: r.writeSet.events };
-    await store.undoHistory.update(ws, actor.id, (h) => ({ ...h, undo: [...h.undo, step] }));
-    expect((await store.undoHistory.get(ws, actor.id)).undo).toEqual([step]);
-    expect((await store.undoHistory.get(ws, (await user("marek")).id)).undo).toEqual([]);
+    expect(await store.undoHistory.next(ws, actor.id, "undo")).toEqual(step);
+    expect(await store.undoHistory.state(ws, actor.id)).toEqual({ canUndo: true, canRedo: false });
+    expect(await store.undoHistory.state(ws, (await user("marek")).id)).toEqual({ canUndo: false, canRedo: false });
 
     await resetDevData(file);
-    expect((await store.undoHistory.get(ws, actor.id)).undo).toEqual([]);
+    expect(await store.undoHistory.next(ws, actor.id, "undo")).toBeNull();
   });
 });
 

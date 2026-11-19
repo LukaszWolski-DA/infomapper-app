@@ -19,6 +19,8 @@ import { buildPlan } from "@/domain/import/plan";
 import { readStandard } from "@/domain/import/standard";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui/components/dialog";
 import { useToast } from "@/ui/components/toast";
+import { gzipJson, MAX_UPLOAD_BYTES, TOO_LARGE, UPLOAD_TYPE } from "@/ui/import-upload";
+import { reportSave } from "@/ui/save-state";
 import { buttonClass, primaryClass } from "../fields";
 import { ReviewStep } from "./review-step";
 import { ScopeStep } from "./scope-step";
@@ -119,24 +121,29 @@ export function ImportWizard({
     const sent = ui.selectionNow();
     let result: ActionResult<ImportOutcome>;
     try {
-      const response = await fetch(`/w/${workspaceId}/import`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          target,
-          channel: s.channel,
-          sourceLabel: s.sourceLabel,
-          text: s.text,
-          ...(s.channel === "ddl" ? { ddl: { database: s.ddl.database, schema: s.ddl.schema } } : {}),
-          ...(s.channel === "query" ? { vendor: s.vendor } : {}),
-          scope: [...s.scope],
-          compare: s.compare,
-          renames: [...s.renames],
-          hintsOff: [...s.hintsOff],
-          fingerprint: planFingerprint(plan),
-        }),
+      // slice 30 (L2): the review's input gzipped, so it fits a Vercel function's request; refused here when it does not
+      const body = await gzipJson({
+        target,
+        channel: s.channel,
+        sourceLabel: s.sourceLabel,
+        text: s.text,
+        ...(s.channel === "ddl" ? { ddl: { database: s.ddl.database, schema: s.ddl.schema } } : {}),
+        ...(s.channel === "query" ? { vendor: s.vendor } : {}),
+        scope: [...s.scope],
+        compare: s.compare,
+        renames: [...s.renames],
+        hintsOff: [...s.hintsOff],
+        fingerprint: planFingerprint(plan),
       });
-      result = (await response.json()) as ActionResult<ImportOutcome>;
+      if (body.byteLength > MAX_UPLOAD_BYTES) {
+        result = { ok: false, code: "invalid", message: TOO_LARGE };
+      } else {
+        // the top bar's save state follows the upload as a write
+        result = await reportSave(
+          fetch(`/w/${workspaceId}/import`, { method: "POST", headers: { "content-type": UPLOAD_TYPE }, body: body as BodyInit }).then((response) => response.json() as Promise<ActionResult<ImportOutcome>>),
+          "change",
+        );
+      }
     } catch {
       result = { ok: false, code: "unexpected", message: "Something went wrong. Nothing was saved." };
     }

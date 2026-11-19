@@ -3,17 +3,16 @@
 // plus version checks, and writes the rows and change events of one command together or not at all.
 
 import type { Write, WriteSet } from "@/domain/changes";
-import { LAST_OWNER } from "@/domain/commands/people";
-import { LAST_PROJECT_MESSAGE } from "@/domain/commands/project";
-import { INFOCUBE_OFF_MESSAGE, turnOffRefusedMessage } from "@/domain/model/levels";
+import { accessChangedRefusal, type CheckedAccess } from "@/domain/commands/access-check";
+import { countChecks, countRefusal } from "@/domain/commands/count-rules";
 import { MAPPING_LOG } from "@/domain/model/mapping-rules";
 import type { WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
-import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-history";
+import { dropNextRedo, dropNextUndo, emptyHistory, historyKey, nextRedo, nextUndo, stateOfHistory, withChange, type UndoHistory } from "@/domain/model/undo-history";
 import { byTabOrder, liveLabelLinksOf, liveProjectCanvasesOf, liveProjectPinsOf, liveRequirementLinksOf, workspaceModelOf, workspacePeopleOf, workspaceSnapshotOf } from "@/domain/model/workspace-model";
 import type { ModuleTable, WritableRows } from "@/domain/types";
-import type { ApplyResult, DataStore } from "../ports";
+import type { ApplyOptions, ApplyResult, DataStore } from "../ports";
 import { newestImportFirst, oldestChangeFirst } from "../order";
 import { assertNotProduction, readDbCached, readDbStamped, writeDb } from "./file";
 import { CORE_SCHEMA, findViolation, keyOf, readRows, rowsOf, upgradeRows, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
@@ -60,6 +59,13 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
       ? h
       : { undo: h.undo.filter((s) => known.has(s.changeGroupId)), redo: h.redo.filter((s) => known.has(s.changeGroupId)) };
   const current = async (workspaceId: Uuid, h: UndoHistory) => withKnown(h, await groupsOf(workspaceId));
+  /** The person's history as it stands, without steps whose change group is gone. */
+  const historyOf = async (workspaceId: Uuid, userId: Uuid) => {
+    const key = `${file}|${historyKey(workspaceId, userId)}`;
+    const fresh = await current(workspaceId, histories.get(key) ?? emptyHistory);
+    histories.set(key, fresh);
+    return fresh;
+  };
 
   return {
     users: {
@@ -206,20 +212,18 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
         (await load()).change_event.filter((e) => e.workspace_id === workspaceId && e.object_type === "requirement" && e.object_id === requirementId),
     },
 
+    // slice 30 (Q4 (a)): in this process's memory; a step is recorded, undone or redone only with its write (`apply`)
     undoHistory: {
-      get: async (workspaceId, userId) => {
-        const key = `${file}|${historyKey(workspaceId, userId)}`;
-        const fresh = await current(workspaceId, histories.get(key) ?? emptyHistory);
-        histories.set(key, fresh);
-        return fresh;
+      state: async (workspaceId, userId) => stateOfHistory(await historyOf(workspaceId, userId)),
+      next: async (workspaceId, userId, mode) => {
+        const h = await historyOf(workspaceId, userId);
+        return (mode === "undo" ? nextUndo(h) : nextRedo(h)) ?? null;
       },
-      update: async (workspaceId, userId, change) => {
-        const key = `${file}|${historyKey(workspaceId, userId)}`;
-        const known = await groupsOf(workspaceId);
-        // From here on synchronous, so no other request changes the history in between.
-        const next = change(withKnown(histories.get(key) ?? emptyHistory, known));
-        histories.set(key, next);
-        return next;
+      drop: async (workspaceId, userId, mode, changeGroupId) => {
+        const h = await historyOf(workspaceId, userId);
+        // synchronous from the read on, so no other request changes the history in between
+        const top = mode === "undo" ? nextUndo(h) : nextRedo(h);
+        if (top?.changeGroupId === changeGroupId) histories.set(`${file}|${historyKey(workspaceId, userId)}`, mode === "undo" ? dropNextUndo(h) : dropNextRedo(h));
       },
     },
 
@@ -234,7 +238,7 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
       return workspaceSnapshotOf(db, workspaceId, modules as { [K in (typeof tables)[number]]: WritableRows[K][] });
     },
 
-    apply: (writeSet) => serialise(file, () => applyToFile(file, writeSet, schema)),
+    apply: (writeSet, options) => serialise(file, () => applyToFile(file, writeSet, schema, options)),
   };
 }
 
@@ -244,19 +248,24 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
  * checked against what is there now (a row changed meanwhile is a stale version) and the outside change is kept. A file
  * changed again during the second try is refused as a stale version.
  */
-async function applyToFile(file: string, writeSet: WriteSet, schema: LocalSchema): Promise<ApplyResult> {
+async function applyToFile(file: string, writeSet: WriteSet, schema: LocalSchema, options: ApplyOptions = {}): Promise<ApplyResult> {
   for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await applyOnce(file, writeSet, schema);
+    const result = await applyOnce(file, writeSet, schema, options);
     if (result !== "changed") return result;
   }
   return { ok: false, error: staleVersion() };
 }
 
-async function applyOnce(file: string, writeSet: WriteSet, schema: LocalSchema): Promise<ApplyResult | "changed"> {
+async function applyOnce(file: string, writeSet: WriteSet, schema: LocalSchema, options: ApplyOptions): Promise<ApplyResult | "changed"> {
   const read = await readDbStamped(file);
   // Copy on write (slice 7a): the cached file is frozen, so only the tables this write touches get new arrays; their
   // written rows are new objects, every other row is shared with the cache.
   const current = upgradeRows(read.db, schema);
+  // slice 30 (B3, L1): the access the command checked, read again before the rows
+  if (options.access) {
+    const changed = accessChangedRefusal(options.access, accessNow(current, options.access));
+    if (changed) return { ok: false, error: changed };
+  }
   const next = { ...current } as DevDb;
   const touched = new Set<StoreTable>(writeSet.writes.map((w) => w.table));
   // slice 15a: a table this store does not know is refused before anything is written, never skipped
@@ -271,57 +280,44 @@ async function applyOnce(file: string, writeSet: WriteSet, schema: LocalSchema):
     if (error) return { ok: false, error };
   }
   next.change_event = [...current.change_event, ...structuredClone(writeSet.events)];
-  // The last owner (slice 8): the domain counts a workspace's owners from what it read before this write, and two owners
-  // removing or demoting each other at once write different rows, which no version check sees. Counted again here,
-  // inside the serialised write.
-  const ownerless = workspaceWithoutOwner(next, writeSet.writes);
-  if (ownerless) return { ok: false, error: domainError("invalid", LAST_OWNER(ownerless)) };
-  // The last project (slice 12a, F8): two deletes at once, or a delete and an undo of "Create project", each counted the
-  // projects from what it read. Counted again here, for the workspaces whose projects this write deletes.
-  if (workspaceWithoutProject(next, writeSet.writes)) return { ok: false, error: domainError("invalid", LAST_PROJECT_MESSAGE) };
-  // InfoCube off with facts or dimensions (slice 15a, C-7): a fact created while another session turned InfoCube off, or
-  // the other way round, each checked what it read. Counted again here, for the workspaces this write touches.
-  const off = offWithDimensional(next, writeSet.writes);
-  if (off) return { ok: false, error: off.turnedOff ? domainError("invalid", turnOffRefusedMessage(off.count)) : domainError("forbidden", INFOCUBE_OFF_MESSAGE) };
+  // The count rules (slice 30, F5, F6; the last owner since slice 8, the last project since 12a, InfoCube off since 15a):
+  // what the command counted from the rows it read is counted again here, inside the serialised write, on the state
+  // after it. One rule with the Postgres adapter (`countRefusal`).
+  const counted = countRefusal(next, countChecks(writeSet.writes));
+  if (counted) return { ok: false, error: counted };
   // only what this write can have broken: the touched tables and the new change events
   const violation = findViolation(next, { tables: touched, newEvents: writeSet.events.length }, schema);
   if (violation) return { ok: false, error: violationError(violation) };
   if (!(await writeDb(file, next, { ifUnchanged: read.stamp }))) return "changed";
+  // slice 30 (F4): the history with its write, in the same serialised step
+  if (options.history) {
+    const workspaceId = writeSet.events[0]?.workspace_id;
+    if (workspaceId) {
+      const key = `${file}|${historyKey(workspaceId, options.history.userId)}`;
+      const known = new Set(next.change_event.filter((e) => e.workspace_id === workspaceId).map((e) => e.change_group_id));
+      const h = histories.get(key) ?? emptyHistory;
+      const kept = { undo: h.undo.filter((s) => known.has(s.changeGroupId)), redo: h.redo.filter((s) => known.has(s.changeGroupId)) };
+      histories.set(key, withChange(kept, options.history, writeSet));
+    }
+  }
   return { ok: true };
 }
 
-/** The name of a workspace this write left with members but no owner, or null. */
-function workspaceWithoutOwner(db: DevDb, writes: readonly Write[]): string | null {
-  const touched = new Set(writes.filter((w) => w.table === "workspace_member" && w.kind !== "insert").map((w) => (w.before as { workspace_id: Uuid }).workspace_id));
-  for (const workspaceId of touched) {
-    const members = db.workspace_member.filter((m) => m.workspace_id === workspaceId);
-    if (members.length > 0 && !members.some((m) => m.role === "owner")) return db.workspace.find((w) => w.id === workspaceId)?.name ?? "This workspace";
-  }
-  return null;
-}
-
-/**
- * A workspace this write touched (its row, or an entity in it) that is left with InfoCube off and live dimensional
- * entities: `turnedOff` when the write is what turned it off.
- */
-function offWithDimensional(db: DevDb, writes: readonly Write[]): { count: number; turnedOff: boolean } | null {
-  const touched = new Set<Uuid>();
-  for (const w of writes) if (w.table === "workspace" || w.table === "entity") touched.add(w.table === "workspace" ? (w.row as { id: Uuid }).id : (w.row as { workspace_id: Uuid }).workspace_id);
-  for (const workspaceId of touched) {
-    const workspace = db.workspace.find((w) => w.id === workspaceId);
-    if (!workspace || workspace.infocube) continue;
-    const count = db.entity.filter((e) => e.workspace_id === workspaceId && e.deleted_at === null && e.model_level === "dimensional").length;
-    if (count) return { count, turnedOff: writes.some((w) => w.table === "workspace" && (w.row as { id: Uuid }).id === workspaceId) };
-  }
-  return null;
-}
-
-/** Whether this write deleted the last live project of a workspace. */
-function workspaceWithoutProject(db: DevDb, writes: readonly Write[]): boolean {
-  const touched = new Set<Uuid>();
-  for (const w of writes) if (w.table === "project" && w.kind === "update" && w.before.deleted_at === null && w.row.deleted_at !== null) touched.add(w.before.workspace_id);
-  for (const workspaceId of touched) if (!db.project.some((p) => p.workspace_id === workspaceId && p.deleted_at === null)) return true;
-  return false;
+/** The actor's access as the file holds it now, for the parts the command read. */
+function accessNow(db: DevDb, checked: CheckedAccess) {
+  const ws = checked.workspace ? db.workspace.find((w) => w.id === checked.workspace!.id && w.deleted_at === null) : undefined;
+  return {
+    ...(checked.workspace
+      ? {
+          workspace: ws
+            ? { archived: ws.archived_at !== null, role: db.workspace_member.find((m) => m.workspace_id === ws.id && m.user_id === checked.userId)?.role ?? null }
+            : null,
+        }
+      : {}),
+    ...(checked.organization
+      ? { organization: { role: db.organization_member.find((m) => m.organization_id === checked.organization!.id && m.user_id === checked.userId)?.role ?? null } }
+      : {}),
+  };
 }
 
 /**
