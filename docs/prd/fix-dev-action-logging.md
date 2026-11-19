@@ -140,6 +140,17 @@ e2e runner (shared infrastructure) for a check the unit test already makes, so i
 3. **Playwright's git metadata in reports** (the real e-mail): unchanged by this fix and public anyway; turning it off
    would be a separate `chore/` (proposal: leave it).
 
+### Łukasz's answers (19 November 2026)
+
+1. **Old artifacts:** left as they are (no secrets; they expire by 3 December).
+2. **Playwright's git metadata:** left as it is (the commits already show the e-mail).
+3. **The leaked password:** Łukasz changes it himself after this fix is merged, on `slice/31-kb-copy`, with
+   `pg:accounts -- --kb` and a new `INFOMAPPER_KB_PASSWORD`; nothing for this branch.
+4. **For the record:** in this checkout, on this branch, Łukasz ran `npm run pg:accounts -- --kb`. `dev`'s version of the
+   script does not know `--kb` (slice 31's F3 adds it), so it gave every person in `infomapper-dev`, the KB account
+   included, `INFOMAPPER_DEMO_PASSWORD`, and printed the e-mails in his terminal. On this branch no `pg:` script is run;
+   Łukasz fixes the KB account after this branch is merged.
+
 ## 7. Plan
 
 - **Step 1 (this document):** reconnaissance, no code. Committed and pushed; no PR yet.
