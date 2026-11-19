@@ -1,6 +1,6 @@
 # Slice 30 – Database B: the writes (saving on Postgres, lasting undo, imports through Storage)
 
-Status: **proposed** (Łukasz, 19 November 2026). **Full path** (CLAUDE.md, "The slice cycle", 2): the Postgres
+Status: **built** (slice 30, steps 1 to 5, 19 November 2026; accepted on `npm run dev:pg` by Łukasz; the decisions await his approval, the measurement runs on `dev`'s preview after the merge). Proposed by Łukasz on 19 November 2026. **Full path** (CLAUDE.md, "The slice cycle", 2): the Postgres
 adapter's writes, a new table, shared infrastructure (undo and change groups, the save chain, the table registry).
 Branch `slice/30-database-writes`, from `dev` (`6da6c05` or later). PRD file: `docs/prd/slice-30-database-writes.md`;
 step 1 writes `docs/prd/slice-30-acceptance.md`. Test regime: CLAUDE.md, "Testing".

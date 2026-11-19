@@ -84,12 +84,18 @@ carry its place**:
 - the seed loader and slice C's copy of a file set them by the row's place in the file; from slice B, `apply` sets them
   by the row's place in its write set;
 - the adapter orders such a list by that column, then by `id` (or a link's key columns);
+- since slice 30 (L8) an update never writes the time column back; the seed loader moves a crowded millisecond's rows
+  past the 999th into the following milliseconds (999 a millisecond), so seed rows keep the file's order; `apply`
+  falls back to the key past the 999th, which keeps the write set's order for the app's rows (UUID v7);
 - the domain reads times in milliseconds only: the pool's `timestamptz` parser truncates to them, so the microseconds
   never reach a rule, a page or a change image.
 
 `project_pinned_label` has no time column; its rows are ordered by their key, and no page shows their order (the
 project home reads them as a set). Where an order means something to a person (the first project), an explicit domain
-rule should say it, not the stored order (`docs/ideas.md`).
+rule should say it, not the stored order (`docs/ideas.md`). Since slice 30 the domain sorts where the order is drawn or
+decides something (AD-12's note): relationships, source relationships, cards and frames in creation order (`created_at`,
+ties in the stored order), source tables by name, database and schema, source columns by ordinal and name, a project's
+tabs by order, time and canvas, four-eyes' last editor by time and change group.
 
 **Closed value lists.** Stored as `text` with a `CHECK` constraint, never as database enum types (AD-18). Values are
 lower-case English words, e.g. `status in ('draft','review','approved')`. The UI shows its own labels.

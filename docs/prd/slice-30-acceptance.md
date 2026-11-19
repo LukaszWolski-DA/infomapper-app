@@ -1048,3 +1048,75 @@ the demo's "Retail Co – DWH", never KB.
 Łukasz added `INFOMAPPER_SERVER_NAME=dev` to `.env.postgres.local`, migrated `infomapper-dev` (`undo_step`), ran the
 manual acceptance above on `npm run dev:pg` and accepted it ("Działa, przeszło moje testy"). The dev server is stopped.
 Next: step 5, the closing; the measurement (S30-05, S30-13) on `dev`'s preview after the merge.
+
+---
+
+## Step 5: the closing (19 November 2026)
+
+Step 4 and Łukasz's acceptance on dev:pg accepted (19 November 2026).
+
+### The decisions, for Łukasz's approval
+
+Every new and changed decision as it is written into `docs/decisions.md` in this step, word for word: PRD section 8's proposals corrected by what was built. The notes are appended to their decision's line; AD-38 follows AD-37 and D-84 has a section of its own ("The writes on Postgres") before "Way of working".
+
+**AD-31** (amended again):
+
+> Amended (slice 30, round 2, B1, 18 November 2026; L2, 19 November 2026): slice B is **the writes only**: writes on Postgres, lasting undo, the count rules in the write's transaction, and imports that the browser gzips so they fit a Vercel function's request (no Supabase Storage). Invitations, organization roles, guests from other organizations and the in-app password work are a slice of their own ("people"), after slice C and before slice D, with e-mail, the base URL and the secret key question; until then accounts are made by script (`npm run pg:accounts`, DB10).
+
+**AD-05** (a note):
+
+> Note (slice 30, B2, B6): rights are enforced in the domain on both adapters; Row Level Security stays deny-all against the API roles and the Data API off, and a dedicated database role with DML rights only comes in slice D. Inside a write's transaction the actor's role and the workspace's archive are read again, and the write is refused when either differs from what the command checked (AD-38). Organization owners and admins will manage the organization but see a workspace's content only with a role in that workspace (one membership per workspace).
+
+**AD-12** (a note):
+
+> Note (slice 30, round 1, L8): **the stored order from slice 30.** `apply` stamps the microseconds of an inserted row's time column, and of each change event's `occurred_at`, by its place in the write set; an update never writes a row's time column back. Past the 999th row of one millisecond the order falls back to the key, which for the app's own rows keeps the write set's order (UUID v7, increasing within one process). The seed loader (and slice C's copy of a file) moves a crowded millisecond's rows past the 999th into the following milliseconds, 999 a millisecond, so seed rows, whose ids are not in their order, keep the file's order; their times move by a millisecond for each further 999 rows. Where an order means something, the domain sorts explicitly: relationships between entities and between source tables, cards and frames in creation order (`created_at`, ties in the stored order); source tables by name, then database, then schema; source columns by ordinal, then name; a project's tabs by their order, then the time added, then the canvas's id; a table's list of source relationships by name; four-eyes' last editor by time, then the change group's id. Two people's change groups written in one millisecond on two servers are ordered by key: accepted (`docs/known-limitations.md`).
+
+**AD-38** (new):
+
+> **AD-38** The writes on Postgres (slice 30, slice B of AD-31's amendment). The Postgres adapter's `apply` writes a command's write set in one transaction on one connection through Supabase's transaction pooler, at READ COMMITTED, in this order: (1) **the locks:** the organization's row first when the write can break a count across its workspaces (a workspace membership or an organization membership written) or makes a workspace, then the workspace's row, both `select … for no key update`, so the writes of one workspace run one after another and foreign key checks are not blocked; a write waits for its locks at most `lock_timeout` (10 s, provisional until slice 30's measurement of a large import), otherwise it is refused as busy ("The workspace is busy saving a large change. Try again in a moment.", code `invalid`: nothing is cut and the draft stays editable); (2) **the access read again** (B3, L1): `runCommand` and undo pass the access the command was checked with (the actor's workspace or organization role, the workspace's archive), and any difference refuses the write: a changed role with "Your role in {workspace} changed meanwhile, so nothing was saved." (`forbidden`), a workspace archived meanwhile with the archive's refusal, one unarchived meanwhile as a stale version; (3) **the rows in three phases** (removes and soft deletes; inserts, with the tables in the order of their foreign keys; the other updates), one statement per table and phase, a versioned row written only from the version the command read, a row without a version only from the whole row it read, a field no column holds refused; (4) **the change events** and **the person's undo history**; (5) **the count rules** on the state after the rows, one pure domain rule both adapters run inside their write (`src/domain/commands/count-rules.ts`) with the commands' messages: a workspace with members keeps an owner; a workspace keeps a live project; no live fact or dimension while InfoCube is off; a live canvas keeps a live project and a live project a live canvas (D-28); an organization's owner keeps a workspace there; a member's organization row goes with their last workspace there and only then; (6) **commit**, or roll back with the first refusal, the database's own refusals (unique, foreign key, check) answered as the local adapter's. **The undo history** is the table `undo_step` (the last 50 steps per person, workspace and list, written in the transaction of the write it records, undoes or redoes; a step leaves by a hard delete; the store's own table, outside the domain's tables, the local file and undo); the pages read only whether there is something to undo or redo, and undo reads the next step's events by its change group. **The import's upload** is the review's input as gzipped JSON, refused above 4.4 MB compressed or 25 MB inflated with the "too large" message. The contract suite (`tests/contract/writes.test.ts`) runs every kind of write, undo and redo and an import on both adapters, and the count rules and one row saved twice under concurrent writes on Postgres (CI's container). With `INFOMAPPER_TIMING=1` a write logs its statements, lock wait and transaction time, and the import's answer carries `Server-Timing`.
+
+**D-59** (a note):
+
+> Note (slice 30): the undo history is stored on Postgres (`undo_step`, AD-38): it survives a restart, a new deployment and several server instances. The local adapter keeps it in its server's memory (Q4 (a)), as before.
+
+**D-58** (a note):
+
+> Note (slice 30, B5, L6): on Postgres the People tab's "Add a person" is shown with its fields and Continue disabled and the line "People are added by an administrator on this server for now." under them, and the server refuses the action, until the people slice brings a working way to add people online; changing a role and removing a person work online, and "New organization…" stays hidden there. The local adapter keeps "Add person" as it is.
+
+**D-84** (new):
+
+> **D-84** The server badge and the save indicator (slice 30), as the prototype accepted on 19 November 2026. In the top bar's right corner, before the details panel's button (before the user indicator where there is none): the save indicator, then the badge; in the document editor's own bar before its options panel's button, and not in the top bar above it. **The badge** names the server: `Local` on the local adapter, `Online · {name}` on Postgres from a plain variable naming the database environment (`Online · dev` on infomapper-dev: the laptop's `npm run dev:pg` and `dev`'s preview), `Online` without it; its tooltip says where changes are saved ("Local server: changes are saved in a file on this computer (development and the demo).", "Online, development server: changes are saved in the database infomapper-dev, for everyone in this workspace. Not production."); up to 1,500 px it shows its short label (`dev`). Production's badge is slice D's. **The indicator** follows every write a workspace's pages send (a field's or a switch's save, a create, the canvas's writes, undo and redo, an import, the document editor's saves): "Saving…" while one is on its way; "✓ Saved" when the last is answered, fully shown about 1.8 s, then faded over 0.6 s; "⚠ Not saved" in the warning colour after a refused write, a failed one or one without an answer after 30 s, until the next write starts, with the reason and what to do in its tooltip by the kind of write: a field's "A text you typed is kept in its field.", a canvas change's "It was taken back here; make it again.", another change's "Make it again.", no answer's "the server did not answer … If this repeats, check your connection and reload the page.", and the busy refusal's own. D-66's drafts and marks and the toasts are unchanged. **The top bar's room:** the Hand, Entity, Note and Frame labels show from 2,101 px, the brand from 1,601 px, the user's role label from 1,501 px; the organization, workspace and project names take at most 128 px from 1,500 px down and at least 56 px; "More" and its steps (D-39, slices 11 and 16) come first.
+
+**AD-22** (the branches note: a sentence added after "with no full run of its own when `git diff --stat <tested>..dev` is empty."):
+
+> Before a release `git log --no-merges dev..main` is empty: the only commits in `main` that `dev` lacks are the releases' merge commits.
+
+
+### Two answers
+
+**Why 44511289154 took 22 min 29 s.** Its wall-clock is the longest part's job, part 9 (21 min 14 s), and that job lost
+five minutes before any test: installing Playwright's Chromium took **319 s against 17 s** in 44500070325 (`npx
+playwright install --with-deps chromium`, the runner's package mirror). The tests themselves, per folder, summed from each
+run's `report.json`:
+
+| Part | Folders | 44487217521 (step 2) | 44500070325 (step 3) | 44511289154 (step 4) |
+| --- | --- | --- | --- | --- |
+| 1 | fixes, slice-00, slice-01a, slice-01b | 523 s | 442 s | **681 s** |
+| 9 | slice-22 to slice-28 | 683 s | 803 s | 828 s |
+| 9 | slice-30 (new) | – | – | **27 s** |
+
+- **Part 1 (11.9 min):** all four folders are slower together, by 30 to 54 % against 44500070325 (fixes 102 → 153 s,
+  slice-00 109 → 168, slice-01a 117 → 186, slice-01b 114 → 174). The other parts' folders are not, and slice-02a to
+  slice-04p, on another runner, are faster than in step 3. A whole part moving one way is its runner, as in step 3's
+  answer.
+- **Part 9 (14.8 min):** its tests ran 889 s against 837 s in 44500070325: slice 30's own folder, **27 s** (its five
+  specs), and slice-22 to slice-28 3 % slower (828 s against 803 s, within the runs' spread: 683 to 814 s).
+- **The app and the new specs are not slower:** no folder that step 4 touches more than any other (the top bar in
+  every spec, the save chain, the canvas's writes) moved apart from its part; slice-06a (S6A-10, the top bar's widths)
+  104 s against 87 and 117; slice-13 (the drafts and refusals, under the indicator now) 97 s against 84 and 124.
+
+**`e2e/slice-29/S30-measure.spec.ts` stays in slice 29's folder,** with `S30-smoke-writes.spec.ts`: the Postgres
+config (`playwright.pg.config.ts`) runs `testDir: "e2e/slice-29"` only, and that folder is the one `e2e/parts.ts` keeps
+out of the local full run (`POSTGRES_ONLY_FOLDERS`); its helpers (`e2e/slice-29/helpers.ts`: Supabase sign-in, queries
+on the app's database) are the smoke's. `e2e/slice-30/` is a local folder of the full run. Moving the two specs would
+mean a second Postgres-only folder in both lists; they keep slice 29's folder, named `S30-…`.
