@@ -524,3 +524,105 @@ function concurrency(name: string, make: (db: DevDb) => Promise<Store>) {
 
 concurrency("the local adapter", localStore);
 if (CONTRACT_DB) concurrency("Postgres", postgresStore);
+
+/** A new server process as far as the store can tell: Postgres gets a new pool, the local adapter a new store on its file. */
+async function freshProcess(name: string, s: Store, file?: string): Promise<DataStore> {
+  if (name === "Postgres") {
+    await getPool().end();
+    delete (globalThis as { __infomapperPgPool?: unknown }).__infomapperPgPool;
+    return createPostgresDataStore(STORE_SCHEMA);
+  }
+  return file ? createLocalDataStore(file, STORE_SCHEMA) : s.store;
+}
+
+function lastingUndo(name: string, make: (db: DevDb) => Promise<Store & { file?: string }>) {
+  describe(`${name}: the undo history (S30-02, S30-03)`, () => {
+    let s: Store & { file?: string };
+    let ctxOf: (actorId: string) => CommandContext;
+    beforeEach(async () => {
+      s = await make(spreadAll(contractRows()));
+      ctxOf = clock();
+    }, 300_000);
+    afterEach(async () => s?.done());
+
+    /** A rename of Product by `actorId`, recorded as the step "Rename entity". */
+    async function rename(store: DataStore, actorId: string, to: string) {
+      const ctx = ctxOf(actorId);
+      const product = (await store.model.load(RETAIL)).entities.find((e) => e.name.startsWith("Product"))!;
+      const set = buildWriteSet(ctx, RETAIL, [update("entity", product, next(ctx, product, { name: to }))]);
+      expect(await store.apply(set, { history: { userId: actorId, kind: "record", label: "Rename entity" } })).toEqual({ ok: true });
+      return set;
+    }
+    /** Undo (or redo) of the person's next step, as `undoAction` does: the revert and the history in one write. */
+    async function revert(store: DataStore, actorId: string, mode: "undo" | "redo") {
+      const step = (await store.undoHistory.next(RETAIL, actorId, mode))!;
+      const access = await accessOf(store, actorId);
+      const reverted = revertChangeGroup(ctxOf(actorId), access, { events: step.events, rows: await store.model.loadForUndo(RETAIL) }, mode, UNDO_TABLES);
+      if (!reverted.ok) return reverted.error;
+      return store.apply(reverted.writeSet, { history: { userId: actorId, kind: mode === "undo" ? "undone" : "redone", stepGroupId: step.changeGroupId, label: step.label } });
+    }
+    const productName = async (store: DataStore) => (await store.model.load(RETAIL)).entities.find((e) => e.name.startsWith("Product"))!.name;
+
+    it("undoes the person's steps in reverse order after a new server process, and redoes them (S30-02)", async () => {
+      await rename(s.store, ANNA, "Product 1");
+      await rename(s.store, ANNA, "Product 2");
+      const store = await freshProcess(name, s, s.file);
+      expect(await store.undoHistory.state(RETAIL, ANNA)).toEqual({ canUndo: true, canRedo: false });
+      expect(await store.undoHistory.state(RETAIL, LUKASZ)).toEqual({ canUndo: false, canRedo: false });
+      expect(await revert(store, ANNA, "undo")).toEqual({ ok: true });
+      expect(await productName(store)).toBe("Product 1");
+      expect(await revert(store, ANNA, "undo")).toEqual({ ok: true });
+      expect(await productName(store)).toBe("Product");
+      expect(await store.undoHistory.state(RETAIL, ANNA)).toEqual({ canUndo: false, canRedo: true });
+      expect(await revert(store, ANNA, "redo")).toEqual({ ok: true });
+      expect(await productName(store)).toBe("Product 1");
+      // a new step empties the redo list
+      await rename(store, ANNA, "Product 3");
+      expect(await store.undoHistory.state(RETAIL, ANNA)).toEqual({ canUndo: true, canRedo: false });
+    });
+
+    it("keeps the last 50 steps", async () => {
+      for (let i = 1; i <= 52; i++) await rename(s.store, ANNA, `Product ${i}`);
+      let undone = 0;
+      while ((await s.store.undoHistory.next(RETAIL, ANNA, "undo")) && undone < 60) {
+        expect(await revert(s.store, ANNA, "undo")).toEqual({ ok: true });
+        undone++;
+      }
+      expect(undone).toBe(50);
+      expect(await productName(s.store)).toBe("Product 2");
+    });
+
+    it("refuses an undo over another person's later change of the same row, and writes nothing (S30-03)", async () => {
+      await rename(s.store, ANNA, "Product by Anna");
+      await rename(s.store, LUKASZ, "Product by Łukasz");
+      expect(await revert(s.store, ANNA, "undo")).toEqual({ code: "conflict", message: "This can't be undone because it was changed afterwards." });
+      expect(await productName(s.store)).toBe("Product by Łukasz");
+    });
+
+    it("refuses an undo raced by another person's write between its read and its write (S30-03)", async () => {
+      await rename(s.store, ANNA, "Product by Anna");
+      const step = (await s.store.undoHistory.next(RETAIL, ANNA, "undo"))!;
+      const access = await accessOf(s.store, ANNA);
+      const reverted = ok(revertChangeGroup(ctxOf(ANNA), access, { events: step.events, rows: await s.store.model.loadForUndo(RETAIL) }, "undo", UNDO_TABLES));
+      const ctx = ctxOf(LUKASZ);
+      const product = (await s.store.model.load(RETAIL)).entities.find((e) => e.name === "Product by Anna")!;
+      const theirs = buildWriteSet(ctx, RETAIL, [update("entity", product, next(ctx, product, { name: "Product by Łukasz" }))]);
+      const results = await atOnce(s.store, reverted, theirs);
+      oneWins(results, "stale_version", "Someone changed this meanwhile.");
+      const name = await productName(s.store);
+      // whichever came first, nothing was overwritten: the undo's name only if the other write was refused
+      expect(["Product", "Product by Łukasz"]).toContain(name);
+      if (name === "Product by Łukasz") expect(await s.store.undoHistory.next(RETAIL, ANNA, "undo")).not.toBeNull();
+    });
+  });
+}
+
+async function localStoreWithFile(db: DevDb): Promise<Store & { file: string }> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "im-contract-undo-"));
+  const file = path.join(dir, "db.json");
+  fs.writeFileSync(file, JSON.stringify(db));
+  return { store: createLocalDataStore(file, STORE_SCHEMA), file, done: async () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
+lastingUndo("the local adapter", localStoreWithFile);
+if (CONTRACT_DB) lastingUndo("Postgres", postgresStore);
