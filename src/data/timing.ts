@@ -22,9 +22,12 @@ export interface TimingRecord {
   waitMs: number;
   /** Each port call's start and end, to tell the reads' span from their sum. */
   readonly spans: [number, number][];
+  /** A write's wait for its workspace's (and organization's) lock, and its whole transaction (slice 30, S30-13). */
+  lockWaitMs: number;
+  applyMs: number;
 }
 
-export const newTimingRecord = (): TimingRecord => ({ started: performance.now(), calls: 0, statements: 0, statementMs: 0, waitMs: 0, spans: [] });
+export const newTimingRecord = (): TimingRecord => ({ started: performance.now(), calls: 0, statements: 0, statementMs: 0, waitMs: 0, spans: [], lockWaitMs: 0, applyMs: 0 });
 
 let source: () => TimingRecord | null = () => null;
 
@@ -50,6 +53,14 @@ export function countWait(ms: number): void {
   if (r) r.waitMs += ms;
 }
 
+/** A write's lock wait and its transaction's time, from the Postgres adapter's `apply` (slice 30). */
+export function countWrite(lockWaitMs: number, applyMs: number): void {
+  const r = currentTiming();
+  if (!r) return;
+  r.lockWaitMs += lockWaitMs;
+  r.applyMs += applyMs;
+}
+
 /** The total length of the time covered by the spans (overlaps counted once). */
 export function spanUnion(spans: readonly [number, number][]): number {
   const sorted = [...spans].sort((a, b) => a[0] - b[0]);
@@ -73,6 +84,9 @@ export interface TimingSummary {
   readMs: number;
   /** From the record's start to now. */
   totalMs: number;
+  /** Writes only (slice 30): the lock's wait and the write's transaction. */
+  lockWaitMs: number;
+  applyMs: number;
 }
 
 const round = (ms: number) => Math.round(ms * 10) / 10;
@@ -85,6 +99,8 @@ export function timingSummary(r: TimingRecord): TimingSummary {
     waitMs: round(r.waitMs),
     readMs: round(spanUnion(r.spans)),
     totalMs: round(performance.now() - r.started),
+    lockWaitMs: round(r.lockWaitMs),
+    applyMs: round(r.applyMs),
   };
 }
 

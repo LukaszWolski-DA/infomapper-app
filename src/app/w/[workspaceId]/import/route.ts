@@ -8,6 +8,7 @@
 
 import { gunzipSync } from "node:zlib";
 import { runImport, MAX_INFLATED_BYTES, MAX_UPLOAD_BYTES, TOO_LARGE, UPLOAD_TYPE } from "@/app/_lib/import-sources";
+import { serverTimingHeader, withTiming } from "@/app/_lib/timing";
 
 /** A large import's write takes seconds (S30-05): Vercel's Pro default, set here so it is reviewed. */
 export const maxDuration = 300;
@@ -15,6 +16,19 @@ export const maxDuration = 300;
 const UNREADABLE = "The upload could not be read. Try again.";
 
 export async function POST(request: Request, ctx: RouteContext<"/w/[workspaceId]/import">) {
+  // slice 30 (S30-05): with INFOMAPPER_TIMING=1 the import's numbers in `Server-Timing` and one log line (no id, name or value)
+  let bytes = { gzipped: 0, inflated: 0, inflateMs: 0 };
+  const response = await withTiming(
+    () => receive(request, ctx, (b) => (bytes = b)),
+    (summary, r) => {
+      console.log(`timing ${JSON.stringify({ route: "import", ...summary, ...bytes })}`);
+      r.headers.set("Server-Timing", `${serverTimingHeader(summary)}, inflate;dur=${bytes.inflateMs}`);
+    },
+  );
+  return response;
+}
+
+async function receive(request: Request, ctx: RouteContext<"/w/[workspaceId]/import">, sizes: (b: { gzipped: number; inflated: number; inflateMs: number }) => void): Promise<Response> {
   const { workspaceId } = await ctx.params;
   const refuse = (message: string, status: number) => Response.json({ ok: false, code: "invalid", message }, { status });
   if (request.headers.get("content-type") !== UPLOAD_TYPE) return refuse(UNREADABLE, 415);
@@ -22,8 +36,10 @@ export async function POST(request: Request, ctx: RouteContext<"/w/[workspaceId]
   const body = Buffer.from(await request.arrayBuffer());
   if (body.byteLength > MAX_UPLOAD_BYTES) return refuse(TOO_LARGE, 413);
   let text: string;
+  const inflating = performance.now();
   try {
     text = gunzipSync(body, { maxOutputLength: MAX_INFLATED_BYTES }).toString("utf8");
+    sizes({ gzipped: body.byteLength, inflated: Buffer.byteLength(text), inflateMs: Math.round(performance.now() - inflating) });
   } catch (e) {
     // inflated past the cap: as large as today's refused upload
     if ((e as { code?: string }).code === "ERR_BUFFER_TOO_LARGE") return refuse(TOO_LARGE, 413);

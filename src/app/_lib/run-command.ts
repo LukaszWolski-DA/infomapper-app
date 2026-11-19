@@ -21,6 +21,7 @@ import type { AppUser, ModuleTable, Workspace } from "@/domain/types";
 import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
 import { recordingStore } from "./checked-access";
 import { retryWhenStale } from "./fresh-retry";
+import { withTiming } from "./timing";
 import { recordLiveNotices } from "./live-notices";
 import { loadLiveState } from "./live-state";
 import { getSession } from "./session";
@@ -116,7 +117,11 @@ export async function runCommand<T>(
     };
   };
   try {
-    const result = options.freshOnStale ? await retryWhenStale(once, (r) => !r.ok && r.code === "stale_version") : await once();
+    // slice 30 (S30-13): with INFOMAPPER_TIMING=1 one log line of numbers per write (no id, name or value)
+    const result = await withTiming(
+      () => (options.freshOnStale ? retryWhenStale(once, (r) => !r.ok && r.code === "stale_version") : once()),
+      (summary, r) => console.log(`timing ${JSON.stringify({ route: "write", ok: r.ok, ...summary })}`),
+    );
     // a refusal that cuts the row's waiting saves brings the fresh page in the same answer (slice 13, F3): the newest
     // stored values and versions, and what the person may still do
     if (!result.ok && REFRESHING_REFUSALS.has(result.code)) revalidatePath("/", "layout");

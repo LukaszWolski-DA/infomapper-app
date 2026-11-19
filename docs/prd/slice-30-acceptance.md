@@ -904,3 +904,130 @@ together (the tests' own durations, summed per folder from each run's `report.js
   `dev` or faster in 44500070325: slice-01b (undo's first specs) 114 s against 129 and 140; slice-12a (the homes' Undo, a
   project's delete) 102 s, inside part 6's slowdown; slice-07a (the import through the gzipped route) 128 s against 134
   and 138.
+
+### What was built
+
+- **The save state** (`src/ui/save-state.ts`, Q6, L5): one store per tab; writes come in through `reportSave` where they
+  leave the page: the save chain (`rowSaves.saveRows`, so every row's save, the canvas's look and the document editor's
+  saves included), `useAction`'s `run` (creates and other writes; the five previews it reads are marked `read`), undo
+  and redo, the canvas's action props (wrapped once in `ModelCanvas`, `reportedAll`) and the import's upload. "Saving…",
+  "Saved" (1.8 s, then a 0.6 s fade), "Not saved" after a refusal (not a cut save), a thrown write or 30 s without an
+  answer, until the next write starts; its tooltip by kind (`failureText`): a row's save "…{reason} A text you typed is
+  kept in its field.", a canvas change "…{reason} It was taken back here; make it again.", another change "…Make it
+  again.", no answer "…the server did not answer. … If this repeats, check your connection and reload the page.", and
+  the busy refusal its own: "Your last change was not saved: The workspace is busy saving a large change. Try again in a
+  moment." (`BUSY_MESSAGE`, now in `src/domain/errors.ts`).
+- **The badge** (Q7): `ShellData.server` (`local`, or `online` with `INFOMAPPER_SERVER_NAME`); `Local`, `Online · dev`,
+  `Online · {name}` or `Online`, the prototype's tooltips; up to 1,500 px the short label (`dev`). `.env.example` lists
+  the variable.
+- **The pair** (`src/app/_components/save-indicator.tsx`, `group-save`): in the top bar before the details panel's
+  button (the user indicator where there is none); in the document editor's bar after Print, before its options
+  panel's button, and not in the top bar above it (F16, `AppShell`'s `savePair`).
+- **The room** (Q6's table): the Hand, Entity, Note and Frame labels from 2,101 px; the brand from 1,601 px; the path
+  names' 1,500 px step (128 px) and 56 px minimum; the user's role label from 1,501 px.
+- **"Add person" online:** every field and Continue disabled, L6's line under them, the actions refusing.
+- **The timing record for writes** (S30-13, S30-05, `INFOMAPPER_TIMING=1` only): `apply` adds its lock wait and its
+  transaction (`countWrite`); `runCommand`, `undoAction` and the import route log one line of numbers each
+  (`timing {"route":"write"|"undo"|"redo"|"import",…}`); the import's answer carries `Server-Timing` (statements, wait,
+  lock, apply, inflate, total); a `withTiming` inside another counts into the outer record.
+- **The check script** `scripts/pg-lock-check.ts` (below) and **the measurement spec** `e2e/slice-29/S30-measure.spec.ts`.
+- **Tests:** `src/ui/save-state.test.ts`; `e2e/slice-30/` (S30-09: the badge, the three states, the room; the editor's
+  single pair); the smoke writes `e2e/slice-29/S30-smoke-writes.spec.ts` (a rename and an attribute stored and shown
+  after a reload, Undo and Redo from a new session, the badge `Online`, "Add person" disabled), skipped unless the
+  database is on this machine (F13): CI's local stack only.
+
+### Where step 4 differs from the plan, or assumed something
+
+- **"Not saved" until the next write starts, not until the next one succeeds:** the accepted prototype's `begin()` shows
+  "Saving…" at the next write; a failing one shows "Not saved" again.
+- **A row's save says "A text you typed is kept in its field."** rather than "Your text is kept where you typed it.":
+  the save chain also carries switches (a canvas's look, a classification) that have no text.
+- **The start page and the local "New organization…" dialog are not followed** (their own `run`; known limitation).
+- **The smoke writes need no reseed:** each smoke job loads a fresh stack, and the read specs beside them count
+  projects, canvases and cards, which the writes leave as they are.
+- **`undo_step` is not yet on infomapper-dev:** `npm run pg:migrate` is the only way to migrate it and was not run in
+  this step (step 2 of the manual acceptance below).
+
+### Earlier tests changed, with their reasons
+
+- `e2e/slice-06a/S6A-10.spec.ts`: the prototype's new steps (the brand from 1,601 px, Hand's label from 2,101 px) and the
+  save pair among the controls always there (`group-save`).
+
+### The check on dev:pg (19 November 2026)
+
+- **The connection:** `npm run dev:pg` reads `INFOMAPPER_DATABASE_URL` from `.env.postgres.local`: a Supabase pooler host
+  (`*.pooler.supabase.com`), port **6543**, the transaction pooler; the migration URL is the session pooler, port 5432.
+  That is the kind and port slice 29 set for the preview's variable (Vercel keeps it write-only, so its value cannot be
+  compared).
+- **Through it**, `npx tsx scripts/pg-lock-check.ts` (the app's domain commands and the Postgres adapter's `apply`):
+
+| Check | Time | Answer |
+| --- | --- | --- |
+| 1. One write (`for no key update`, `set local lock_timeout`) | 411 ms | stored |
+| 2. A write while another session holds the workspace's row for 2 s | 2,297 ms | stored after the wait |
+| 3. A write while another session holds it for 13 s (past 10 s) | 10,251 ms | refused: busy (`invalid`), the name unchanged |
+| 4. Two sessions delete the workspace's last two projects at once | 701 ms | one stored, the other "A workspace needs at least one project."; one project left |
+
+- **Written into infomapper-dev:** the workspace "Slice 30 lock check" in InfoMate (with its member, two projects, a
+  canvas, the built-in classifications and stereotypes, and their change events), renamed and deleted as above, then
+  soft-deleted: its rows stay, hidden everywhere (known limitation, "A check workspace in infomapper-dev"). Nothing else;
+  no reset.
+
+### The line for .env.postgres.local
+
+`INFOMAPPER_SERVER_NAME=dev`
+
+### The measurement, prepared (run on dev's preview after the merge)
+
+`e2e/slice-29/S30-measure.spec.ts`, as S29-08: `MEASURE=1 PG_BASE_URL=<dev's preview> npx playwright test --config
+playwright.pg.config.ts S30-measure`, with `INFOMAPPER_TIMING=1` on the preview.
+- **S30-13:** per kind (a rename in the entity panel, an attribute added there, a card moved, Undo) 2 discarded and 10
+  counted writes, from the action to the indicator's "Saved"; medians, with the refreshed page's statements
+  (`im-timing`). The write's own split (statements, lock wait, transaction) from the server's `timing` log lines in
+  Vercel's runtime logs.
+- **S30-05:** a 10,000-column file (1,000 tables) through the wizard: the review (file to review shown), the import
+  (click to toast) with the route's `Server-Timing`, and Anna's rename sent meanwhile in a second browser: its time and
+  its answer.
+- It writes into the demo's "Retail Co – DWH" and puts Product's and Customer's names back; the import's new system
+  "Synth {time}" stays (Undo removes it). Results in `.data/measure/s30/`; the report goes to
+  `docs/prd/slice-30-measurement.md`.
+
+### Łukasz's manual acceptance on dev:pg
+
+Before: stop `npm run dev` (it uses port 3000 too). The two demo people are **Łukasz** and **Anna Nowak** (their demo
+addresses are in `e2e/slice-29/helpers.ts`, `PEOPLE`; the password is `INFOMAPPER_DEMO_PASSWORD` in
+`.env.postgres.local`). Browser 1 is your usual one, browser 2 another browser or a private window. Everything happens in
+the demo's "Retail Co – DWH", never KB.
+
+1. Add the line `INFOMAPPER_SERVER_NAME=dev` to `.env.postgres.local`.
+2. `npm run pg:migrate -- --dry-run`: it lists `20261119120000_undo_step.sql` only. Then `npm run pg:migrate`.
+3. `npm run dev:pg`, and open http://localhost:3000 in both browsers.
+4. **S30-09 (badge).** Browser 1: sign in as Łukasz, open "Retail Co – DWH", its first project, its first canvas. The top
+   bar's right corner shows the badge `Online · dev` before the details panel's button; its tooltip: "Online,
+   development server: changes are saved in the database infomapper-dev, for everyone in this workspace. Not
+   production." Make the window narrower than 1,500 px: the badge says `dev`.
+5. **S30-08.** The user indicator shows your role ("Owner"), not "Read only"; the workspace home has no read-only banner;
+   the canvas's tools and creates are there. On the workspace home, People tab: "Add a person" is shown, its fields and
+   Continue disabled, with "People are added by an administrator on this server for now." under them.
+6. **S30-01 and S30-09 (indicator).** Browser 1, the canvas: in the Model tab open Product; rename it to "Product A"
+   (Enter). The indicator shows "Saving…", then "✓ Saved", which fades after about 2 s. Click "Add attribute" in its
+   panel: a new attribute. Place a new entity with the Entity tool (pick a concept), and drag a column of a source table
+   onto one of its attributes (a mapping). Each shows "Saving…" and "Saved". Reload: all of it is there.
+7. **S30-01 (second person).** Browser 2: sign in as Anna Nowak, open the same canvas: "Product A", the new entity and
+   its mapping are there (a reload shows anything made after the page opened).
+8. **S30-06.** Both browsers: open Product A's panel. Browser 2 (Anna): change its definition to "Anna's text", leave the
+   field: "Saved". Browser 1 (Łukasz), without reloading: change the definition to "Łukasz's text", leave the field: the
+   field shows "Changed meanwhile to: Anna's text" with "Use this" and "Keep mine"; the indicator says "Not saved" with
+   the reason in its tooltip. Click "Keep mine": saved; Anna sees "Łukasz's text" after a reload.
+9. **S30-02.** Browser 1: close it (or sign out), sign in again as Łukasz: the top bar's Undo is enabled. Undo several
+   times: your steps go back newest first (the definition, the mapping, the new entity, the attribute, the rename), each
+   with its toast "Undone: …". Redo brings them back. Anna's change is not among them.
+10. **S30-03.** Browser 1: rename Product A to "Product B". Browser 2: rename it to "Product C". Browser 1: Undo: refused,
+    "Couldn't undo “Rename entity” because it was changed afterwards. Ctrl+Z again goes further back."; the entity stays
+    "Product C".
+11. **S30-04.** Browser 1: the Sources tab, "Import sources…", a new system "CRM check", the sample file
+    `src/domain/import/samples/crm_snapshot_2026-10-20.csv`, Next, Next, "Import into CRM check": the tables and
+    columns appear; the indicator shows "Saving…" then "Saved". Reload: they are there. Undo: the whole import goes in
+    one step.
+12. **Afterwards:** the entity's name and definition as you want them (Product); the import undone. Nothing in KB was
+    touched.

@@ -25,6 +25,7 @@ import type { Uuid } from "@/domain/ids";
 import type { ApplyOptions, ApplyResult } from "../ports";
 import type { AnyRow, StoreSchema } from "../rows";
 import { stampPlaces, tablesInKeyOrder } from "./load";
+import { countWrite } from "../timing";
 import { timeColumnOf } from "./tables";
 import { changeHistory } from "./undo-history";
 
@@ -101,6 +102,8 @@ export async function applyWriteSet(pool: Pool, schema: StoreSchema, writeSet: W
   const unknown = writeSet.writes.find((w) => !schema.rules[w.table]);
   if (unknown) return { ok: false, error: domainError("invalid", `The store does not know the table ${unknown.table}.`) };
   const client = await pool.connect();
+  const started = performance.now();
+  let lockWait = 0;
   try {
     await client.query("begin");
     try {
@@ -108,7 +111,9 @@ export async function applyWriteSet(pool: Pool, schema: StoreSchema, writeSet: W
       const order = await insertOrder(pool, client, schema);
       await client.query(`set local lock_timeout = '${LOCK_TIMEOUT}'`);
       const workspaceId = writeSet.events[0]?.workspace_id;
+      const lockStart = performance.now();
       await lock(client, writeSet, workspaceId);
+      lockWait = performance.now() - lockStart;
       if (options.access) {
         const changed = accessChangedRefusal(options.access, await accessNow(client, options.access));
         if (changed) throw new Refused(changed);
@@ -137,6 +142,8 @@ export async function applyWriteSet(pool: Pool, schema: StoreSchema, writeSet: W
     }
   } finally {
     client.release();
+    // slice 30 (S30-13): with INFOMAPPER_TIMING=1, the lock's wait and the whole transaction
+    countWrite(lockWait, performance.now() - started);
   }
 }
 

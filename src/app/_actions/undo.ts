@@ -22,6 +22,7 @@ import { rememberGoneProject } from "../_lib/gone-project";
 import { rememberNextCanvas } from "../_lib/next-canvas";
 import { withLiveCanvases, type ActionResult } from "../_lib/run-command";
 import { getSession } from "../_lib/session";
+import { withTiming } from "../_lib/timing";
 import { lockedRefusal } from "../_lib/unlock";
 
 export interface UndoState {
@@ -46,6 +47,14 @@ export async function undoAction(
   mode: "undo" | "redo",
   open?: { projectId: string; canvasId: string },
 ): Promise<ActionResult<UndoOutcome>> {
+  // slice 30 (S30-13): with INFOMAPPER_TIMING=1 one log line of numbers (no id, name or value)
+  return withTiming(
+    () => revert(workspaceId, mode, open),
+    (summary, r) => console.log(`timing ${JSON.stringify({ route: mode, ok: r.ok, ...summary })}`),
+  );
+}
+
+async function revert(workspaceId: string, mode: "undo" | "redo", open?: { projectId: string; canvasId: string }): Promise<ActionResult<UndoOutcome>> {
   const session = await getSession();
   if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
   const { user } = session;
