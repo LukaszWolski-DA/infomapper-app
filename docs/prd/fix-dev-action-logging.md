@@ -159,3 +159,16 @@ e2e runner (shared infrastructure) for a check the unit test already makes, so i
   its `server.log` files searched as in section 5; a short note in `docs/known-limitations.md` is not needed (nothing
   remains limited). Report and stop.
 - **Closing:** a prompt with the merge into `dev` only, on Łukasz's command.
+
+## 8. Step 2 (19 November 2026)
+
+- Commits: `80107ce` (the test, failing on the unfixed config: "expected true to be false"; the request-lines case
+  passed), `eec30dd` (the fix; both cases pass). `npm run lint`, `npm run typecheck` and `npm test` (195 files, 2,370
+  passed, 4 skipped) pass. Draft PR 83 into `dev`: CI's `check`, Schema's `migrations` and `smoke` pass.
+- The full run: E2E run 44613791701 on `eec30dd` (which contains `dev`'s head `4d920f3`): 844 passed, 0 failed, 0 flaky,
+  16 skipped; 18 min 37 s wall-clock. Parts (minutes, heap peak from the memory logs): 1: 12.3, 1,011 MB; 2: 10.8,
+  894 MB; 3: 8.9, 1,030 MB; 4: 7.6, 1,209 MB; 5: 12.3, 1,288 MB; 6: 8.8, 1,723 MB; 7: 7.7, 1,374 MB; 8: 8.3, 1,387 MB;
+  9: 14.6, 1,478 MB.
+- Its nine `server.log` files (10,499 lines): 0 server action lines (`└─ ƒ`), 0 `demo-pass`, 0 of the laptop's
+  `INFOMAPPER_DEMO_PASSWORD` or `INFOMAPPER_KB_PASSWORD`; 9,840 request lines remain. Before the fix, 81 of 84 runs'
+  `part` artifacts held `demo-pass` in `server.log` (section 3).
