@@ -441,3 +441,39 @@ Claude took the technical calls on Łukasz's behalf, as agreed; they are quoted 
 - **Question 4 (F11):** no full run in step 3, and one full run before the merge (step 5).
 - **Question 1 (Q2):** the count script was added now, in its own commit on `slice/31-kb-copy`, before step 2 (`a3c72ad`),
   and was run on Łukasz's command (Q2 above).
+
+## Step 4: Łukasz's manual acceptance (19 November 2026)
+
+Łukasz ran each command himself on his laptop, on `slice/31-kb-copy` at `33e4d9e`, against `infomapper-dev`. The checks
+in the app were on `npm run dev:pg` (environment 2, the same database as `dev`'s preview).
+
+| Criterion | What was run | Result |
+| --- | --- | --- |
+| S31-07 (before) | `Get-FileHash .data\dev-db.json` | `F2B60E19C457190D878F7052A331A84DCFB4E6FDFD32978A…` |
+| – | a fresh backup | `.data/backups/dev-db-20261119-2015.json`, also as `kb-model-latest.json` |
+| S31-01 | `npm run pg:kb -- .data/backups/dev-db-20261119-2015.json` | format 17, the upgrade in memory made no rows; 4,871 rows, equal per table in the file and the database (38 tables, the same counts as Q2's); 1 person; copied in 38 s |
+| S31-01 | `npm run pg:accounts -- --kb` | "The --kb account: created, linked." |
+| S31-01 | sign-in on `dev:pg` with his real e-mail | organization KB with "Kanton Basel": its projects, canvases and model as locally |
+| S31-02 | sign-in on `dev:pg` as the demo's Łukasz, in a private window | no KB: only the demo's organizations |
+| S31-03 | `npm run pg:backup` | `.data/backups/pg/kb-20261119-2043.json`, 6,477,493 bytes, 4,891 rows (20 more change events than the copy: the online changes of the sign-in check, a few card moves and an attribute's rename) |
+| S31-03 | an entity renamed online ("… TEST"), then `npm run pg:restore -- .data/backups/pg/kb-20261119-2043.json` | 4,891 rows, equal per table; "People: 1, of them 1 online already and kept as they are"; in the app the entity has its name back without " TEST" |
+| S31-05 | `npm run pg:seed -- --reset` | refused: "The database holds 1 organization the seed does not make (a copy of Łukasz's model, or one made online): nothing was reset. First npm run pg:backup, then npm run pg:kb -- --remove, then the reset." |
+| S31-07 (after) | `Get-FileHash .data\dev-db.json` | `F2B60E19C457190D878F7052A331A84DCFB4E6FDFD32978A…`, the same: no command of the slice changed the file |
+
+**Not run in the acceptance, on Łukasz's decision (19 November 2026):**
+- **S31-04, the copy again after a local change.** The first copy and the restore both go through `pg:kb`'s one path
+  (`readBackupCopy`, `placeAll`, `organizationRows`, `replaceOrganization`); the restore replaced KB's rows as a second
+  copy would. The copy again is covered by `tests/contract/copy.test.ts` ("copies again: an online change and the
+  organization's undo steps go, another organization's stay, and a person's link stays").
+- **S31-08, `pg-lock-check` on `infomapper-dev`.** It was run in step 3 on a throwaway local cluster with the demo loaded:
+  the write was refused as busy after 15,009 ms (`lock_timeout` 15 s), and the reset's guard refused through `pg:seed`
+  with the database unchanged.
+
+**Found during the acceptance: the development server logs server actions' arguments.** On `npm run dev:pg`, the sign-in
+printed the e-mail and the password typed, in plain text, in the server's terminal: Next.js's development server logs
+every Server Function invocation with its arguments by default (`logging.serverFunctions`, not set in
+`next.config.ts`). It reached only the laptop's terminal; production builds (the preview, the smoke job) do not log it.
+The e2e workflow's public `server.log` artifacts hold the same kind of lines, with the demo's data and the development
+passwords. Łukasz was advised to clear the terminal and change the online password. The fix, `logging: { serverFunctions:
+false }` with a guard test, touches shared configuration, so it is a `fix/` branch of its own (CLAUDE.md, "The slice
+cycle", 4), proposed as a separate task, not part of this slice.
