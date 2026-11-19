@@ -788,3 +788,55 @@ Step 2 accepted (Łukasz, 19 November 2026).
 - **Q4.** Decided: (a), the local adapter keeps its undo history in memory; `undo_step` is on Postgres only.
 - **The lock.** Decided: `for no key update` on the workspace's and the organization's rows, as step 1 proposed (step 2
   used `for update` because the step's prompt copied the PRD); the order stays the organization's row first.
+
+### What was built
+
+- **`undo_step`** (migration `20261119120000_undo_step.sql`, `data-model-v2.md` §10): Q4's table, key `(workspace_id,
+  user_id, list, position)`, `list` CHECK `undo`/`redo`, a unique index on `(workspace_id, change_group_id)`, RLS
+  enabled. **The registry's class:** `POSTGRES_ONLY_TABLES` (`src/data/postgres/undo-history.ts`), the store's own
+  bookkeeping, outside the domain's tables, the local file and undo; the guard test leaves it out of the registry and
+  the schema check reads its row type (`PostgresOnlyTables`) beside the domain's (44 tables, RLS on every one).
+- **The history port** (F3, F4): `state` (two answers, no events; the three pages read only this), `next` (the step
+  reverted next, its events read by its change group in their stored order), `drop` (only while it is still the next
+  one). A step is recorded, undone or redone only through `apply`'s `history` (`HistoryChange`): on Postgres in the
+  write's transaction under the workspace's lock (a new step empties the redo list; a list keeps its last 50, the oldest
+  hard-deleted in the same transaction, L3); on the local adapter in its serialised write, in memory (Q4 (a)), by the
+  same pure rule (`withChange`). `runCommand` and `undoAction` pass it; undo and redo are on again online.
+- **The lock** is `for no key update` on both rows.
+- **The import** (L2): the wizard gzips the review's input (`gzipJson`, `src/ui/import-upload.ts`) and refuses a body
+  over 4,400,000 bytes before sending it; the route takes only `application/gzip`, refuses a compressed body over the
+  same limit (413) and inflates with `maxOutputLength` 25 MB (413 past it), both with today's message; `maxDuration =
+  300`. The same route and body on both adapters; the import is still one change group and one undo step.
+- **Tests:** `writes.test.ts` gains the undo history on both adapters: S30-02 (two steps, a new process (on Postgres a new
+  pool, locally a new store on the file), undo twice in reverse order, redo, a new step empties redo), the 50 steps (52
+  recorded, 50 undone, the oldest two gone), S30-03's content case (another person's later change: refused with its
+  message, nothing written) and its race (an undo and another write built from one read, at once: one stored, the other
+  stale, nothing overwritten); `compare-schema.test.ts` reads `undo_step`'s type; `store.test.ts`'s history case uses
+  the new port.
+
+### Sizes (L2)
+
+| File | Columns | Text | Upload body | Gzipped | Ratio |
+| --- | --- | --- | --- | --- | --- |
+| `crm_snapshot_2026-10-20.csv` (the largest sample) | 24 | 2,399 B | 2,760 B | 767 B | 3.6× |
+| generated (`syntheticStandard`, 1,000 tables) | 10,000 | 769,075 B | 803,292 B | 82,224 B | 9.8× |
+
+At that ratio the 4.4 MB limit holds about 43 MB of such text, so the 25 MB inflated cap binds first.
+
+### Where step 3 differs from the plan, or assumed something
+
+- **The local adapter's history test of a "new process"** is a new store on the same file in the same process: its
+  history is in memory (Q4 (a)), so a real new process starts with none, as its known limitation says.
+- **Plain JSON to the route is refused (415):** every body is gzipped now, the e2e specs' direct posts included.
+- **`next` on Postgres drops a step whose change group has no events** (only after a reset that kept the steps, which
+  `pg:seed -- --reset` does not: it empties every table), as the local adapter leaves such steps out.
+
+### Earlier tests changed, with their reasons
+
+- `src/data/local/store.test.ts`, "keeps a history per person and workspace…": the port's `update` and `get` are gone;
+  the step is recorded with its write and read with `next` and `state`.
+- `tests/contract/shared.ts`: reads `undoHistory.state` instead of `get`.
+- `e2e/slice-07a/S7A-04-route.spec.ts`: posts gzipped JSON (`postImport`); the size case checks the inflated cap, a dense
+  compressed body (413) and plain JSON (415).
+- `e2e/slice-07a/S7A-14-counts.spec.ts`: posts gzipped JSON.
+- `scripts/bench-import-write.ts`, `scripts/bench-thumbnails.ts`: the new port (benches, not tests).
