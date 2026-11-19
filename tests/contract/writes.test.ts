@@ -239,7 +239,7 @@ async function scenario(store: DataStore, ctxOf: (actorId: string) => CommandCon
   {
     const ctx = ctxOf(ANNA);
     const product = m.entities.find((e) => e.name === "Product")!;
-    const set = () => buildWriteSet(ctx, RETAIL, [update("entity", product, next(ctx, product, { description_text: "checked" } as never))]);
+    const set = () => buildWriteSet(ctx, RETAIL, [update("entity", product, next(ctx, product, { alias: "checked" }))]);
     const ws = (await store.workspaces.get(RETAIL))!;
     await step("access: role changed", set(), { access: { userId: ANNA, workspace: { id: RETAIL, name: ws.name, archived: false, role: "owner" } } });
     await step("access: archived meanwhile", set(), { access: { userId: ANNA, workspace: { id: RETAIL, name: ws.name, archived: true, role: "modeler" } } });
