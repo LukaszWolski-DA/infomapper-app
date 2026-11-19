@@ -3,6 +3,7 @@
 // plus version checks, and writes the rows and change events of one command together or not at all.
 
 import type { Write, WriteSet } from "@/domain/changes";
+import { accessChangedRefusal, type CheckedAccess } from "@/domain/commands/access-check";
 import { countChecks, countRefusal } from "@/domain/commands/count-rules";
 import { MAPPING_LOG } from "@/domain/model/mapping-rules";
 import type { WorkspaceRows } from "@/domain/commands/undo";
@@ -11,7 +12,7 @@ import type { Uuid } from "@/domain/ids";
 import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-history";
 import { byTabOrder, liveLabelLinksOf, liveProjectCanvasesOf, liveProjectPinsOf, liveRequirementLinksOf, workspaceModelOf, workspacePeopleOf, workspaceSnapshotOf } from "@/domain/model/workspace-model";
 import type { ModuleTable, WritableRows } from "@/domain/types";
-import type { ApplyResult, DataStore } from "../ports";
+import type { ApplyOptions, ApplyResult, DataStore } from "../ports";
 import { newestImportFirst, oldestChangeFirst } from "../order";
 import { assertNotProduction, readDbCached, readDbStamped, writeDb } from "./file";
 import { CORE_SCHEMA, findViolation, keyOf, readRows, rowsOf, upgradeRows, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
@@ -232,7 +233,7 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
       return workspaceSnapshotOf(db, workspaceId, modules as { [K in (typeof tables)[number]]: WritableRows[K][] });
     },
 
-    apply: (writeSet) => serialise(file, () => applyToFile(file, writeSet, schema)),
+    apply: (writeSet, options) => serialise(file, () => applyToFile(file, writeSet, schema, options)),
   };
 }
 
@@ -242,19 +243,24 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
  * checked against what is there now (a row changed meanwhile is a stale version) and the outside change is kept. A file
  * changed again during the second try is refused as a stale version.
  */
-async function applyToFile(file: string, writeSet: WriteSet, schema: LocalSchema): Promise<ApplyResult> {
+async function applyToFile(file: string, writeSet: WriteSet, schema: LocalSchema, options: ApplyOptions = {}): Promise<ApplyResult> {
   for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await applyOnce(file, writeSet, schema);
+    const result = await applyOnce(file, writeSet, schema, options);
     if (result !== "changed") return result;
   }
   return { ok: false, error: staleVersion() };
 }
 
-async function applyOnce(file: string, writeSet: WriteSet, schema: LocalSchema): Promise<ApplyResult | "changed"> {
+async function applyOnce(file: string, writeSet: WriteSet, schema: LocalSchema, options: ApplyOptions): Promise<ApplyResult | "changed"> {
   const read = await readDbStamped(file);
   // Copy on write (slice 7a): the cached file is frozen, so only the tables this write touches get new arrays; their
   // written rows are new objects, every other row is shared with the cache.
   const current = upgradeRows(read.db, schema);
+  // slice 30 (B3, L1): the access the command checked, read again before the rows
+  if (options.access) {
+    const changed = accessChangedRefusal(options.access, accessNow(current, options.access));
+    if (changed) return { ok: false, error: changed };
+  }
   const next = { ...current } as DevDb;
   const touched = new Set<StoreTable>(writeSet.writes.map((w) => w.table));
   // slice 15a: a table this store does not know is refused before anything is written, never skipped
@@ -279,6 +285,23 @@ async function applyOnce(file: string, writeSet: WriteSet, schema: LocalSchema):
   if (violation) return { ok: false, error: violationError(violation) };
   if (!(await writeDb(file, next, { ifUnchanged: read.stamp }))) return "changed";
   return { ok: true };
+}
+
+/** The actor's access as the file holds it now, for the parts the command read. */
+function accessNow(db: DevDb, checked: CheckedAccess) {
+  const ws = checked.workspace ? db.workspace.find((w) => w.id === checked.workspace!.id && w.deleted_at === null) : undefined;
+  return {
+    ...(checked.workspace
+      ? {
+          workspace: ws
+            ? { archived: ws.archived_at !== null, role: db.workspace_member.find((m) => m.workspace_id === ws.id && m.user_id === checked.userId)?.role ?? null }
+            : null,
+        }
+      : {}),
+    ...(checked.organization
+      ? { organization: { role: db.organization_member.find((m) => m.organization_id === checked.organization!.id && m.user_id === checked.userId)?.role ?? null } }
+      : {}),
+  };
 }
 
 /**

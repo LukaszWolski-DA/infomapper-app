@@ -19,6 +19,7 @@ import { isOpen } from "@/domain/source-changes/rules";
 import { settleAfterWrites } from "@/domain/source-changes/settle";
 import type { AppUser, ModuleTable, Workspace } from "@/domain/types";
 import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
+import { recordingStore } from "./checked-access";
 import { retryWhenStale } from "./fresh-retry";
 import { recordLiveNotices } from "./live-notices";
 import { loadLiveState } from "./live-state";
@@ -80,7 +81,9 @@ export async function runCommand<T>(
   const store = getDataStore(STORE_SCHEMA);
   const once = async (): Promise<ActionResult<T>> => {
     const ctx: CommandContext = { actorId: user.id, now: new Date().toISOString(), newId: () => uuidv7() };
-    const result = await build(ctx, store, user);
+    // slice 30 (B3, L1): what the command reads about the actor is recorded and read again inside the write
+    const recorded = recordingStore(store, user.id);
+    const result = await build(ctx, recorded.store, user);
     if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message, ...(result.error.fields ? { fields: result.error.fields } : {}) };
     const organizationId = await organizationOfWrite(store, result.writeSet);
     if (organizationId && organizationId !== "new") {
@@ -99,7 +102,7 @@ export async function runCommand<T>(
       if (completed.error.message === CONTEXT_LABEL_GONE) revalidatePath("/", "layout");
       return { ok: false, code: completed.error.code, message: completed.error.message };
     }
-    const applied = await store.apply(completed.writeSet);
+    const applied = await store.apply(completed.writeSet, { access: recorded.checkedFor(workspaceId) });
     if (!applied.ok) return { ok: false, code: applied.error.code, message: applied.error.message };
     await remember(store, user.id, completed.writeSet);
     if (completed.value.canvases.length) recordLiveNotices(user.id, completed.value);

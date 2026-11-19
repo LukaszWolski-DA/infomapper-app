@@ -86,10 +86,12 @@ export async function undoAction(
     // or redo never links the working context or labels a card it brings back (`revert`)
     const result = await withLiveCanvases(ctx, store, user, reverted.writeSet, { revert: true });
     if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message };
-    const applied = await store.apply(result.writeSet);
+    // slice 30 (B3, L1): the access this undo was checked with, read again inside the write
+    const checked = { userId: user.id, workspace: { id: workspace.id, name: workspace.name, archived: workspace.archived_at !== null, role: access.member?.role ?? null } };
+    const applied = await store.apply(result.writeSet, { access: checked });
     if (!applied.ok) {
       // Changed between reading and writing: the same as changed afterwards.
-      return applied.error.code === "stale_version" || applied.error.code === "conflict" || applied.error.code === "not_found"
+      return (applied.error.code === "stale_version" || applied.error.code === "conflict" || applied.error.code === "not_found")
         ? drop()
         : { ok: false, code: applied.error.code, message: applied.error.message };
     }

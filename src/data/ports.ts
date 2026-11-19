@@ -3,6 +3,7 @@
 // Every read of workspace data takes the workspace id and filters on it. Soft-deleted rows are never returned.
 
 import type { WriteSet } from "@/domain/changes";
+import type { CheckedAccess } from "@/domain/commands/access-check";
 import type { WorkspaceRows } from "@/domain/commands/undo";
 import type { DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
@@ -189,6 +190,15 @@ export interface UndoHistoryRepository {
 
 export type ApplyResult = { ok: true } | { ok: false; error: DomainError };
 
+/** How a write set is applied (slice 30). */
+export interface ApplyOptions {
+  /**
+   * The access the command was checked with (B3, L1): inside the write, before its rows, the store reads the actor's
+   * role and the workspace's archive again and refuses when either differs (`accessChangedRefusal`).
+   */
+  access?: CheckedAccess;
+}
+
 export interface DataStore {
   /**
    * The store takes no writes (slice 29, Q5): `apply` refuses every write set with code `archived` and
@@ -220,5 +230,5 @@ export interface DataStore {
    * Applies the rows and change events of one command together or not at all (AD-13). Refuses a stale version,
    * unknown ids, duplicate keys and broken rules with the same error a database would cause.
    */
-  apply(writeSet: WriteSet): Promise<ApplyResult>;
+  apply(writeSet: WriteSet, options?: ApplyOptions): Promise<ApplyResult>;
 }
