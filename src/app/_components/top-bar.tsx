@@ -29,16 +29,22 @@ import type { ShellData } from "../_lib/shell";
 import { projectHref, workspaceHref } from "../_lib/paths";
 import { ROLE_CAN, ROLE_LABEL } from "../_lib/roles";
 import { NewOrganizationDialog } from "./new-organization-dialog";
+import { SavePair } from "./save-indicator";
 import { PanelToggle } from "./side-panels";
 
-export function TopBar({ shell, tools, panelToggles = false }: { shell: ShellData; tools?: ReactNode; panelToggles?: boolean }) {
+/**
+ * `savePair`: the save indicator and the server badge (slice 30), before the details panel's button, else before the
+ * user indicator; off on a page that draws them in a bar of its own (the document editor, F16).
+ */
+export function TopBar({ shell, tools, panelToggles = false, savePair = true }: { shell: ShellData; tools?: ReactNode; panelToggles?: boolean; savePair?: boolean }) {
   return (
     <header
       data-testid="bar-top"
       className="flex h-12 min-w-0 flex-none items-center gap-2.5 overflow-hidden border-b border-im-line bg-im-surface px-2.5 max-[1001px]:gap-1.5 max-[1001px]:px-1.5"
     >
       {panelToggles && <PanelToggle side="left" />}
-      <div className="mr-1.5 whitespace-nowrap max-[1301px]:hidden">
+      {/* slice 30: hidden up to 1,600 px, as the prototype, to make room for the save pair */}
+      <div className="mr-1.5 whitespace-nowrap max-[1601px]:hidden">
         <b className="text-sm font-semibold">InfoMapper</b>
       </div>
       <OrganizationSwitcher shell={shell} />
@@ -51,6 +57,7 @@ export function TopBar({ shell, tools, panelToggles = false }: { shell: ShellDat
           so nothing is cut off from 800 to 2,560 px; what is still missing comes out of the working context's label, the
           only tool that shrinks (slice 16, item 5): the tools' tiny shrink weight lets the switchers reach their minimum first */}
       {tools && <div data-testid="bar-tools" className="flex min-w-0 shrink-[0.001] items-center gap-2.5 max-[2101px]:gap-2 max-[1001px]:gap-1">{tools}</div>}
+      {savePair && <SavePair server={shell.server} />}
       {panelToggles && <PanelToggle side="right" />}
       <UserIndicator shell={shell} />
     </header>
@@ -64,7 +71,7 @@ function SwitcherButton({ testId, title, children }: { testId: string; title: st
     <DropdownMenuTrigger
       data-testid={testId}
       title={title}
-      className="inline-flex h-[30px] min-w-[52px] max-w-[260px] items-center gap-1.5 rounded-md px-2 font-medium max-[2101px]:max-w-[150px] max-[2101px]:px-1.5 max-[1301px]:max-w-[110px] max-[1001px]:min-w-[44px] text-im-ink-2 outline-none hover:bg-im-hover hover:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical data-[state=open]:bg-im-hover"
+      className="inline-flex h-[30px] min-w-[56px] max-w-[260px] items-center gap-1.5 rounded-md px-2 font-medium max-[2101px]:max-w-[150px] max-[2101px]:px-1.5 max-[1501px]:max-w-[128px] max-[1501px]:px-[5px] max-[1301px]:max-w-[110px] max-[1001px]:min-w-[44px] text-im-ink-2 outline-none hover:bg-im-hover hover:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical data-[state=open]:bg-im-hover"
     >
       <span className="min-w-0 truncate">{children}</span>
       <svg viewBox="0 0 16 16" className="size-3 flex-none fill-none stroke-current stroke-[1.6]" aria-hidden>
@@ -333,7 +340,7 @@ function UserIndicator({ shell }: { shell: ShellData }) {
         >
           {initials}
         </span>
-        <span data-testid="indicator-user-role" className="whitespace-nowrap text-xs font-medium">
+        <span data-testid="indicator-user-role" className="whitespace-nowrap text-xs font-medium max-[1501px]:hidden">
           {label}
         </span>
       </DropdownMenuTrigger>

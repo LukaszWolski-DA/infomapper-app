@@ -4,6 +4,7 @@ import { useCallback, useContext, useEffect, useRef, useTransition } from "react
 import { CanvasUiCtx } from "@/canvas/context";
 import { useToast } from "@/ui/components/toast";
 import { rowSaves, type SaveRowsRow } from "@/ui/row-saves";
+import { reportSave } from "@/ui/save-state";
 import type { ActionResult } from "../_lib/run-command";
 import { useUndoNow } from "./undo";
 
@@ -41,7 +42,8 @@ export function useAction() {
         startTransition(async () => {
           let result: ActionResult<T>;
           try {
-            result = await action();
+            // slice 30: the top bar's save state follows the writes; a row's save is followed by `rowSaves` itself
+            result = options?.afterPage || options?.read ? await action() : await reportSave(action(), "change");
           } catch {
             result = { ok: false, code: "unexpected", message: "Something went wrong. Nothing was saved." };
           }
@@ -98,8 +100,11 @@ export function useAction() {
  */
 type SaveOptions = { undoable?: boolean; deletes?: boolean; quiet?: boolean };
 
-/** `run`'s options: “Undo” in its toast, and whether a refusal waits for the fresh page (a row's save, slice 13). */
-type RunOptions = { undoable?: boolean; afterPage?: boolean; quiet?: boolean };
+/**
+ * `run`'s options: “Undo” in its toast, whether a refusal waits for the fresh page (a row's save, slice 13), and `read`:
+ * the action only reads (a preview), so the save state does not follow it (slice 30).
+ */
+type RunOptions = { undoable?: boolean; afterPage?: boolean; quiet?: boolean; read?: boolean };
 
 /** The refusals whose answer brings the fresh page (`runCommand`, slice 13, F3). */
 const REFRESHING = new Set<string>(["stale_version", "forbidden", "archived", "not_found"]);

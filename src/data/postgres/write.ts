@@ -20,7 +20,7 @@ import type { Pool, PoolClient } from "pg";
 import type { Write, WriteSet } from "@/domain/changes";
 import { accessChangedRefusal, type AccessNow, type CheckedAccess } from "@/domain/commands/access-check";
 import { countChecks, countRefusal, crossesWorkspaces, needsOrganizationLock, type CountCheck, type CountRows } from "@/domain/commands/count-rules";
-import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
+import { BUSY_MESSAGE, domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
 import type { ApplyOptions, ApplyResult } from "../ports";
 import type { AnyRow, StoreSchema } from "../rows";
@@ -30,7 +30,6 @@ import { changeHistory } from "./undo-history";
 
 /** How long a write waits for its workspace's lock (L7: provisional until S30-05's figures). */
 export const LOCK_TIMEOUT = "10s";
-export const BUSY_MESSAGE = "The workspace is busy saving a large change. Try again in a moment.";
 
 const ident = (name: string): string => {
   if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error(`Not a table or column name: ${name}`);

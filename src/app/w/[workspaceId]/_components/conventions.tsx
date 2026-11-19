@@ -77,7 +77,7 @@ export function Conventions(p: ConventionsProps) {
   const askRemove = async (c: Classification) => {
     if (!(p.uses[c.id] ?? 0) && !whatStops(c)) return void remove(c);
     setRemoving({ c, impact: null });
-    const r = await run(() => classificationImpactAction(p.workspaceId, c.id));
+    const r = await run(() => classificationImpactAction(p.workspaceId, c.id), undefined, { read: true });
     if (r.ok) setRemoving((now) => (now?.c.id === c.id ? { c, impact: r.value } : now));
     else setRemoving(null);
   };

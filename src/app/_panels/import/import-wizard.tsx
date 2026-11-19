@@ -20,6 +20,7 @@ import { readStandard } from "@/domain/import/standard";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui/components/dialog";
 import { useToast } from "@/ui/components/toast";
 import { gzipJson, MAX_UPLOAD_BYTES, TOO_LARGE, UPLOAD_TYPE } from "@/ui/import-upload";
+import { reportSave } from "@/ui/save-state";
 import { buttonClass, primaryClass } from "../fields";
 import { ReviewStep } from "./review-step";
 import { ScopeStep } from "./scope-step";
@@ -137,8 +138,11 @@ export function ImportWizard({
       if (body.byteLength > MAX_UPLOAD_BYTES) {
         result = { ok: false, code: "invalid", message: TOO_LARGE };
       } else {
-        const response = await fetch(`/w/${workspaceId}/import`, { method: "POST", headers: { "content-type": UPLOAD_TYPE }, body: body as BodyInit });
-        result = (await response.json()) as ActionResult<ImportOutcome>;
+        // the top bar's save state follows the upload as a write
+        result = await reportSave(
+          fetch(`/w/${workspaceId}/import`, { method: "POST", headers: { "content-type": UPLOAD_TYPE }, body: body as BodyInit }).then((response) => response.json() as Promise<ActionResult<ImportOutcome>>),
+          "change",
+        );
       }
     } catch {
       result = { ok: false, code: "unexpected", message: "Something went wrong. Nothing was saved." };

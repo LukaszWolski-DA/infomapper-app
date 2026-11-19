@@ -16,6 +16,7 @@
 // Slice 14b: while any save is on its way, leaving the page asks first (`leave-guard.ts`).
 
 import { track } from "./leave-guard";
+import { reportSave } from "./save-state";
 
 /**
  * What a save's answer needs to say: whether it was stored, why not, and the row's new version (`value.version`), or
@@ -111,11 +112,12 @@ export class RowSaves {
     tails.add(this.gate);
     const result = Promise.all(tails).then(async (): Promise<R | null> => {
       if (checked.some((p) => p.n <= p.row.cutThrough)) return null;
-      const outcome = await send((id) => {
+      // slice 30: the top bar's save state follows every row's save
+      const outcome = await reportSave(send((id) => {
         const p = checked.find((x) => x.id === id);
         if (!p) throw new Error(`saveRows: ${id} is not a checked row of this save`);
         return Math.max(p.row.answered, p.shown!);
-      });
+      }), "row");
       if (outcome.ok) {
         if (outcome.versions) this.answer(outcome.versions);
         const v = versionOf(outcome.value);

@@ -13,6 +13,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { CanvasUiCtx } from "@/canvas/context";
 import { doneStepMessage } from "@/domain/model/undo-history";
 import { useToast } from "@/ui/components/toast";
+import { reportSave } from "@/ui/save-state";
 import { rowSaves } from "@/ui/row-saves";
 import { undoAction, type UndoState } from "../_actions/undo";
 
@@ -68,7 +69,8 @@ export function UndoProvider({
         // after the panels' saves on their way, and before any started meanwhile (slice 9, F5)
         const result = await rowSaves.exclusive(async () => {
           await ui.settled();
-          const r = await undoAction(workspaceId, mode, projectId && canvasId ? { projectId, canvasId } : undefined).catch(() => ({
+          // slice 30: the top bar's save state follows undo and redo as writes
+          const r = await reportSave(undoAction(workspaceId, mode, projectId && canvasId ? { projectId, canvasId } : undefined), "change").catch(() => ({
             ok: false as const,
             message: "Something went wrong. Nothing was changed.",
           }));

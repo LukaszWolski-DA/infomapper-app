@@ -28,7 +28,7 @@ export function FrameToolButton() {
         <rect x="2.5" y="4" width="11" height="9.5" rx="2.5" strokeDasharray="2.5 2" />
         <path d="M2.5 2h5" />
       </svg>
-      <span className="hidden min-[1881px]:inline">Frame</span>
+      <span className="hidden min-[2101px]:inline">Frame</span>
     </button>
   );
 }

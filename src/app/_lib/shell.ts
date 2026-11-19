@@ -24,7 +24,7 @@ export interface ShellData {
    * Which server the page runs on (slice 30): `online` on Postgres, where people and organizations are made by script
    * until the people slice (no "New organization…", "Add person" disabled, B5).
    */
-  server: { kind: "local" | "online" };
+  server: { kind: "local" } | { kind: "online"; name: string | null };
   /** Workspaces of the current organization the user is a member of. */
   workspaces: { id: Uuid; name: string; archived: boolean; role: WorkspaceRole }[];
   role: WorkspaceRole;
@@ -151,7 +151,8 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
       };
     }),
     workspace: { id: workspace.id, name: workspace.name, archived, infocube: !!workspace.infocube },
-    server: { kind: isPostgresMode() ? "online" : "local" },
+    // Q7: the badge's value, from the adapter and a plain variable naming the database environment (`dev`)
+    server: isPostgresMode() ? { kind: "online", name: process.env.INFOMAPPER_SERVER_NAME?.trim() || null } : { kind: "local" },
     workspaces: workspacesHere.map((w, i) => ({ id: w.id, name: w.name, archived: isArchived(w), role: roles[i]!.role })),
     role: member.role,
     guest: isGuest(workspace, user.id, myOrgMemberships),

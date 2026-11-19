@@ -28,7 +28,7 @@ export function EntityToolButton() {
         <rect x="2.5" y="2.5" width="11" height="11" rx="2" />
         <path d="M2.5 6h11M8 8.5v3M6.5 10h3" />
       </svg>
-      <span className="hidden min-[1881px]:inline">Entity</span>
+      <span className="hidden min-[2101px]:inline">Entity</span>
     </button>
   );
 }
