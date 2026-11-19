@@ -10,7 +10,7 @@
 // command's: the app's writes are refused until slice B).
 //
 // Slice 31 (F3): by default only the people of the seed's organizations (every membership in one of them,
-// `seedPeople`), so a copied organization's people (KB's) never get the demo's password and their e-mails are never
+// `seedPeople`), so a copied organization's people (Łukasz's model's) never get the demo's password and their e-mails are never
 // printed; it says how many it left out. `npm run pg:accounts -- --kb` handles only the person whose e-mail is
 // INFOMAPPER_KB_EMAIL, with the password INFOMAPPER_KB_PASSWORD (both only in `.env.postgres.local`, never in Vercel), on
 // infomapper-dev only (`devTargetRefusal`): it makes or keeps their Auth account, sets the password, links it, and prints
@@ -54,21 +54,21 @@ async function linkKb(admin: SupabaseClient, db: Client): Promise<void> {
   if (found.length !== 1) throw new Error("No person in the database has INFOMAPPER_KB_EMAIL's address: run npm run pg:kb first. Nothing was changed.");
   const id = found[0]!.id;
   if (seedPeople([id], await memberships(db)).handled.length) {
-    throw new Error("INFOMAPPER_KB_EMAIL names a person of the seed's organizations, not KB's: nothing was changed.");
+    throw new Error("INFOMAPPER_KB_EMAIL names a person of the seed's organizations, not a copied organization's: nothing was changed.");
   }
   let authId = (await accountsByEmail(admin)).get(email);
   let made = false;
   if (authId) {
     const { error } = await admin.auth.admin.updateUserById(authId, { password, email_confirm: true });
-    if (error) throw new Error(`Setting the KB account's password failed: ${error.code ?? "error"}.`);
+    if (error) throw new Error(`Setting the --kb account's password failed: ${error.code ?? "error"}.`);
   } else {
     const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
-    if (error || !data.user) throw new Error(`Creating the KB account failed: ${error?.code ?? "no user"}.`);
+    if (error || !data.user) throw new Error(`Creating the --kb account failed: ${error?.code ?? "no user"}.`);
     authId = data.user.id;
     made = true;
   }
   await db.query("update app_user set auth_user_id = $1 where id = $2", [authId, id]);
-  console.log(`The KB account: ${made ? "created" : "given its password again"}, linked.`);
+  console.log(`The --kb account: ${made ? "created" : "given its password again"}, linked.`);
 }
 
 async function main(): Promise<number> {
@@ -116,7 +116,7 @@ async function main(): Promise<number> {
       await db.query("update app_user set auth_user_id = $1 where id = $2", [authId, person.id]);
     }
     console.log(`${people.length} people of the seed's organizations: ${created} accounts created, ${updated} given the password again; all linked.`);
-    if (leftOut) console.log(`${leftOut} other ${leftOut === 1 ? "person" : "people"} left out (no seed organization's only; KB's account: npm run pg:accounts -- --kb).`);
+    if (leftOut) console.log(`${leftOut} other ${leftOut === 1 ? "person" : "people"} left out (no seed organization's only; the own account: npm run pg:accounts -- --kb).`);
     console.log("Sign-in e-mails and the workspaces each sees (organization / workspace, role):");
     for (const person of people) {
       const { rows } = await db.query<{ organization: string; workspace: string; role: string; archived: boolean }>(

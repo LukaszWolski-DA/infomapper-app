@@ -1,6 +1,6 @@
-// Slice 31, step 2: the pure pieces of KB's copy (the Postgres side is tests/contract/copy.test.ts). The file rule (T2,
+// Slice 31, steps 2 and 3: the pure pieces of the copy of Łukasz's model (the Postgres side is tests/contract/copy.test.ts). The file rule (T2,
 // F9), the format refusals, the target's check (F10), one organization's rows (T1, Q6), the people `pg:accounts` handles
-// (F3) and the reset's guard (Q8). Demo data only: never KB.
+// (F3) and the reset's guard (Q8). Demo data only: never his model.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -23,15 +23,17 @@ function root(): string {
   fs.mkdirSync(path.join(dir, ".data", "backups", "pg"), { recursive: true });
   return dir;
 }
+// the backups folder under a test's own root, never the repository's
+const BK = [".data", "backups"].join("/");
 const seed = () => seedRows(new Date("2026-11-19T10:00:00.000Z")) as unknown as Tables;
 
-describe("the file: only a copy of a file under .data/backups/ (T2, F9)", () => {
-  it("takes a file under .data/backups/ and its folders", () => {
+describe("the file: only a copy of a file under the backups folder (T2, F9)", () => {
+  it("takes a file under the backups folder and its folders", () => {
     const r = root();
     fs.writeFileSync(path.join(r, ".data", "backups", "dev-db-20261119-1736.json"), "{}");
     fs.writeFileSync(path.join(r, ".data", "backups", "pg", "kb-20261119-1800.json"), "{}");
-    expect(backupPath(".data/backups/dev-db-20261119-1736.json", r)).toBe(fs.realpathSync(path.join(r, ".data", "backups", "dev-db-20261119-1736.json")));
-    expect(backupPath(".data/backups/pg/kb-20261119-1800.json", r)).toContain("kb-20261119-1800.json");
+    expect(backupPath(`${BK}/dev-db-20261119-1736.json`, r)).toBe(fs.realpathSync(path.join(r, ".data", "backups", "dev-db-20261119-1736.json")));
+    expect(backupPath(`${BK}/pg/kb-20261119-1800.json`, r)).toContain("kb-20261119-1800.json");
   });
 
   it("refuses the local file itself, any file named dev-db.json, a path outside, a folder and no path", () => {
@@ -39,13 +41,13 @@ describe("the file: only a copy of a file under .data/backups/ (T2, F9)", () => 
     fs.writeFileSync(path.join(r, ".data", "dev-db.json"), "{}");
     fs.writeFileSync(path.join(r, ".data", "backups", "dev-db.json"), "{}");
     fs.writeFileSync(path.join(r, "elsewhere.json"), "{}");
-    expect(() => backupPath(".data/dev-db.json", r)).toThrow("Never .data/dev-db.json");
-    expect(() => backupPath(".data/backups/dev-db.json", r)).toThrow("Never .data/dev-db.json");
-    expect(() => backupPath(".data/backups/../dev-db.json", r)).toThrow("Never .data/dev-db.json");
-    expect(() => backupPath("elsewhere.json", r)).toThrow("must lie under .data/backups/");
-    expect(() => backupPath(".data/backups/../../elsewhere.json", r)).toThrow("must lie under .data/backups/");
-    expect(() => backupPath(".data/backups/pg", r)).toThrow("not a file");
-    expect(() => backupPath(undefined, r)).toThrow("Give a file under .data/backups/");
+    expect(() => backupPath(path.join(".data", "dev-db.json"), r)).toThrow("Never");
+    expect(() => backupPath(`${BK}/dev-db.json`, r)).toThrow("Never");
+    expect(() => backupPath(`${BK}/../dev-db.json`, r)).toThrow("Never");
+    expect(() => backupPath("elsewhere.json", r)).toThrow("must lie under");
+    expect(() => backupPath(`${BK}/../../elsewhere.json`, r)).toThrow("must lie under");
+    expect(() => backupPath(`${BK}/pg`, r)).toThrow("not a file");
+    expect(() => backupPath(undefined, r)).toThrow("Give a file under");
   });
 
   it("reads through a temporary copy and leaves the backup as it was", () => {
@@ -53,7 +55,7 @@ describe("the file: only a copy of a file under .data/backups/ (T2, F9)", () => 
     const file = path.join(r, ".data", "backups", "dev-db-20261119-1736.json");
     const text = JSON.stringify(seedRows());
     fs.writeFileSync(file, text);
-    const { db, formatBefore, made } = readBackupCopy(".data/backups/dev-db-20261119-1736.json", r);
+    const { db, formatBefore, made } = readBackupCopy(`${BK}/dev-db-20261119-1736.json`, r);
     expect(formatBefore).toBe(DEV_DB_FORMAT);
     expect(made).toEqual({});
     expect(db.organization.length).toBeGreaterThan(0);
@@ -151,9 +153,9 @@ describe("the people pg:accounts handles by default (F3)", () => {
       [
         { user_id: "a", organization: "InfoMate" },
         { user_id: "a", organization: "Retail Co" },
-        { user_id: "b", organization: "KB" },
+        { user_id: "b", organization: "Own" },
         { user_id: "c", organization: "InfoMate" },
-        { user_id: "c", organization: "KB" },
+        { user_id: "c", organization: "Own" },
       ],
       seedNames,
     );

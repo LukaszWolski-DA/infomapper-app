@@ -2,11 +2,11 @@
 // checks) and "Performance test" (`npm run seed:large`'s workspace) into Postgres, in one transaction, checked by counts
 // per table against the rows built (slice 29, Q7).
 //
-// The rows are built in memory with the seed's own functions: no JSON file is read, so the loader never meets KB or any
+// The rows are built in memory with the seed's own functions: no JSON file is read, so the loader never meets Łukasz's model or any
 // other local data. The target is INFOMAPPER_MIGRATION_URL (Supabase's session pooler, L1), from the environment or
 // `.env.postgres.local` (git-ignored, L4), named as host/database only. Without --reset it refuses a database with rows.
 // Environments 2 and 3 share infomapper-dev: a reset changes what the preview shows at once.
-// Slice 31 (Q8, T4): the reset refuses while the database holds any organization the seed does not make (KB's copy, or
+// Slice 31 (Q8, T4): the reset refuses while the database holds any organization the seed does not make (a copy of Łukasz's model, or
 // one made online), naming the order to follow (pg:backup, pg:kb -- --remove, then the reset); no override.
 import { Client } from "pg";
 import { STORE_SCHEMA } from "../src/compose/tables";

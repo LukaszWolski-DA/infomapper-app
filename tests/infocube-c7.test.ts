@@ -90,7 +90,7 @@ function withCascades(ctx: CommandContext, rows: Rows, writeSet: WriteSet): Writ
 }
 
 const on = { infocube: true };
-const KB = { licensed: true, organizationName: "KB" };
+const LICENSED = { licensed: true, organizationName: "Licensed Org" };
 const factOf = (rows: Rows) => rows.entity.find((e) => e.model_level === "dimensional")!;
 
 /** The seed with one fact (made by InfoCube's command), and its attribute `amount` as a measure. */
@@ -125,7 +125,7 @@ const deleteFact = (rows: Rows, fact: Entity, ctx = makeCtx()) =>
   );
 
 const turnOff = (rows: Rows, ws: Partial<Workspace> = on) =>
-  updateWorkspaceSettings(makeCtx(), access("owner", ws), { workspaceId: ids.ws, expectedVersion: 3, infocube: false }, { ...KB, dimensionalEntities: dimensionalCount(rows.entity, ids.ws) });
+  updateWorkspaceSettings(makeCtx(), access("owner", ws), { workspaceId: ids.ws, expectedVersion: 3, infocube: false }, { ...LICENSED, dimensionalEntities: dimensionalCount(rows.entity, ids.ws) });
 
 describe("turning InfoCube off (C-7, 4 November 2026)", () => {
   it("is refused with one fact, and allowed once it is deleted", () => {
