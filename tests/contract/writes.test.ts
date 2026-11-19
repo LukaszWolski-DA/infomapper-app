@@ -1,0 +1,526 @@
+// The contract of the writes (slice 30, S30-10): the same writes on the same rows give the same answers and leave the
+// same data on both adapters, and the count rules hold under writes at the same moment (S30-07).
+//
+// - The scenario: one sequence of domain commands (a concept, an entity, an attribute, a rename, a cascade delete with
+//   its undo and redo, an import with its undo) and of hand-built write sets for what the adapter alone must refuse (a
+//   stale version, a row not found, a unique index, a foreign key, a check, the six count rules, the access read again),
+//   run on each adapter from the same rows, with the same ids and times. Every answer is compared, then every read of
+//   `reads.test.ts`.
+// - The concurrency cases: two write sets built from one read, applied at once (`Promise.all`), for each count rule and
+//   for one row saved twice from the same version: at most one is stored, the other gets the rule's refusal, and the
+//   data keeps the thing counted.
+//
+// The local adapter always runs (in `npm test`). Postgres runs when INFOMAPPER_CONTRACT_DB names a database on this
+// machine (CI's container, the "Schema" workflow); the writes use their own database beside it (`{name}_writes`), made
+// here, so the two files never load into one database at once.
+
+import { readFileSync } from "node:fs";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { Client } from "pg";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { STORE_SCHEMA, UNDO_TABLES } from "@/compose/tables";
+import { buildWriteSet, type CommandContext, type CommandResult, type Write, type WriteSet } from "@/domain/changes";
+import { addAttribute } from "@/domain/commands/attribute";
+import { createConcept } from "@/domain/commands/concept";
+import { createEntity, deleteEntity, updateEntity } from "@/domain/commands/entity";
+import { importSources, importStateOf } from "@/domain/commands/import";
+import { revertChangeGroup } from "@/domain/commands/undo";
+import { planFingerprint } from "@/domain/import/compare";
+import { buildPlan } from "@/domain/import/plan";
+import { readStandard } from "@/domain/import/standard";
+import type { WorkspaceAccess } from "@/domain/permissions";
+import type { AnyRow } from "@/data/rows";
+import type { DevDb } from "@/data/local/schema";
+import { SEED_IDS } from "@/data/local/seed";
+import { createLocalDataStore } from "@/data/local/store";
+import type { ApplyOptions, ApplyResult, DataStore } from "@/data/ports";
+import { pgClientConfig } from "@/data/postgres/config";
+import { getPool } from "@/data/postgres/pool";
+import { createPostgresDataStore } from "@/data/postgres/store";
+import { assertLocalDatabase, contractRows, preparePostgres, readEverything, spreadAll } from "./shared";
+
+const RETAIL = SEED_IDS.wsRetailDwh;
+const LUKASZ = SEED_IDS.userLukasz;
+const ANNA = SEED_IDS.userAnna;
+
+/** Ids and times both adapters get alike: UUID-shaped, increasing, from a counter; one second per command. */
+function clock() {
+  let id = 0;
+  let second = 0;
+  return (actorId: string): CommandContext => {
+    second += 1;
+    const now = new Date(Date.UTC(2026, 10, 20, 9, 0, second)).toISOString();
+    return { actorId, now, newId: () => `01a1c000-0000-7000-8000-${(++id).toString(16).padStart(12, "0")}` };
+  };
+}
+
+/** An answer as both adapters must give it: the code and the message up to its detail in brackets (table and rule). */
+const answerOf = (r: ApplyResult) => (r.ok ? { ok: true } : { ok: false, code: r.error.code, message: r.error.message.split(" (")[0] });
+
+const ok = <T>(r: CommandResult<T>): WriteSet & { value: T } => {
+  if (!r.ok) throw new Error(r.error.message);
+  return Object.assign(r.writeSet, { value: r.value });
+};
+
+interface Store {
+  store: DataStore;
+  done: () => Promise<void>;
+}
+
+async function localStore(db: DevDb): Promise<Store> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "im-contract-writes-"));
+  const file = path.join(dir, "db.json");
+  fs.writeFileSync(file, JSON.stringify(db));
+  return { store: createLocalDataStore(file, STORE_SCHEMA), done: async () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
+const CONTRACT_DB = process.env.INFOMAPPER_CONTRACT_DB;
+
+/** The writes' own database on the contract server, made when missing. */
+async function writesDatabase(): Promise<string> {
+  assertLocalDatabase(CONTRACT_DB!);
+  const url = new URL(CONTRACT_DB!);
+  const name = `${url.pathname.slice(1)}_writes`;
+  if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error("The contract database's name is not a plain name.");
+  const admin = new Client(pgClientConfig(CONTRACT_DB!));
+  await admin.connect();
+  try {
+    if (!(await admin.query("select 1 from pg_database where datname = $1", [name])).rows.length) await admin.query(`create database "${name}"`);
+  } finally {
+    await admin.end();
+  }
+  url.pathname = `/${name}`;
+  return url.toString();
+}
+
+let pgUrl: string | null = null;
+async function postgresStore(db: DevDb): Promise<Store> {
+  pgUrl ??= await writesDatabase();
+  await preparePostgres(pgUrl, db);
+  process.env.INFOMAPPER_DATABASE_URL = pgUrl;
+  return { store: createPostgresDataStore(STORE_SCHEMA), done: async () => undefined };
+}
+
+afterAll(async () => {
+  if (pgUrl) await getPool().end();
+});
+
+/** A live canvas of the workspace that is in a project (the contract rows delete one of the seed's canvases). */
+async function liveCanvas(store: DataStore, workspaceId = RETAIL): Promise<string> {
+  for (const c of await store.canvases.list(workspaceId)) if ((await store.canvases.listLinksOfCanvas(workspaceId, c.id)).length) return c.id;
+  throw new Error("No live canvas in a project.");
+}
+
+const accessOf = async (store: DataStore, userId: string, workspaceId = RETAIL): Promise<WorkspaceAccess> => ({
+  workspace: (await store.workspaces.get(workspaceId))!,
+  member: await store.workspaces.getMember(workspaceId, userId),
+});
+
+/** A versioned row's next version, as a command writes it. */
+const next = <R extends object>(ctx: CommandContext, row: R, patch: Partial<R>): R =>
+  ({ ...row, ...patch, version: ((row as AnyRow).version as number) + 1, updated_at: ctx.now, updated_by: ctx.actorId }) as R;
+const update = (table: string, before: object, row: object) => ({ kind: "update", table, before, row }) as unknown as Write;
+const insert = (table: string, row: object) => ({ kind: "insert", table, row }) as unknown as Write;
+const remove = (table: string, before: object) => ({ kind: "remove", table, before }) as unknown as Write;
+
+/** The scenario's steps: each runs one write and answers what the adapter said. */
+async function scenario(store: DataStore, ctxOf: (actorId: string) => CommandContext): Promise<Record<string, unknown>> {
+  const answers: Record<string, unknown> = {};
+  const step = async (name: string, writeSet: WriteSet, options?: ApplyOptions) => {
+    answers[name] = answerOf(await store.apply(writeSet, options));
+  };
+  const anna = await accessOf(store, ANNA);
+
+  // a concept and an entity on a canvas, then an attribute and a rename (inserts, then a versioned update)
+  const concept = ok(createConcept(ctxOf(ANNA), anna, { concepts: (await store.model.load(RETAIL)).concepts }, { name: "Finance" }));
+  await step("create concept", concept);
+  let m = await store.model.load(RETAIL);
+  const canvasId = await liveCanvas(store);
+  const entity = ok(
+    createEntity(ctxOf(ANNA), anna, { concept: m.concepts.find((c) => c.id === concept.value.conceptId)!, entities: m.entities, canvas: await store.canvases.get(RETAIL, canvasId) }, {
+      conceptId: concept.value.conceptId,
+      placement: { canvasId, x: 900, y: 40 },
+    }),
+  );
+  await step("create entity", entity);
+  m = await store.model.load(RETAIL);
+  const made = m.entities.find((e) => e.id === entity.value.entityId)!;
+  await step("add attribute", ok(addAttribute(ctxOf(ANNA), anna, { entity: made, attributes: m.attributes }, { entityId: made.id, name: "amount" })));
+  const rename = ok(updateEntity(ctxOf(ANNA), anna, { entity: made, entities: m.entities, concept: null, stereotypes: m.stereotypes }, { entityId: made.id, expectedVersion: made.version, name: "Invoice" }));
+  await step("rename entity", rename);
+  // the same rename again from the version it was read at: someone changed it meanwhile
+  await step("stale version", ok(updateEntity(ctxOf(ANNA), anna, { entity: made, entities: m.entities, concept: null, stereotypes: m.stereotypes }, { entityId: made.id, expectedVersion: made.version, name: "Bill" })));
+
+  // a cascade: an entity with its attribute and its card (soft deletes), its undo and redo
+  m = await store.model.load(RETAIL);
+  // the entity made above, with its attribute and its card (the seed's entities carry the contract rows' guard cases)
+  const customer = m.entities.find((e) => e.id === made.id)!;
+  const del = ok(deleteEntity(ctxOf(ANNA), anna, { ...m, entity: customer, canvasItems: await store.canvasItems.list(RETAIL) }, { entityId: customer.id, expectedVersion: customer.version }));
+  await step("delete an entity", del);
+  const undone = ok(revertChangeGroup(ctxOf(ANNA), anna, { events: del.events, rows: await store.model.loadForUndo(RETAIL) }, "undo", UNDO_TABLES));
+  await step("undo delete an entity", undone);
+  await step("redo delete an entity", ok(revertChangeGroup(ctxOf(ANNA), anna, { events: undone.events, rows: await store.model.loadForUndo(RETAIL) }, "redo", UNDO_TABLES)));
+
+  // an import into a new system (inserts across the source tables, classification links, the import), and its undo
+  const text = readFileSync(path.resolve(__dirname, "../../src/domain/import/samples/crm_snapshot_2026-10-20.csv"), "utf8");
+  const read = readStandard(text, "crm.csv");
+  const state = importStateOf(await store.model.load(RETAIL), await store.model.listChanges(RETAIL));
+  const target = { newName: "CRM contract" };
+  const scope = read.tables.map((t) => t.key);
+  const plan = buildPlan(state.model, read, target, { scope: new Set(scope), compare: "schemas", renames: new Map() });
+  const imported = ok(
+    importSources(ctxOf(ANNA), anna, state, { target, channel: "file", sourceLabel: "crm.csv", text, scope, compare: "schemas", renames: [], fingerprint: planFingerprint(plan) }),
+  );
+  await step("import", imported);
+  await step("undo import", ok(revertChangeGroup(ctxOf(ANNA), anna, { events: imported.events, rows: await store.model.loadForUndo(RETAIL) }, "undo", UNDO_TABLES)));
+
+  // F8: a child written before its parent in one write set is stored (the phases put the parent first)
+  {
+    const ctx = ctxOf(ANNA);
+    const conceptId = ctx.newId();
+    const base = { version: 1, created_at: ctx.now, created_by: ANNA, updated_at: ctx.now, updated_by: ANNA, deleted_at: null, workspace_id: RETAIL };
+    const parent = { ...m.concepts[0]!, ...base, id: conceptId, name: "Child first", sort_order: 99 };
+    const child = { ...m.entities.find((e) => e.name === "Product")!, ...base, id: ctx.newId(), concept_id: conceptId, name: "Child of child first" };
+    await step("child before parent", buildWriteSet(ctx, RETAIL, [insert("entity", child), insert("concept", parent)]));
+  }
+
+  // what the adapter refuses by itself
+  m = await store.model.load(RETAIL);
+  {
+    const ctx = ctxOf(ANNA);
+    const product = m.entities.find((e) => e.name === "Product")!;
+    await step("not found", buildWriteSet(ctx, RETAIL, [update("entity", { ...product, id: "01a1c0ff-0000-7000-8000-000000000001" }, next(ctx, { ...product, id: "01a1c0ff-0000-7000-8000-000000000001" }, { name: "Ghost" }))]));
+    const system = m.sourceSystems[0]!;
+    await step("unique index", buildWriteSet(ctx, RETAIL, [insert("source_system", { ...system, id: ctx.newId(), created_at: ctx.now })]));
+    const attribute = m.attributes[0]!;
+    await step("foreign key", buildWriteSet(ctx, RETAIL, [insert("attribute", { ...attribute, id: ctx.newId(), entity_id: "01a1c0ff-0000-7000-8000-000000000002", created_at: ctx.now })]));
+    const mapping = m.mappings[0]!;
+    await step("check", buildWriteSet(ctx, RETAIL, [update("mapping", mapping, next(ctx, mapping, { status: "bogus" } as never))]));
+  }
+
+  // the count rules, written past the domain's own checks
+  {
+    const ctx = ctxOf(LUKASZ);
+    const projects = await store.projects.list(RETAIL);
+    await step("count: last project", buildWriteSet(ctx, RETAIL, projects.map((p) => update("project", p, next(ctx, p, { deleted_at: ctx.now })))));
+    const owners = (await store.workspaces.listMembers(RETAIL)).filter((x) => x.role === "owner");
+    await step("count: last owner", buildWriteSet(ctx, RETAIL, owners.map((o) => update("workspace_member", o, { ...o, role: "admin" }))));
+    const links = await store.canvases.listLinksOfCanvas(RETAIL, canvasId);
+    await step("count: canvas links", buildWriteSet(ctx, RETAIL, links.map((l) => remove("project_canvas", l))));
+    const workspace = (await store.workspaces.get(RETAIL))!;
+    const product = m.entities.find((e) => e.name === "Product")!;
+    await step(
+      "count: InfoCube off",
+      buildWriteSet(ctx, RETAIL, [
+        update("workspace", workspace, next(ctx, workspace, { infocube: false })),
+        insert("entity", { ...product, id: ctx.newId(), name: "Dim Off", model_level: "dimensional", created_at: ctx.now }),
+      ]),
+    );
+    const lukaszHere = (await store.workspaces.getMember(RETAIL, LUKASZ))!;
+    const otherOwner = { ...lukaszHere, user_id: ANNA, role: "owner" as const };
+    const annaHere = (await store.workspaces.getMember(RETAIL, ANNA))!;
+    // Łukasz owns InfoMate: out of every one of his InfoMate workspaces at once, another owner left in each
+    const his = (await store.workspaces.listForUser(LUKASZ)).filter((w) => w.organization_id === SEED_IDS.orgInfoMate);
+    const writes: Write[] = [update("workspace_member", annaHere, otherOwner)];
+    for (const w of his) {
+      if (w.id !== RETAIL) {
+        const anyone = (await store.workspaces.listMembers(w.id)).find((x) => x.user_id !== LUKASZ);
+        if (anyone) writes.push(update("workspace_member", anyone, { ...anyone, role: "owner" }));
+        else writes.push(insert("workspace_member", { workspace_id: w.id, user_id: ANNA, role: "owner", added_by: LUKASZ, created_at: ctx.now }));
+      }
+      writes.push(remove("workspace_member", (await store.workspaces.getMember(w.id, LUKASZ))!));
+    }
+    await step("count: organization owner's last workspace", buildWriteSet(ctx, RETAIL, writes));
+  }
+
+  // the access read again: a role and an archive other than the command checked
+  {
+    const ctx = ctxOf(ANNA);
+    const product = m.entities.find((e) => e.name === "Product")!;
+    const set = () => buildWriteSet(ctx, RETAIL, [update("entity", product, next(ctx, product, { description_text: "checked" } as never))]);
+    const ws = (await store.workspaces.get(RETAIL))!;
+    await step("access: role changed", set(), { access: { userId: ANNA, workspace: { id: RETAIL, name: ws.name, archived: false, role: "owner" } } });
+    await step("access: archived meanwhile", set(), { access: { userId: ANNA, workspace: { id: RETAIL, name: ws.name, archived: true, role: "modeler" } } });
+    await step("access: as checked", set(), { access: { userId: ANNA, workspace: { id: RETAIL, name: ws.name, archived: false, role: "modeler" } } });
+  }
+
+  // a link row changed in place (a tab order) from the row it was read as, and once more from that old row: stale
+  {
+    const ctx = ctxOf(LUKASZ);
+    const [link] = await store.canvases.listLinksOfCanvas(RETAIL, await liveCanvas(store));
+    await step("link update", buildWriteSet(ctx, RETAIL, [update("project_canvas", link!, { ...link!, sort_order: link!.sort_order + 10 })]));
+    await step("link update, stale", buildWriteSet(ctx, RETAIL, [update("project_canvas", link!, { ...link!, sort_order: link!.sort_order + 20 })]));
+  }
+  return answers;
+}
+
+const EXPECTED: Record<string, unknown> = {
+  "create concept": { ok: true },
+  "create entity": { ok: true },
+  "add attribute": { ok: true },
+  "rename entity": { ok: true },
+  "stale version": { ok: false, code: "stale_version", message: "Someone changed this meanwhile." },
+  "delete an entity": { ok: true },
+  "undo delete an entity": { ok: true },
+  "redo delete an entity": { ok: true },
+  import: { ok: true },
+  "undo import": { ok: true },
+  "child before parent": { ok: true },
+  "not found": { ok: false, code: "not_found", message: "This record does not exist." },
+  "unique index": { ok: false, code: "conflict", message: "This already exists" },
+  "foreign key": { ok: false, code: "not_found", message: "This refers to something that does not exist" },
+  check: { ok: false, code: "invalid", message: "A data rule was broken" },
+  "count: last project": { ok: false, code: "invalid", message: "A workspace needs at least one project." },
+  "count: last owner": { ok: false, code: "invalid", message: "Retail Co – DWH needs at least one owner." },
+  "count: canvas links": { ok: false, code: "invalid", message: "A canvas belongs to at least one project." },
+  "count: InfoCube off": { ok: false, code: "invalid", message: "InfoCube can be turned off only when this workspace has no facts or dimensions. It has 8: delete them first." },
+  "count: organization owner's last workspace": { ok: false, code: "invalid", message: "Łukasz owns InfoMate, so they keep at least one workspace there." },
+  "access: role changed": { ok: false, code: "forbidden", message: "Your role in Retail Co – DWH changed meanwhile, so nothing was saved." },
+  "access: archived meanwhile": { ok: false, code: "stale_version", message: "Someone changed this meanwhile." },
+  "access: as checked": { ok: true },
+  "link update": { ok: true },
+  "link update, stale": { ok: false, code: "stale_version", message: "Someone changed this meanwhile." },
+};
+
+describe("the writes on the local adapter (S30-10)", () => {
+  let s: Store;
+  let answers: Record<string, unknown>;
+  beforeAll(async () => {
+    s = await localStore(spreadAll(contractRows()));
+    answers = await scenario(s.store, clock());
+  }, 120_000);
+  afterAll(async () => s?.done());
+
+  it("answers every step as the contract says", () => {
+    expect(answers).toEqual(EXPECTED);
+  });
+});
+
+describe.runIf(!!CONTRACT_DB)("the writes on Postgres: the same answers and the same data as the local adapter's (S30-10)", () => {
+  let local: Store;
+  let pg: Store;
+  let localAnswers: Record<string, unknown>;
+  let pgAnswers: Record<string, unknown>;
+  let localReads: Record<string, unknown>;
+  let pgReads: Record<string, unknown>;
+  beforeAll(async () => {
+    const db = spreadAll(contractRows());
+    local = await localStore(db);
+    pg = await postgresStore(db);
+    localAnswers = await scenario(local.store, clock());
+    pgAnswers = await scenario(pg.store, clock());
+    localReads = await readEverything(local.store, db);
+    pgReads = await readEverything(pg.store, db);
+  }, 600_000);
+  afterAll(async () => local?.done());
+
+  it("answers every step as the local adapter does", () => {
+    expect(pgAnswers).toEqual(localAnswers);
+  });
+
+  it("leaves the data every read gives as the local adapter does", () => {
+    for (const name of Object.keys(localReads)) {
+      // loadForUndo returns deleted rows too; compared as sets past a crowded millisecond, as reads.test.ts does
+      expect.soft(pgReads[name], name).toEqual(localReads[name]);
+    }
+  });
+});
+
+/** Two write sets built from one read, applied at once: the answers, in either order. */
+async function atOnce(store: DataStore, a: WriteSet, b: WriteSet): Promise<ApplyResult[]> {
+  return Promise.all([store.apply(a), store.apply(b)]);
+}
+
+/** One of the two stored, the other refused with `message`. */
+function oneWins(results: ApplyResult[], code: string, message: string) {
+  const answers = results.map(answerOf);
+  expect(answers.filter((r) => r.ok)).toHaveLength(1);
+  expect(answers.find((r) => !r.ok)).toEqual({ ok: false, code, message });
+}
+
+function concurrency(name: string, make: (db: DevDb) => Promise<Store>) {
+  describe(`${name}: writes at the same moment (S30-07)`, () => {
+    let s: Store;
+    let ctxOf: (actorId: string) => CommandContext;
+    // each case from the same fresh rows
+    beforeEach(async () => {
+      s = await make(spreadAll(contractRows()));
+      ctxOf = clock();
+    }, 300_000);
+    afterEach(async () => s?.done());
+
+    it("the last two projects deleted at once: one stays", async () => {
+      const store = s.store;
+      const ctx = ctxOf(LUKASZ);
+      const projects = await store.projects.list(RETAIL);
+      // keep two: the others go first (their canvases stay linked to them; only the project count is tested)
+      if (projects.length > 2) {
+        const setup = await store.apply(buildWriteSet(ctx, RETAIL, projects.slice(2).map((p) => update("project", p, next(ctx, p, { deleted_at: ctx.now })))));
+        expect(setup).toEqual({ ok: true });
+      }
+      const [p1, p2] = await store.projects.list(RETAIL);
+      const c2 = ctxOf(LUKASZ);
+      const results = await atOnce(store, buildWriteSet(c2, RETAIL, [update("project", p1!, next(c2, p1!, { deleted_at: c2.now }))]), buildWriteSet(c2, RETAIL, [update("project", p2!, next(c2, p2!, { deleted_at: c2.now }))]));
+      oneWins(results, "invalid", "A workspace needs at least one project.");
+      expect(await store.projects.list(RETAIL)).toHaveLength(1);
+    });
+
+    it("two owners demoting each other at once: one owner stays", async () => {
+      const store = s.store;
+      const ctx = ctxOf(LUKASZ);
+      const anna = (await store.workspaces.getMember(RETAIL, ANNA))!;
+      expect(await store.apply(buildWriteSet(ctx, RETAIL, [update("workspace_member", anna, { ...anna, role: "owner" })]))).toEqual({ ok: true });
+      const owners = (await store.workspaces.listMembers(RETAIL)).filter((x) => x.role === "owner");
+      expect(owners).toHaveLength(2);
+      const c2 = ctxOf(LUKASZ);
+      const results = await atOnce(
+        store,
+        buildWriteSet(c2, RETAIL, [update("workspace_member", owners[0]!, { ...owners[0]!, role: "admin" })]),
+        buildWriteSet(c2, RETAIL, [update("workspace_member", owners[1]!, { ...owners[1]!, role: "admin" })]),
+      );
+      oneWins(results, "invalid", "Retail Co – DWH needs at least one owner.");
+      expect((await store.workspaces.listMembers(RETAIL)).filter((x) => x.role === "owner")).toHaveLength(1);
+    });
+
+    it("a shared canvas taken out of its two projects at once: one link stays", async () => {
+      const store = s.store;
+      const canvasId = await liveCanvas(store);
+      const ctx = ctxOf(LUKASZ);
+      const canvases = await store.canvases.list(RETAIL);
+      // the canvas in two projects
+      const projects = await store.projects.list(RETAIL);
+      let links = await store.canvases.listLinksOfCanvas(RETAIL, canvasId);
+      if (links.length < 2) {
+        const another = projects.find((p) => !links.some((l) => l.project_id === p.id))!;
+        expect(await store.apply(buildWriteSet(ctx, RETAIL, [insert("project_canvas", { project_id: another.id, canvas_id: canvasId, workspace_id: RETAIL, sort_order: 40, added_at: ctx.now, added_by: LUKASZ })]))).toEqual({ ok: true });
+        links = await store.canvases.listLinksOfCanvas(RETAIL, canvasId);
+      }
+      // the two projects each keep another canvas, so only the canvas's own count is tested
+      const extra: Write[] = [];
+      for (const l of links) {
+        const others = (await store.canvases.listLinksOfProject(RETAIL, l.project_id)).filter((x) => x.canvas_id !== l.canvas_id);
+        if (!others.length) {
+          const other = canvases.find((c) => c.id !== l.canvas_id && !extra.some((w) => (w as unknown as { row: AnyRow }).row.canvas_id === c.id))!;
+          extra.push(insert("project_canvas", { project_id: l.project_id, canvas_id: other.id, workspace_id: RETAIL, sort_order: 50, added_at: ctx.now, added_by: LUKASZ }));
+        }
+      }
+      if (extra.length) expect(await store.apply(buildWriteSet(ctx, RETAIL, extra))).toEqual({ ok: true });
+      expect(links.length).toBeGreaterThanOrEqual(2);
+      const c2 = ctxOf(LUKASZ);
+      const results = await atOnce(store, buildWriteSet(c2, RETAIL, [remove("project_canvas", links[0]!)]), buildWriteSet(c2, RETAIL, [remove("project_canvas", links[1]!)]));
+      if (links.length === 2) oneWins(results, "invalid", "A canvas belongs to at least one project.");
+      expect((await store.canvases.listLinksOfCanvas(RETAIL, canvasId)).length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("InfoCube turned off while a fact is made: never off with a fact", async () => {
+      const store = s.store;
+      const ctx = ctxOf(LUKASZ);
+      const workspace = (await store.workspaces.get(RETAIL))!;
+      if (!workspace.infocube) expect(await store.apply(buildWriteSet(ctx, RETAIL, [update("workspace", workspace, next(ctx, workspace, { infocube: true }))]))).toEqual({ ok: true });
+      const on = (await store.workspaces.get(RETAIL))!;
+      const facts = (await store.model.load(RETAIL)).entities.filter((e) => e.model_level === "dimensional");
+      if (facts.length) {
+        const c0 = ctxOf(LUKASZ);
+        expect(await store.apply(buildWriteSet(c0, RETAIL, facts.map((f) => update("entity", f, next(c0, f, { deleted_at: c0.now })))))).toEqual({ ok: true });
+      }
+      const product = (await store.model.load(RETAIL)).entities.find((e) => e.name === "Product")!;
+      const c2 = ctxOf(LUKASZ);
+      const results = await atOnce(
+        store,
+        buildWriteSet(c2, RETAIL, [update("workspace", on, next(c2, on, { infocube: false }))]),
+        buildWriteSet(c2, RETAIL, [insert("entity", { ...product, id: c2.newId(), name: "Fact Race", model_level: "dimensional", created_at: c2.now, updated_at: c2.now, version: 1 })]),
+      );
+      expect(results.map(answerOf).filter((r) => r.ok)).toHaveLength(1);
+      const after = (await store.workspaces.get(RETAIL))!;
+      const dimensional = (await store.model.load(RETAIL)).entities.filter((e) => e.model_level === "dimensional");
+      expect(!after.infocube && dimensional.length > 0).toBe(false);
+    });
+
+    it("an organization's owner taken out of their last two workspaces at once: one stays", async () => {
+      const store = s.store;
+      const ctx = ctxOf(LUKASZ);
+      // Łukasz owns InfoMate; keep two of his InfoMate workspaces, each with another owner
+      const his = (await store.workspaces.listForUser(LUKASZ)).filter((w) => w.organization_id === SEED_IDS.orgInfoMate);
+      const setup: Write[] = [];
+      for (const w of his) {
+        const members = await store.workspaces.listMembers(w.id);
+        const other = members.find((x) => x.user_id !== LUKASZ);
+        if (other) {
+          if (other.role !== "owner") setup.push(update("workspace_member", other, { ...other, role: "owner" }));
+        } else setup.push(insert("workspace_member", { workspace_id: w.id, user_id: ANNA, role: "owner", added_by: LUKASZ, created_at: ctx.now }));
+      }
+      if (setup.length) expect(await store.apply(buildWriteSet(ctx, RETAIL, setup))).toEqual({ ok: true });
+      for (const w of his.slice(2)) {
+        const c = ctxOf(LUKASZ);
+        expect(await store.apply(buildWriteSet(c, w.id, [remove("workspace_member", (await store.workspaces.getMember(w.id, LUKASZ))!)]))).toEqual({ ok: true });
+      }
+      const [w1, w2] = his;
+      expect(w2).toBeDefined();
+      const c2 = ctxOf(LUKASZ);
+      const results = await atOnce(
+        store,
+        buildWriteSet(c2, w1!.id, [remove("workspace_member", (await store.workspaces.getMember(w1!.id, LUKASZ))!)]),
+        buildWriteSet(c2, w2!.id, [remove("workspace_member", (await store.workspaces.getMember(w2!.id, LUKASZ))!)]),
+      );
+      oneWins(results, "invalid", "Łukasz owns InfoMate, so they keep at least one workspace there.");
+      expect((await store.workspaces.listForUser(LUKASZ)).filter((w) => w.organization_id === SEED_IDS.orgInfoMate)).toHaveLength(1);
+    });
+
+    it("a member taken out of their last two workspaces at once: their organization row never stays alone", async () => {
+      const store = s.store;
+      const ctx = ctxOf(LUKASZ);
+      // Anna is an InfoMate member: in exactly two of its workspaces, each keeping an owner
+      const his = (await store.workspaces.listForUser(LUKASZ)).filter((w) => w.organization_id === SEED_IDS.orgInfoMate);
+      const annaIn = (await store.workspaces.listForUser(ANNA)).filter((w) => w.organization_id === SEED_IDS.orgInfoMate);
+      const target = his.find((w) => !annaIn.some((a) => a.id === w.id));
+      if (annaIn.length < 2 && target) {
+        expect(await store.apply(buildWriteSet(ctx, target.id, [insert("workspace_member", { workspace_id: target.id, user_id: ANNA, role: "modeler", added_by: LUKASZ, created_at: ctx.now })]))).toEqual({ ok: true });
+      }
+      const two = (await store.workspaces.listForUser(ANNA)).filter((w) => w.organization_id === SEED_IDS.orgInfoMate);
+      for (const w of two.slice(2)) {
+        const c = ctxOf(LUKASZ);
+        const row = (await store.workspaces.getMember(w.id, ANNA))!;
+        expect(await store.apply(buildWriteSet(c, w.id, [row.role === "owner" ? update("workspace_member", row, { ...row, role: "modeler" }) : remove("workspace_member", row)]))).toEqual({ ok: true });
+      }
+      const [a1, a2] = (await store.workspaces.listForUser(ANNA)).filter((w) => w.organization_id === SEED_IDS.orgInfoMate);
+      expect(a2).toBeDefined();
+      for (const w of [a1!, a2!]) {
+        const row = (await store.workspaces.getMember(w.id, ANNA))!;
+        if (row.role === "owner") {
+          const c = ctxOf(LUKASZ);
+          expect(await store.apply(buildWriteSet(c, w.id, [update("workspace_member", row, { ...row, role: "modeler" })]))).toEqual({ ok: true });
+        }
+      }
+      expect((await store.organizations.getMember(SEED_IDS.orgInfoMate, ANNA))?.role).toBe("member");
+      const c2 = ctxOf(LUKASZ);
+      // each removal read the other workspace, so neither removes Anna's organization row (P7)
+      const results = await atOnce(
+        store,
+        buildWriteSet(c2, a1!.id, [remove("workspace_member", (await store.workspaces.getMember(a1!.id, ANNA))!)]),
+        buildWriteSet(c2, a2!.id, [remove("workspace_member", (await store.workspaces.getMember(a2!.id, ANNA))!)]),
+      );
+      oneWins(results, "stale_version", "Someone changed this meanwhile.");
+      const left = (await store.workspaces.listForUser(ANNA)).filter((w) => w.organization_id === SEED_IDS.orgInfoMate);
+      const row = await store.organizations.getMember(SEED_IDS.orgInfoMate, ANNA);
+      expect(left.length > 0 || row === null).toBe(true);
+    });
+
+    it("one row saved twice from the same version: the second is stale", async () => {
+      const store = s.store;
+      const product = (await store.model.load(RETAIL)).entities.find((e) => e.name === "Product")!;
+      const c2 = ctxOf(ANNA);
+      const results = await atOnce(
+        store,
+        buildWriteSet(c2, RETAIL, [update("entity", product, next(c2, product, { name: "Product A" }))]),
+        buildWriteSet(c2, RETAIL, [update("entity", product, next(c2, product, { name: "Product B" }))]),
+      );
+      oneWins(results, "stale_version", "Someone changed this meanwhile.");
+      expect((await store.model.load(RETAIL)).entities.find((e) => e.id === product.id)!.version).toBe(product.version + 1);
+    });
+  });
+}
+
+concurrency("the local adapter", localStore);
+if (CONTRACT_DB) concurrency("Postgres", postgresStore);
