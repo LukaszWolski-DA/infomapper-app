@@ -16,13 +16,12 @@ import path from "node:path";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { STORE_SCHEMA } from "@/compose/tables";
-import { READ_ONLY_SERVER_MESSAGE } from "@/domain/errors";
 import type { ModuleTable } from "@/domain/types";
 import type { DevDb } from "@/data/local/schema";
 import { createLocalDataStore } from "@/data/local/store";
 import type { DataStore } from "@/data/ports";
 import { pgClientConfig } from "@/data/postgres/config";
-import { loadRows, stampPlaces } from "@/data/postgres/load";
+import { loadRows, spreadCrowded, stampPlaces } from "@/data/postgres/load";
 import { getPool } from "@/data/postgres/pool";
 import { createPostgresDataStore } from "@/data/postgres/store";
 import { seedRows } from "../../scripts/lib/seed-rows";
@@ -30,6 +29,13 @@ import { seedRows } from "../../scripts/lib/seed-rows";
 type Row = Record<string, unknown> & { id?: string; workspace_id?: string; deleted_at?: string | null };
 const AT = new Date("2026-11-16T10:00:00.000Z");
 const LATER = "2026-11-16T11:00:00.000Z";
+
+/** Every table's crowded milliseconds spread as the loader spreads them (slice 30, L8). */
+function spreadAll(db: DevDb): DevDb {
+  const out = { ...db } as unknown as Record<string, unknown>;
+  for (const [table, rows] of Object.entries(out)) if (Array.isArray(rows)) out[table] = spreadCrowded(table, rows as Row[]);
+  return out as unknown as DevDb;
+}
 
 /** The seed with the guards' cases (rows changed, two pins added; every foreign key still holds). */
 function contractRows(): DevDb {
@@ -138,7 +144,8 @@ let localReads: Record<string, unknown>;
 let tmp: string;
 
 beforeAll(async () => {
-  db = contractRows();
+  // slice 30 (L8): the loader spreads a crowded millisecond into the next ones; the local adapter gets the same times
+  db = spreadAll(contractRows());
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), "im-contract-"));
   const file = path.join(tmp, "contract-db.json");
   fs.writeFileSync(file, JSON.stringify(db));
@@ -238,13 +245,21 @@ describe.runIf(!!CONTRACT_DB)("the reads on Postgres: the same as the local adap
     }
   });
 
-  it("refuses every write with the read-only error (S29-03)", async () => {
-    const result = await store.apply({ changeGroupId: "x", writes: [], events: [] } as never);
-    expect(result).toEqual({ ok: false, error: { code: "archived", message: READ_ONLY_SERVER_MESSAGE } });
-  });
 });
 
 describe("the loader's places (F2)", () => {
+  it("moves a crowded millisecond's rows past the 999th into the following milliseconds (slice 30, L8)", () => {
+    const rows = Array.from({ length: 2003 }, (_, i) => ({ id: String(i), created_at: "2026-11-16T10:00:00.123Z" }));
+    const spread = spreadCrowded("concept", rows);
+    expect(spread[998]!.created_at).toBe("2026-11-16T10:00:00.123Z");
+    expect(spread[999]!.created_at).toBe("2026-11-16T10:00:00.124Z");
+    expect(spread[2002]!.created_at).toBe("2026-11-16T10:00:00.125Z");
+    const { rows: stamped, crowded } = stampPlaces("concept", spread);
+    expect(crowded).toBe(0);
+    expect(stamped[999]!.created_at).toBe("2026-11-16T10:00:00.124000Z");
+    const few = rows.slice(0, 10);
+    expect(spreadCrowded("concept", few)).toBe(few);
+  });
   it("stamps each row's place in its millisecond as microseconds, and never more than 999", () => {
     const rows = Array.from({ length: 1002 }, (_, i) => ({ id: String(i), created_at: "2026-11-16T10:00:00.123Z" }));
     const { rows: stamped, crowded } = stampPlaces("concept", rows);

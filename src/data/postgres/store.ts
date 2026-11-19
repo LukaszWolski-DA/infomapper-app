@@ -1,10 +1,9 @@
-// The Postgres adapter, reads only (slice 29, Q1): every read of the 14 repositories and `snapshot`, with the local
+// The Postgres adapter (slice 29, Q1; writes since slice 30): every read of the 14 repositories and `snapshot`, with the local
 // adapter's results for the same rows. One statement per table a call reads (F3, no read fix yet: DB7); the rules are
 // the domain's (`workspace-model.ts`) and the shared row rules (`../rows.ts`, `../order.ts`), never copied. A call that
-// reads several tables reads them in one read-only transaction. `apply` refuses every write (Q5) until slice B.
+// reads several tables reads them in one read-only transaction. `apply` writes in one transaction (slice 30, `./write.ts`).
 // Server only.
 
-import { READ_ONLY_SERVER_MESSAGE, domainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
 import { MAPPING_LOG } from "@/domain/model/mapping-rules";
 import { emptyHistory } from "@/domain/model/undo-history";
@@ -25,6 +24,7 @@ import { newestImportFirst, oldestChangeFirst } from "../order";
 import type { DataStore } from "../ports";
 import type { AnyRow, StoreSchema } from "../rows";
 import { getPool, readTransaction, type Queryable } from "./pool";
+import { applyWriteSet } from "./write";
 import { readTable, workspaceRows } from "./tables";
 
 /** The tables `model.load` reads (`workspaceModelOf`); `entity` and `attribute` with their deleted rows (lost originals). */
@@ -90,8 +90,6 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
   };
 
   return {
-    readOnly: true,
-
     users: {
       list: async () => (await read("app_user")) as never,
       get: async (userId) => one(await read("app_user", "id = $1", userId)),
@@ -220,12 +218,11 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
         (await read("change_event", "workspace_id = $1 and object_type = 'requirement' and object_id = $2", workspaceId, requirementId)) as never,
     },
 
-    // Nothing is written on this server, so there is nothing to undo (slice B makes the history lasting, DB4).
+    // The lasting history is slice 30's step 3 (`undo_step`, DB4); until then this server keeps none, so Undo is off here
+    // and a recorded step is dropped.
     undoHistory: {
       get: async () => emptyHistory,
-      update: async () => {
-        throw new Error(READ_ONLY_SERVER_MESSAGE);
-      },
+      update: async () => emptyHistory,
     },
 
     // slice 25 (F1), slice 29 (F3): one read-only transaction, so every table comes from one state of the data
@@ -248,7 +245,8 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
       });
     },
 
-    apply: async () => ({ ok: false, error: domainError("archived", READ_ONLY_SERVER_MESSAGE) }),
+    // slice 30: the writes, in one transaction each (`./write.ts`)
+    apply: (writeSet, options) => applyWriteSet(pool, schema, writeSet, options),
   };
 }
 

@@ -8,6 +8,7 @@ import { indexOf } from "@/domain/model/classifications";
 import type { CardSubject } from "@/domain/model/frames";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "@/domain/model/type-check";
 import { cardShownNames } from "@/domain/model/aliases";
+import { byCreation } from "@/domain/model/workspace-model";
 import type { Canvas, CanvasItem, LiveLevel, NameMode, RowFilter, SourceChange, WorkspaceModel } from "@/domain/types";
 import type { EntityRole, RowFeed } from "./module-marks";
 import { lineNeedsClip, ROLE_MARK, rowNeedsClip, titleNeedsClip } from "./text-fit";
@@ -232,7 +233,8 @@ export function buildCards(
   };
 
   const cards: Omit<CardData, "clipName" | "clipLine1">[] = [];
-  for (const item of items) {
+  // slice 30 (Q3): cards in creation order, which is the drawing order (a later card on top)
+  for (const item of [...items].sort(byCreation)) {
     const base = {
       id: item.id,
       version: item.version,

@@ -1,24 +1,23 @@
 // S29-06 (slice 29): the smoke on Postgres. The workspace home, a project home, a canvas page and a document's page open
-// and draw from Postgres, read only (S29-03): the indicator says "Read only", the home says why, nothing is offered to
-// change.
+// and draw from Postgres. Slice 30: the server takes writes, so the pages are no longer read only (S30-08): the role
+// shows, and what the role allows is offered. These specs only read (F13: they also run against the preview).
 import { expect, test } from "@playwright/test";
-import { READ_ONLY_SERVER_TEXT } from "../../src/app/_lib/roles";
 import { firstCanvas, PEOPLE, query, signIn, workspaceId } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await signIn(page, PEOPLE.lukasz);
 });
 
-test("the workspace home draws its projects, read only", async ({ page }) => {
+test("the workspace home draws its projects, and offers what the role allows", async ({ page }) => {
   const ws = await workspaceId("Retail Co – DWH");
   await page.goto(`/w/${ws}`);
   await expect(page.getByTestId("page-workspace-home")).toBeVisible();
-  await expect(page.getByTestId("banner-read-only")).toHaveText(READ_ONLY_SERVER_TEXT);
-  await expect(page.getByTestId("indicator-user-role")).toHaveText("Read only");
-  await expect(page.getByTestId("indicator-user")).toHaveAttribute("data-standing", "none");
+  await expect(page.getByTestId("banner-read-only")).toHaveCount(0);
+  await expect(page.getByTestId("indicator-user-role")).not.toHaveText("Read only");
+  await expect(page.getByTestId("indicator-user")).toHaveAttribute("data-standing", "full");
   const projects = await query<{ n: number }>("select count(*) as n from project where workspace_id = $1 and deleted_at is null", [ws]);
   await expect(page.getByTestId("tile-project")).toHaveCount(Number(projects[0]!.n));
-  await expect(page.getByTestId("tile-new-project")).toHaveCount(0);
+  await expect(page.getByTestId("tile-new-project")).toHaveCount(1);
 });
 
 test("a project home draws its canvases' tiles with their thumbnails", async ({ page }) => {
@@ -49,7 +48,7 @@ test("a canvas page draws its cards from Postgres", async ({ page }) => {
     [canvasId],
   );
   await expect(page.getByTestId("card-name").filter({ hasText: entity!.name }).first()).toBeAttached();
-  await expect(page.getByTestId("indicator-user-role")).toHaveText("Read only");
+  await expect(page.getByTestId("indicator-user-role")).not.toHaveText("Read only");
 });
 
 test("a document's page is laid out from Postgres", async ({ page }) => {

@@ -8,7 +8,7 @@ import { AppShell } from "@/app/_components/app-shell";
 import { GoneNotice } from "@/app/_components/gone-notice";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { projectHref, workspaceHref } from "@/app/_lib/paths";
-import { READ_ONLY_SERVER_TEXT, ROLE_LABEL } from "@/app/_lib/roles";
+import { ROLE_LABEL } from "@/app/_lib/roles";
 import { loadShell } from "@/app/_lib/shell";
 import { thumbnailHrefs } from "@/app/_lib/thumbnails";
 import { workspaceStats } from "@/app/_panels/stats";
@@ -55,7 +55,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const moduleTab = moduleTabs.find((t) => t.id === tab);
   const archived = shell.workspace.archived;
   // slice 29 (Q5): a server that takes no writes offers no change, as an archive does
-  const canHere = (action: Parameters<typeof can>[1]) => !shell.workspace.readOnly && can(access, action);
+  const canHere = (action: Parameters<typeof can>[1]) => can(access, action);
   const isOwner = shell.role === "owner";
   const isAdmin = isOwner || shell.role === "admin";
   const roleLabel = ROLE_LABEL[shell.role] + (shell.guest ? " · guest" : "");
@@ -130,10 +130,6 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               {isOwner && (
                 <UnarchiveButton workspaceId={workspace.id} workspaceName={workspace.name} version={workspace.version} />
               )}
-            </Banner>
-          ) : shell.workspace.readOnly ? (
-            <Banner tone="info" testId="banner-read-only">
-              {READ_ONLY_SERVER_TEXT}
             </Banner>
           ) : shell.standing !== "full" ? (
             <Banner tone="info" testId="banner-role">

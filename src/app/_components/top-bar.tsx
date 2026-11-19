@@ -27,7 +27,7 @@ import { useAction } from "./use-action";
 import type { ActionResult } from "../_lib/run-command";
 import type { ShellData } from "../_lib/shell";
 import { projectHref, workspaceHref } from "../_lib/paths";
-import { READ_ONLY_SERVER_TEXT, ROLE_CAN, ROLE_LABEL } from "../_lib/roles";
+import { ROLE_CAN, ROLE_LABEL } from "../_lib/roles";
 import { NewOrganizationDialog } from "./new-organization-dialog";
 import { PanelToggle } from "./side-panels";
 
@@ -138,8 +138,8 @@ function OrganizationSwitcher({ shell }: { shell: ShellData }) {
               </MenuLink>
             ) : null,
           )}
-          {/* slice 29 (Q5, DB10): no new organization on a server that takes no writes; scripts make them there */}
-          {!shell.workspace.readOnly && (
+          {/* slice 29 (DB10), slice 30: no new organization online; scripts make them there until the people slice */}
+          {shell.server.kind === "local" && (
             <>
               <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
               <DropdownMenuItem className={itemClass} data-testid="menu-item-new-organization" onSelect={() => setCreating(true)}>
@@ -306,9 +306,9 @@ function UserIndicator({ shell }: { shell: ShellData }) {
     .slice(0, 2)
     .toUpperCase();
   // slice 29 (Q5, L5): a server that takes no writes says so, not "Archived"
-  const label = workspace.archived ? "Archived" : workspace.readOnly ? "Read only" : ROLE_LABEL[role] + (guest ? " · guest" : "");
+  const label = workspace.archived ? "Archived" : ROLE_LABEL[role] + (guest ? " · guest" : "");
   const guestFrom = user.homeOrganizations.join(", ");
-  const title = `${user.name}: ${workspace.archived ? "this workspace is archived (read-only)" : workspace.readOnly ? READ_ONLY_SERVER_TEXT : `${ROLE_LABEL[role]} in ${workspace.name}`}${guest ? `, guest from ${guestFrom}` : ""}`;
+  const title = `${user.name}: ${workspace.archived ? "this workspace is archived (read-only)" : `${ROLE_LABEL[role]} in ${workspace.name}`}${guest ? `, guest from ${guestFrom}` : ""}`;
 
   return (
     <DropdownMenu>
@@ -350,7 +350,7 @@ function UserIndicator({ shell }: { shell: ShellData }) {
             </>
           ) : null}
           .<br />
-          {workspace.archived ? "The workspace is archived, so everything is read-only." : workspace.readOnly ? READ_ONLY_SERVER_TEXT : ROLE_CAN[role]}
+          {workspace.archived ? "The workspace is archived, so everything is read-only." : ROLE_CAN[role]}
         </div>
         <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
         <MenuLink href={workspaceHref(workspace.id, "people")}>People and roles</MenuLink>

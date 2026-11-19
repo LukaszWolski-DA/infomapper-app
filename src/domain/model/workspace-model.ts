@@ -37,7 +37,15 @@ const idsOf = (rows: readonly { id: Uuid; workspace_id: Uuid; deleted_at: string
   new Set(ofWorkspace(rows, workspaceId).map((r) => r.id));
 
 /** A project's canvases in tab order: their place, then when they were added. */
-export const byTabOrder = (a: ProjectCanvas, b: ProjectCanvas): number => a.sort_order - b.sort_order || a.added_at.localeCompare(b.added_at);
+export const byTabOrder = (a: ProjectCanvas, b: ProjectCanvas): number =>
+  a.sort_order - b.sort_order || a.added_at.localeCompare(b.added_at) || a.canvas_id.localeCompare(b.canvas_id);
+
+/**
+ * Creation order (slice 30, Q3, L8): by `created_at`; rows made in one millisecond keep the order they were read in,
+ * which is the stored order (their place in their write set on Postgres, the file's order locally). A stable sort, so the
+ * seed's rows, which share one time and whose ids are not in their order, keep the file's order on both adapters.
+ */
+export const byCreation = (a: { created_at: string }, b: { created_at: string }): number => a.created_at.localeCompare(b.created_at);
 
 /**
  * The deleted originals that live copies point to, with their entity's name, deleted too or not (slice 10c, F6): what a
@@ -70,14 +78,18 @@ export function workspaceModelOf(rows: StoredRows, workspaceId: Uuid): Workspace
     concepts: of(rows.concept).sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
     entities: of(rows.entity).sort((a, b) => a.name.localeCompare(b.name)),
     attributes: of(rows.attribute).sort((a, b) => a.entity_id.localeCompare(b.entity_id) || a.sort_order - b.sort_order),
-    relationships: of(rows.relationship),
+    // slice 30 (Q3): parallel lines take their places in creation order
+    relationships: of(rows.relationship).sort(byCreation),
     sourceSystems: of(rows.source_system).sort((a, b) => a.name.localeCompare(b.name)),
-    sourceTables: of(rows.source_table).sort((a, b) => a.name.localeCompare(b.name)),
-    sourceColumns: of(rows.source_column).sort((a, b) => a.source_table_id.localeCompare(b.source_table_id) || a.ordinal - b.ordinal),
+    // slice 30 (Q3): one name in two schemas or systems by database, then schema
+    sourceTables: of(rows.source_table).sort(
+      (a, b) => a.name.localeCompare(b.name) || a.database_name.localeCompare(b.database_name) || a.schema_name.localeCompare(b.schema_name),
+    ),
+    sourceColumns: of(rows.source_column).sort((a, b) => a.source_table_id.localeCompare(b.source_table_id) || a.ordinal - b.ordinal || a.name.localeCompare(b.name)),
     mappings: of(rows.mapping),
     mappingInputs: of(rows.mapping_input).sort((a, b) => a.mapping_id.localeCompare(b.mapping_id) || a.sort_order - b.sort_order),
     attributeInputs: of(rows.attribute_input).sort((a, b) => a.attribute_id.localeCompare(b.attribute_id) || a.sort_order - b.sort_order),
-    sourceRelationships: of(rows.source_relationship),
+    sourceRelationships: of(rows.source_relationship).sort(byCreation),
     sourceRelationshipColumns: of(rows.source_relationship_column).sort(
       (a, b) => a.source_relationship_id.localeCompare(b.source_relationship_id) || a.sort_order - b.sort_order,
     ),

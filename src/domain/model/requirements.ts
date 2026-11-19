@@ -3,6 +3,7 @@
 // an element (prototype `reqsFor`), and who last changed a requirement's content (four-eyes, AD-06).
 
 import type { Uuid } from "../ids";
+import { laterOrSame } from "./mapping-rules";
 import type {
   Attribute,
   AttributeInput,
@@ -516,7 +517,7 @@ export function lastRequirementEditor(requirement: Requirement, events: readonly
     const content =
       e.operation === "create" ||
       (!!e.before_image && !!e.after_image && CONTENT_COLUMNS.some((c) => (e.before_image![c] ?? null) !== (e.after_image![c] ?? null)));
-    if (content && (!last || e.occurred_at >= last.occurred_at)) last = e;
+    if (content && (!last || laterOrSame(e, last))) last = e;
   }
   return last?.user_id ?? requirement.created_by;
 }

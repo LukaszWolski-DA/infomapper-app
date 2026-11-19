@@ -6,8 +6,11 @@
 //   the end of its one statement, so its rows' order does not matter).
 // - The stored order (data-model-v2.md, "Conventions", F2): each row's time column gets microseconds by its place among
 //   the rows of its table that share its millisecond, so Postgres orders them as the file does; the domain reads
-//   milliseconds only. A millisecond holds 1,000 places: rows after the 999th share the last one and fall back to their
-//   key (`crowded` reports them).
+//   milliseconds only. A millisecond holds 1,000 places: since slice 30 (L8) the loader moves a crowded millisecond's
+//   rows past the 999th into the following milliseconds (`spreadCrowded`), so the seed's rows, whose ids are not in
+//   their order, keep it too; their times move by a millisecond for each further 999 rows. Rows still past the 999th of
+//   a millisecond after that fall back to their key (`crowded` reports them). `apply` never moves a time: a write's
+//   rows carry the time its change images hold.
 // - A row field its table has no column for is refused before anything is written (it would be dropped silently).
 // - Counts per table are compared with the rows given before the commit; a difference rolls everything back.
 
@@ -50,6 +53,29 @@ export function withPlace(iso: string, place: number): string {
   const m = /^(.*\.\d{3})Z$/.exec(iso);
   if (!m) throw new Error(`A time column holds ${iso}, not the domain's ISO text in milliseconds.`);
   return `${m[1]}${String(Math.min(place, 999)).padStart(3, "0")}Z`;
+}
+
+/**
+ * The rows with a crowded millisecond's rows past the 999th moved into the following milliseconds, 999 each, in the rows'
+ * order (slice 30, L8; the loader only), so no microsecond is shared (`stampPlaces` counts the last place, 999, as
+ * crowded). A copy; the same array when nothing is crowded.
+ */
+const PER_MS = 999;
+export function spreadCrowded(table: string, rows: readonly AnyRow[]): readonly AnyRow[] {
+  const column = timeColumnOf(table);
+  if (!column) return rows;
+  const seen = new Map<string, number>();
+  let out: AnyRow[] | null = null;
+  rows.forEach((r, i) => {
+    const at = r[column];
+    if (typeof at !== "string") return;
+    const place = seen.get(at) ?? 0;
+    seen.set(at, place + 1);
+    if (place < PER_MS) return;
+    out ??= [...rows];
+    out[i] = { ...r, [column]: new Date(Date.parse(at) + Math.floor(place / PER_MS)).toISOString() };
+  });
+  return out ?? rows;
 }
 
 /** The rows with their places stamped into their time column (a copy; the rows given are not changed). */
@@ -148,7 +174,7 @@ export async function loadRows(db: Queryable, schema: StoreSchema, data: Readonl
     for (const table of order) {
       const given = data[table] ?? [];
       if (!given.length) continue;
-      const stamped = stampPlaces(table, given);
+      const stamped = stampPlaces(table, spreadCrowded(table, given));
       if (stamped.crowded) crowded[table] = stamped.crowded;
       await db.query(`insert into ${ident(table)} select * from json_populate_recordset(null::${ident(table)}, $1::json)`, [JSON.stringify(stamped.rows)]);
     }

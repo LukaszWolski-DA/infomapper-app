@@ -1,5 +1,5 @@
 // Repository interfaces (AD-19). The app talks to stored data only through these.
-// Adapters: the local JSON file (src/data/local, AD-29) and, since slice 29, Postgres for reads (src/data/postgres).
+// Adapters: the local JSON file (src/data/local, AD-29) and Postgres (src/data/postgres; reads since slice 29, writes since slice 30).
 // Every read of workspace data takes the workspace id and filters on it. Soft-deleted rows are never returned.
 
 import type { WriteSet } from "@/domain/changes";
@@ -200,12 +200,6 @@ export interface ApplyOptions {
 }
 
 export interface DataStore {
-  /**
-   * The store takes no writes (slice 29, Q5): `apply` refuses every write set with code `archived` and
-   * `READ_ONLY_SERVER_MESSAGE`, and the pages show the workspace read-only (`ShellData.workspace.readOnly`). The Postgres
-   * adapter until slice B; absent on the local adapter.
-   */
-  readOnly?: boolean;
   users: UserRepository;
   organizations: OrganizationRepository;
   workspaces: WorkspaceRepository;
