@@ -768,3 +768,13 @@ Step 1's report said four; there are five today, and step 4 adds a sixth:
 - Secret: `INFOMAPPER_DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`;
 - plain: `INFOMAPPER_DATA`, `INFOMAPPER_TIMING`, and from step 4 `INFOMAPPER_SERVER_NAME` (Q7).
 Each scoped to `slice/30-database-writes`, beside the existing entries for `dev`.
+
+### Checks (on `69168bf`)
+
+- CI (`check`) and Schema (`migrations` with the contract suite on Postgres, 26 tests; `smoke`) passed.
+- **The full run:** [run 44487217521](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/44487217521) on
+  `69168bf`, which contains `dev`'s head (`6da6c05`): 839 passed, 0 failed, 0 flaky, 16 skipped; wall-clock 17 min
+  14 s. Why: the step touches the local adapter (its write and its counts) and shared infrastructure (`apply`'s port,
+  `runCommand`). Parts (time, heap peak): 1 9.2 min, 1,155 MB; 2 11.0 min, 1,024 MB; 3 6.7 min, 1,407 MB; 4 10.0 min,
+  1,125 MB; 5 10.5 min, 1,223 MB; 6 9.5 min, 1,574 MB; 7 9.8 min, 1,121 MB; 8 6.8 min, 1,407 MB; 9 11.9 min, 1,602 MB.
+  Later commits on the branch touch only `docs/` (`git diff --stat 69168bf..HEAD`).
