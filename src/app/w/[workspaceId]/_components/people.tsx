@@ -15,7 +15,7 @@ import {
   type AddPersonFormInput,
 } from "@/app/_actions/people";
 import { useAction } from "@/app/_components/use-action";
-import { ROLE_LABEL } from "@/app/_lib/roles";
+import { ADD_PERSON_ONLINE_TEXT, ROLE_LABEL } from "@/app/_lib/roles";
 import type { RemovePersonPreview } from "@/domain/commands/people";
 import type { WorkspaceRole } from "@/domain/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
@@ -36,8 +36,11 @@ function FieldMessage({ text }: { text?: string }) {
   ) : null;
 }
 
-/** "Add a person" (item 10): name, e-mail and role, then the summary (F11) with Back and Add. */
-export function AddPersonBox({ workspaceId }: { workspaceId: string }) {
+/**
+ * "Add a person" (item 10): name, e-mail and role, then the summary (F11) with Back and Add. `online` (slice 30, B5): the
+ * box shows, its Continue is disabled with the reason as its tooltip and a line under it (L6).
+ */
+export function AddPersonBox({ workspaceId, online = false }: { workspaceId: string; online?: boolean }) {
   const { run, pending } = useAction();
   const empty: AddPersonFormInput = { workspaceId, name: "", email: "", role: "modeler" };
   const [form, setForm] = useState(empty);
@@ -101,9 +104,20 @@ export function AddPersonBox({ workspaceId }: { workspaceId: string }) {
               </option>
             ))}
           </select>
-          <button type="submit" data-testid="button-add-person-continue" className={btnClass} disabled={pending}>
+          <button
+            type="submit"
+            data-testid="button-add-person-continue"
+            className={btnClass}
+            disabled={pending || online}
+            title={online ? ADD_PERSON_ONLINE_TEXT : undefined}
+          >
             Continue
           </button>
+          {online && (
+            <p data-testid="text-add-person-online" className="m-0 w-full text-[12.5px] text-im-ink-3">
+              {ADD_PERSON_ONLINE_TEXT}
+            </p>
+          )}
         </form>
       ) : (
         <>

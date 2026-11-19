@@ -286,7 +286,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                   ))}
                 </tbody>
               </table>
-              {managesPeople && <AddPersonBox workspaceId={workspace.id} />}
+              {managesPeople && <AddPersonBox workspaceId={workspace.id} online={shell.server.kind === "online"} />}
               {organizationAccess && <OrganizationAccessBox workspaceId={workspace.id} link={organizationAccess.link} version={organizationAccess.version} />}
               <H3>What each role can do</H3>
               <table className="w-full border-collapse text-[13px]">

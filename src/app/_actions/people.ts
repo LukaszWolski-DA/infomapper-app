@@ -6,7 +6,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { DataStore } from "@/data";
-import { getDataStore } from "@/data";
+import { getDataStore, isPostgresMode } from "@/data";
 import {
   addPerson,
   changeRole,
@@ -21,6 +21,7 @@ import {
 import { normalizeEmail } from "@/domain/commands/organization";
 import { notFound as notFoundError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
+import { ADD_PERSON_ONLINE_TEXT } from "../_lib/roles";
 import { runCommand, type ActionResult } from "../_lib/run-command";
 import { getSession } from "../_lib/session";
 import { lockedRefusal } from "../_lib/unlock";
@@ -93,7 +94,11 @@ export interface AddPersonFormInput {
 }
 
 /** "Add a person": the form's checks and the summary (item 10, F11). Writes nothing. */
+/** B5 (slice 30): no person is added online until the people slice; the button says why, and the server refuses too. */
+const ONLINE_REFUSAL = { ok: false as const, code: "forbidden" as const, message: ADD_PERSON_ONLINE_TEXT };
+
 export async function previewAddPersonAction(input: AddPersonFormInput): Promise<ActionResult<AddPersonPreview>> {
+  if (isPostgresMode()) return ONLINE_REFUSAL;
   return readAs(input?.workspaceId, async (store, userId) => {
     const state = await addState(store, input.workspaceId, userId, input.email);
     if (!state) return { ok: false, code: "not_found", message: NOT_FOUND.error.message };
@@ -103,6 +108,7 @@ export async function previewAddPersonAction(input: AddPersonFormInput): Promise
 }
 
 export async function addPersonAction(input: AddPersonFormInput): Promise<ActionResult<{ toast: string }>> {
+  if (isPostgresMode()) return ONLINE_REFUSAL;
   return done(
     await runCommand(async (ctx, store, user) => {
       const state = await addState(store, input?.workspaceId, user.id, input?.email);
