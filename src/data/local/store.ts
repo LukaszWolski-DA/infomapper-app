@@ -9,7 +9,7 @@ import { MAPPING_LOG } from "@/domain/model/mapping-rules";
 import type { WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
-import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-history";
+import { dropNextRedo, dropNextUndo, emptyHistory, historyKey, nextRedo, nextUndo, stateOfHistory, withChange, type UndoHistory } from "@/domain/model/undo-history";
 import { byTabOrder, liveLabelLinksOf, liveProjectCanvasesOf, liveProjectPinsOf, liveRequirementLinksOf, workspaceModelOf, workspacePeopleOf, workspaceSnapshotOf } from "@/domain/model/workspace-model";
 import type { ModuleTable, WritableRows } from "@/domain/types";
 import type { ApplyOptions, ApplyResult, DataStore } from "../ports";
@@ -59,6 +59,13 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
       ? h
       : { undo: h.undo.filter((s) => known.has(s.changeGroupId)), redo: h.redo.filter((s) => known.has(s.changeGroupId)) };
   const current = async (workspaceId: Uuid, h: UndoHistory) => withKnown(h, await groupsOf(workspaceId));
+  /** The person's history as it stands, without steps whose change group is gone. */
+  const historyOf = async (workspaceId: Uuid, userId: Uuid) => {
+    const key = `${file}|${historyKey(workspaceId, userId)}`;
+    const fresh = await current(workspaceId, histories.get(key) ?? emptyHistory);
+    histories.set(key, fresh);
+    return fresh;
+  };
 
   return {
     users: {
@@ -205,20 +212,18 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
         (await load()).change_event.filter((e) => e.workspace_id === workspaceId && e.object_type === "requirement" && e.object_id === requirementId),
     },
 
+    // slice 30 (Q4 (a)): in this process's memory; a step is recorded, undone or redone only with its write (`apply`)
     undoHistory: {
-      get: async (workspaceId, userId) => {
-        const key = `${file}|${historyKey(workspaceId, userId)}`;
-        const fresh = await current(workspaceId, histories.get(key) ?? emptyHistory);
-        histories.set(key, fresh);
-        return fresh;
+      state: async (workspaceId, userId) => stateOfHistory(await historyOf(workspaceId, userId)),
+      next: async (workspaceId, userId, mode) => {
+        const h = await historyOf(workspaceId, userId);
+        return (mode === "undo" ? nextUndo(h) : nextRedo(h)) ?? null;
       },
-      update: async (workspaceId, userId, change) => {
-        const key = `${file}|${historyKey(workspaceId, userId)}`;
-        const known = await groupsOf(workspaceId);
-        // From here on synchronous, so no other request changes the history in between.
-        const next = change(withKnown(histories.get(key) ?? emptyHistory, known));
-        histories.set(key, next);
-        return next;
+      drop: async (workspaceId, userId, mode, changeGroupId) => {
+        const h = await historyOf(workspaceId, userId);
+        // synchronous from the read on, so no other request changes the history in between
+        const top = mode === "undo" ? nextUndo(h) : nextRedo(h);
+        if (top?.changeGroupId === changeGroupId) histories.set(`${file}|${historyKey(workspaceId, userId)}`, mode === "undo" ? dropNextUndo(h) : dropNextRedo(h));
       },
     },
 
@@ -284,6 +289,17 @@ async function applyOnce(file: string, writeSet: WriteSet, schema: LocalSchema, 
   const violation = findViolation(next, { tables: touched, newEvents: writeSet.events.length }, schema);
   if (violation) return { ok: false, error: violationError(violation) };
   if (!(await writeDb(file, next, { ifUnchanged: read.stamp }))) return "changed";
+  // slice 30 (F4): the history with its write, in the same serialised step
+  if (options.history) {
+    const workspaceId = writeSet.events[0]?.workspace_id;
+    if (workspaceId) {
+      const key = `${file}|${historyKey(workspaceId, options.history.userId)}`;
+      const known = new Set(next.change_event.filter((e) => e.workspace_id === workspaceId).map((e) => e.change_group_id));
+      const h = histories.get(key) ?? emptyHistory;
+      const kept = { undo: h.undo.filter((s) => known.has(s.changeGroupId)), redo: h.redo.filter((s) => known.has(s.changeGroupId)) };
+      histories.set(key, withChange(kept, options.history, writeSet));
+    }
+  }
   return { ok: true };
 }
 

@@ -102,7 +102,7 @@ export default async function CanvasPage({
     store.canvasItems.list(ws),
     store.canvases.list(ws),
     store.workspaces.get(ws),
-    store.undoHistory.get(ws, shell.user.id),
+    store.undoHistory.state(ws, shell.user.id),
     store.projects.list(ws),
     store.frames.list(ws),
     store.labels.list(ws),
@@ -123,7 +123,7 @@ export default async function CanvasPage({
   for (const f of frameRows) if (f.concept_id && canvases.some((c) => c.id === f.canvas_id)) conceptFrames[f.concept_id] = (conceptFrames[f.concept_id] ?? 0) + 1;
   // a delete that landed after `loadShell` read the canvas (slice 12a): the same way as arriving at a deleted canvas (D-38)
   const canvas = canvases.find((c) => c.id === canvasId) ?? (await leaveMissingCanvas(ws, projectId, canvasId));
-  const undoState = { canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 };
+  const undoState = history;
   // Four-eyes (AD-06): the panel says beforehand who may not approve; the server checks again.
   const fourEyes = !!workspace?.four_eyes;
   const events = fourEyes ? await store.changeEvents.list(ws) : [];

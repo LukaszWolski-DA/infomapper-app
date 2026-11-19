@@ -658,6 +658,24 @@ written in the same group; adding, changing or removing a person (with the `orga
 removal writes) to that workspace's; a password change to the workspace whose People tab was used. `object_id` for
 `organization_member` is the user, for `organization_access` the organization. None of these groups is an undo step.
 
+### `undo_step`
+The lasting undo history on Postgres (slice 30, DB4, Q4): each person's undo and redo lists in a workspace, the last 50
+steps of each (D-59). Written only in the transaction of the write it records, undoes or redoes, under the workspace's
+lock; a step's events are its change group's `change_event` rows. Not model data: no `version`, no change event, no
+soft delete; a step leaves the history by a hard delete (L3). The store's own bookkeeping, outside the domain's tables,
+the local file and undo (`POSTGRES_ONLY_TABLES`, `src/data/postgres/undo-history.ts`): the local adapter keeps its
+history in the server's memory (Q4 (a)). Migration `20261119120000_undo_step.sql`.
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| `workspace_id` | uuid | no | PK part, FK `workspace` |
+| `user_id` | uuid | no | PK part, FK `app_user` |
+| `list` | text | no | PK part; `undo`, `redo` |
+| `position` | integer | no | PK part; grows within a list; the step reverted next is the highest |
+| `change_group_id` | uuid | no | the step's change group; unique per workspace (in one list at a time) |
+| `label` | text | no | the step's name in the toasts |
+| `created_at` | timestamptz | no | |
+
 ### `baseline`
 A frozen, named snapshot of the model part of a workspace (AD-03, AD-14).
 

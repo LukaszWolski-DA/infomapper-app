@@ -339,14 +339,15 @@ describe("undo (slice 1b)", () => {
     const ws = access.workspace.id;
     const r = createProject(ctxFor(actor.id), access, { workspaceId: ws, name: "Finance" });
     if (!r.ok) throw new Error(r.error.message);
-    await store.apply(r.writeSet);
+    // slice 30 (F4): a step is recorded with its write
+    await store.apply(r.writeSet, { history: { userId: actor.id, kind: "record", label: "Create project" } });
     const step = { changeGroupId: r.writeSet.changeGroupId, label: "Create project", events: r.writeSet.events };
-    await store.undoHistory.update(ws, actor.id, (h) => ({ ...h, undo: [...h.undo, step] }));
-    expect((await store.undoHistory.get(ws, actor.id)).undo).toEqual([step]);
-    expect((await store.undoHistory.get(ws, (await user("marek")).id)).undo).toEqual([]);
+    expect(await store.undoHistory.next(ws, actor.id, "undo")).toEqual(step);
+    expect(await store.undoHistory.state(ws, actor.id)).toEqual({ canUndo: true, canRedo: false });
+    expect(await store.undoHistory.state(ws, (await user("marek")).id)).toEqual({ canUndo: false, canRedo: false });
 
     await resetDevData(file);
-    expect((await store.undoHistory.get(ws, actor.id)).undo).toEqual([]);
+    expect(await store.undoHistory.next(ws, actor.id, "undo")).toBeNull();
   });
 });
 

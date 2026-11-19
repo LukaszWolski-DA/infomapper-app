@@ -778,3 +778,13 @@ Each scoped to `slice/30-database-writes`, beside the existing entries for `dev`
   `runCommand`). Parts (time, heap peak): 1 9.2 min, 1,155 MB; 2 11.0 min, 1,024 MB; 3 6.7 min, 1,407 MB; 4 10.0 min,
   1,125 MB; 5 10.5 min, 1,223 MB; 6 9.5 min, 1,574 MB; 7 9.8 min, 1,121 MB; 8 6.8 min, 1,407 MB; 9 11.9 min, 1,602 MB.
   Later commits on the branch touch only `docs/` (`git diff --stat 69168bf..HEAD`).
+
+---
+
+## Step 3: lasting undo and the gzipped import (19 November 2026)
+
+Step 2 accepted (Łukasz, 19 November 2026).
+
+- **Q4.** Decided: (a), the local adapter keeps its undo history in memory; `undo_step` is on Postgres only.
+- **The lock.** Decided: `for no key update` on the workspace's and the organization's rows, as step 1 proposed (step 2
+  used `for update` because the step's prompt copied the PRD); the order stays the organization's row first.

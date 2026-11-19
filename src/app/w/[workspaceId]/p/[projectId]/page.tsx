@@ -63,7 +63,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
     store.requirements.list(ws),
     store.requirements.listLinks(ws),
     store.model.listChanges(ws),
-    store.undoHistory.get(ws, shell.user.id),
+    store.undoHistory.state(ws, shell.user.id),
   ]);
   // labels with a live canvas (slice 3b): “Open live canvas” instead of “Open as live canvas”
   const withLive = new Set(allCanvases.filter((c) => c.deleted_at === null && c.live_label_id).map((c) => c.live_label_id!));
@@ -110,7 +110,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   const frameCounts = Object.fromEntries(view.canvases.map((c) => [c.id, frames.filter((f) => f.canvas_id === c.id).length]));
 
   return (
-    <UndoProvider workspaceId={ws} state={{ canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 }}>
+    <UndoProvider workspaceId={ws} state={history}>
     <AppShell shell={shell} project={{ view, currentCanvasId: null, tools: <UndoButtons /> }}>
       <div data-testid="page-project-home" className="min-h-full bg-im-canvas px-[clamp(16px,4vw,48px)] pb-12 pt-7">
         <div className="mx-auto max-w-[1180px]">

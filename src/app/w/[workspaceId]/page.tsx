@@ -40,7 +40,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     store.model.load(workspaceId),
     store.requirements.list(workspaceId),
     store.requirements.listLinks(workspaceId),
-    store.undoHistory.get(workspaceId, shell.user.id),
+    store.undoHistory.state(workspaceId, shell.user.id),
   ]);
   const orgMemberships = await store.organizations.listMembershipsOfUsers(members.map((m) => m.user_id));
   const organizations = await Promise.all(
@@ -105,7 +105,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
 
   // Undo and Redo, buttons and keys, on the person's history of the workspace (slice 12a, D-65)
   return (
-    <UndoProvider workspaceId={workspaceId} state={{ canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 }}>
+    <UndoProvider workspaceId={workspaceId} state={history}>
     <AppShell shell={shell} tools={<UndoButtons />}>
       {query.gone === "project" && <GoneNotice message="That project no longer exists." />}
       {/* slice 25 (step 4b): a module's page the person can no longer open sent them back here */}

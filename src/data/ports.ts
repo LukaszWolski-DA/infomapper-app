@@ -7,7 +7,7 @@ import type { CheckedAccess } from "@/domain/commands/access-check";
 import type { WorkspaceRows } from "@/domain/commands/undo";
 import type { DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
-import type { UndoHistory } from "@/domain/model/undo-history";
+import type { HistoryChange, UndoState, UndoStep } from "@/domain/model/undo-history";
 import type { MappingLog } from "@/domain/model/mapping-rules";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type {
@@ -179,13 +179,18 @@ export interface ChangeEventRepository {
 }
 
 /**
- * The undo history of each person in each workspace (slice 1b). In memory on the server for now; it comes into the
- * database with Supabase. Steps whose change group is no longer in the change log (fresh demo data) are left out.
+ * The undo history of each person in each workspace (slice 1b; split in slice 30, F3, F4). The local adapter keeps it in
+ * memory (Q4 (a)); Postgres stores it (`undo_step`). A step is recorded, undone or redone only with its write, through
+ * `apply`'s `history`; these calls read it, and drop a step that can no longer be reverted. Steps whose change group is no
+ * longer in the change log (fresh demo data) are left out.
  */
 export interface UndoHistoryRepository {
-  get(workspaceId: Uuid, userId: Uuid): Promise<UndoHistory>;
-  /** Changes the history in one step, so two writes at the same moment cannot lose a step. */
-  update(workspaceId: Uuid, userId: Uuid, change: (history: UndoHistory) => UndoHistory): Promise<UndoHistory>;
+  /** What the pages show: is there something to undo, to redo. Never reads a step's events. */
+  state(workspaceId: Uuid, userId: Uuid): Promise<UndoState>;
+  /** The step undo (or redo) reverts next, with its change group's events, or null. */
+  next(workspaceId: Uuid, userId: Uuid, mode: "undo" | "redo"): Promise<UndoStep | null>;
+  /** Drops the step `changeGroupId` if it is still the next one of `mode` (a refused revert, slice 1b). */
+  drop(workspaceId: Uuid, userId: Uuid, mode: "undo" | "redo", changeGroupId: Uuid): Promise<void>;
 }
 
 export type ApplyResult = { ok: true } | { ok: false; error: DomainError };
@@ -197,6 +202,11 @@ export interface ApplyOptions {
    * role and the workspace's archive again and refuses when either differs (`accessChangedRefusal`).
    */
   access?: CheckedAccess;
+  /**
+   * The person's undo history as this write changes it (slice 30, F4): written with the rows, in the same transaction on
+   * Postgres and in the same serialised write locally. The write set's change group is the step recorded or the revert.
+   */
+  history?: HistoryChange;
 }
 
 export interface DataStore {

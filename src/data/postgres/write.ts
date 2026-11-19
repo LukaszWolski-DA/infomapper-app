@@ -3,7 +3,7 @@
 //
 // In this order, on one connection, at READ COMMITTED:
 // 1. the locks (B4): the organization's row first when the write can break a count across its workspaces
-//    (`needsOrganizationLock`) or makes a workspace, then the workspace's row, both `for update`, so every write in a
+//    (`needsOrganizationLock`) or makes a workspace, then the workspace's row, both `for no key update` (it serialises the writes and leaves foreign key checks free), so every write in a
 //    workspace waits for the one before it; `lock_timeout` bounds the wait (L7), refused as busy;
 // 2. the access the command was checked with, read again (B3, L1: `accessChangedRefusal`), before the rows;
 // 3. the rows in three phases (F8: Postgres checks foreign keys after each statement and unique indexes on each row, the
@@ -12,7 +12,7 @@
 //    a versioned row is updated only from the version the command read, a link row only from the whole row it read (F10);
 //    an update never sets a row's time column, which carries its place in the stored order (F9); an insert's time
 //    column gets its place in the write set as microseconds (AD-12's note);
-// 4. the change events, stamped the same way;
+// 4. the change events, stamped the same way, and the person's undo history as the write changes it (`undo_step`);
 // 5. the count rules on the state after the rows (F5, F6: `countRefusal`), with the rows each check reads;
 // 6. commit, or roll back with the first refusal.
 
@@ -26,6 +26,7 @@ import type { ApplyOptions, ApplyResult } from "../ports";
 import type { AnyRow, StoreSchema } from "../rows";
 import { stampPlaces, tablesInKeyOrder } from "./load";
 import { timeColumnOf } from "./tables";
+import { changeHistory } from "./undo-history";
 
 /** How long a write waits for its workspace's lock (L7: provisional until S30-05's figures). */
 export const LOCK_TIMEOUT = "10s";
@@ -119,6 +120,8 @@ export async function applyWriteSet(pool: Pool, schema: StoreSchema, writeSet: W
         for (const table of tables) await writeTable(client, schema, columns, table, phase, writes.filter((w) => w.table === table));
       }
       if (writeSet.events.length) await insertRows(client, columns, "change_event", stampPlaces("change_event", writeSet.events as unknown as AnyRow[]).rows);
+      // F4: the person's undo history with its write (`undo_step`)
+      if (options.history) await changeHistory(client, writeSet, options.history);
       const checks = countChecks(writeSet.writes);
       if (checks.length) {
         const refusal = countRefusal(await countRows(client, checks), checks);
@@ -145,8 +148,8 @@ async function lock(client: PoolClient, writeSet: WriteSet, workspaceId: Uuid | 
   if (!organizationId && workspaceId && needsOrganizationLock(writeSet.writes)) {
     organizationId = (await client.query<{ organization_id: Uuid }>("select organization_id from workspace where id = $1", [workspaceId])).rows[0]?.organization_id ?? null;
   }
-  if (organizationId) await client.query("select id from organization where id = $1 for update", [organizationId]);
-  if (workspaceId && !made) await client.query("select id from workspace where id = $1 for update", [workspaceId]);
+  if (organizationId) await client.query("select id from organization where id = $1 for no key update", [organizationId]);
+  if (workspaceId && !made) await client.query("select id from workspace where id = $1 for no key update", [workspaceId]);
 }
 
 /** The actor's access as the database holds it now, for the parts the command read. */

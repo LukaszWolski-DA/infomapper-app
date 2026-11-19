@@ -14,7 +14,7 @@ import { domainError, type DomainErrorCode } from "@/domain/errors";
 import { ACCOUNT_EXISTS_MESSAGE } from "@/domain/commands/organization";
 import { uuidv7 } from "@/domain/ids";
 import { changeLabel } from "@/domain/model/change-label";
-import { recordChange } from "@/domain/model/undo-history";
+import type { HistoryChange } from "@/domain/model/undo-history";
 import { isOpen } from "@/domain/source-changes/rules";
 import { settleAfterWrites } from "@/domain/source-changes/settle";
 import type { AppUser, ModuleTable, Workspace } from "@/domain/types";
@@ -63,7 +63,7 @@ export type Saved<T extends object = object> = T & { version: number };
  * settles (slice 7b, Q12: a deleted object, a status set in the mapping panel, a column mapped; `settleAfterWrites`),
  * then the live canvas rules (slice 3b: what labels mark and what live canvases hold, in the same change group;
  * `completeLiveWrites`), then the adapter applies the rows and change events together, and the change group goes into
- * the person's undo history (slice 1b). Refusals come back with the domain's message. With `freshOnStale`, a write
+ * the person's undo history (slice 1b), in the same write (slice 30). Refusals come back with the domain's message. With `freshOnStale`, a write
  * refused as stale is built again from fresh data (slice 4a: the requirement key counter, `fresh-retry.ts`). A write
  * into an organization this session has not unlocked is refused before anything is applied (slice 8, F3). With
  * `versions`, the answer carries the new version of every row written, the settled changes and the live step's included
@@ -102,9 +102,9 @@ export async function runCommand<T>(
       if (completed.error.message === CONTEXT_LABEL_GONE) revalidatePath("/", "layout");
       return { ok: false, code: completed.error.code, message: completed.error.message };
     }
-    const applied = await store.apply(completed.writeSet, { access: recorded.checkedFor(workspaceId) });
+    // slice 30 (F4): the step goes into the person's undo history with its write
+    const applied = await store.apply(completed.writeSet, { access: recorded.checkedFor(workspaceId), history: historyOf(user.id, completed.writeSet) });
     if (!applied.ok) return { ok: false, code: applied.error.code, message: applied.error.message };
-    await remember(store, user.id, completed.writeSet);
     if (completed.value.canvases.length) recordLiveNotices(user.id, completed.value);
     const deleted = deletedIds(completed.writeSet.writes);
     return {
@@ -259,9 +259,8 @@ const EMPTY_LIVE_STATE = {
 };
 
 /** A change of the model or the layout can be undone; settings, people and a canvas's look cannot. */
-async function remember(store: DataStore, userId: AppUser["id"], writeSet: WriteSet): Promise<void> {
+function historyOf(userId: AppUser["id"], writeSet: WriteSet): HistoryChange | undefined {
   const workspaceId = writeSet.events[0]?.workspace_id;
-  if (!workspaceId || !isUndoable(writeSet.events, UNDO_TABLES)) return;
-  const step = { changeGroupId: writeSet.changeGroupId, label: writeSet.label ?? changeLabel(writeSet.events, UNDO_TABLES.nouns), events: writeSet.events };
-  await store.undoHistory.update(workspaceId, userId, (h) => recordChange(h, step));
+  if (!workspaceId || !isUndoable(writeSet.events, UNDO_TABLES)) return undefined;
+  return { userId, kind: "record", label: writeSet.label ?? changeLabel(writeSet.events, UNDO_TABLES.nouns) };
 }

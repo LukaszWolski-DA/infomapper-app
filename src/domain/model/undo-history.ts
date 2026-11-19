@@ -1,7 +1,7 @@
 // The undo history of one person in one workspace (slice 1b): the last 50 change groups they can undo, and the
-// steps they undid and can redo. Pure values; the server keeps one per person and workspace in memory for now
-// (persistent history comes with Supabase). Each step holds its change group's events, which `revertChangeGroup`
-// turns into the opposite change group.
+// steps they undid and can redo. Pure values. The local adapter keeps one per person and workspace in memory; on
+// Postgres it is stored (`undo_step`, slice 30), written in the transaction of the write it records (`HistoryChange`).
+// Each step holds its change group's events, which `revertChangeGroup` turns into the opposite change group.
 
 import type { Uuid } from "../ids";
 import type { ChangeEvent } from "../types";
@@ -23,6 +23,32 @@ export interface UndoHistory {
 }
 
 export const emptyHistory: UndoHistory = { undo: [], redo: [] };
+
+/** What the pages need (slice 30, F3): whether there is something to undo and to redo; never the steps' events. */
+export interface UndoState {
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
+export const stateOfHistory = (h: UndoHistory): UndoState => ({ canUndo: h.undo.length > 0, canRedo: h.redo.length > 0 });
+
+/**
+ * How a write changes its person's history (slice 30, F4), applied with the write in one step: `record` a new step (the
+ * write's own change group, named `label`); `undone` / `redone`: the write reverted the step `stepGroupId`, which leaves
+ * its list while the write's group goes to the other one, under the step's name, if that step is still the next one.
+ */
+export type HistoryChange =
+  | { userId: Uuid; kind: "record"; label: string }
+  | { userId: Uuid; kind: "undone" | "redone"; stepGroupId: Uuid; label: string };
+
+/** A history after the write set's change group was applied with `change` (the local adapter's and the tests' rule). */
+export function withChange(history: UndoHistory, change: HistoryChange, group: { changeGroupId: Uuid; events: readonly ChangeEvent[] }): UndoHistory {
+  const step: UndoStep = { changeGroupId: group.changeGroupId, label: change.label, events: group.events };
+  if (change.kind === "record") return recordChange(history, step);
+  const top = change.kind === "undone" ? nextUndo(history) : nextRedo(history);
+  if (top?.changeGroupId !== change.stepGroupId) return history;
+  return change.kind === "undone" ? afterUndo(history, step) : afterRedo(history, step);
+}
 
 /** The key of a history: one per person and workspace. */
 export const historyKey = (workspaceId: Uuid, userId: Uuid): string => `${workspaceId}|${userId}`;

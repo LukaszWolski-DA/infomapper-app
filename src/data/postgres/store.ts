@@ -6,7 +6,6 @@
 
 import type { Uuid } from "@/domain/ids";
 import { MAPPING_LOG } from "@/domain/model/mapping-rules";
-import { emptyHistory } from "@/domain/model/undo-history";
 import {
   byTabOrder,
   liveLabelLinksOf,
@@ -24,6 +23,7 @@ import { newestImportFirst, oldestChangeFirst } from "../order";
 import type { DataStore } from "../ports";
 import type { AnyRow, StoreSchema } from "../rows";
 import { getPool, readTransaction, type Queryable } from "./pool";
+import { dropStep, historyState, nextStep } from "./undo-history";
 import { applyWriteSet } from "./write";
 import { readTable, workspaceRows } from "./tables";
 
@@ -218,11 +218,11 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
         (await read("change_event", "workspace_id = $1 and object_type = 'requirement' and object_id = $2", workspaceId, requirementId)) as never,
     },
 
-    // The lasting history is slice 30's step 3 (`undo_step`, DB4); until then this server keeps none, so Undo is off here
-    // and a recorded step is dropped.
+    // slice 30 (DB4, Q4): the lasting history (`undo_step`); recorded, undone and redone only with a write (`apply`)
     undoHistory: {
-      get: async () => emptyHistory,
-      update: async () => emptyHistory,
+      state: (workspaceId, userId) => historyState(pool, workspaceId, userId),
+      next: (workspaceId, userId, mode) => nextStep(pool, schema, workspaceId, userId, mode),
+      drop: (workspaceId, userId, mode, changeGroupId) => dropStep(pool, workspaceId, userId, mode, changeGroupId),
     },
 
     // slice 25 (F1), slice 29 (F3): one read-only transaction, so every table comes from one state of the data

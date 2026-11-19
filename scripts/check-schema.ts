@@ -12,7 +12,7 @@ import { Client } from "pg";
 import { pgClientConfig } from "../src/data/postgres/config";
 import { loadPgEnv, targetName } from "./lib/pg-env";
 import { compareSchemas, NOT_IN_DOMAIN_YET, tablesFromPg, type PgColumnRow } from "../tests/schema/compare-schema";
-import { domainTables } from "../tests/schema/domain-tables";
+import { domainTables, POSTGRES_ONLY_FILE } from "../tests/schema/domain-tables";
 
 const MIGRATIONS = path.resolve(__dirname, "../supabase/migrations");
 
@@ -51,7 +51,8 @@ async function main(): Promise<number> {
         order by table_name, ordinal_position`,
     );
     const { tables, unsupported } = tablesFromPg(rows);
-    const domain = domainTables();
+    // slice 30: the tables only the Postgres adapter has (`undo_step`), beside the domain's
+    const domain = [...domainTables(), ...domainTables(POSTGRES_ONLY_FILE, "PostgresOnlyTables")];
     const mismatches = [...unsupported, ...compareSchemas(domain, tables, NOT_IN_DOMAIN_YET)];
     if (mismatches.length) {
       console.error(`The migrations and the domain disagree (${mismatches.length}):`);

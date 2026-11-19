@@ -14,6 +14,8 @@ const ROOT = path.resolve(__dirname, "../..");
 export const DEV_DB_FILE = path.join(ROOT, "src/data/local/schema.ts");
 /** The whole file, InfoMapper's tables and the modules' (slice 15a, AD-33): the interface the schema check reads. */
 export const COMPOSED_DB_FILE = path.join(ROOT, "src/compose/tables.ts");
+/** The tables only the Postgres adapter has (slice 30: `undo_step`), outside the domain's and the local file's. */
+export const POSTGRES_ONLY_FILE = path.join(ROOT, "src/data/postgres/undo-history.ts");
 
 /** Type aliases whose name tells the column type (both are `string` to TypeScript). */
 const NAMED: Record<string, ColumnKind> = { Uuid: "uuid", Timestamp: "timestamptz" };

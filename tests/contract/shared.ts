@@ -118,7 +118,7 @@ export async function readEverything(store: DataStore, db: DevDb): Promise<Recor
     for (const k of of("requirement_link").slice(0, 5)) await all(`requirements.getLink ${ws} ${k.id}`, () => store.requirements.getLink(ws, k.id!));
     await all(`changeEvents.list ${ws}`, () => store.changeEvents.list(ws));
     for (const m of of("mapping").slice(0, 3)) await all(`changeEvents.listForMapping ${ws} ${m.id}`, () => store.changeEvents.listForMapping(ws, m.id!));
-    for (const u of users) await all(`undoHistory.get ${ws} ${u.id}`, () => store.undoHistory.get(ws, u.id!));
+    for (const u of users) await all(`undoHistory.state ${ws} ${u.id}`, () => store.undoHistory.state(ws, u.id!));
     await all(`snapshot ${ws}`, () => store.snapshot(ws, MODULE_TABLES));
   }
   await all("snapshot (no such workspace)", () => store.snapshot("01a0f9e9-0000-7000-8000-000000000000", []));
