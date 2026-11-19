@@ -11,16 +11,26 @@
 // timing record (`im-timing`); the thumbnail its Server-Timing; the snapshot its action's time and its answer's bytes
 // (against Vercel's 4.5 MB). Results go to MEASURE_OUT (default .data/measure/s29/) as JSON and are printed as a table.
 // Nothing secret is printed: the bypass header is the config's, and no trace is recorded on Vercel.
+//
+// Slice 31: with MEASURE_WORKSPACE (and MEASURE_EMAIL_VAR, MEASURE_PASSWORD_VAR: `measure-target.ts`) the one data set is
+// the workspace of that id, its largest canvas and its first shared document, measured as that account; labels only,
+// no name, and nothing recorded but the numbers (`.data/measure/s31/`). LOCAL_DB refuses `dev-db.json` and anything
+// under a `backups` folder: a measurement build serves a demo file only.
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { demoPassword, PEOPLE, query } from "./helpers";
+import { query } from "./helpers";
+import { largestCanvas, OWN_MODE, OWN_WORKSPACE, signInToMeasure } from "./measure-target";
 
 const MEASURE = !!process.env.MEASURE;
 const LOADS = Number(process.env.LOADS ?? 10);
 const WARMUP = Number(process.env.WARMUP ?? 2);
 const LOCAL_DB = process.env.LOCAL_DB;
-const DATASETS = ["Retail Co – DWH", "Performance test"] as const;
+if (LOCAL_DB && (/dev-db\.json$/i.test(LOCAL_DB) || /[\\/]backups[\\/]/i.test(path.resolve(LOCAL_DB)))) {
+  throw new Error("LOCAL_DB must be a demo file: never the development data file or a backup.");
+}
+if (LOCAL_DB && OWN_MODE) throw new Error("MEASURE_WORKSPACE is for Postgres only.");
+const DATASETS: readonly string[] = OWN_MODE ? ["the workspace"] : ["Retail Co – DWH", "Performance test"];
 
 test.skip(!MEASURE, "MEASURE=1 only");
 test.setTimeout(30 * 60_000);
@@ -34,6 +44,7 @@ interface Ids {
 
 /** The data set's ids: from Postgres (the app's database), or from the local file the measurement build serves. */
 async function idsOf(workspace: string): Promise<Ids> {
+  if (OWN_WORKSPACE) return largestCanvas(OWN_WORKSPACE);
   if (LOCAL_DB) {
     const db = JSON.parse(fs.readFileSync(LOCAL_DB, "utf8")) as Record<string, Record<string, unknown>[]>;
     const ws = db.workspace!.find((w) => w.name === workspace && w.deleted_at === null)!;
@@ -59,13 +70,10 @@ async function signInForMeasure(page: Page) {
   if (LOCAL_DB) {
     await page.goto("/sign-in");
     await page.getByTestId("button-dev-user").filter({ hasText: "Łukasz" }).click();
+    await expect(page).not.toHaveURL(/\/sign-in/);
   } else {
-    await page.goto("/sign-in");
-    await page.getByTestId("input-sign-in-email").fill(PEOPLE.lukasz);
-    await page.getByTestId("input-sign-in-password").fill(demoPassword());
-    await page.getByTestId("button-sign-in").click();
+    await signInToMeasure(page);
   }
-  await expect(page).not.toHaveURL(/\/sign-in/);
 }
 
 interface Sample {
@@ -155,7 +163,8 @@ test("S29-08: the pages' load and reads, the thumbnail and the snapshot", async 
     if (ids.documentId) await run(`${dataset} | editor snapshot`, () => loadEditor(page, `${home}/d/${ids.documentId}`));
   }
 
-  const target = LOCAL_DB ? "local adapter (measurement build)" : `Vercel preview ${new URL(test.info().project.use.baseURL!).hostname}`;
+  const host = new URL(test.info().project.use.baseURL!).hostname;
+  const target = LOCAL_DB ? "local adapter (measurement build)" : /.vercel.app$/.test(host) ? `Vercel preview ${host}` : `the server on ${host}`;
   const rows = Object.entries(results).map(([key, { first, samples }]) => {
     const m = (f: (s: Sample) => number | undefined) => median(samples.map(f).filter((x): x is number => typeof x === "number"));
     return {
@@ -175,7 +184,7 @@ test("S29-08: the pages' load and reads, the thumbnail and the snapshot", async 
   });
   console.log(`\nS29-08 on ${target}, ${LOADS} loads after ${WARMUP} discarded (medians; "first" is the run's first load)`);
   console.table(rows);
-  const out = process.env.MEASURE_OUT ?? path.join(".data", "measure", "s29");
+  const out = process.env.MEASURE_OUT ?? path.join(".data", "measure", OWN_MODE ? "s31" : "s29");
   fs.mkdirSync(out, { recursive: true });
   const file = path.join(out, `${LOCAL_DB ? "local" : "preview"}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
   fs.writeFileSync(file, JSON.stringify({ target, loads: LOADS, warmup: WARMUP, at: new Date().toISOString(), rows, results }, null, 2));
