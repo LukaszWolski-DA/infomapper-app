@@ -29,8 +29,11 @@ import { countWrite } from "../timing";
 import { timeColumnOf } from "./tables";
 import { changeHistory } from "./undo-history";
 
-/** How long a write waits for its workspace's lock (L7: provisional until S30-05's figures). */
-export const LOCK_TIMEOUT = "10s";
+/**
+ * How long a write waits for its workspace's lock (AD-38; slice 31: 15 s, Łukasz's decision on slice 30's measurement of
+ * 19 November 2026: an import at the cap of 30,000 column rows holds the lock about 8.3 s at S30-05's rate).
+ */
+export const LOCK_TIMEOUT = "15s";
 
 const ident = (name: string): string => {
   if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error(`Not a table or column name: ${name}`);
