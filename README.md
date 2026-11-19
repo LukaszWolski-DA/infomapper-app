@@ -90,11 +90,15 @@ Slice 30 makes Postgres take writes (AD-38): each write in one transaction with 
 again and six count rules checked inside it on both adapters; a lasting undo history on Postgres (`undo_step`, D-59's
 note); imports gzipped by the browser to fit a Vercel function's request; a save indicator and a server badge in the top
 bar (D-84); and "Add person" disabled online until the people slice (D-58's note).
+Slice 31 copies Łukasz's own model (organization KB) into `infomapper-dev` (AD-39): from a copy of a backup of his local
+file, again or removed by one command, with his own Supabase account, backup and restore by script, and a reset that
+refuses while it is there; the lock timeout becomes 15 s; the measuring specs take their workspace and account from
+variables. The local file stays the model's master until Łukasz's switch day.
 Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md), [slice 9](docs/prd/slice-09-acceptance.md), [slice 10a](docs/prd/slice-10a-acceptance.md), [slice 10b](docs/prd/slice-10b-acceptance.md), [slice 10c](docs/prd/slice-10c-acceptance.md), [slice 11](docs/prd/slice-11-acceptance.md), [slice 12a](docs/prd/slice-12a-acceptance.md), [slice 12b](docs/prd/slice-12b-acceptance.md), [slice 13](docs/prd/slice-13-acceptance.md), [slice 14a](docs/prd/slice-14a-acceptance.md), [slice 14b](docs/prd/slice-14b-acceptance.md), [slice 15](docs/prd/slice-15-acceptance.md) (15a to 15d), [slice 16](docs/prd/slice-16-acceptance.md), [slice 17](docs/prd/slice-17-acceptance.md), [slice 18](docs/prd/slice-18-acceptance.md), [slice 19](docs/prd/slice-19-acceptance.md), [slice 20](docs/prd/slice-20-acceptance.md), [slice 21](docs/prd/slice-21-acceptance.md), [slice 22](docs/prd/slice-22-acceptance.md), [slice 23](docs/prd/slice-23-acceptance.md), [slice 24](docs/prd/slice-24-acceptance.md), [slice 25](docs/prd/slice-25-acceptance.md), [slice 26](docs/prd/slice-26-acceptance.md), [slice 27](docs/prd/slice-27-acceptance.md), [slice 28](docs/prd/slice-28-acceptance.md), [slice 29](docs/prd/slice-29-acceptance.md), [slice 30](docs/prd/slice-30-acceptance.md).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md), [slice 9](docs/prd/slice-09-acceptance.md), [slice 10a](docs/prd/slice-10a-acceptance.md), [slice 10b](docs/prd/slice-10b-acceptance.md), [slice 10c](docs/prd/slice-10c-acceptance.md), [slice 11](docs/prd/slice-11-acceptance.md), [slice 12a](docs/prd/slice-12a-acceptance.md), [slice 12b](docs/prd/slice-12b-acceptance.md), [slice 13](docs/prd/slice-13-acceptance.md), [slice 14a](docs/prd/slice-14a-acceptance.md), [slice 14b](docs/prd/slice-14b-acceptance.md), [slice 15](docs/prd/slice-15-acceptance.md) (15a to 15d), [slice 16](docs/prd/slice-16-acceptance.md), [slice 17](docs/prd/slice-17-acceptance.md), [slice 18](docs/prd/slice-18-acceptance.md), [slice 19](docs/prd/slice-19-acceptance.md), [slice 20](docs/prd/slice-20-acceptance.md), [slice 21](docs/prd/slice-21-acceptance.md), [slice 22](docs/prd/slice-22-acceptance.md), [slice 23](docs/prd/slice-23-acceptance.md), [slice 24](docs/prd/slice-24-acceptance.md), [slice 25](docs/prd/slice-25-acceptance.md), [slice 26](docs/prd/slice-26-acceptance.md), [slice 27](docs/prd/slice-27-acceptance.md), [slice 28](docs/prd/slice-28-acceptance.md), [slice 29](docs/prd/slice-29-acceptance.md), [slice 30](docs/prd/slice-30-acceptance.md), [slice 31](docs/prd/slice-31-acceptance.md).
 
 ## Getting started
 
@@ -141,7 +145,10 @@ is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at 
   Postgres jobs and Vercel). It is never in `.env.local`, which Next.js loads for `npm run dev`. The two never mix: on
   Postgres the local adapter and its files refuse to start; on the local adapter no connection is opened.
 - **Environments 2 and 3 share `infomapper-dev`.** Since slice 30 a write in one shows in the other, and a
-  `pg:seed -- --reset` from the laptop changes what the preview shows at once (the undo histories too).
+  `pg:seed -- --reset` from the laptop changes what the preview shows at once (the undo histories too). Since slice 31
+  `infomapper-dev` may hold a copy of Łukasz's model (AD-39); the reset then refuses until it is backed up and removed.
+- **Run a `pg:` script only from a checkout whose code is the one its docs describe** (slice 31): another branch's script
+  may lack a guard.
 - **The server badge** says `Online · {INFOMAPPER_SERVER_NAME}` on Postgres (`dev` in `.env.postgres.local` and in
   `dev`'s Preview variables), `Local` on the local adapter.
 - **Running against Postgres:** put the values in `.env.postgres.local` (the names are in `.env.example`), then
@@ -262,8 +269,11 @@ is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at 
 | `npm run pg:check` | One parameterized query through the transaction pooler with full TLS verification (`-- --migration`: the session pooler) |
 | `npm run pg:migrate` | Applies the migrations `infomapper-dev` has not had yet (`-- --dry-run` lists them); the only way to migrate it (slice 30: `undo_step`) |
 | `npx tsx scripts/pg-lock-check.ts` | Slice 30: the writes' lock and a count rule through `.env.postgres.local`'s database, in a workspace of its own that it soft-deletes at the end (timings and answers only) |
-| `npm run pg:seed` | The demo and "Performance test" into Postgres in one transaction, counts checked (`-- --reset` empties every table first; never a JSON file) |
-| `npm run pg:accounts` | A Supabase Auth account per person with `INFOMAPPER_DEMO_PASSWORD`, linked by `auth_user_id` (after `pg:seed`) |
+| `npm run pg:seed` | The demo and "Performance test" into Postgres in one transaction, counts checked (`-- --reset` empties every table first, refused while an organization the seed does not make is there; never a JSON file) |
+| `npm run pg:accounts` | A Supabase Auth account per person of the seed's organizations with `INFOMAPPER_DEMO_PASSWORD`, linked by `auth_user_id` (after `pg:seed`); `-- --kb` only Łukasz's own account (`INFOMAPPER_KB_EMAIL`, `INFOMAPPER_KB_PASSWORD`, slice 31) |
+| `npm run pg:kb -- <file under .data/backups/>` | Slice 31: Łukasz's model from a copy of a backup of the local file into `infomapper-dev`, in one transaction, counts checked (again: replaces it as a whole; `-- --remove` removes it) |
+| `npm run pg:backup` / `npm run pg:restore -- <file>` | Slice 31: the model's rows from `infomapper-dev` into a new `.data/backups/pg/kb-<yyyymmdd-hhmm>.json`, and back from such a file (counts only) |
+| `npx tsx scripts/kb-counts.ts <file under .data/backups/>` | Slice 31: a read-only count of the model in a copy of a backup (counts and schema names only) |
 | `npx tsx scripts/pg-auth-check.ts` | Checks Auth on `infomapper-dev`: the Data API off, sign-ups off, the admin API, sign-in, `getClaims` (statuses only) |
 | `npx tsx scripts/pg-snapshot-size.ts` | The editor's snapshot per workspace through the Postgres adapter: its bytes against Vercel's 4.5 MB |
 | `npx tsx scripts/preview-probe.ts <preview> [paths]` | A protected preview's status, redirect and regions, with the bypass header |

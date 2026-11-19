@@ -1935,16 +1935,68 @@ the next write starts ("Saving…", the prototype's `begin()`), not until the ne
 `Online · dev` comes from `INFOMAPPER_SERVER_NAME=dev` (Q7); another value shows as `Online · {value}` with a generic
 tooltip, and none as `Online`. Production's badge is slice D's decision.
 
-### The lock timeout is provisional
+### A write waits at most 15 s for its workspace's lock
 
-A write waits at most 10 s for its workspace's lock (`LOCK_TIMEOUT`, L7), then is refused as busy ("The workspace is busy
-saving a large change. Try again in a moment.", code `invalid`: the draft stays editable). The value is set again after
-S30-05's measurement of a large import on `dev`'s preview.
+A write waits at most 15 s for its workspace's lock (`LOCK_TIMEOUT`; 10 s, provisional, in slice 30; 15 s since slice 31
+on slice 30's measurement, AD-38's note), then is refused as busy ("The workspace is busy saving a large change. Try
+again in a moment.", code `invalid`: the draft stays editable). An import at the cap of 30,000 column rows holds the lock
+about 8.3 s at S30-05's rate; a larger write ahead, or a copy of KB (below), can still make a write behind it busy.
 
 ### A check workspace in infomapper-dev
 
 `scripts/pg-lock-check.ts` (slice 30, step 4) made the workspace "Slice 30 lock check" in the demo's InfoMate on
 `infomapper-dev` for its checks and soft-deleted it at the end: its rows (the workspace, its member, two projects, a
 canvas, the built-in classifications and stereotypes, their change events) stay in the tables, hidden everywhere. A
-`pg:seed -- --reset` (on Łukasz's OK) removes them.
+`pg:seed -- --reset` (on Łukasz's OK) removes them; since slice 31 only after KB has been backed up and removed
+(`pg:backup`, `pg:kb -- --remove`), since the reset refuses while KB is in the database.
+
+## Łukasz's model in infomapper-dev (slice 31, AD-39)
+
+### KB is in the shared infomapper-dev
+
+Once `pg:kb` has run, `npm run dev:pg` on the laptop and `dev`'s preview show organization KB at once, and a write from
+either changes it for both. The local file stays KB's master until Łukasz's switch day (C1.1): **a copy again replaces
+KB online as a whole**, so whatever was changed online since is gone (a `pg:backup` first keeps it in a file). The
+measurement on KB writes there too, and undoes its writes at the end. Only KB's own member sees it: the demo accounts
+are not members (S31-02). Nobody else may copy, restore or remove KB: the scripts run from the laptop with
+`.env.postgres.local`, and the reset refuses while KB is there.
+
+### What a copy and a backup do not carry
+
+- **The undo history:** the local adapter keeps it in memory only, so a copy starts KB's undo empty online; a copy, a
+  restore and a removal empty KB's undo histories (`undo_step`), since a step would point to rows that changed under it.
+  An Undo of a step made before a restore is not possible.
+- **The organization's development password** (`organization_access`, D-58): never copied and never in a backup (C1.2).
+  Online nobody needs it (Supabase Auth signs in, and every organization a person belongs to is unlocked). A password
+  set online in KB's access box is not in a backup and goes with the next copy or restore.
+- **The Supabase link** (`app_user.auth_user_id`): not in a backup. People are never deleted by a copy, a restore or a
+  removal, so Łukasz's link stays; after `pg:kb -- --remove` his person row stays with his account and sees no
+  organization until KB is copied in again.
+- **Changes since the backup** go with a restore, online changes since the last copy with a copy again.
+
+### KB's backups hold his e-mail
+
+`pg:backup`'s files (`.data/backups/pg/kb-<yyyymmdd-hhmm>.json`, git-ignored) hold KB's content and his e-mail, as his
+local file does. They stay on the laptop; they are never committed, uploaded or attached to a report. Supabase's own
+backups of `infomapper-dev` are not set up (slice D).
+
+### A copy holds KB's rows locked
+
+A copy, a restore and a removal lock KB's organization and workspace rows `for update` for their whole transaction (the
+first copy took 38 s). A write in KB from the preview or `dev:pg` meanwhile waits up to 15 s and is then refused as busy;
+the person makes it again. Writes in other organizations are not held.
+
+### A pg: script of another branch may not have the guards
+
+A `pg:` script runs the code of the checkout it is started from. After slice 31's step 4, `npm run pg:accounts -- --kb`
+run from a checkout of another branch (with `dev`'s script, before slice 31's merge) ignored `--kb`, gave every person
+in `infomapper-dev` the demo password, KB's account included, and printed every e-mail in the laptop's terminal; it was
+put right with this branch's `pg:accounts -- --kb` and a new `INFOMAPPER_KB_PASSWORD`. Nothing in a script can tell
+which checkout's docs were meant: CLAUDE.md's rule is to run a `pg:` script only from a checkout whose code its docs
+describe.
+
+### The measurement build can serve the local file
+
+`npm run measure:start` without `INFOMAPPER_DEV_DB` serves `.data/dev-db.json`, Łukasz's own file, on 127.0.0.1:3300
+(it was so before slice 31). The measuring specs never point at it; run it with `INFOMAPPER_DEV_DB` set to another file.
 

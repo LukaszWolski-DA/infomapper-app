@@ -90,7 +90,11 @@ the writes: Postgres writes each command in one transaction with the workspace's
 timeout and its busy refusal), the access read again and six count rules checked inside the write on both adapters;
 the undo history lasts on Postgres (`undo_step`; the local adapter keeps it in memory); the import's upload is gzipped
 by the browser; the top bar has a save indicator and a server badge (D-84); "Add person" is disabled online until the
-people slice (D-58's note).
+people slice (D-58's note). Slice 31 (AD-39) is slice C: Łukasz's organization KB copied from a copy of a backup of his
+local file into `infomapper-dev` (`pg:kb`, again or `--remove`), his own Supabase account (`pg:accounts -- --kb`), backup
+and restore by script (`pg:backup`, `pg:restore`), the reset refused while an organization the seed does not make is in
+the database, `lock_timeout` 15 s, and the measuring specs taking their workspace and account from variables; the local
+file stays KB's master until Łukasz's switch day.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -449,7 +453,7 @@ local adapter no pool is made.
   (`pool.ts`): 5 connections, 5 s idle, `attachDatabasePool` on Vercel, the transaction pooler, never a named statement.
 - **Writes** (slice 30, AD-38): `src/data/postgres/write.ts` (`applyWriteSet`): one transaction per write set; the
   locks (`needsOrganizationLock`: the organization's row first, then the workspace's, `for no key update`;
-  `LOCK_TIMEOUT` 10 s, provisional, then `BUSY_MESSAGE` with code `invalid`); the access read again
+  `LOCK_TIMEOUT` 15 s since slice 31, then `BUSY_MESSAGE` with code `invalid`); the access read again
   (`ApplyOptions.access`, recorded by `recordingStore` in `src/app/_lib/checked-access.ts`, compared by
   `accessChangedRefusal`); the three write phases (removes and soft deletes, inserts in key order, updates); the change
   events and the undo history (`ApplyOptions.history`); the count rules (`countChecks`, `countRefusal` in
@@ -480,7 +484,17 @@ local adapter no pool is made.
   **A later page to measure** puts `<TimingRecord />` last.
 - **The data:** `npm run pg:seed` builds the demo and "Performance test" in memory (`scripts/lib/seed-rows.ts`) and
   loads them with `loadRows` (one transaction, the database's own key order, a field no column holds refused, counts
-  checked); it never reads a JSON file, so never KB.
+  checked); it never reads a JSON file, so never KB. Its `--reset` refuses while the database holds an organization the
+  seed does not make (`resetRefusal`, `scripts/lib/seed-organizations.ts`, inside the reset's transaction).
+- **KB's copy** (slice 31, AD-39): `replaceOrganization`, `placeAll` and `readOrganization` in `load.ts` (one organization's
+  rows replaced in one transaction, stamped by their places in the whole file, counts checked; people never deleted);
+  the file only through `scripts/lib/backup-file.ts` (`backupPath`, `readBackupCopy`: under `.data/backups/`, never
+  `dev-db.json`, a temporary copy, upgraded in memory); KB's rows by key in `scripts/lib/organization-rows.ts`; the target
+  check `devTargetRefusal` (`scripts/lib/pg-env.ts`). Tests: `tests/kb-copy.test.ts` (the path rule, the rows, the target),
+  `tests/contract/copy.test.ts` (in CI's container: the demo's file copied, every read on both adapters equal, the copy
+  again, `--remove`, backup and restore, the refusals, the reset's guard). **The name "KB" stands in code only in
+  `scripts/pg-kb.ts` and `scripts/kb-counts.ts`**; `tests/own-model-guard.test.ts` fails a spec, fixture, helper, config
+  or workflow that names it, reads the local file or the backups, or uses `INFOMAPPER_KB_EMAIL` / `INFOMAPPER_KB_PASSWORD`.
 
 ## Testing (AD-21)
 
@@ -522,6 +536,11 @@ local adapter no pool is made.
     concurrent writes), and the smoke set writes (`S30-smoke-writes.spec.ts`), **only against a database on this machine**
     (F13): against `dev:pg` or the preview those specs skip. Slice 30's measurement (`S30-measure.spec.ts`, `MEASURE=1`)
     runs on `dev`'s preview; the Postgres-only specs stay in `e2e/slice-29` (the config's `testDir`, `POSTGRES_ONLY_FOLDERS`).
+    Since slice 31 the measuring specs (S29-08, S30-measure) measure the demo by default, or the workspace
+    `MEASURE_WORKSPACE` signed in with the account the variables named by `MEASURE_EMAIL_VAR` and `MEASURE_PASSWORD_VAR`
+    hold (`e2e/slice-29/measure-target.ts`): then they record numbers only (no trace, screenshot, video or HTML report),
+    write their raw files to `.data/measure/s31/` and name objects by role. **KB is measured only that way, from the
+    laptop; never in CI** (the repository and its artifacts are public).
   - **The single-file check:** `gh workflow run e2e.yml --ref <branch> -f files="e2e/<folder>/<spec>.ts ..." -f
     rounds=3`: `rounds` jobs side by side, each with its own fresh dev server, each running the files once (paths under
     `e2e/` only, checked before a server starts).
@@ -561,8 +580,14 @@ local adapter no pool is made.
   "Kanton Basel" in his `.data/dev-db.json` is a real business model he builds by hand to test and give feedback; later
   acceptance sessions use it. Never run `npm run reset-dev-data` on that file without a fresh backup and his OK; back it
   up on request and before a slice that changes the local file's format (`.data/backups/dev-db-<yyyymmdd-hhmm>.json`,
-  the newest also `.data/backups/kb-model-latest.json`; git-ignored). It holds his real e-mail and KB's password hash,
-  so it is never committed; it stays on his disk only (his decision, 28 October 2026). **Since 10 November 2026 his file
+  the newest also `.data/backups/kb-model-latest.json`; git-ignored). It holds his real e-mail and KB's organization
+  password hash, so it is never committed. **Since slice 31 (C1.2, amending his decision of 28 October 2026) KB may be
+  copied into `infomapper-dev`** (`pg:kb`, AD-39): its content and his e-mail, never the password hash; he signs in online
+  with his own Supabase account. The file is still read only on a copy of a backup (the scripts refuse
+  `.data/dev-db.json` itself and any path outside `.data/backups/`) and stays KB's master until his switch day (C1.1).
+  **No e2e, smoke or measuring run opens KB or signs in with his real e-mail where its artifacts are public**; the
+  measurement of KB runs from the laptop only. KB online is changed only by his own use and by `pg:kb`, `pg:restore` and
+  `pg:kb -- --remove` on his command; never reset (the reset refuses while KB is there). **Since 10 November 2026 his file
   is changed only on his explicit command** (a format upgrade included): a dev server of his that serves this checkout
   runs the branch's code on it, so before a step that changes the format, check that none does (slice 24, step 3).
 
@@ -582,8 +607,8 @@ local adapter no pool is made.
 | # | Environment | Adapter, sign-in | Its values |
 | --- | --- | --- | --- |
 | 1 | `npm run dev` on the laptop | local (`.data/dev-db.json`, KB; `.data/demo-db.json`), the development sign-in | none needed |
-| 2 | `npm run dev:pg` on the laptop | Postgres on `infomapper-dev`, Supabase Auth | `.env.postgres.local` |
-| 3 | The Vercel preview of `dev` | Postgres on `infomapper-dev`, Supabase Auth; writes from `dev`'s first deployment with slice 30 | Vercel's Preview, scoped to the branch |
+| 2 | `npm run dev:pg` on the laptop | Postgres on `infomapper-dev` (the demo, "Performance test" and, since slice 31, a copy of KB), Supabase Auth | `.env.postgres.local` |
+| 3 | The Vercel preview of `dev` | Postgres on `infomapper-dev`, the same data, Supabase Auth; writes from `dev`'s first deployment with slice 30 | Vercel's Preview, scoped to the branch |
 | 4 | Production (slice D) | its own Vercel project `infomapper-app` and Supabase `infomapper-prod` | – |
 
 Environments 2 and 3 share `infomapper-dev`: since slice 30 a write in one shows in the other, and a
@@ -591,7 +616,14 @@ Environments 2 and 3 share `infomapper-dev`: since slice 30 a write in one shows
 `INFOMAPPER_SERVER_NAME` (`dev` in `.env.postgres.local` and in `dev`'s Preview variables). **Running against Postgres:**
 `npm run pg:check`, `pg:migrate` (the only way to migrate `infomapper-dev`; slice 30 added `undo_step`),
 `schema:check -- --existing`, `pg:seed`, `pg:accounts`, `dev:pg`; `npx tsx scripts/pg-lock-check.ts` checks the
-writes' lock and a count rule there in a workspace of its own.
+writes' lock and a count rule there in a workspace of its own. Since slice 31 KB's copy is there too (`pg:kb`,
+`pg:backup`, `pg:restore`, `pg:accounts -- --kb`; AD-39): a copy, a restore or a removal shows on the preview at once.
+
+**A `pg:` script is run only from a checkout whose code is the one its docs describe** (slice 31, after step 4): check
+the branch before giving or running one. A `pg:` script of another branch may lack a guard the docs promise: `dev`'s
+`pg:accounts` before slice 31 ignored `--kb`, gave every person in `infomapper-dev` the demo password (KB's account
+included) and printed every e-mail. Until a slice that adds or changes a `pg:` script is merged, its command runs only on
+that slice's branch, and the prompt names the branch.
 
 **Hosting rules** (AD-22's note):
 - **Vercel project `infomapper-app-dev`** (Pro, `fra1` beside Supabase's Frankfurt, Fluid compute, Node.js 22.x set
@@ -613,7 +645,8 @@ writes' lock and a count rule there in a workspace of its own.
   `./`, and ignore its services prompt (`vercel.json` has no `services` key).
 - **Variables:** Preview only, branch-scoped; the three connection values (`INFOMAPPER_DATABASE_URL`, `SUPABASE_URL`,
   `SUPABASE_PUBLISHABLE_KEY`) as Secret, `INFOMAPPER_DATA` and `INFOMAPPER_TIMING` as plain. **Never in Vercel:**
-  `SUPABASE_SECRET_KEY`, `INFOMAPPER_MIGRATION_URL`, `INFOMAPPER_DEMO_PASSWORD`. The bypass secret
+  `SUPABASE_SECRET_KEY`, `INFOMAPPER_MIGRATION_URL`, `INFOMAPPER_DEMO_PASSWORD`, `INFOMAPPER_KB_EMAIL`,
+  `INFOMAPPER_KB_PASSWORD` (slice 31: only in `.env.postgres.local`). The bypass secret
   (`VERCEL_AUTOMATION_BYPASS_SECRET`) lives only in `.env.postgres.local`.
 - **A preview is protected** (Vercel Authentication, Standard Protection): reach it with the bypass header
   (`scripts/preview-probe.ts`, `PG_BASE_URL=<preview>` with `playwright.pg.config.ts`, which then records no trace).
@@ -643,14 +676,20 @@ npm run pg:check         # one parameterized query through the transaction poole
 npm run pg:migrate       # the migrations infomapper-dev has not had yet (-- --dry-run lists them); the only way to migrate it
 npm run schema:check -- --existing   # compare a migrated database (INFOMAPPER_MIGRATION_URL) with the domain, RLS on every table
 npm run pg:seed          # the demo and Performance test into Postgres, counts checked (-- --reset empties every table first)
-npm run pg:accounts      # a Supabase Auth account per person (INFOMAPPER_DEMO_PASSWORD), linked by auth_user_id
+npm run pg:accounts      # a Supabase Auth account per person of the seed's organizations (INFOMAPPER_DEMO_PASSWORD), linked by auth_user_id; says how many it left out
+npm run pg:accounts -- --kb   # slice 31: only Łukasz's own account (INFOMAPPER_KB_EMAIL, INFOMAPPER_KB_PASSWORD), made or kept and linked; prints "linked" only
+npm run pg:kb -- .data/backups/<copy of a backup>.json   # slice 31: KB from a backup of the local file into infomapper-dev (again: replaces KB as a whole); counts only
+npm run pg:kb -- --remove     # slice 31: remove KB from infomapper-dev (people and other organizations stay)
+npm run pg:backup        # slice 31: KB's rows from infomapper-dev into a new .data/backups/pg/kb-<yyyymmdd-hhmm>.json (the local file's shape), counts only
+npm run pg:restore -- .data/backups/pg/kb-<yyyymmdd-hhmm>.json   # slice 31: KB back as that backup holds it; KB's undo histories emptied
+npx tsx scripts/kb-counts.ts .data/backups/<copy of a backup>.json   # slice 31: a read-only count of KB in a copy of a backup (counts and schema names only)
 npx tsx scripts/pg-auth-check.ts       # Auth on infomapper-dev: Data API off, sign-ups off, admin API, sign-in, getClaims
 npx tsx scripts/pg-snapshot-size.ts    # the editor's snapshot per workspace against Vercel's 4.5 MB
 npx tsx scripts/preview-probe.ts <preview> [paths]   # a protected preview's status, redirect and regions (bypass header)
 npx playwright test --config playwright.pg.config.ts   # the smoke set on Postgres: against dev:pg, or PG_BASE_URL=<preview>
 MEASURE=1 PG_BASE_URL=<preview> npx playwright test --config playwright.pg.config.ts S29-08   # slice 29's measurement (LOCAL_DB=<file> against measure:start)
 MEASURE=1 PG_BASE_URL=<dev's preview> npx playwright test --config playwright.pg.config.ts S30-measure   # slice 30: the writes (S30-13) and a 10,000-column import (S30-05), INFOMAPPER_TIMING=1 on the preview
-npx tsx scripts/pg-lock-check.ts       # slice 30: the writes' lock, the lock timeout and a count rule through .env.postgres.local's database (a workspace of its own, soft-deleted at the end)
+npx tsx scripts/pg-lock-check.ts       # slice 30 (slice 31: holds 18 s against 15 s): the writes' lock, the lock timeout and a count rule through .env.postgres.local's database (a workspace of its own, soft-deleted at the end)
 npm run build            # production build (npm start serves it; no dev sign-in, no local data)
 npm run measure:build    # measurement-only production build in .next-measure (AD-31)
 npm run measure:start    # serve it on http://127.0.0.1:3300 with INFOMAPPER_MEASURE=1 (local adapter, dev sign-in)

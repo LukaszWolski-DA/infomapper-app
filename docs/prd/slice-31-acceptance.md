@@ -477,3 +477,39 @@ The e2e workflow's public `server.log` artifacts hold the same kind of lines, wi
 passwords. Łukasz was advised to clear the terminal and change the online password. The fix, `logging: { serverFunctions:
 false }` with a guard test, touches shared configuration, so it is a `fix/` branch of its own (CLAUDE.md, "The slice
 cycle", 4), proposed as a separate task, not part of this slice.
+
+## After step 4: the accounts script run from the wrong checkout (19 November 2026)
+
+- **What happened.** After step 4, Łukasz ran `npm run pg:accounts -- --kb` in a checkout on `fix/dev-action-logging`,
+  whose `pg:accounts` was `dev`'s, without F3. That version does not know `--kb` and ignored it: it gave **every** person
+  in `infomapper-dev` the demo password (`INFOMAPPER_DEMO_PASSWORD`), the KB account included, and printed every
+  person's e-mail in his terminal. The terminal is the laptop's only; nothing reached a log, an artifact or the
+  repository.
+- **Fixed** on `slice/31-kb-copy`, with this branch's `pg:accounts -- --kb` and a new `INFOMAPPER_KB_PASSWORD` in
+  `.env.postgres.local`: the KB account has its own password again, and **the demo password no longer opens the KB
+  account**, checked by Łukasz on `dev`'s preview.
+- **The rule that comes of it** (CLAUDE.md, "Environments and hosting"): a `pg:` script is run only from a checkout whose
+  code is the one its docs describe; until this slice is merged into `dev`, `pg:kb`, `pg:backup`, `pg:restore` and
+  `pg:accounts -- --kb` exist only on `slice/31-kb-copy`, and `dev`'s `pg:accounts` gives every person the demo password.
+
+## For the measurement chore after the merge (S31-06)
+
+The `chore/` PR that measures KB (section 2, "Measurement on KB") also does these, found on `dev:pg` and the preview
+during the acceptance:
+
+- **The S30-05 runs' leftovers:** count the soft-deleted rows that slice 30's large-import runs (S30-05) left in the demo's
+  "Retail Co – DWH" on `infomapper-dev` (per table, live and soft-deleted), since undo reads every undoable table with its
+  deleted rows (`loadForUndo`).
+- **Undo, KB and the demo apart:** measure Undo on KB and on the demo separately, each with that count of soft-deleted
+  rows beside it.
+- **The 70 s Undo** seen once on `dev:pg`: explain it (where the time went: the read of the whole workspace, the lock
+  wait, the pool, the laptop's distance to Frankfurt), before any fix is proposed.
+- **0 statements in the routes' Server-Timing on `dev:pg`:** explain why the thumbnail route's (and the import's)
+  `Server-Timing` shows no statements on `dev:pg` (whether the timed pool is used there, or `INFOMAPPER_TIMING` is off).
+
+## Step 5: the closing (19 November 2026)
+
+- `dev` (`d5926a3`, with `fix/dev-action-logging`) merged into `slice/31-kb-copy` with a merge commit (`e816117`), no
+  conflict.
+- The docs: `decisions.md` (AD-31 amended again, AD-39 new, AD-38's note on `lock_timeout`), CLAUDE.md, README,
+  `known-limitations.md`, `ideas.md`; `data-model-v2.md` unchanged (no field without a column, Q1).

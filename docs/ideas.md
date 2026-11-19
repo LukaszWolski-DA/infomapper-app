@@ -1046,8 +1046,9 @@ slice.
 
 ## The database program: what comes later (slice 29, the walking skeleton)
 
-- **The read fixes, a slice of their own after slice B** (Łukasz, 17 November 2026: slice B's rights round changes the
-  same reads). The thumbnail first (a whole `model.load` and five more reads for one canvas: 264 ms against 12 ms
+- **The read fixes, a slice of their own, only if slice C's measurement on KB asks for it** (Łukasz, 17 November 2026:
+  after slice B; 19 November 2026: slice C first, then the read fixes only if the measurement on KB in the `chore/`
+  after slice 31's merge shows them needed, aimed at what is slow on KB; AD-31 as amended by slice 31). The thumbnail first (a whole `model.load` and five more reads for one canvas: 264 ms against 12 ms
   locally), then one read per page instead of 31 to 50 port calls and 73 to 116 statements, and the link guards' tables
   in one query each. Measured with `e2e/slice-29/S29-08-measure.spec.ts` against `docs/prd/slice-29-measurement.md`.
 - **`dev` as the Production Branch of `infomapper-app-dev`** (chore/dev-branch, for slice D; done there: the `dev`
@@ -1060,8 +1061,15 @@ slice.
 - **Undo reads the whole workspace** (slice 30, F2): every Ctrl+Z reads every undoable table with its deleted rows
   (`loadForUndo`, about 35 statements on Postgres); for the read fixes slice, read only the rows the step's events name
   and their parents and children. Slice 30's measurement gives its figure (S30-13, Undo).
-- **The lock timeout's value** (slice 30, L7): 10 s until S30-05's figures on `dev`'s preview; then a value, and whether
-  a large import should take its lock later or in parts.
+- **The lock timeout's value** (slice 30, L7): 15 s since slice 31 (AD-38's note); open: whether a large import should take
+  its lock later or in parts.
+- **KB's switch day** (slice 31, C1.1): Łukasz's decision after the measurement on KB; on that day the last `pg:kb` from
+  the local file, then KB online is the master and the local file a backup. Then: Supabase's own backups (slice D), and
+  whether `pg:backup` runs on a schedule.
+- **The measurement on KB** (S31-06, the `chore/` after slice 31's merge): reads, writes with the fixed spec, the snapshot's
+  size, beside the demo's; also the soft-deleted rows S30-05 left in the demo's "Retail Co – DWH", Undo on KB and on the
+  demo apart, the 70 s Undo once seen on `dev:pg`, and the routes' `Server-Timing` with 0 statements on `dev:pg`
+  (`docs/prd/slice-31-acceptance.md`).
 - **"Explicit orders where an order means something"** (below) was done in slice 30 for the lists that are drawn or
   decide something (AD-12's note); the first project in the top bar still comes from the stored order.
 - **A hotfix path into `main`** (slice D): a `hotfix/` branch from `main` into `main` with its own full run, then `main`
