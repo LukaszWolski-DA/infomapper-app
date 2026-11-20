@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Client } from "pg";
 import { STORE_SCHEMA } from "@/compose/tables";
+import type { CommandContext } from "@/domain/changes";
 import type { ModuleTable } from "@/domain/types";
 import type { DevDb } from "@/data/local/schema";
 import type { DataStore } from "@/data/ports";
@@ -15,6 +16,21 @@ import { seedRows } from "../../scripts/lib/seed-rows";
 export type Row = Record<string, unknown> & { id?: string; workspace_id?: string; deleted_at?: string | null };
 export const AT = new Date("2026-11-16T10:00:00.000Z");
 export const LATER = "2026-11-16T11:00:00.000Z";
+
+/**
+ * The suite's one clock (fix/contract-seed-clock): ids and times both adapters get alike. Ids are UUID-shaped and
+ * increasing, from a counter after `prefix`; times start an hour after `from` (the seed's time) and add one second per
+ * command, so every command is later than every seed row on any day, and the two adapters' stored orders agree (AD-12).
+ */
+export function contractClock(prefix: string, from: Date = AT): (actorId: string) => CommandContext {
+  let id = 0;
+  let second = 0;
+  const start = from.getTime() + 60 * 60 * 1000;
+  return (actorId) => {
+    second += 1;
+    return { actorId, now: new Date(start + second * 1000).toISOString(), newId: () => `${prefix}-0000-7000-8000-${(++id).toString(16).padStart(12, "0")}` };
+  };
+}
 
 /** Every table's crowded milliseconds spread as the loader spreads them (slice 30, L8). */
 export function spreadAll(db: DevDb): DevDb {
