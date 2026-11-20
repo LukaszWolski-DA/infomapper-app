@@ -5,7 +5,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { seedRows } from "../scripts/lib/seed-rows";
-import { AT } from "./contract/shared";
+import { AT, contractClock } from "./contract/shared";
 
 const ISO = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/;
 
@@ -31,4 +31,13 @@ describe("the contract suite's seed is at the time it is given", () => {
       expect(otherTimes(AT.toISOString())).toEqual([]);
     });
   }
+
+  it("the suite's clock starts after every seed row and adds a second per command", () => {
+    const ctxOf = contractClock("01a1c000");
+    const first = ctxOf("someone");
+    const second = ctxOf("someone");
+    expect(Date.parse(first.now)).toBeGreaterThan(AT.getTime());
+    expect(Date.parse(second.now) - Date.parse(first.now)).toBe(1000);
+    expect(first.newId()).toBe("01a1c000-0000-7000-8000-000000000001");
+  });
 });
