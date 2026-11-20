@@ -435,3 +435,26 @@ Done by Łukasz, on `slice/33-people` unless said otherwise. Nothing of KB was w
   is made from `dev`'s checkout, as Łukasz did.
 - **CLAUDE.md** says that the Vercel variable `SUPABASE_SECRET_KEY` existed before slice 33 (when and why is not
   known), and that since slice 33 it holds the key `vercel_dev_preview`, which only the preview uses.
+
+## 10. Step 5: Łukasz's acceptance (20 November 2026)
+
+**Passed**, on `npm run dev:pg` with the demo account of the demo's Łukasz (`lukasz@infomate.pl`), after the backup
+`kb-20261120-1911.json`:
+- **S33-01:** `test.person@example.com` invited as Modeler; the link shown once and copied; the invitation pending with
+  its expiry. Later `test.second@example.com` as Reader: New link moved the expiry; Revoke removed it.
+- **S33-02:** the invite page in a private window; the 10-character message; Join; signed in; the person sees only
+  Retail Co – DWH, while the demo's Łukasz also sees Performance test. The inviter's list shows Test Person as Modeler
+  and no pending invitation; the same link again shows the one refused message.
+- **S33-03:** Change password: a wrong current password refused; the new one works, the old one does not. A reset link:
+  a new password set, signed in; the same link again refused.
+- Then Test Person was removed from the workspace.
+
+**Not checked by hand:** the local adapter on `npm run dev` (it would raise Łukasz's local file to format 18; the full run
+covers it) and an Admin's reset link for an Owner (the smoke spec `S33-smoke-people` covers it in CI).
+
+**Seen during the acceptance:** after signing in as Test Person on `/sign-in`, the page stayed blank on `/` with Next.js's
+development badge "Rendering" until Ctrl+F5, although the server had answered the workspace's page twice without an
+error. The assumed cause is the sign-in's soft navigation (`router.push`) racing Next.js's own refresh after an action
+that sets cookies, made visible by `dev:pg`'s 3 to 5 s pages; not reproduced. The sign-in form is slice 29's; Join and
+Set password (this slice) navigate the same way. Proposed: a full page load after the three actions that change the
+session. Open: Łukasz decides where (this slice or a `fix/` branch) and whether Claude reproduces it on `dev:pg`.
