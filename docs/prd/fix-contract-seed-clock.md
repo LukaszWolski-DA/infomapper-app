@@ -1,6 +1,6 @@
 # Fix – The contract suite's seed mixes a fixed time with the real one
 
-Status: **step 1, reconnaissance** (20 November 2026); no code yet. Branch `fix/contract-seed-clock` from `dev` at
+Status: **step 2, the fix and its proof** (20 November 2026); step 1 accepted by Łukasz the same day. Branch `fix/contract-seed-clock` from `dev` at
 `6a6e7d7`. A fix to shared test infrastructure (the contract suite and `scripts/lib/seed-rows.ts`), outside slices
 (CLAUDE.md, the slice cycle, 4). Found on slice 32's branch (`docs/prd/slice-32-acceptance.md` on `slice/32-theme`,
 "Open before step 4").
@@ -96,6 +96,12 @@ guard fails the day a new seed step does.
 functions and their callers in scripts, fixtures and unit tests for no gain here; the real-time default is right for
 `npm run seed`); faking `Date` inside the contract suites themselves (the guard covers the source; faking it next to
 `pg`'s pool and timers adds risk for nothing).
+
+**Łukasz's answer (step 1, 20 November 2026):** step 1 accepted. `npm run pg:seed`'s demo rows take the seed's moment
+(Claude's call, accepted; quoted for his approval at the closing): "With the fix, `npm run pg:seed`'s demo rows (the
+star, the derivations, the types, the checks, the documents) are stamped with the seed's moment, the same as the rest
+of the seed, instead of the real time a few milliseconds later; counts, ids and content are unchanged, and the loader's
+place stamps keep the file's order (AD-12)."
 
 ## 4. The proof
 
