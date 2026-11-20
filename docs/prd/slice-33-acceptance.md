@@ -401,3 +401,14 @@ merge; after the merge, the preview's "Invite person" checked (F3).
 - **D8 (F22):** the "signed in as someone else" line: an idea for later (*recommended*) or in this slice.
 - **D9 (P-n):** the prototype's single error line in the new dialogs and pages (*recommended*) or the app's field messages.
 - **D10:** the not-set-up wording of Q3 ("This server is not set up for invitations yet.").
+
+## 8. Łukasz's answers to step 1 (20 November 2026)
+
+- **D1 to D10: accepted as recommended.** D1, D2, D6, D7, D9 and D10 are Łukasz's decisions; D3, D4, D5 and D8 are
+  Claude's technical calls and the plan's changes, quoted for his approval at the closing.
+- **F1: yes.** This slice changes the rule "the secret key is never used by the app and never in Vercel" (P1.2 knew the
+  cost). At the closing CLAUDE.md, `.env.example` and AD-04's note are rewritten: the key is read only in
+  `src/app/_lib/supabase-admin.ts` (and the scripts), and a check keeps it out of the client bundle.
+- **F4, F8 and the smaller changes: accepted.** Step 4 has no laptop item; step 6 has no Redeploy.
+- **A tenth e2e part,** if part 9's heap needs it, goes first on its own `chore/` branch with its own full run; Łukasz is
+  told before it starts.
