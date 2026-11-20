@@ -101,10 +101,20 @@ jobs:
       - run: npm run pg:seed
       - run: npm run pg:accounts
       - run: npm run build
+      # slice 33 (Q3, F1): the secret key (here the local stack's throwaway one) is in no file the browser gets
+      - run: npx tsx scripts/check-client-bundle.ts
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test --config playwright.pg.config.ts
         env:
           PG_SERVE: "1"
+      # slice 33: the online screenshots (demo data on this runner's throwaway stack only)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-screens
+          path: test-results/screens-pg/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: On failure, show the port range and what holds the stack's ports
         if: failure()
         run: |

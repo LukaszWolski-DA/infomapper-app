@@ -6,7 +6,7 @@ import { newSession } from "../slice-00/helpers";
 import { asUser } from "../slice-01b/helpers";
 import { canvasUrl } from "../slice-01a/helpers";
 import { expect, test } from "./fixtures";
-import { changeRoleAs, expectToast, openPeople, personRow, SEED_IDS, signInAs } from "./helpers";
+import { changeRoleAs, closeLinkDialog, expectToast, inviteInBox, joinByLink, openPeople, personRow, SEED_IDS, signInAs } from "./helpers";
 
 const DWH = "Retail Co – DWH";
 
@@ -46,13 +46,14 @@ test("S8-10: removing: the confirmation with the last-workspace sentence, Cancel
   await page.goto(`${canvasUrl()}?note=${note.id}`);
   await expect(page.getByTestId("panel-note")).toContainText("by Piotr Wiśniewski.");
 
-  // a removed person can be added again
+  // a removed person can be invited again (slice 33: "Invite person" replaced "Add person"); joining keeps his name
   await openPeople(page, ws);
-  const box = page.getByTestId("box-add-person");
-  await box.getByTestId("input-add-person-name").fill("Piotr");
-  await box.getByTestId("input-add-person-email").fill("piotr.w@infomate.pl");
-  await box.getByTestId("button-add-person-continue").click();
-  await box.getByTestId("button-add-person").click();
+  const link = await inviteInBox(page, "piotr.w@infomate.pl");
+  await closeLinkDialog(page);
+  const again = await browser.newContext();
+  await joinByLink(await again.newPage(), link);
+  await again.close();
+  await openPeople(page, ws);
   await expect(personRow(page, "Piotr Wiśniewski")).toBeVisible();
 });
 
