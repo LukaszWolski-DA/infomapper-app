@@ -1098,3 +1098,19 @@ only by Undo of its import while that is still in the person's history (slice 30
 this way, 26 steps down), or by deleting its tables one by one, which leaves the system itself. The idea: "Delete
 {system}…" in its panel, with its impact (tables, columns, mappings that read them, open changes to resolve) and one
 undo step.
+
+## A light, dark or system theme chosen in the app (Łukasz, 19 November 2026, for Łukasz to decide)
+
+Today the app follows the system's or the browser's theme only: the tokens' dark values are under
+`@media (prefers-color-scheme: dark)` (`src/app/globals.css`, `src/canvas/canvas.css`, Tailwind's `dark` variant), and
+there is no control in the app. The idea: a choice of Light, Dark or System (the default), per person, remembered on the
+server (a cookie the server reads, like the side panels', so the first paint is right), with the dark values moved under
+a class or attribute on `<html>` and System keeping the media query. Things to check: the thumbnails take the page's
+tokens through `<use>` (AD-32) and InfoDocumenter's printed pages stay light.
+
+**Done in slice 32** (D-85): Light, Dark or System (the default) in the person's menu, remembered per browser in the
+cookie `im-theme` that the server reads (not per person, as the idea had it: the sign-in page has no person), `data-theme`
+on `<html>` from the first paint, the dark values written once under Tailwind's `dark` variant (the media query for System,
+the attribute for a choice) and `color-scheme` following the choice. The thumbnails follow it with no change (AD-32);
+InfoDocumenter's pages stay light. Left for later: the choice stored in the person's account (it would follow across
+browsers and devices), a keyboard shortcut and a dark theme for InfoDocumenter's pages.

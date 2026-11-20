@@ -2,8 +2,26 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Dark mode follows the system, as in the prototype. */
-@custom-variant dark (@media (prefers-color-scheme: dark));
+/* Dark mode (slice 32, D-85): the theme chosen in the person's menu, `data-theme` on <html> (`src/ui/theme.ts`), or the
+   system's while none is chosen (System). This variant is the one place that says what "dark" means: every dark value
+   is written once, under `@variant dark { … }` (here and in canvas.css) or as a `dark:` utility, and Tailwind writes it
+   under both selectors. No other rule reads `prefers-color-scheme` (tests/theme-css.test.ts). */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+}
+
+/* Native controls, lists and scroll bars follow the theme (slice 32, P1: System follows the system, so they match a dark
+   Windows too). InfoDocumenter's pages keep their own `color-scheme: light` (document-css.ts). */
+:root { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 
 /*
  * One palette: the prototype's colour tokens (docs/prototype), light and dark.
@@ -41,8 +59,8 @@
   --im-req-on: #ffffff;
   --im-shadow: rgba(22, 32, 48, 0.16);
 }
-@media (prefers-color-scheme: dark) {
-  :root {
+:root {
+  @variant dark {
     --im-canvas: #13181e;
     --im-grid: #2b343e;
     --im-panel: #181e25;
@@ -78,11 +96,9 @@
 [data-bg="white"] { --im-canvas: #ffffff; --im-grid: #d3d9e0; }
 [data-bg="blue"] { --im-canvas: #ecf1f8; --im-grid: #c2cedf; }
 [data-bg="warm"] { --im-canvas: #f4f1eb; --im-grid: #d8d0c2; }
-@media (prefers-color-scheme: dark) {
-  [data-bg="white"] { --im-canvas: #1b2128; --im-grid: #2c343e; }
-  [data-bg="blue"] { --im-canvas: #101925; --im-grid: #233247; }
-  [data-bg="warm"] { --im-canvas: #1c1a17; --im-grid: #35302a; }
-}
+[data-bg="white"] { @variant dark { --im-canvas: #1b2128; --im-grid: #2c343e; } }
+[data-bg="blue"] { @variant dark { --im-canvas: #101925; --im-grid: #233247; } }
+[data-bg="warm"] { @variant dark { --im-canvas: #1c1a17; --im-grid: #35302a; } }
 .im-swatch { background: radial-gradient(var(--im-grid) 1px, transparent 1.2px) 0 0 / 6px 6px, var(--im-canvas); }
 
 /* shadcn/ui variables, mapped onto the prototype palette (they follow light and dark through it). */
@@ -182,12 +198,10 @@
 .tc-attn { color: #a16207; }
 .tc-ok { color: #15803d; }
 .tc-info { color: #2563eb; }
-@media (prefers-color-scheme: dark) {
-  .tc-warn { color: #ff8b4e; }
-  .tc-attn { color: #e9b949; }
-  .tc-ok { color: #4ade80; }
-  .tc-info { color: #7aa7ff; }
-}
+.tc-warn { @variant dark { color: #ff8b4e; } }
+.tc-attn { @variant dark { color: #e9b949; } }
+.tc-ok { @variant dark { color: #4ade80; } }
+.tc-info { @variant dark { color: #7aa7ff; } }
 .rt-view {
   border: 1px solid var(--im-line); border-radius: 6px; background: var(--im-surface); padding: 8px 10px; min-height: 40px;
   max-height: 9.2em; overflow: hidden; font-size: 12.5px; line-height: 1.5; text-align: left; width: 100%; color: var(--im-ink);

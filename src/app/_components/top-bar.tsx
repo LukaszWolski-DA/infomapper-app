@@ -24,6 +24,7 @@ import {
 import { signOut } from "../_actions/session";
 import { createProjectAction, createWorkspaceAction } from "../_actions/workspace";
 import { useAction } from "./use-action";
+import { ThemeChoice } from "./theme-choice";
 import type { ActionResult } from "../_lib/run-command";
 import type { ShellData } from "../_lib/shell";
 import { projectHref, workspaceHref } from "../_lib/paths";
@@ -362,6 +363,9 @@ function UserIndicator({ shell }: { shell: ShellData }) {
         <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
         <MenuLink href={workspaceHref(workspace.id, "people")}>People and roles</MenuLink>
         <MenuLink href={workspaceHref(workspace.id)}>Workspace home</MenuLink>
+        <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+        {/* slice 32 (D-85): Light, Dark or System */}
+        <ThemeChoice headingClass={sectionClass} />
         <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
         <DropdownMenuItem asChild className={itemClass}>
           <button type="button" data-testid="button-sign-out" className="w-full" onClick={() => void signOut()}>

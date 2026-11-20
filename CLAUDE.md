@@ -95,6 +95,9 @@ local file into `infomapper-dev` (`pg:kb`, again or `--remove`), his own Supabas
 and restore by script (`pg:backup`, `pg:restore`), the reset refused while an organization the seed does not make is in
 the database, `lock_timeout` 15 s, and the measuring specs taking their workspace and account from variables; the local
 file was KB's master until Łukasz's switch on 20 November 2026; since then KB online is the master (AD-39's note).
+Slice 32 (D-85, an exception to AD-31's "no new feature slices") is the theme: Light, Dark or System (the default) in the
+person's menu, remembered per browser in the cookie `im-theme` that the server reads, `data-theme` on `<html>` from the
+first paint, the dark values written once under Tailwind's `dark` variant, `color-scheme` following; no data changes.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -422,6 +425,19 @@ list up to date in each sub-slice):
 
 **UI (AD-20).** Tailwind and shadcn/ui; Tiptap for rich text. Match the prototype’s layout, wording and behaviour;
 visual polish may improve, behaviour may not change without a decision.
+
+**The theme (slice 32, D-85).** The cookie `im-theme` (`light` or `dark`; System deletes it; per browser, not per person)
+is read by the root layout (`src/app/layout.tsx`), which renders `data-theme` on `<html>`; the rules are
+`src/ui/theme.ts`, the click (`chooseTheme`: the cookie first, then the attribute) and the listener for the back-forward
+cache and another tab (`ThemeSync`, `pageshow` and `visibilitychange`) `src/ui/theme-sync.tsx`, the menu's section
+`src/app/_components/theme-choice.tsx` (Radix radio items drawn as one segmented row). **A dark value is written only
+under Tailwind's `dark` variant** (`@variant dark { … }` inside its rule, or a `dark:` utility), never under
+`@media (prefers-color-scheme: dark)`: the variant in `globals.css` is the one place that reads it (the media query while
+no theme is chosen and not Light, or `data-theme="dark"`). Another CSS file takes it with `@reference
+"../app/globals.css";` (`canvas.css`). `tests/theme-css.test.ts` fails any other reader and compiles `globals.css` with
+`@tailwindcss/node` (a devDependency at the build's version) to check both selectors. `color-scheme` follows the choice
+(`light dark` for System). InfoDocumenter's pages keep their own tokens and `color-scheme: light`; the thumbnails take the
+page's tokens (AD-32). `global-error` shows System (`docs/known-limitations.md`).
 
 **Canvas (AD-24).** React Flow with the named workarounds listed under AD-24 in docs/decisions.md. Follow them in all canvas work; the spike in spikes/canvas-react-flow shows how.
 
@@ -1077,6 +1093,18 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - read the side panels (`sectionsToggle`, `optionsToggle`, `widthOf`, `inertOf`, `expectPanel`: shown with its width
     and handle, or 0 wide, inert, no handle), the preview's scale (`zoomOf`) and the cookie (`panelsCookie`).
   A cookie a spec adds needs the path `/` (`url: origin + "/"`), or the page's own cookie wins.
+
+  Slice 32's fixtures are slice 28's (`seed` "docs", "plain" or "full"; the theme writes nothing). Its helpers do the
+  following:
+  - open the person's menu and choose a theme (`openUserMenu`, `chooseTheme`, `themeItem`, `expectChecked` with
+    `aria-checked`), read `<html>`'s attribute, the tokens, `color-scheme` and the body's background (`themeAttr`,
+    `tokenOf`, `expectTokens`, `colorSchemeOf`, `bodyBg`) and the cookie (`themeCookie`);
+  - read what the server's HTML and CSS alone paint, in a context with JavaScript off and the test's cookies
+    (`withoutScript`), and the e2e data file's counts (`dataFootprint`: a choice writes nothing).
+  **The theme in tests:** without the cookie a page is at System and Playwright emulates a light system, so every earlier
+  spec sees the page as before; each test's fresh context starts without the cookie. `emulateMedia({ colorScheme })` sets
+  System's side only: under Light or Dark it changes nothing. The smoke set has `e2e/slice-29/S32-smoke-theme.spec.ts`
+  (it writes nothing, so it runs against any target).
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,
