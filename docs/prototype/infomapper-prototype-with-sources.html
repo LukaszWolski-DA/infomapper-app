@@ -6513,18 +6513,25 @@ function renderUserBtn() {
   b.className = "userbtn" + (perm === "review" ? " review" : perm === "none" ? " none" : "");
   b.title = `${ROOT.user.name}: ${w.archived ? "this workspace is archived (read-only)" : (me.role || "") + " in " + w.name}${me.guest ? ", guest from " + me.guest : ""}`;
 }
+/* Theme (the theme slice): Light, Dark or System (the default). System follows prefers-color-scheme; Light and Dark set
+   data-theme on <html>, which the dark tokens already honour. In the app it is a cookie the server reads; here memory. */
+const THEMES = [["light", "Light"], ["dark", "Dark"], ["system", "System"]];
+let THEME = "system";
+function setTheme(v) { THEME = v; if (v === "system") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = v; }
 $("#tUser").addEventListener("click", ev => {
   ev.stopPropagation(); if (!cmenu.hidden) { closeCtx(); return; }
   const w = curWs(), me = w.members.find(m => m.you) || {}, r = $("#tUser").getBoundingClientRect();
   cmenu.innerHTML = `<div class="umenu-id"><b>${esc(ROOT.user.name)}</b><span>${esc(ROOT.user.email)}</span></div>
 <div class="umenu-role">In <b>${esc(w.name)}</b> you are <b>${esc(me.role || "")}</b>${me.guest ? `, a guest from ${esc(me.guest)}` : ""}.<br>${w.archived ? "The workspace is archived, so everything is read-only." : esc(ROLE_CAN[me.role] || "")}</div>
-<hr><button data-um="people"><span>People and roles</span></button><button data-um="ws"><span>Workspace home</span></button><hr><button data-um="out"><span>Sign out</span></button>
+<hr><button data-um="people"><span>People and roles</span></button><button data-um="ws"><span>Workspace home</span></button><hr><div class="msec">Theme</div><div class="seg" role="group" aria-label="Theme" data-testid="seg-theme">${THEMES.map(([v, l]) => `<button data-um="th" data-v="${v}" aria-pressed="${THEME === v}">${l}</button>`).join("")}</div><hr><button data-um="out"><span>Sign out</span></button>
 <hr><div class="umenu-proto">Prototype only</div><button data-um="srv"><span>Show the server as ${esc(SAVE.other())}</span></button><button data-um="fail"><span>${SAVE.failArmed() ? "Don't fail the next change" : "Make the next change fail to save"}</span></button>`;
   ctxItems = [{}]; cmenu.hidden = false;
   const m = cmenu.getBoundingClientRect(); cmenu.style.left = Math.max(8, r.right - m.width) + "px"; cmenu.style.top = (r.bottom + 6) + "px";
 });
 cmenu.addEventListener("click", ev => {
-  const u = ev.target.closest("[data-um]"); if (!u) return; closeCtx();
+  const u = ev.target.closest("[data-um]"); if (!u) return;
+  if (u.dataset.um === "th") { setTheme(u.dataset.v); u.parentElement.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === u))); return; }
+  closeCtx();
   if (u.dataset.um === "people") { V.wsTab = "people"; goWsHome(); }
   else if (u.dataset.um === "ws") goWsHome();
   else if (u.dataset.um === "srv") { SAVE.toggleSrv(); toast(`The badge shows ${SAVE.srv() === "dev" ? "Online · dev" : "Local"}. Prototype only.`); }
