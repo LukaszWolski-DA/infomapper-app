@@ -6,6 +6,40 @@ merge, beside the demo's "Retail Co – DWH" in the same sitting, in the style o
 beforehand, nothing is switched; Łukasz decides** the switch day (AD-39, C1.1) and whether the read fixes slice comes
 before it (AD-31's amendment). KB's objects are named by role, with sizes; no name, content or e-mail.
 
+## Decided (Łukasz, 20 November 2026)
+
+1. **Decided: the switch now (option A),** with these rules from now on:
+   - `pg:backup` before every merge into `dev`, before every acceptance on `dev:pg` and before every `pg:migrate`; the
+     prompt for each says so. Slice acceptances on `dev:pg` use the demo accounts only (they do not see KB).
+   - Łukasz runs `pg:backup` himself after a working session in KB online.
+   - The local KB is no longer worked in; `.data/dev-db.json` stays as a backup. `pg:kb` from the local file is not run
+     after the switch (it would overwrite the master with an older copy); restoring is `pg:restore` from
+     `.data/backups/pg/`. A guard in `pg:kb` against that is an idea for later (the rule now, the code later;
+     `docs/ideas.md`).
+   Done the same day: "The switch", below.
+2. **Decided: the read fixes slice later (option A),** aimed at what grows: Undo reading only its step's rows first
+   (`docs/ideas.md`).
+3. **Decided: the demo's soft-deleted rows stay** (no reset).
+4. **Decided: nothing in KB online is kept:** the switch's copy replaces it (the measurement's 36 redo steps and the
+   trimmed undo history included).
+
+## The switch (20 November 2026)
+
+Run by Łukasz from this branch's checkout (`chore/slice-31-measurement`, slice 31's `pg:` scripts as merged into `dev`
+at `722b87b`), one command at a time, pasting counts only:
+
+| Step | Command | What it showed |
+| --- | --- | --- |
+| 1 | SHA-256 of `.data/dev-db.json`; the ports 3000, 3001, 3200, 3300 | `F2B60E19…6DE20A`; no server listening |
+| 2 | a copy as `.data/backups/dev-db-20261120-0708.json` and `kb-model-latest.json` | both the same SHA-256 as step 1 |
+| 3 | `npm run pg:kb -- .data/backups/dev-db-20261120-0708.json` | target `infomapper-dev`'s pooler; removed first KB's online rows (5,017, and 50 undo steps); **4,871 rows, equal per table in the file and the database (38 tables)**, as at slice 31's copy; 1 person, kept as online; copied in 14.5 s |
+| 4 | `npm run pg:backup` | `.data/backups/pg/kb-20261120-0710.json`, 6,444,731 bytes, 4,871 rows, the same per table; read in 5.3 s |
+| 5 | `dev`'s preview, signed in with Łukasz's own account | signed in; the models look the same as locally; Undo and Redo disabled (KB's history empty) |
+| 6 | SHA-256 of `.data/dev-db.json` again | `F2B60E19…6DE20A`, equal to step 1 |
+
+From now on KB online is the master and `.data/dev-db.json` a backup; the first backup of the master is
+`.data/backups/pg/kb-20261120-0710.json`.
+
 ## How it was measured
 
 - **The preview:** `dev`'s branch address, `infomapper-app-dev-git-dev-lukaszs-projects-9ffbc132.vercel.app`. `dev`'s

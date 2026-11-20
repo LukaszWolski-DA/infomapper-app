@@ -93,7 +93,7 @@ bar (D-84); and "Add person" disabled online until the people slice (D-58's note
 Slice 31 copies Łukasz's own model (organization KB) into `infomapper-dev` (AD-39): from a copy of a backup of his local
 file, again or removed by one command, with his own Supabase account, backup and restore by script, and a reset that
 refuses while it is there; the lock timeout becomes 15 s; the measuring specs take their workspace and account from
-variables. The local file stays the model's master until Łukasz's switch day.
+variables. The local file was the model's master until Łukasz's switch on 20 November 2026; since then the online copy is the master and the local file a backup.
 Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
