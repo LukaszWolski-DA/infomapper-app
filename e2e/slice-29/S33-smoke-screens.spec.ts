@@ -1,6 +1,6 @@
 // Slice 33's online screenshots (demo data only): the People tab with "Password reset link" and a pending invitation,
 // the link dialog, the invite page, "Change password…". Taken in CI's smoke job on Supabase's throwaway local stack
-// (the artifact `smoke-screens`); against `dev:pg` or the preview it is skipped (it writes: an invitation), never KB.
+// (the artifact `smoke-screens`); against `dev:pg` or the preview it is skipped (it writes: an invitation); never his own model.
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "@playwright/test";

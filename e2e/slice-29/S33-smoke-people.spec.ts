@@ -5,7 +5,7 @@
 // F13 of slice 30: these specs write (Auth accounts too), so they run only against a database on this machine (CI's
 // Supabase local stack, the Schema workflow's smoke job); against `npm run dev:pg` or the preview, both on
 // infomapper-dev, they are skipped. They change only the passwords of the people they invite (made-up addresses, a new
-// one each run), never a demo account's; never KB.
+// one each run), never a demo account's; never Łukasz's own model.
 import { expect, test, type Page } from "@playwright/test";
 import { fillSignIn, PEOPLE, query, signIn, workspaceId } from "./helpers";
 
@@ -43,7 +43,9 @@ async function invite(page: Page, wsId: string, email: string, role = "reviewer"
   return link;
 }
 
+/** Signs out from an app page (a link's page has no person's menu: back to the start, which lands in a workspace). */
 async function signOut(page: Page) {
+  if (!(await page.getByTestId("indicator-user").isVisible())) await page.goto("/");
   await page.getByTestId("indicator-user").click();
   await page.getByTestId("button-sign-out").click();
   await expect(page).toHaveURL(/\/sign-in/);
