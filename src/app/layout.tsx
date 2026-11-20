@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import localFont from "next/font/local";
 import { ToastProvider } from "@/ui/components/toast";
 import { NoBrowserMenu } from "@/ui/no-browser-menu";
 import { PickHost } from "@/ui/pick-popover";
 import { SaveHook } from "@/ui/save-hook";
+import { parseTheme, themeAttribute, THEME_COOKIE } from "@/ui/theme";
+import { ThemeSync } from "@/ui/theme-sync";
 import { areTestHooksOn } from "@/data/local/measure-mode";
 import "./globals.css";
 import "@/compose/styles";
@@ -32,12 +35,16 @@ export const metadata: Metadata = {
   description: "Data modeling for data warehouse work",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // slice 32 (D-85): the theme chosen in this browser, on <html> from the first paint; none for System
+  const theme = themeAttribute(parseTheme((await cookies()).get(THEME_COOKIE)?.value));
   return (
-    <html lang="en" className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}>
+    <html lang="en" data-theme={theme} className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-im-panel font-sans text-[13px] text-im-ink">
         {/* slice 16 (item 7, D-71): no browser context menu in the app's own surfaces */}
         <NoBrowserMenu />
+        {/* slice 32 (P3): a page restored from the back-forward cache, or another tab shown again, takes the cookie's theme */}
+        <ThemeSync />
         <ToastProvider>{children}</ToastProvider>
         {/* slice 17 (D-72): the picker for a new entity's concept and for requirements to link */}
         <PickHost />
