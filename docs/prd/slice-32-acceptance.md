@@ -347,6 +347,21 @@ The merge into `dev` and the tag `slice-32` only on Łukasz's command, with `pg:
 
 Also to confirm: no measuring sitting and no reference figure (P10); `global-error` as a known limitation (P4).
 
+## Łukasz's answers (20 November 2026)
+
+Łukasz decided P1 and P2. P3, P4, P9 and P10 are Claude's technical calls, accepted and to be quoted for his approval
+at the closing. The other proposals are accepted as written.
+
+- **P1: yes.** `color-scheme: light dark` for System: native controls follow a dark Windows. The PRD's "System looks as
+  today" reads "as today, except native controls, which now match".
+- **P2: radio items** for keyboard access, keeping the prototype's look: the three choices in one row as a segmented
+  control (`aria-checked`). If that cannot be done cleanly with Radix's menu, stop before building it and show two
+  screenshots (the segmented row, and three rows with a check) for him to choose.
+- **P3: yes,** the `pageshow` and `visibilitychange` listener.
+- **P4: yes,** `global-error` shows System; recorded in `known-limitations.md`.
+- **P9: yes,** one small smoke spec on Postgres.
+- **P10: yes,** no measuring sitting.
+
 ## Decision texts (proposals, to be quoted in full at the closing)
 
 - **AD-31 (note):** as the PRD's section 8.
@@ -356,3 +371,31 @@ Also to confirm: no measuring sitting and no reference figure (P10); `global-err
   first paint. The dark values written once under Tailwind's `dark` variant, which is the media query while no theme is
   chosen and the attribute when one is. `color-scheme` follows the choice. Thumbnails follow it through their `<use>`
   (AD-32 unchanged). InfoDocumenter's pages stay light.
+
+## Step 2: the build against the plan
+
+Built as planned (`src/ui/theme.ts`, the root layout, the two CSS files with the guard test, the menu's section, the
+specs and the smoke spec). The differences:
+
+- **The menu's choice is its own component** (`src/app/_components/theme-choice.tsx`), not `Seg`. P2 needs Radix's
+  `RadioGroup` and `RadioItem` (`menuitemradio`, `aria-checked`), which `Seg`'s buttons are not. Drawn with `Seg`'s classes
+  (the row on `im-hover`, the chosen one on `im-surface` with its line and shadow). The segmented row works cleanly
+  in Radix's menu, so no screenshots for a choice were needed.
+- **The keyboard moves along the row with ↓ and ↑,** Radix's vertical menu order (Light, Dark, System, then
+  "Sign out"), not ← and →: in a Radix menu those open and close submenus. Enter and Space choose; the menu stays open.
+- **The focus ring shows on keyboard focus only** (`focus-visible`); a hovered choice only darkens its text, as the
+  prototype's.
+- **The listener** (`ThemeSync`) and the click (`chooseTheme`, cookie first) are in `src/ui/theme-sync.tsx`, mounted in
+  the root layout beside `NoBrowserMenu`. The menu reads the shown theme from `<html>` each time it opens.
+- **The CSS build writes `color-scheme` as Lightning CSS's own variables too** (`--lightningcss-light`,
+  `--lightningcss-dark`, its fallback for `light-dark()`); the app uses neither. The computed `color-scheme` is as
+  planned. It also writes `#ffffff` as `#fff`; the specs compare six-digit hex.
+- **The guard test compiles `globals.css`** with `@tailwindcss/node`'s `compile` (the version the build uses), so it checks
+  the expanded rules, not only the source. `@tailwindcss/node` comes in through `@tailwindcss/postcss`; it is not in
+  `package.json` itself. Proposal: leave it so (the build cannot run without it), or add it to `devDependencies` at the
+  same version. Łukasz's choice.
+- **The smoke spec** is `e2e/slice-29/S32-smoke-theme.spec.ts` (the smoke set's folder, `POSTGRES_ONLY_FOLDERS`). It
+  writes nothing, so it runs against any target (CI's local stack, `dev:pg`, the preview).
+- **`known-limitations.md`'s entry for P4** is written in this step, as Łukasz asked, not at the closing.
+- **The screenshots** of the menu in Light and Dark are attachments of S32-01's second test (`menu-light`,
+  `menu-dark`) in the run's report.

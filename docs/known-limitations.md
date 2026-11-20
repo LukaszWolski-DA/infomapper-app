@@ -2012,3 +2012,12 @@ describe.
 `npm run measure:start` without `INFOMAPPER_DEV_DB` serves `.data/dev-db.json`, Łukasz's own file, on 127.0.0.1:3300
 (it was so before slice 31). The measuring specs never point at it; run it with `INFOMAPPER_DEV_DB` set to another file.
 
+
+## The theme (slice 32)
+
+### The root error page shows System
+
+When the root layout itself fails, Next.js shows `src/app/global-error.tsx`, which brings its own `<html>` and is a client
+component: it cannot read the theme's cookie on the server, so it has no `data-theme` and follows the system's theme
+(System), whatever the person chose (P4, Łukasz, 20 November 2026). Every other page, the sign-in page and "not found"
+included, follows the choice from the first paint.
