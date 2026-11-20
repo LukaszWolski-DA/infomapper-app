@@ -399,3 +399,18 @@ specs and the smoke spec). The differences:
 - **`known-limitations.md`'s entry for P4** is written in this step, as Łukasz asked, not at the closing.
 - **The screenshots** of the menu in Light and Dark are attachments of S32-01's second test (`menu-light`,
   `menu-dark`) in the run's report.
+
+## Step 3: Łukasz's acceptance (20 November 2026)
+
+Passed, on the branch's commit c2eeba3 (the step 2 full run's commit).
+
+- **Where:** `npm run dev` (the local adapter, looking only) and `npm run dev:pg` with a demo account, after `pg:backup`
+  (`kb-20261120-1256.json`, 4,871 rows). KB was not opened.
+- **S32-01:** the three choices apply at once, the menu stays open, and native controls and scroll bars follow.
+- **S32-02:** F5 shows no flash; the choice holds on the sign-in page after signing out and in another workspace; another
+  browser starts at System.
+- **S32-03:** the thumbnails follow at once; InfoDocumenter's pages stay white while the editor around them is dark.
+
+Open before step 4: the Schema workflow's `migrations` job (the contract suite's seed clock, failing on `dev` too) is
+fixed on its own `fix/` branch; step 4 starts in a new session once that fix is merged into `dev` and `dev` into this
+branch.
