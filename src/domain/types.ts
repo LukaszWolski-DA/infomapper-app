@@ -120,6 +120,47 @@ export interface WorkspaceMember {
   created_at: Timestamp;
 }
 
+/** The roles an invitation may give (slice 33, P2.1): never Owner (`invitation_role_ck`). */
+export const INVITATION_ROLES = ["admin", "modeler", "reviewer", "reader"] as const;
+export type InvitationRole = (typeof INVITATION_ROLES)[number];
+
+/**
+ * An invitation to a workspace by a link the inviter copies (slice 33, AD-40). The link holds a one-time token; the row
+ * holds only its SHA-256 (`token_hash`, never in a change event: `SECRET_COLUMNS`). Pending while neither accepted nor
+ * revoked; a pending one past `expires_at` is expired and may be renewed ("New link": a new hash and expiry on the same
+ * row). Outside undo, as every people table.
+ */
+export interface Invitation {
+  id: Uuid;
+  workspace_id: Uuid;
+  /** Lower case (`invitation_email_lower`). */
+  email: string;
+  role: InvitationRole;
+  token_hash: string;
+  invited_by: Uuid;
+  created_at: Timestamp;
+  expires_at: Timestamp;
+  accepted_at: Timestamp | null;
+  revoked_at: Timestamp | null;
+}
+
+/**
+ * A one-time link to set a new password (slice 33, PT4, D1), made by an Owner or Admin on a workspace's People tab:
+ * `workspace_id` is that workspace, and its change events go into its log. Live while neither used nor revoked and
+ * before `expires_at`; a newer link for the same person revokes the earlier one. Outside undo.
+ */
+export interface PasswordReset {
+  id: Uuid;
+  workspace_id: Uuid;
+  app_user_id: Uuid;
+  token_hash: string;
+  created_by: Uuid;
+  created_at: Timestamp;
+  expires_at: Timestamp;
+  used_at: Timestamp | null;
+  revoked_at: Timestamp | null;
+}
+
 // ---- Model (data model section 4) ----
 
 /**
@@ -728,6 +769,8 @@ export interface CoreWritableRows {
   organization_licence: OrganizationLicence;
   workspace: Workspace;
   workspace_member: WorkspaceMember;
+  invitation: Invitation;
+  password_reset: PasswordReset;
   project: Project;
   canvas: Canvas;
   project_canvas: ProjectCanvas;

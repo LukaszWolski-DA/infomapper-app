@@ -95,16 +95,38 @@ export function addPerson(ctx: CommandContext, state: AddPersonState, input: unk
     writes.push({ kind: "insert", table: "app_user", row: user });
     userId = user.id;
   }
-  // a guest of this organization (a workspace here, no row) stays a guest
-  if (!accountOrganizationMember && accountWorkspaceIds.length === 0) {
-    writes.push({ kind: "insert", table: "organization_member", row: { organization_id: organization.id, user_id: userId, role: "member", created_at: ctx.now } });
+  writes.push(
+    ...joinWrites(ctx, {
+      organizationId: organization.id,
+      workspaceId: access.workspace.id,
+      userId,
+      role: p.role,
+      addedBy: ctx.actorId,
+      linked: accountOrganizationMember !== null || accountWorkspaceIds.length > 0,
+    }),
+  );
+  return { ok: true, value: { userId, ...preview }, writeSet: buildWriteSet(ctx, access.workspace.id, writes) };
+}
+
+/**
+ * A person joins a workspace (item 10; slice 33's invitations, F17): a `member` row in the organization when they have
+ * no link to it yet, then the workspace membership. `linked`: a row in the organization or a workspace there; a guest of
+ * this organization (a workspace here, no row) stays a guest.
+ */
+export function joinWrites(
+  ctx: Pick<CommandContext, "now">,
+  j: { organizationId: Uuid; workspaceId: Uuid; userId: Uuid; role: WorkspaceRole; addedBy: Uuid | null; linked: boolean },
+): Write[] {
+  const writes: Write[] = [];
+  if (!j.linked) {
+    writes.push({ kind: "insert", table: "organization_member", row: { organization_id: j.organizationId, user_id: j.userId, role: "member", created_at: ctx.now } });
   }
   writes.push({
     kind: "insert",
     table: "workspace_member",
-    row: { workspace_id: access.workspace.id, user_id: userId, role: p.role, added_by: ctx.actorId, created_at: ctx.now },
+    row: { workspace_id: j.workspaceId, user_id: j.userId, role: j.role, added_by: j.addedBy, created_at: ctx.now },
   });
-  return { ok: true, value: { userId, ...preview }, writeSet: buildWriteSet(ctx, access.workspace.id, writes) };
+  return writes;
 }
 
 function checkAdd(state: AddPersonState, input: unknown) {
