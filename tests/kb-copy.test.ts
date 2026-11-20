@@ -143,6 +143,29 @@ describe("one organization's rows (T1, Q6)", () => {
     expect(() => organizationRows({ ...db, change_event: [event("(changed)")] }, org, STORE_SCHEMA)).not.toThrow();
     expect(() => organizationRows({ ...db, change_event: [event("scrypt$1$abc")] }, org, STORE_SCHEMA)).toThrow("holds the organization's password");
   });
+
+  it("takes the workspaces' invitations and reset links (slice 33), and refuses a token hash or an account in a change event", () => {
+    const db = seed();
+    const org = organizationNamed(db, "Retail Co");
+    const ws = db.workspace!.find((w) => w.organization_id === org)!.id as string;
+    const other = db.workspace!.find((w) => w.organization_id !== org)!.id as string;
+    const by = db.workspace_member!.find((m) => m.workspace_id === ws)!.user_id as string;
+    const invitation = (id: string, workspace_id: string) => ({
+      id, workspace_id, email: `${id}@example.com`, role: "modeler", token_hash: "f".repeat(64), invited_by: by,
+      created_at: "2026-11-20T10:00:00.000Z", expires_at: "2026-11-27T10:00:00.000Z", accepted_at: null, revoked_at: null,
+    });
+    const reset = { id: "r", workspace_id: ws, app_user_id: by, token_hash: "e".repeat(64), created_by: by, created_at: "2026-11-20T10:00:00.000Z", expires_at: "2026-11-21T10:00:00.000Z", used_at: null, revoked_at: null };
+    const rows = organizationRows({ ...db, invitation: [invitation("mine", ws), invitation("theirs", other)], password_reset: [reset] }, org, STORE_SCHEMA);
+    expect(rows.invitation!.map((i) => i.id)).toEqual(["mine"]);
+    expect(rows.password_reset).toEqual([reset]);
+    const event = (object_type: string, after_image: Record<string, unknown>) => ({
+      id: "e", workspace_id: ws, change_group_id: "g", occurred_at: "2026-11-20T10:00:00.000Z", user_id: by, object_type,
+      object_id: "mine", operation: "create", before_image: null, after_image, context_label_id: null,
+    });
+    expect(() => organizationRows({ ...db, change_event: [event("invitation", { token_hash: "(changed)" })] }, org, STORE_SCHEMA)).not.toThrow();
+    expect(() => organizationRows({ ...db, change_event: [event("invitation", { token_hash: "f".repeat(64) })] }, org, STORE_SCHEMA)).toThrow("holds a secret value");
+    expect(() => organizationRows({ ...db, change_event: [event("app_user", { auth_user_id: "0b6f1a52-3c3e-4f4e-9d0a-6f1d2a3b4c5d" })] }, org, STORE_SCHEMA)).toThrow("holds a secret value");
+  });
 });
 
 describe("the people pg:accounts handles by default (F3)", () => {

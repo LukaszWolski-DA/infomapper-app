@@ -26,6 +26,7 @@ import { addAttribute } from "@/domain/commands/attribute";
 import { createConcept } from "@/domain/commands/concept";
 import { createEntity, deleteEntity, updateEntity } from "@/domain/commands/entity";
 import { importSources, importStateOf } from "@/domain/commands/import";
+import { acceptInvitation, createInvitation, createPasswordReset, renewInvitation, revokeInvitation, redeemPasswordReset } from "@/domain/commands/invitations";
 import { revertChangeGroup } from "@/domain/commands/undo";
 import { planFingerprint } from "@/domain/import/compare";
 import { buildPlan } from "@/domain/import/plan";
@@ -104,7 +105,7 @@ async function liveCanvas(store: DataStore, workspaceId = RETAIL): Promise<strin
   throw new Error("No live canvas in a project.");
 }
 
-const accessOf = async (store: DataStore, userId: string, workspaceId = RETAIL): Promise<WorkspaceAccess> => ({
+const accessOf = async (store: DataStore, userId: string, workspaceId: string = RETAIL): Promise<WorkspaceAccess> => ({
   workspace: (await store.workspaces.get(workspaceId))!,
   member: await store.workspaces.getMember(workspaceId, userId),
 });
@@ -244,8 +245,88 @@ async function scenario(store: DataStore, ctxOf: (actorId: string) => CommandCon
     await step("link update", buildWriteSet(ctx, RETAIL, [update("project_canvas", link!, { ...link!, sort_order: link!.sort_order + 10 })]));
     await step("link update, stale", buildWriteSet(ctx, RETAIL, [update("project_canvas", link!, { ...link!, sort_order: link!.sort_order + 20 })]));
   }
+
+  // slice 33: invitations and reset links through their commands, on both adapters
+  {
+    const lukasz = await accessOf(store, LUKASZ);
+    const inviteState = async (email: string) => ({
+      access: lukasz,
+      account: await store.users.getByEmail(email),
+      members: await store.workspaces.listMembers(RETAIL),
+      invitations: await store.invitations.listOpen(RETAIL),
+    });
+    const made = ok(createInvitation(ctxOf(LUKASZ), await inviteState("ola.nowa@example.com"), { workspaceId: RETAIL, email: "Ola.Nowa@example.com", role: "reviewer", tokenHash: hex(1) }));
+    await step("invite", made);
+    // the pending index, written past the command's own check
+    await step("invite, pending twice", buildWriteSet(ctxOf(LUKASZ), RETAIL, [insert("invitation", { ...(await store.invitations.get(RETAIL, made.value.invitationId))!, id: ctxOf(LUKASZ).newId(), token_hash: hex(2) })]));
+    const renewed = ok(renewInvitation(ctxOf(LUKASZ), { access: lukasz, invitation: await store.invitations.get(RETAIL, made.value.invitationId) }, { workspaceId: RETAIL, invitationId: made.value.invitationId, tokenHash: hex(3) }));
+    await step("new link", renewed);
+    // accepting: a new person, signed by the id the caller made
+    const acceptState = async (tokenHash: string) => {
+      const invitation = await store.invitations.getByTokenHash(tokenHash);
+      const workspace = invitation ? await store.workspaces.get(invitation.workspace_id) : null;
+      const account = invitation ? await store.users.getByEmail(invitation.email) : null;
+      const organizationId = workspace?.organization_id;
+      return {
+        invitation,
+        workspace,
+        organization: organizationId ? await store.organizations.get(organizationId) : null,
+        inviter: invitation ? await store.users.get(invitation.invited_by) : null,
+        account,
+        accountOrganizationMember: account && organizationId ? await store.organizations.getMember(organizationId, account.id) : null,
+        accountWorkspaceIds: account ? (await store.workspaces.listForUser(account.id)).filter((w) => w.organization_id === organizationId).map((w) => w.id) : [],
+      };
+    };
+    const stale = await acceptState(hex(3));
+    const newcomer = ctxOf(LUKASZ).newId();
+    const joinCtx = { ...ctxOf(newcomer), actorId: newcomer };
+    // the link before "New link" finds nothing: the command refuses before anything is written
+    const old = acceptInvitation(joinCtx, await acceptState(hex(1)), { tokenHash: hex(1), name: "Ola Nowa", authUserId: null });
+    answers["accept, the old link"] = old.ok ? { ok: true } : { ok: false, code: old.error.code, message: old.error.message };
+    await step("accept, new person", ok(acceptInvitation(joinCtx, stale, { tokenHash: hex(3), name: "Ola Nowa", authUserId: null })));
+    // an existing person (Anna, already in InfoMate) into another InfoMate workspace
+    const annaRow = (await store.users.get(ANNA))!;
+    const annaIn = new Set((await store.workspaces.listForUser(ANNA)).map((w) => w.id));
+    const target = (await store.workspaces.listForUser(LUKASZ)).find((w) => w.organization_id === SEED_IDS.orgInfoMate && !annaIn.has(w.id));
+    expect(target, "an InfoMate workspace of Łukasz's without Anna").toBeDefined();
+    {
+      const there = await accessOf(store, LUKASZ, target!.id);
+      await step(
+        "invite, existing person",
+        ok(createInvitation(ctxOf(LUKASZ), { access: there, account: annaRow, members: await store.workspaces.listMembers(target!.id), invitations: await store.invitations.listOpen(target!.id) }, { workspaceId: target!.id, email: annaRow.email, role: "reader", tokenHash: hex(4) })),
+      );
+      await step("accept, existing person", ok(acceptInvitation(ctxOf(ANNA), await acceptState(hex(4)), { tokenHash: hex(4), authUserId: null })));
+    }
+    // revoking the contract rows' pending one
+    const pending = (await store.invitations.listOpen(RETAIL)).find((i) => i.email === "pending.person@example.com")!;
+    await step("revoke", ok(revokeInvitation(ctxOf(LUKASZ), { access: lukasz, invitation: pending }, { workspaceId: RETAIL, invitationId: pending.id })));
+    // a reset link for the person who just joined (only in Retail Co – DWH, a member of InfoMate), then used
+    const ola = (await store.users.getByEmail("ola.nowa@example.com"))!;
+    const reach = {
+      workspaces: await Promise.all(
+        (await store.workspaces.listForUser(ola.id)).map(async (w) => ({
+          workspaceId: w.id,
+          organizationId: w.organization_id,
+          personRole: (await store.workspaces.getMember(w.id, ola.id))!.role,
+          actorRole: (await store.workspaces.getMember(w.id, LUKASZ))?.role ?? null,
+        })),
+      ),
+      organizations: await store.organizations.listMembershipsOfUsers([ola.id]),
+    };
+    const resetState = async () => ({ access: lukasz, person: ola, members: await store.workspaces.listMembers(RETAIL), reach, resets: await store.passwordResets.listOfUser(ola.id) });
+    await step("reset link", ok(createPasswordReset(ctxOf(LUKASZ), await resetState(), { workspaceId: RETAIL, userId: ola.id, tokenHash: hex(5) })));
+    await step("reset link again", ok(createPasswordReset(ctxOf(LUKASZ), await resetState(), { workspaceId: RETAIL, userId: ola.id, tokenHash: hex(6) })));
+    const redeemState = async (h: string) => {
+      const reset = await store.passwordResets.getByTokenHash(h);
+      return { reset, person: reset ? await store.users.get(reset.app_user_id) : null };
+    };
+    await step("use reset link", ok(redeemPasswordReset(ctxOf(ola.id), await redeemState(hex(6)), { tokenHash: hex(6), authUserId: null })));
+  }
   return answers;
 }
+
+/** A link's token hash as the server hands it on. */
+const hex = (n: number) => n.toString(16).padStart(64, "d");
 
 const EXPECTED: Record<string, unknown> = {
   "create concept": { ok: true },
@@ -273,6 +354,17 @@ const EXPECTED: Record<string, unknown> = {
   "access: as checked": { ok: true },
   "link update": { ok: true },
   "link update, stale": { ok: false, code: "stale_version", message: "Someone changed this meanwhile." },
+  invite: { ok: true },
+  "invite, pending twice": { ok: false, code: "conflict", message: "This already exists" },
+  "new link": { ok: true },
+  "accept, the old link": { ok: false, code: "not_found", message: "This invitation link has expired, was already used or was revoked. Nothing was changed." },
+  "accept, new person": { ok: true },
+  "invite, existing person": { ok: true },
+  "accept, existing person": { ok: true },
+  revoke: { ok: true },
+  "reset link": { ok: true },
+  "reset link again": { ok: true },
+  "use reset link": { ok: true },
 };
 
 describe("the writes on the local adapter (S30-10)", () => {
@@ -457,6 +549,41 @@ function concurrency(name: string, make: (db: DevDb) => Promise<Store>) {
       );
       oneWins(results, "invalid", "Łukasz owns InfoMate, so they keep at least one workspace there.");
       expect((await store.workspaces.listForUser(LUKASZ)).filter((w) => w.organization_id === SEED_IDS.orgInfoMate)).toHaveLength(1);
+    });
+
+    it("one invitation link accepted twice at once: one person joins (slice 33, F26)", async () => {
+      const store = s.store;
+      const lukasz = await accessOf(store, LUKASZ);
+      const tokenHash = "e".repeat(64);
+      const made = createInvitation(
+        ctxOf(LUKASZ),
+        { access: lukasz, account: null, members: await store.workspaces.listMembers(RETAIL), invitations: await store.invitations.listOpen(RETAIL) },
+        { workspaceId: RETAIL, email: "twice@example.com", role: "modeler", tokenHash },
+      );
+      expect(made.ok && (await store.apply(made.writeSet))).toEqual({ ok: true });
+      const invitation = (await store.invitations.getByTokenHash(tokenHash))!;
+      const state = {
+        invitation,
+        workspace: (await store.workspaces.get(RETAIL))!,
+        organization: await store.organizations.get(SEED_IDS.orgInfoMate),
+        inviter: await store.users.get(LUKASZ),
+        account: null,
+        accountOrganizationMember: null,
+        accountWorkspaceIds: [],
+      };
+      const join = (name: string) => {
+        const c = ctxOf(LUKASZ);
+        const r = acceptInvitation({ ...c, actorId: c.newId() }, state, { tokenHash, name, authUserId: null });
+        if (!r.ok) throw new Error(r.error.message);
+        return r.writeSet;
+      };
+      const answers = (await atOnce(store, join("First"), join("Second"))).map(answerOf);
+      // the refusal is the e-mail's unique index or the invitation read stale, whichever the adapter meets first
+      expect(answers.filter((r) => r.ok)).toHaveLength(1);
+      expect(answers.find((r) => !r.ok)?.code).toMatch(/^(conflict|stale_version)$/);
+      const person = (await store.users.getByEmail("twice@example.com"))!;
+      expect((await store.workspaces.listMembers(RETAIL)).filter((m) => m.user_id === person.id)).toHaveLength(1);
+      expect((await store.invitations.getByTokenHash(tokenHash))!.accepted_at).not.toBeNull();
     });
 
     it("a member taken out of their last two workspaces at once: their organization row never stays alone", async () => {

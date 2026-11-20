@@ -63,6 +63,42 @@ export function contractRows(): DevDb {
     rows.project_pinned_label!.push({ project_id: project.id, label_id: l!.id, workspace_id: l!.workspace_id });
   }
   del(gone);
+  // slice 33: invitations in every state and reset links (the seed has none), in the first workspace with two members
+  const ws = rows.workspace!.find((w) => rows.workspace_member!.filter((m) => m.workspace_id === w.id).length >= 2)!;
+  const [by, other] = rows.workspace_member!.filter((m) => m.workspace_id === ws.id);
+  const hash = (n: number) => n.toString(16).padStart(64, "c");
+  const invitation = (n: number, email: string, patch: Row) => ({
+    id: `01a1c033-0000-7000-8000-${n.toString(16).padStart(12, "0")}`,
+    workspace_id: ws.id,
+    email,
+    role: "modeler",
+    token_hash: hash(n),
+    invited_by: by!.user_id,
+    created_at: "2026-11-16T10:00:00.000Z",
+    expires_at: "2026-11-23T10:00:00.000Z",
+    accepted_at: null,
+    revoked_at: null,
+    ...patch,
+  });
+  rows.invitation!.push(
+    invitation(1, "pending.person@example.com", {}),
+    invitation(2, "expired.person@example.com", { expires_at: "2026-11-09T10:00:00.000Z", created_at: "2026-11-02T10:00:00.000Z" }),
+    invitation(3, "accepted.person@example.com", { accepted_at: "2026-11-16T10:30:00.000Z" }),
+    invitation(4, "revoked.person@example.com", { revoked_at: "2026-11-16T10:30:00.000Z", role: "reader" }),
+  );
+  const reset = (n: number, patch: Row) => ({
+    id: `01a1c033-0000-7000-8000-${(16 + n).toString(16).padStart(12, "0")}`,
+    workspace_id: ws.id,
+    app_user_id: other!.user_id,
+    token_hash: hash(16 + n),
+    created_by: by!.user_id,
+    created_at: "2026-11-16T10:00:00.000Z",
+    expires_at: "2026-11-17T10:00:00.000Z",
+    used_at: null,
+    revoked_at: null,
+    ...patch,
+  });
+  rows.password_reset!.push(reset(1, { used_at: "2026-11-16T10:10:00.000Z" }), reset(2, {}));
   return db;
 }
 
@@ -76,7 +112,13 @@ export async function readEverything(store: DataStore, db: DevDb): Promise<Recor
   const orgs = rows.organization!;
   const all = async (name: string, read: () => Promise<unknown>) => (out[name] = await read());
   await all("users.list", () => store.users.list());
+  // slice 33: a link's lookups by hash, and every person's reset links
+  for (const i of rows.invitation!) await all(`invitations.getByTokenHash ${i.id}`, () => store.invitations.getByTokenHash(i.token_hash as string));
+  await all("invitations.getByTokenHash (unknown)", () => store.invitations.getByTokenHash("0".repeat(64)));
+  for (const r of rows.password_reset!) await all(`passwordResets.getByTokenHash ${r.id}`, () => store.passwordResets.getByTokenHash(r.token_hash as string));
+  await all("passwordResets.getByTokenHash (unknown)", () => store.passwordResets.getByTokenHash("0".repeat(64)));
   for (const u of users) {
+    await all(`passwordResets.listOfUser ${u.id}`, () => store.passwordResets.listOfUser(u.id!));
     await all(`users.get ${u.id}`, () => store.users.get(u.id!));
     await all(`users.getByEmail ${u.id}`, () => store.users.getByEmail(u.email as string));
     await all(`organizations.listForUser ${u.id}`, () => store.organizations.listForUser(u.id!));
@@ -95,6 +137,8 @@ export async function readEverything(store: DataStore, db: DevDb): Promise<Recor
     await all(`users.listForWorkspace ${ws}`, () => store.users.listForWorkspace(ws));
     await all(`workspaces.get ${ws}`, () => store.workspaces.get(ws));
     await all(`workspaces.listMembers ${ws}`, () => store.workspaces.listMembers(ws));
+    await all(`invitations.listOpen ${ws}`, () => store.invitations.listOpen(ws));
+    for (const i of of("invitation")) await all(`invitations.get ${ws} ${i.id}`, () => store.invitations.get(ws, i.id!));
     for (const u of users) await all(`workspaces.getMember ${ws} ${u.id}`, () => store.workspaces.getMember(ws, u.id!));
     for (const t of MODULE_TABLES) await all(`modules.list ${ws} ${t}`, () => store.modules.list(ws, t));
     await all(`projects.list ${ws}`, () => store.projects.list(ws));
