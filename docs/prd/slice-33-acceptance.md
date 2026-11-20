@@ -412,3 +412,26 @@ merge; after the merge, the preview's "Invite person" checked (F3).
 - **F4, F8 and the smaller changes: accepted.** Step 4 has no laptop item; step 6 has no Redeploy.
 - **A tenth e2e part,** if part 9's heap needs it, goes first on its own `chore/` branch with its own full run; Łukasz is
   told before it starts.
+
+## 9. Step 4: Łukasz's settings (20 November 2026)
+
+Done by Łukasz, on `slice/33-people` unless said otherwise. Nothing of KB was written by any of them.
+
+1. **`pg:backup` before the migration, on `slice/33-people`: refused.** "The table password_reset belongs to no
+   workspace and no organization: the copy does not know whose its rows are." The table was not in the database yet,
+   so the backup could not tell its owner; nothing was written. The backup was made from `dev` (`b4c7a96`) instead:
+   `kb-20261120-1908.json`, 4,871 rows.
+2. **`pg:migrate -- --dry-run`:** 23 applied, 1 to apply (`20261120120000_people.sql`). **`pg:migrate`:** applied.
+3. **`schema:check -- --existing`:** matches, 46 tables, Row Level Security on every table.
+4. **`pg:backup` after the migration:** `kb-20261120-1911.json`, 4,871 rows (the same as before).
+5. **Supabase:** a new secret key `vercel_dev_preview` (Supabase takes only lower-case letters, digits and underscores
+   in a key's name, so not `vercel-dev-preview` as proposed).
+6. **Vercel:** `SUPABASE_SECRET_KEY` **already existed** as a Preview variable scoped to `dev`, contrary to CLAUDE.md's
+   "never in Vercel". Łukasz changed its value to the new key: Sensitive, Preview, `dev` only. No Redeploy (F3).
+
+**For step 6** (Claude's call, quoted for Łukasz's approval at the closing):
+- **`pg:backup` before a migration that adds a table** (finding of item 1): a table the code knows but the database does
+  not have yet is skipped with a line saying so, never guessed; with a test. Until then a backup before such a migration
+  is made from `dev`'s checkout, as Łukasz did.
+- **CLAUDE.md** says that the Vercel variable `SUPABASE_SECRET_KEY` existed before slice 33 (when and why is not
+  known), and that since slice 33 it holds the key `vercel_dev_preview`, which only the preview uses.
