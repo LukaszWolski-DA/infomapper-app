@@ -1955,8 +1955,9 @@ canvas, the built-in classifications and stereotypes, their change events) stay 
 ### KB is in the shared infomapper-dev
 
 Once `pg:kb` has run, `npm run dev:pg` on the laptop and `dev`'s preview show organization KB at once, and a write from
-either changes it for both. The local file stays KB's master until Łukasz's switch day (C1.1): **a copy again replaces
-KB online as a whole**, so whatever was changed online since is gone (a `pg:backup` first keeps it in a file). The
+either changes it for both. The local file was KB's master until Łukasz's switch on 20 November 2026 (C1.1); since
+then KB online is the master. **A copy again replaces KB online as a whole**, so whatever was changed online since is
+gone (a `pg:backup` first keeps it in a file): after the switch `pg:kb` is not run (below). The
 measurement on KB writes there too, and undoes its writes at the end. Only KB's own member sees it: the demo accounts
 are not members (S31-02). Nobody else may copy, restore or remove KB: the scripts run from the laptop with
 `.env.postgres.local`, and the reset refuses while KB is there.
@@ -1973,6 +1974,17 @@ are not members (S31-02). Nobody else may copy, restore or remove KB: the script
   removal, so Łukasz's link stays; after `pg:kb -- --remove` his person row stays with his account and sees no
   organization until KB is copied in again.
 - **Changes since the backup** go with a restore, online changes since the last copy with a copy again.
+
+### Since the switch: KB's backups are made by hand, and pg:kb has no guard
+
+Since 20 November 2026 KB online is the master (AD-39's note) and the local file a backup.
+- **No Supabase backups until slice D:** `infomapper-dev` has none set up. KB's only backups are `pg:backup`'s files on
+  the laptop (`.data/backups/pg/`), made by hand: before every merge into `dev`, every acceptance on `dev:pg` and every
+  `pg:migrate`, and by Łukasz after a working session. What is written online after the newest backup is lost if
+  `infomapper-dev` or the laptop's backups are lost, and is gone with a `pg:restore` of an older file.
+- **`pg:kb` is unguarded after the switch:** it still copies KB from any backup of the local file, replacing the master
+  with an older copy, and nothing in the script refuses it. The rule is not to run it (CLAUDE.md); the guard is an idea
+  (`docs/ideas.md`).
 
 ### KB's backups hold his e-mail
 

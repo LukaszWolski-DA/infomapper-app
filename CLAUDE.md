@@ -94,7 +94,7 @@ people slice (D-58's note). Slice 31 (AD-39) is slice C: Łukasz's organization 
 local file into `infomapper-dev` (`pg:kb`, again or `--remove`), his own Supabase account (`pg:accounts -- --kb`), backup
 and restore by script (`pg:backup`, `pg:restore`), the reset refused while an organization the seed does not make is in
 the database, `lock_timeout` 15 s, and the measuring specs taking their workspace and account from variables; the local
-file stays KB's master until Łukasz's switch day.
+file was KB's master until Łukasz's switch on 20 November 2026; since then KB online is the master (AD-39's note).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -577,17 +577,25 @@ local adapter no pool is made.
 - Use `data-testid` attributes for elements tests need; name them after the components (e.g. `card-entity`,
   `panel-inspector`, `nav-breadcrumbs`).
 - **Łukasz's test model** (since slice 8's manual acceptance, 28 October 2026): the organization KB with the workspace
-  "Kanton Basel" in his `.data/dev-db.json` is a real business model he builds by hand to test and give feedback; later
-  acceptance sessions use it. Never run `npm run reset-dev-data` on that file without a fresh backup and his OK; back it
+  "Kanton Basel" is a real business model he builds by hand to test and give feedback. **Since the switch on 20 November
+  2026 (AD-39's note) KB online in `infomapper-dev` is the master**, worked in on `dev`'s preview with his own account;
+  the local KB in `.data/dev-db.json` is no longer worked in and stays as a backup. The rules since then:
+  - **`pg:backup` before every merge into `dev`, before every acceptance on `dev:pg` and before every `pg:migrate`**; the
+    prompt for each says so. Łukasz runs `pg:backup` himself after a working session in KB online.
+  - **Slice acceptances on `dev:pg` use the demo accounts only** (they do not see KB).
+  - **`pg:kb` from the local file is not run after the switch** (it would overwrite the master with an older copy; the
+    script has no guard against it yet, `docs/ideas.md`); a restore is `pg:restore` from `.data/backups/pg/`.
+
+  What follows was written before the switch and still holds for the file: later acceptance sessions used it. Never run `npm run reset-dev-data` on that file without a fresh backup and his OK; back it
   up on request and before a slice that changes the local file's format (`.data/backups/dev-db-<yyyymmdd-hhmm>.json`,
   the newest also `.data/backups/kb-model-latest.json`; git-ignored). It holds his real e-mail and KB's organization
   password hash, so it is never committed. **Since slice 31 (C1.2, amending his decision of 28 October 2026) KB may be
   copied into `infomapper-dev`** (`pg:kb`, AD-39): its content and his e-mail, never the password hash; he signs in online
   with his own Supabase account. The file is still read only on a copy of a backup (the scripts refuse
-  `.data/dev-db.json` itself and any path outside `.data/backups/`) and stays KB's master until his switch day (C1.1).
+  `.data/dev-db.json` itself and any path outside `.data/backups/`) and was KB's master until the switch (C1.1, 20 November 2026).
   **No e2e, smoke or measuring run opens KB or signs in with his real e-mail where its artifacts are public**; the
-  measurement of KB runs from the laptop only. KB online is changed only by his own use and by `pg:kb`, `pg:restore` and
-  `pg:kb -- --remove` on his command; never reset (the reset refuses while KB is there). **Since 10 November 2026 his file
+  measurement of KB runs from the laptop only. KB online is changed only by his own use and by `pg:restore` and
+  `pg:kb -- --remove` on his command (since the switch never `pg:kb` from the local file); never reset (the reset refuses while KB is there). **Since 10 November 2026 his file
   is changed only on his explicit command** (a format upgrade included): a dev server of his that serves this checkout
   runs the branch's code on it, so before a step that changes the format, check that none does (slice 24, step 3).
 

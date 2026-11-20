@@ -1063,13 +1063,16 @@ slice.
   and their parents and children. Slice 30's measurement gives its figure (S30-13, Undo).
 - **The lock timeout's value** (slice 30, L7): 15 s since slice 31 (AD-38's note); open: whether a large import should take
   its lock later or in parts.
-- **KB's switch day** (slice 31, C1.1): Łukasz's decision after the measurement on KB; on that day the last `pg:kb` from
-  the local file, then KB online is the master and the local file a backup. Then: Supabase's own backups (slice D), and
-  whether `pg:backup` runs on a schedule.
-- **The measurement on KB** (S31-06, the `chore/` after slice 31's merge): reads, writes with the fixed spec, the snapshot's
-  size, beside the demo's; also the soft-deleted rows S30-05 left in the demo's "Retail Co – DWH", Undo on KB and on the
-  demo apart, the 70 s Undo once seen on `dev:pg`, and the routes' `Server-Timing` with 0 statements on `dev:pg`
-  (`docs/prd/slice-31-acceptance.md`).
+- **The read fixes slice's aim** (Łukasz, 20 November 2026, on slice 31's measurement): what grows with use, Undo first.
+  Undo reads the whole workspace with every soft-deleted row (`loadForUndo`): 52 ms on KB, 842 ms on the demo's
+  "Retail Co – DWH" with 42,060 soft-deleted rows (27 MB per Undo); read only the step's rows. Then the people read
+  over all change events (`peopleRows`), and the whole workspace read by every page and refresh (79 to 149 statements).
+  Not before the switch (`docs/prd/slice-31-measurement.md`).
+- **A guard in `pg:kb` after the switch** (Łukasz, 20 November 2026: the rule now, the code later): since KB online is
+  the master, `pg:kb` from the local file would overwrite it with an older copy. Proposal: the copy refuses while KB
+  online has change events newer than the file's newest, or once a marker says the switch is done, with an explicit
+  override for a deliberate copy. Until then CLAUDE.md's rule: `pg:kb` is not run.
+- **KB's backups after the switch:** Supabase's own backups (slice D), and whether `pg:backup` runs on a schedule.
 - **"Explicit orders where an order means something"** (below) was done in slice 30 for the lists that are drawn or
   decide something (AD-12's note); the first project in the top bar still comes from the stored order.
 - **A hotfix path into `main`** (slice D): a `hotfix/` branch from `main` into `main` with its own full run, then `main`
