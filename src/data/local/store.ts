@@ -2,6 +2,7 @@
 // Development only. It enforces what the real database would: keys, unique indexes, foreign keys, CHECKs,
 // plus version checks, and writes the rows and change events of one command together or not at all.
 
+import { listedInvitations } from "@/domain/commands/invitations";
 import type { Write, WriteSet } from "@/domain/changes";
 import { accessChangedRefusal, type CheckedAccess } from "@/domain/commands/access-check";
 import { countChecks, countRefusal } from "@/domain/commands/count-rules";
@@ -117,6 +118,17 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
       getMember: async (workspaceId, userId) =>
         (await load()).workspace_member.find((m) => m.workspace_id === workspaceId && m.user_id === userId) ?? null,
       listMembers: async (workspaceId) => (await load()).workspace_member.filter((m) => m.workspace_id === workspaceId),
+    },
+
+    invitations: {
+      listOpen: async (workspaceId) => listedInvitations((await load()).invitation.filter((i) => i.workspace_id === workspaceId)),
+      get: async (workspaceId, invitationId) => (await load()).invitation.find((i) => i.workspace_id === workspaceId && i.id === invitationId) ?? null,
+      getByTokenHash: async (tokenHash) => (await load()).invitation.find((i) => i.token_hash === tokenHash) ?? null,
+    },
+
+    passwordResets: {
+      getByTokenHash: async (tokenHash) => (await load()).password_reset.find((r) => r.token_hash === tokenHash) ?? null,
+      listOfUser: async (userId) => (await load()).password_reset.filter((r) => r.app_user_id === userId),
     },
 
     projects: {

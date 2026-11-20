@@ -45,7 +45,7 @@ Table groups (AD-10):
 
 | Group | Tables |
 | --- | --- |
-| Tenancy and access | `app_user`, `organization`, `organization_access`, `organization_licence`, `organization_member`, `workspace`, `workspace_member`, `invitation` |
+| Tenancy and access | `app_user`, `organization`, `organization_access`, `organization_licence`, `organization_member`, `workspace`, `workspace_member`, `invitation`, `password_reset` |
 | Model | `concept`, `entity`, `attribute`, `relationship` |
 | Sources | `source_system`, `source_table`, `source_column`, `source_relationship`, `source_relationship_column`, `source_import`, `source_change`, `classification`, `classification_link` |
 | Mappings | `mapping`, `mapping_input` |
@@ -128,7 +128,7 @@ copies point to it.
 
 ### `app_user`
 A person who can sign in. `id` is the application's own (AD-11). Since slice 29 (L3) the Supabase Auth account is linked
-by `auth_user_id`, set by the accounts script (later by invitations, slice B); there is deliberately no foreign key into
+by `auth_user_id`, set by the accounts script and, since slice 33, by accepting an invitation or using a reset link (D5); there is deliberately no foreign key into
 the `auth` schema, so the table works with any identity provider later, and a person's id never changes with their
 account. The local adapter's file has no such column (no format change): it reads as null.
 
@@ -233,15 +233,36 @@ again in its serialised write; the database slice does it in the write's transac
 | `created_at` | timestamptz | no | |
 
 ### `invitation`
+An invitation to a workspace by a link the inviter copies (slice 33, AD-40). Pending while neither accepted nor revoked; a
+pending one past `expires_at` is expired and is renewed in place ("New link": a new `token_hash` and `expires_at`).
+At most one pending invitation per workspace and e-mail (`invitation_pending_uq`, partial: `accepted_at` and
+`revoked_at` null; an expired one counts). Outside undo; its change events carry a marker for `token_hash`
+(`SECRET_COLUMNS`). The local file has it since format 18.
+
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
 | `id`, `workspace_id` | uuid | no | |
 | `email` | text | no | lower-case |
-| `role` | text | no | as `workspace_member.role` |
-| `token_hash` | text | no | unique; the token itself is only in the e-mail |
+| `role` | text | no | `admin`, `modeler`, `reviewer`, `reader` (never `owner`) |
+| `token_hash` | text | no | unique; the SHA-256 (hex) of the link's token, which is shown once and never stored |
 | `invited_by`, `created_at` | | no | |
-| `expires_at` | timestamptz | no | |
+| `expires_at` | timestamptz | no | 7 days after it was made or renewed |
 | `accepted_at`, `revoked_at` | timestamptz | yes | |
+
+### `password_reset`
+A one-time link to set a new password (slice 33, PT4, D1), made on a workspace's People tab: `workspace_id` is that
+workspace, whose log gets its change events. Live while neither used nor revoked and before `expires_at`; a newer link
+for the same person revokes the earlier one. Outside undo; `token_hash` as in `invitation`. The local file has it since
+format 18.
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| `id`, `workspace_id` | uuid | no | |
+| `app_user_id` | uuid | no | the person whose password it sets |
+| `token_hash` | text | no | unique |
+| `created_by`, `created_at` | | no | |
+| `expires_at` | timestamptz | no | 24 hours after it was made |
+| `used_at`, `revoked_at` | timestamptz | yes | |
 
 ---
 

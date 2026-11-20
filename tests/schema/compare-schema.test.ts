@@ -91,6 +91,8 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
         // slice 24: entity stereotypes
         "stereotype",
         "organization_access", "organization_licence",
+        // slice 33: invitations and password reset links
+        "invitation", "password_reset",
         // slice 15a: InfoCube's tables, through the composition root (AD-33)
         "cube_entity", "cube_measure",
         // slice 15b: the key links (role-playing)

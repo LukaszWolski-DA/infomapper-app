@@ -129,6 +129,17 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
       listMembers: async (workspaceId) => (await ofWorkspace(pool, "workspace_member", workspaceId, false)) as never,
     },
 
+    invitations: {
+      listOpen: async (workspaceId) => (await read("invitation", "workspace_id = $1 and accepted_at is null and revoked_at is null", workspaceId)) as never,
+      get: async (workspaceId, invitationId) => one(await read("invitation", "workspace_id = $1 and id = $2", workspaceId, invitationId)),
+      getByTokenHash: async (tokenHash) => one(await read("invitation", "token_hash = $1", tokenHash)),
+    },
+
+    passwordResets: {
+      getByTokenHash: async (tokenHash) => one(await read("password_reset", "token_hash = $1", tokenHash)),
+      listOfUser: async (userId) => (await read("password_reset", "app_user_id = $1", userId)) as never,
+    },
+
     projects: {
       get: async (workspaceId, projectId) => one(await read("project", "workspace_id = $1 and id = $2 and deleted_at is null", workspaceId, projectId)),
       list: async (workspaceId) => (await ofWorkspace(pool, "project", workspaceId, true)) as never,
