@@ -30,10 +30,15 @@ export const userMenu = (page: Page): Locator => page.getByTestId("menu-user");
 export const themeGroup = (page: Page): Locator => page.getByTestId("seg-theme");
 export const themeItem = (page: Page, theme: ThemeChoice): Locator => page.getByTestId(`theme-${theme}`);
 
-/** Opens the person's menu (if it is not open). */
+/**
+ * Opens the person's menu (if it is not open). Asks the trigger, not the menu's visibility: after Escape the menu stays
+ * visible for its closing animation, and a click on it then lands on an item that is leaving (step 4's full run).
+ */
 export async function openUserMenu(page: Page) {
-  if (!(await userMenu(page).isVisible())) await page.getByTestId("indicator-user").click();
-  await expect(userMenu(page)).toBeVisible();
+  const trigger = page.getByTestId("indicator-user");
+  if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(userMenu(page)).toHaveAttribute("data-state", "open");
 }
 
 /** Chooses a theme in the menu; the menu stays open. */
