@@ -38,21 +38,14 @@ import { localFileOf, upgradedFrom } from "../../scripts/lib/backup-file";
 import { organizationRows, type Tables } from "../../scripts/lib/organization-rows";
 import { resetRefusal } from "../../scripts/lib/seed-organizations";
 import { seedRows } from "../../scripts/lib/seed-rows";
-import { assertLocalDatabase, preparePostgres, readEverything, spreadAll, type Row } from "./shared";
+import { assertLocalDatabase, AT, contractClock, preparePostgres, readEverything, spreadAll, type Row } from "./shared";
 
 const CONTRACT_DB = process.env.INFOMAPPER_CONTRACT_DB;
 const RETAIL = SEED_IDS.wsRetailDwh;
 const ANNA = SEED_IDS.userAnna;
 const SAMPLE = path.resolve(__dirname, "../../src/domain/import/samples/crm_snapshot_2026-10-20.csv");
 
-function clock() {
-  let id = 0;
-  let second = 0;
-  return (actorId: string): CommandContext => {
-    second += 1;
-    return { actorId, now: new Date(Date.UTC(2026, 10, 19, 9, 0, second)).toISOString(), newId: () => `01a1d000-0000-7000-8000-${(++id).toString(16).padStart(12, "0")}` };
-  };
-}
+const clock = () => contractClock("01a1d000");
 const ok = <T>(r: CommandResult<T>): WriteSet => {
   if (!r.ok) throw new Error(r.error.message);
   return r.writeSet;
@@ -74,7 +67,7 @@ async function importInto(store: DataStore, ctx: CommandContext, text: string, l
 /** The demo with an import and a re-import that raises changes, as a local file's text. */
 async function demoFileText(dir: string): Promise<string> {
   const file = path.join(dir, "demo-db.json");
-  fs.writeFileSync(file, JSON.stringify(seedRows(new Date("2026-11-19T08:00:00.000Z"))));
+  fs.writeFileSync(file, JSON.stringify(seedRows(AT)));
   const store = createLocalDataStore(file, STORE_SCHEMA);
   const ctxOf = clock();
   const first = fs.readFileSync(SAMPLE, "utf8");

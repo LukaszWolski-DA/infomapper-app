@@ -39,22 +39,13 @@ import type { ApplyOptions, ApplyResult, DataStore } from "@/data/ports";
 import { pgClientConfig } from "@/data/postgres/config";
 import { getPool } from "@/data/postgres/pool";
 import { createPostgresDataStore } from "@/data/postgres/store";
-import { assertLocalDatabase, contractRows, preparePostgres, readEverything, spreadAll } from "./shared";
+import { assertLocalDatabase, contractClock, contractRows, preparePostgres, readEverything, spreadAll } from "./shared";
+
+const clock = () => contractClock("01a1c000");
 
 const RETAIL = SEED_IDS.wsRetailDwh;
 const LUKASZ = SEED_IDS.userLukasz;
 const ANNA = SEED_IDS.userAnna;
-
-/** Ids and times both adapters get alike: UUID-shaped, increasing, from a counter; one second per command. */
-function clock() {
-  let id = 0;
-  let second = 0;
-  return (actorId: string): CommandContext => {
-    second += 1;
-    const now = new Date(Date.UTC(2026, 10, 20, 9, 0, second)).toISOString();
-    return { actorId, now, newId: () => `01a1c000-0000-7000-8000-${(++id).toString(16).padStart(12, "0")}` };
-  };
-}
 
 /** An answer as both adapters must give it: the code and the message up to its detail in brackets (table and rule). */
 const answerOf = (r: ApplyResult) => (r.ok ? { ok: true } : { ok: false, code: r.error.code, message: r.error.message.split(" (")[0] });
