@@ -81,8 +81,9 @@ export function contractRows(): DevDb {
     ...patch,
   });
   rows.invitation!.push(
-    invitation(1, "pending.person@example.com", {}),
+    // in the time order (AD-12: the stored order is the time, then the place): the expired one was made first
     invitation(2, "expired.person@example.com", { expires_at: "2026-11-09T10:00:00.000Z", created_at: "2026-11-02T10:00:00.000Z" }),
+    invitation(1, "pending.person@example.com", {}),
     invitation(3, "accepted.person@example.com", { accepted_at: "2026-11-16T10:30:00.000Z" }),
     invitation(4, "revoked.person@example.com", { revoked_at: "2026-11-16T10:30:00.000Z", role: "reader" }),
   );

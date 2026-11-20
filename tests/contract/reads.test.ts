@@ -74,7 +74,7 @@ describe("the reads on the local adapter, against the rows themselves", () => {
     const invitations = rowsOf("invitation");
     expect(invitations).toHaveLength(4);
     const ws = invitations[0]!.workspace_id!;
-    expect((localReads[`invitations.listOpen ${ws}`] as Row[]).map((i) => i.email)).toEqual(["pending.person@example.com", "expired.person@example.com"]);
+    expect((localReads[`invitations.listOpen ${ws}`] as Row[]).map((i) => i.email)).toEqual(["expired.person@example.com", "pending.person@example.com"]);
     for (const i of invitations) expect(localReads[`invitations.getByTokenHash ${i.id}`]).toEqual(i);
     expect(localReads["invitations.getByTokenHash (unknown)"]).toBeNull();
     const resets = rowsOf("password_reset");
