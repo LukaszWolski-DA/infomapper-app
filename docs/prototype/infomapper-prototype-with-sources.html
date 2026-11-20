@@ -838,6 +838,16 @@ body.wsmode #dtabs{display:none}
 .people th{font-size:11.5px;font-weight:600;color:var(--ink-3)}
 .people .av{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;background:var(--logical-soft);color:var(--logical);font-size:11px;font-weight:600;margin-right:8px}
 .people .pend{color:var(--ink-3);font-style:italic}
+.people .exp{color:var(--ink-3);font-size:12px}
+.people td .btn+.btn{margin-left:6px}
+.people.ppl{table-layout:fixed}
+.people.ppl td:first-child{overflow-wrap:anywhere}
+.people.ppl td:last-child{white-space:nowrap}
+.linkbox{display:flex;gap:8px;align-items:center;margin-top:12px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.linkbox code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px var(--mono)}
+.pplerr{color:var(--warn);font-size:12.5px;margin:10px 0 0}
+.pplfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+#pplDlg .fld input:disabled{opacity:.6;cursor:default}
 .bl{display:grid;grid-template-columns:1fr auto;gap:6px 16px;padding:12px 14px;background:var(--surface);border-radius:10px;box-shadow:0 0 0 1px var(--line);margin-bottom:10px}
 .bl .t{font-weight:600}
 .bl .m{color:var(--ink-3);font-size:12px}
@@ -1674,6 +1684,7 @@ table.dt.drels{margin-top:1mm}
 
 <dialog class="wiz iw" id="wiz" aria-labelledby="wizTitle"></dialog>
 <dialog class="set iw" id="setDlg" aria-labelledby="setTitle"></dialog>
+<dialog class="set iw" id="pplDlg" aria-labelledby="pplTitle" data-testid="ppl-dialog"></dialog>
 <script>
 "use strict";
 /* =========================================================
@@ -6342,11 +6353,12 @@ ${w.baselines.length ? w.baselines.slice().reverse().map(b => `<div class="bl"><
   : `<p style="color:var(--ink-3)">No baselines yet.</p>`}`;
   } else if (tab === "people") {
     body = `<p style="color:var(--ink-2);margin-top:14px">Roles apply to this workspace only. Guests come from another organization.${w.settings?.fourEyes ? " Four-eyes is on: nobody approves their own change." : ""}</p>
-<table class="people"><tr><th>Person</th><th>Role</th><th></th></tr>${w.members.map(m => { const ini = (m.name || m.email).split(/[\s.@]+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join("");
+<table class="people ppl"><colgroup><col><col style="width:140px"><col style="width:236px"></colgroup><tr><th>Person</th><th>Role</th><th></th></tr>${w.members.filter(m => !m.pending).map(m => { const ini = (m.name || m.email).split(/[\s.@]+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join("");
   return `<tr><td><span class="av">${esc(ini)}</span>${m.pending ? `<span class="pend">${esc(m.email)} · invitation sent</span>` : `${esc(m.name)} <span style="color:var(--ink-3)">${esc(m.email)}</span>`}${m.guest ? ` <span class="badge">Guest from ${esc(m.guest)}</span>` : ""}</td>
 <td>${m.you || !admin ? esc(m.role) : `<select data-role="${m.id}">${["Owner", "Admin", "Modeler", "Reviewer", "Reader"].map(r => `<option${r === m.role ? " selected" : ""}>${r}</option>`).join("")}</select>`}</td>
-<td style="text-align:right">${!m.you && admin ? `<button class="btn sm" data-rm="${m.id}">Remove</button>` : ""}</td></tr>`; }).join("")}</table>
-${admin ? `<div class="box" style="margin-top:16px"><h4>Invite someone</h4><p>They get an e-mail to sign up or sign in (AD-04). People outside ${esc(curOrg().name)} join as guests.</p><div class="row2"><input type="text" id="inv-mail" placeholder="name@company.com" style="flex:1;min-width:240px"><select id="inv-role">${["Admin", "Modeler", "Reviewer", "Reader"].map(r => `<option${r === "Modeler" ? " selected" : ""}>${r}</option>`).join("")}</select><button class="btn sm pri" data-wa="invite">Invite</button></div></div>` : ""}
+<td>${!m.you && admin && SAVE.srv() === "dev" && !m.guest && !(m.role === "Owner" && myRole() !== "Owner") ? `<button class="btn sm" data-pr="${m.id}">Password reset link</button>` : ""}${!m.you && admin ? `<button class="btn sm" data-rm="${m.id}">Remove</button>` : ""}</td></tr>`; }).join("")}</table>
+${admin ? `<div class="box" style="margin-top:16px"><h4>Invite person</h4><p>You get a link to copy and send yourself (e-mail, Teams). It works once, for 7 days. The person sets their own password.</p><div class="row2"><input type="text" id="inv-mail" placeholder="name@company.com" style="flex:1;min-width:240px"><select id="inv-role">${["Admin", "Modeler", "Reviewer", "Reader"].map(r => `<option${r === "Modeler" ? " selected" : ""}>${r}</option>`).join("")}</select><button class="btn sm pri" data-wa="invite">Create invitation link</button></div></div>
+${w.members.some(m => m.pending) ? `<h3>Pending invitations</h3><table class="people ppl" data-testid="pending"><colgroup><col><col style="width:140px"><col style="width:236px"></colgroup><tr><th>E-mail</th><th>Role</th><th></th></tr>${w.members.filter(m => m.pending).map(m => `<tr><td><span class="pend">${esc(m.email)}</span> <span class="exp">· expires ${esc(m.exp || inDays(7))}</span></td><td>${esc(m.role)}</td><td><button class="btn sm" data-inv="new" data-id="${m.id}">New link</button><button class="btn sm" data-inv="rev" data-id="${m.id}">Revoke</button></td></tr>`).join("")}</table>` : ""}` : ""}
 <h3>What each role can do</h3><table class="people"><tr><th>Role</th><th>Model</th><th>Approve</th><th>Canvases and notes</th><th>People and settings</th></tr>
 <tr><td>Owner</td><td>edit</td><td>yes</td><td>yes</td><td>everything, incl. delete and transfer</td></tr><tr><td>Admin</td><td>edit</td><td>yes</td><td>yes</td><td>invite, roles, settings</td></tr><tr><td>Modeler</td><td>edit</td><td>no</td><td>yes</td><td>no</td></tr><tr><td>Reviewer</td><td>read, comment</td><td>yes</td><td>notes</td><td>no</td></tr><tr><td>Reader</td><td>read</td><td>no</td><td>no</td><td>no</td></tr></table>`;
   } else {
@@ -6415,8 +6427,10 @@ wsBox.addEventListener("click", ev => {
   if (a.dataset.wa === "baseline") { const n = $("#bl-name").value.trim(); if (!n) { $("#bl-name").focus(); toast("Give the baseline a name."); return; }
     rootChange(() => { w.baselines.push({id:uid("bl"), name:n, note:$("#bl-note").value.trim(), created:new Date().toISOString().slice(0, 10), by:ROOT.user.name, model:modelPart(S)}); }, `Created the baseline ${n}.`); return; }
   if (a.dataset.wa === "invite") { const mail = $("#inv-mail").value.trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { $("#inv-mail").focus(); toast("Enter an e-mail address."); return; }
-    const dom = mail.split("@")[1], guest = /infomate/.test(dom) ? null : (dom.split(".")[0].replace(/^./, c => c.toUpperCase()));
-    rootChange(() => { w.members.push({id:uid("m"), name:"", email:mail, role:$("#inv-role").value, pending:true, ...(guest && curOrg().id === "org_infomate" ? {guest} : {})}); }, `Invitation sent to ${mail}.`); return; }
+    if (w.members.some(m => m.email.toLowerCase() === mail.toLowerCase())) { toast(`${mail} is already in this workspace or invited.`); return; }
+    const role = $("#inv-role").value;
+    rootChange(() => { w.members.push({id:uid("m"), name:"", email:mail.toLowerCase(), role, pending:true, exp:inDays(7)}); });
+    PPL.link("Invitation link", `Send it to <b>${esc(mail)}</b>. They join <b>${esc(w.name)}</b> as ${esc(role)}.`, "invite", "It works once, for 7 days."); return; }
 });
 const curOrgName = w => ROOT.orgs.find(o => o.id === w.orgId)?.name || "";
 wsBox.addEventListener("change", ev => {
@@ -6517,14 +6531,70 @@ function renderUserBtn() {
    data-theme on <html>, which the dark tokens already honour. In the app it is a cookie the server reads; here memory. */
 const THEMES = [["light", "Light"], ["dark", "Dark"], ["system", "System"]];
 let THEME = "system";
+/* People (the people slice): invitation and password reset links copied by the inviter, Change password…, the pages a
+   link opens. In the app the links are one-time tokens (only their hash is stored); here they are made up. */
+function inDays(n) { return new Date(Date.now() + n * 864e5).toLocaleDateString("en-GB", {day:"numeric", month:"short", year:"numeric"}); }
+const pplDlg = $("#pplDlg");
+const PPL = (() => {
+  const host = () => SAVE.srv() === "dev" ? "https://infomapper-app-dev-git-dev-lukaszs-projects-9ffbc132.vercel.app" : "http://localhost:3000";
+  const token = () => Array.from({length:43}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"[Math.floor(Math.random() * 64)]).join("");
+  const head = title => `<div class="whead"><h2 id="pplTitle">${title}</h2><button class="tb" data-pplclose aria-label="Close" style="border:0;background:none;cursor:pointer;color:var(--ink-2)">✕</button></div>`;
+  function open(html) { pplDlg.innerHTML = html; pplDlg.querySelector("[data-pplclose]").onclick = () => pplDlg.close(); if (!pplDlg.open) pplDlg.showModal(); }
+  function link(title, text, path, valid) {
+    const url = `${host()}/${path}/${token()}`;
+    open(`${head(title)}<div class="setbody"><p style="margin-top:12px">${text}</p><div class="linkbox"><code data-testid="ppl-link">${esc(url)}</code><button class="btn primary" data-copy>Copy</button></div>
+<p class="hint" style="margin-top:8px">${valid} Shown only now: if it gets lost, make a new link.</p><div class="pplfoot"><button class="btn" data-done>Done</button></div></div>`);
+    pplDlg.querySelector("[data-copy]").onclick = async () => { try { await navigator.clipboard.writeText(url); } catch (e) { /* the preview may refuse */ } toast("Link copied."); };
+    pplDlg.querySelector("[data-done]").onclick = () => pplDlg.close();
+  }
+  function form(title, intro, fields, button, check, done) {
+    open(`${head(title)}<div class="setbody">${intro}${fields.map(f => `<div class="fld"><label for="pf-${f.id}">${f.label}</label><input id="pf-${f.id}" type="${f.type || "password"}" ${f.value ? `value="${esc(f.value)}" disabled` : ""} autocomplete="${f.ac || "off"}"></div>`).join("")}
+<p class="hint" style="margin-top:6px">${fields.some(f => f.id === "new") ? "At least 10 characters." : ""}</p><p class="pplerr" data-err hidden></p><div class="pplfoot"><button class="btn" data-cancel>${button ? "Cancel" : "Close"}</button>${button ? `<button class="btn primary" data-ok>${button}</button>` : ""}</div></div>`);
+    pplDlg.querySelector("[data-cancel]").onclick = () => pplDlg.close();
+    const ok = pplDlg.querySelector("[data-ok]");
+    if (ok) ok.onclick = () => { const v = id => (pplDlg.querySelector(`#pf-${id}`) || {}).value || ""; const err = check(v); const e = pplDlg.querySelector("[data-err]");
+      if (err) { e.textContent = err; e.hidden = false; return; } pplDlg.close(); toast(done); };
+  }
+  const pwRules = v => v("new").length < 10 ? "The password needs at least 10 characters." : v("new") !== v("again") ? "The two passwords are not the same." : "";
+  function pw() {
+    form("Change password", `<p style="margin-top:12px">For ${esc(ROOT.user.email)}.</p>`,
+      [{id:"cur", label:"Current password", ac:"current-password"}, {id:"new", label:"New password", ac:"new-password"}, {id:"again", label:"New password again", ac:"new-password"}],
+      "Change password", v => !v("cur") ? "Enter your current password." : v("cur") === "wrong" ? "The current password is not right. Nothing was changed." : pwRules(v),
+      "Password changed. Use the new one next time you sign in.");
+  }
+  function join(kind) {
+    const w = curWs(), org = curOrg().name, by = ROOT.user.name;
+    if (kind === "exp") { form("Invitation", `<p style="margin-top:12px">This invitation link has expired, was already used or was revoked. Nothing was changed.</p><p>Ask the person who invited you for a new link.</p>`, [], "", () => "", ""); return; }
+    const intro = `<p style="margin-top:12px">${esc(by)} invited you to <b>${esc(w.name)}</b> in <b>${esc(org)}</b> as <b>Modeler</b>.</p>`;
+    if (kind === "new") form(`Join ${esc(org)}`, intro, [{id:"mail", label:"E-mail", type:"email", value:"new.person@example.com"}, {id:"name", label:"Your name", type:"text", ac:"name"}, {id:"new", label:"Password", ac:"new-password"}, {id:"again", label:"Password again", ac:"new-password"}],
+      "Join", v => !v("name").trim() ? "Enter your name." : pwRules(v), `In the app you are now signed in to ${w.name} as Modeler. Prototype only.`);
+    else form(`Join ${esc(org)}`, intro + `<p>You already have an account: sign in to add this workspace to yours.</p>`, [{id:"mail", label:"E-mail", type:"email", value:"anna.nowak@infomate.pl"}, {id:"cur", label:"Password", ac:"current-password"}],
+      "Sign in and join", v => !v("cur") ? "Enter your password." : v("cur") === "wrong" ? "The e-mail or the password is not right." : "", `In the app ${w.name} is now among your workspaces. Prototype only.`);
+  }
+  function reset() {
+    form("Set a new password", `<p style="margin-top:12px">For anna.nowak@infomate.pl. This link works once, for 24 hours.</p>`,
+      [{id:"new", label:"New password", ac:"new-password"}, {id:"again", label:"New password again", ac:"new-password"}],
+      "Set password", pwRules, "Password set. In the app you are now signed in. Prototype only.");
+  }
+  document.addEventListener("click", ev => {
+    const pr = ev.target.closest("[data-pr]"), inv = ev.target.closest("[data-inv]"); if (!pr && !inv) return;
+    const w = curWs();
+    if (pr) { const m = w.members.find(x => x.id === pr.dataset.pr); link("Password reset link", `For <b>${esc(m.name || m.email)}</b>. They set a new password with it and are signed in.`, "reset", "It works once, for 24 hours."); return; }
+    const m = w.members.find(x => x.id === inv.dataset.id);
+    if (inv.dataset.inv === "rev") { rootChange(() => { w.members = w.members.filter(x => x !== m); }, `The invitation to ${m.email} is revoked; its link no longer works.`); return; }
+    rootChange(() => { m.exp = inDays(7); });
+    link("New invitation link", `For <b>${esc(m.email)}</b>, as ${esc(m.role)}. The earlier link no longer works.`, "invite", "It works once, for 7 days.");
+  });
+  return {link, pw, join, reset};
+})();
 function setTheme(v) { THEME = v; if (v === "system") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = v; }
 $("#tUser").addEventListener("click", ev => {
   ev.stopPropagation(); if (!cmenu.hidden) { closeCtx(); return; }
   const w = curWs(), me = w.members.find(m => m.you) || {}, r = $("#tUser").getBoundingClientRect();
   cmenu.innerHTML = `<div class="umenu-id"><b>${esc(ROOT.user.name)}</b><span>${esc(ROOT.user.email)}</span></div>
 <div class="umenu-role">In <b>${esc(w.name)}</b> you are <b>${esc(me.role || "")}</b>${me.guest ? `, a guest from ${esc(me.guest)}` : ""}.<br>${w.archived ? "The workspace is archived, so everything is read-only." : esc(ROLE_CAN[me.role] || "")}</div>
-<hr><button data-um="people"><span>People and roles</span></button><button data-um="ws"><span>Workspace home</span></button><hr><div class="msec">Theme</div><div class="seg" role="group" aria-label="Theme" data-testid="seg-theme">${THEMES.map(([v, l]) => `<button data-um="th" data-v="${v}" aria-pressed="${THEME === v}">${l}</button>`).join("")}</div><hr><button data-um="out"><span>Sign out</span></button>
-<hr><div class="umenu-proto">Prototype only</div><button data-um="srv"><span>Show the server as ${esc(SAVE.other())}</span></button><button data-um="fail"><span>${SAVE.failArmed() ? "Don't fail the next change" : "Make the next change fail to save"}</span></button>`;
+<hr><button data-um="people"><span>People and roles</span></button><button data-um="ws"><span>Workspace home</span></button><hr><div class="msec">Theme</div><div class="seg" role="group" aria-label="Theme" data-testid="seg-theme">${THEMES.map(([v, l]) => `<button data-um="th" data-v="${v}" aria-pressed="${THEME === v}">${l}</button>`).join("")}</div><hr>${SAVE.srv() === "dev" ? `<button data-um="pw"><span>Change password…</span></button>` : ""}<button data-um="out"><span>Sign out</span></button>
+<hr><div class="umenu-proto">Prototype only</div><button data-um="srv"><span>Show the server as ${esc(SAVE.other())}</span></button><button data-um="fail"><span>${SAVE.failArmed() ? "Don't fail the next change" : "Make the next change fail to save"}</span></button><button data-um="jn"><span>Open an invitation link (new person)</span></button><button data-um="jo"><span>Open an invitation link (has an account)</span></button><button data-um="jx"><span>Open an expired invitation link</span></button><button data-um="rs"><span>Open a password reset link</span></button>`;
   ctxItems = [{}]; cmenu.hidden = false;
   const m = cmenu.getBoundingClientRect(); cmenu.style.left = Math.max(8, r.right - m.width) + "px"; cmenu.style.top = (r.bottom + 6) + "px";
 });
@@ -6534,7 +6604,12 @@ cmenu.addEventListener("click", ev => {
   closeCtx();
   if (u.dataset.um === "people") { V.wsTab = "people"; goWsHome(); }
   else if (u.dataset.um === "ws") goWsHome();
-  else if (u.dataset.um === "srv") { SAVE.toggleSrv(); toast(`The badge shows ${SAVE.srv() === "dev" ? "Online · dev" : "Local"}. Prototype only.`); }
+  else if (u.dataset.um === "srv") { SAVE.toggleSrv(); rebuild(); toast(`The badge shows ${SAVE.srv() === "dev" ? "Online · dev" : "Local"}. Prototype only.`); }
+  else if (u.dataset.um === "pw") PPL.pw();
+  else if (u.dataset.um === "jn") PPL.join("new");
+  else if (u.dataset.um === "jo") PPL.join("old");
+  else if (u.dataset.um === "jx") PPL.join("exp");
+  else if (u.dataset.um === "rs") PPL.reset();
   else if (u.dataset.um === "fail") { SAVE.armFail(); toast(SAVE.failArmed() ? "The next change will fail to save. Prototype only." : "The next change will save as usual."); }
   else toast("Signing out is not part of the prototype.");
 }, true);
