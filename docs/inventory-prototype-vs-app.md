@@ -395,22 +395,31 @@ draws it for everyone and refuses the change. The armed button disarms after 4 s
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Inviting people | an e-mail and a role, an invitation e-mail, a pending row; guests from the e-mail's domain | the People tab, `data-wa="invite"` | database (AD-04); guests from other organizations: idea (AD-01) |
+| Inviting people | an e-mail and a role, a link to copy (`PPL.link`), pending invitations with New link and Revoke | the People tab, `data-wa="invite"`, `data-inv` | **present** since slice 33 (AD-40); guests from other organizations: idea (AD-01); e-mail: slice D |
+| Passwords | "Change password…" in the person's menu; "Password reset link" by a person; the pages a link opens (`PPL.join`, `PPL.reset`) | the person's menu `data-um="pw"`, `data-pr` | **present** online since slice 33 (AD-40, D1, D4) |
 
 **Present:** the People tab, settings (four-eyes, Data Vault 2.0 mode), archived and read-only workspaces; importing
 and re-importing only for owners, admins and modelers in a workspace that is not archived (7a, item 40). Since slice 8,
 in the development form (D-58): "Add a person" (name, e-mail, role, a summary; the account at once, reached through the
 organization's link and password), the role select and Remove per member for owners and admins, and the "Organization
-access" box (the link, changing the password). Since slice 21 (D-76): "Concept colours" (prototype `data-ccol`), for
+access" box (the link, changing the password). Since slice 33 (AD-40) "Invite person" replaced "Add a person" on both
+adapters: a link copied by the inviter, "Pending invitations" (expired marked, New link, Revoke), the pages
+`/invite/<token>` and `/reset/<token>` outside the app shell, and online "Change password…" and "Password reset link". Since slice 21 (D-76): "Concept colours" (prototype `data-ccol`), for
 those who may edit the model, one undo step per change; since slice 23 (D-78) in the Metadata conventions tab, and the
 settings' "Model conventions" box points there (its sentence and button; the prototype's chips are a deliberate
 difference, see Sources). Still missing from the settings: the prototype's "Statuses" and "Requirement templates"
 lines.
 
-**Deliberate differences (slice 8, PRD section 8):** a start page with signing in and creating an organization; adding
-makes the account at once instead of an invitation; Remove asks first and says when the person leaves the organization;
+**Deliberate differences (slice 8, PRD section 8):** a start page with signing in and creating an organization; Remove asks first and says when the person leaves the organization;
 the last owner keeps the role, only an owner gives or takes Owner, an admin cannot change or remove an owner, and nobody
 changes their own row (F12); every people change follows the app's roles, archive and change log.
+
+**Deliberate differences (slice 33, acceptance doc section 4):** the link pages are pages outside the app shell, not
+dialogs over the app; a refused link's page has no button; the pending table and its buttons only for Owners and Admins;
+the role select offers Owner to owners only; a bad e-mail is the field's message, not a toast; "Sign in and join" refuses
+with the sign-in's text ("The e-mail address or the password is wrong."); the dialogs and pages show one error line (D9);
+a person without an Auth account sees "Set a password for your account to join." (D5, not in the prototype); a refused
+reset link has its own message (not in the prototype).
 
 ## InfoCube
 

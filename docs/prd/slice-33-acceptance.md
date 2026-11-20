@@ -458,3 +458,65 @@ error. The assumed cause is the sign-in's soft navigation (`router.push`) racing
 that sets cookies, made visible by `dev:pg`'s 3 to 5 s pages; not reproduced. The sign-in form is slice 29's; Join and
 Set password (this slice) navigate the same way. Proposed: a full page load after the three actions that change the
 session. Open: Łukasz decides where (this slice or a `fix/` branch) and whether Claude reproduces it on `dev:pg`.
+
+## 11. Step 6: the closing (20 November 2026)
+
+**`dev`** had not moved (`b4c7a96`): no merge into the branch was needed.
+
+**The backup before a migration that adds a table** (step 4's finding, Claude's call): `readOrganization`
+(`src/data/postgres/load.ts`) leaves out a table the code knows and the database does not have yet and names it in
+`notInDatabase`; `pg:backup` prints "Not in the database yet, so left out (no rows of them can be there): …" and reads the
+rest. Test: `tests/contract/copy.test.ts` (CI's container) reads with a schema that has one table more than the database:
+the same rows as without it, and the table named.
+
+**What remains of the made-up person in `infomapper-dev`** (item 5; a read-only count, counts and booleans only, on
+20 November 2026 after the acceptance): one `app_user` (`test.person@example.com`) linked to its Supabase Auth account;
+**one `organization_member` row (InfoMate, member) and one `workspace_member` row (Retail Co – DWH, Modeler)**; five
+change events signed by them (their Join: the person, the two memberships, the invitation accepted; their reset link
+used) and three about them; their invitation (accepted) and their reset link (used); no undo step. **No removal was
+stored:** the workspace's log has no event that removed them, so "Then Test Person was removed" (section 10) did not
+reach the database (the click, the confirmation or a refusal: not known from the data). As designed after a removal:
+the `app_user` row, its Auth account and the change events stay (D-58: accounts are never deleted; earlier work keeps its
+author's name), and the organization row goes with their last workspace there. Proposed, not done: Łukasz removes Test
+Person again on the People tab (it writes the removal and, as their last InfoMate workspace, their organization row);
+the Supabase Auth account may stay (it sees nothing without a workspace) or be deleted by hand in Supabase's dashboard
+(Authentication → Users); the `app_user` row stays, as every person's does.
+
+**Claude's technical calls, for Łukasz's approval** (the decisions D1, D2, D6, D7, D9 and D10 are his):
+- **PT1 as amended (F1, F2, F3):** `SUPABASE_SECRET_KEY` read in the app only by `src/app/_lib/supabase-admin.ts`
+  (server-only) and by the scripts; CI checks the built client files (`scripts/check-client-bundle.ts`); nothing on the
+  laptop; no Redeploy; without the key "This server is not set up for invitations yet." (D10).
+- **PT2 as amended (F14, F15):** 32 random bytes, base64url, in the link only; SHA-256 (hex) stored and looked up through
+  its unique index (no constant-time comparison: nothing compares a secret); the link's address from the request; expiry
+  on the application's clock.
+- **PT3:** the invite page's paths: new, existing, and (D5) a person without an Auth account; the one refused message;
+  the archived workspace's own (D7).
+- **PT4 as amended (F7):** `password_reset` a table of its own with `workspace_id`; one migration with the pending index
+  (F5); RLS on, no policy.
+- **PT5:** the reset page; a newer link revokes the earlier one.
+- **PT6 → D3:** locally Join signs the person in with only the invitation's organization unlocked, no password.
+- **PT7 (F17):** "Add person" removed on both adapters and from the domain; `joinWrites` stays; the e2e helper
+  `addPerson` invites and accepts through the domain.
+- **PT8:** the organization's membership by `joinWrites` (a plain member unless already linked; a guest stays a guest).
+- **PT9:** not named in the PRD's text; nothing was built under it.
+- **F4:** `invitation` brought into the domain (type, rules, ports, the local file's format 18, contract cases).
+- **F6:** the token hashes and `app_user.auth_user_id` as markers in change events (`SECRET_COLUMNS`); a column neither
+  image has stays out; KB's copy refuses any secret value in a change event.
+- **F8 → D1** (Łukasz's decision); **F10:** the Auth account first, marked with the invitation or the reset link, removed
+  again when the write is refused, reused by a later Join of the same invitation; **F11:** 10 to 72 characters with the
+  prototype's texts; **F12:** the proxy's `LINK_PATH`; **F13:** Join, "Sign in and join" and "Set password" write the
+  session's cookies; **F16:** "Change password…" with the secret key; **F25:** the change events signed by the person who
+  joins or sets a password; **F26:** the once-only rule in the write (a whole-row comparison), tested at the same moment.
+- **D3** (above), **D4:** a reset ends the person's other sessions, a change of one's own password keeps them; **D5:** Join
+  and a reset make and link an account for a person without one; **D8:** the "signed in as someone else" line is an idea.
+- **The backup before a migration that adds a table** (above).
+- **Step 2's differences** (accepted by Łukasz with step 2): `addPerson` kept until step 3; `auth_user_id` marked in
+  change events; `redeemPasswordReset` (the hooks lint reads `use…` as a hook); a second Join of one link refused as a
+  conflict on Postgres and as stale locally; the reset link's own refused message.
+- **Step 3's differences:** the port `users.getAuthUserId` (Postgres reads never return the link with the row); D5's
+  sentence "Set a password for your account to join." (not in the prototype); "Set password" sets the password before it
+  marks the link used (a known limitation); a Join whose sign-in then fails sends to `/sign-in`; a Join is the person's
+  own change event, so a removed person who joined stays named on the workspace's pages; "Change password…"'s refusals
+  are its dialog's line, not a toast (D9); the online screenshots are CI's artifact `smoke-screens`, uploaded on every
+  run (demo data on a throwaway stack); the link dialog's link box shrinks with the dialog (a grid column of
+  `minmax(0, 1fr)`).

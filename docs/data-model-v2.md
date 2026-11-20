@@ -135,7 +135,7 @@ account. The local adapter's file has no such column (no format change): it read
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
 | `id` | uuid | no | primary key |
-| `auth_user_id` | uuid | yes | unique: the Supabase Auth user signed in as this person (slice 29); null without an account |
+| `auth_user_id` | uuid | yes | unique: the Supabase Auth user signed in as this person (slice 29); null without an account; since slice 33 a change event carries a marker in its place (`SECRET_COLUMNS`) |
 | `email` | text | no | unique, lower-case |
 | `display_name` | text | no | |
 | `created_at` | timestamptz | no | |

@@ -89,7 +89,7 @@ Slice 29 is the database program's walking skeleton (AD-37), with no change to h
 Slice 30 makes Postgres take writes (AD-38): each write in one transaction with the workspace's lock, the access read
 again and six count rules checked inside it on both adapters; a lasting undo history on Postgres (`undo_step`, D-59's
 note); imports gzipped by the browser to fit a Vercel function's request; a save indicator and a server badge in the top
-bar (D-84); and "Add person" disabled online until the people slice (D-58's note).
+bar (D-84); and "Add person" disabled online until the people slice (D-58's note; slice 33 replaced it).
 Slice 31 copies Łukasz's own model (organization KB) into `infomapper-dev` (AD-39): from a copy of a backup of his local
 file, again or removed by one command, with his own Supabase account, backup and restore by script, and a reset that
 refuses while it is there; the lock timeout becomes 15 s; the measuring specs take their workspace and account from
@@ -97,11 +97,16 @@ variables. The local file was the model's master until Łukasz's switch on 20 No
 Slice 32 lets a person choose the theme (D-85, an exception to AD-31's "no new feature slices"): Light, Dark or
 System (the default) in the person's menu, remembered per browser in a cookie the server reads, so the first paint is
 right; no data changes.
+Slice 33 brings people online (AD-40): an Owner or Admin invites by a link they copy and send themselves (7 days, once;
+pending invitations with New link and Revoke), the person joins on `/invite/<token>` and sets their own password;
+"Change password…" in the person's menu and a one-time "Password reset link" for 24 hours, online only. "Invite person"
+replaces "Add person" on both adapters; the server makes Supabase accounts with the secret key, read only by
+`src/app/_lib/supabase-admin.ts`.
 Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md), [slice 9](docs/prd/slice-09-acceptance.md), [slice 10a](docs/prd/slice-10a-acceptance.md), [slice 10b](docs/prd/slice-10b-acceptance.md), [slice 10c](docs/prd/slice-10c-acceptance.md), [slice 11](docs/prd/slice-11-acceptance.md), [slice 12a](docs/prd/slice-12a-acceptance.md), [slice 12b](docs/prd/slice-12b-acceptance.md), [slice 13](docs/prd/slice-13-acceptance.md), [slice 14a](docs/prd/slice-14a-acceptance.md), [slice 14b](docs/prd/slice-14b-acceptance.md), [slice 15](docs/prd/slice-15-acceptance.md) (15a to 15d), [slice 16](docs/prd/slice-16-acceptance.md), [slice 17](docs/prd/slice-17-acceptance.md), [slice 18](docs/prd/slice-18-acceptance.md), [slice 19](docs/prd/slice-19-acceptance.md), [slice 20](docs/prd/slice-20-acceptance.md), [slice 21](docs/prd/slice-21-acceptance.md), [slice 22](docs/prd/slice-22-acceptance.md), [slice 23](docs/prd/slice-23-acceptance.md), [slice 24](docs/prd/slice-24-acceptance.md), [slice 25](docs/prd/slice-25-acceptance.md), [slice 26](docs/prd/slice-26-acceptance.md), [slice 27](docs/prd/slice-27-acceptance.md), [slice 28](docs/prd/slice-28-acceptance.md), [slice 29](docs/prd/slice-29-acceptance.md), [slice 30](docs/prd/slice-30-acceptance.md), [slice 31](docs/prd/slice-31-acceptance.md), [slice 32](docs/prd/slice-32-acceptance.md).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md), [slice 9](docs/prd/slice-09-acceptance.md), [slice 10a](docs/prd/slice-10a-acceptance.md), [slice 10b](docs/prd/slice-10b-acceptance.md), [slice 10c](docs/prd/slice-10c-acceptance.md), [slice 11](docs/prd/slice-11-acceptance.md), [slice 12a](docs/prd/slice-12a-acceptance.md), [slice 12b](docs/prd/slice-12b-acceptance.md), [slice 13](docs/prd/slice-13-acceptance.md), [slice 14a](docs/prd/slice-14a-acceptance.md), [slice 14b](docs/prd/slice-14b-acceptance.md), [slice 15](docs/prd/slice-15-acceptance.md) (15a to 15d), [slice 16](docs/prd/slice-16-acceptance.md), [slice 17](docs/prd/slice-17-acceptance.md), [slice 18](docs/prd/slice-18-acceptance.md), [slice 19](docs/prd/slice-19-acceptance.md), [slice 20](docs/prd/slice-20-acceptance.md), [slice 21](docs/prd/slice-21-acceptance.md), [slice 22](docs/prd/slice-22-acceptance.md), [slice 23](docs/prd/slice-23-acceptance.md), [slice 24](docs/prd/slice-24-acceptance.md), [slice 25](docs/prd/slice-25-acceptance.md), [slice 26](docs/prd/slice-26-acceptance.md), [slice 27](docs/prd/slice-27-acceptance.md), [slice 28](docs/prd/slice-28-acceptance.md), [slice 29](docs/prd/slice-29-acceptance.md), [slice 30](docs/prd/slice-30-acceptance.md), [slice 31](docs/prd/slice-31-acceptance.md), [slice 32](docs/prd/slice-32-acceptance.md), [slice 33](docs/prd/slice-33-acceptance.md).
 
 ## Getting started
 
@@ -194,8 +199,11 @@ is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at 
 - **Variables:** Preview only, scoped to the branch. The database URL (the transaction pooler), `SUPABASE_URL` and
   `SUPABASE_PUBLISHABLE_KEY` as Secret; `INFOMAPPER_DATA=postgres`, `INFOMAPPER_TIMING=1` and (slice 30)
   `INFOMAPPER_SERVER_NAME=dev` as plain values.
-  - **Never in Vercel:** `SUPABASE_SECRET_KEY` (it bypasses Row Level Security; only the accounts script needs it),
-    `INFOMAPPER_MIGRATION_URL` (the scripts' only) and `INFOMAPPER_DEMO_PASSWORD`.
+  - `SUPABASE_SECRET_KEY` (slice 33, AD-40): Preview, scoped to `dev`, Sensitive, holding a key of its own
+    (`vercel_dev_preview` in Supabase, so it can be revoked apart from the laptop's). It bypasses Row Level Security;
+    the app reads it only in `src/app/_lib/supabase-admin.ts`. The variable already existed before slice 33 (when and
+    why is not known); since slice 33 it holds this key.
+  - **Never in Vercel:** `INFOMAPPER_MIGRATION_URL` (the scripts' only) and `INFOMAPPER_DEMO_PASSWORD`.
   - The Protection Bypass for Automation secret lives only in `.env.postgres.local`
     (`VERCEL_AUTOMATION_BYPASS_SECRET`), for the measuring spec and the probe script.
 
