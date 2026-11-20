@@ -414,3 +414,19 @@ Passed, on the branch's commit c2eeba3 (the step 2 full run's commit).
 Open before step 4: the Schema workflow's `migrations` job (the contract suite's seed clock, failing on `dev` too) is
 fixed on its own `fix/` branch; step 4 starts in a new session once that fix is merged into `dev` and `dev` into this
 branch.
+
+## Step 4: the closing (20 November 2026)
+
+- **`dev` merged into the branch:** `dev` at `73b0853` (with fix/contract-seed-clock), a merge commit, no conflict.
+- **`@tailwindcss/node` in `devDependencies`** at the installed `4.3.3` (`^4.3.3`, deduped with `@tailwindcss/postcss`'s),
+  since `tests/theme-css.test.ts` imports it (step 2's open question; Claude's call).
+- **The docs:** `decisions.md` (AD-31's note on the exception; D-85, new, under "Appearance"), `ideas.md` (the idea
+  done), `known-limitations.md` (the choice per browser, not per account; a second window that stays visible; the focus
+  ring under the mouse pointer in the menu; `global-error` at System, from step 2), `inventory-prototype-vs-app.md` (the
+  menu's "Theme" section and its deliberate differences: the cookie, radio items, ↓ and ↑ along the row,
+  `color-scheme`), the README (slice 32, its acceptance link, "The theme") and CLAUDE.md (slice 32's sentence, the theme's
+  rule beside AD-20, slice 32's helpers and the theme in tests).
+- **Claude's technical calls, for Łukasz's approval:** P3 (the listener), P4 (`global-error` at System), P9 (the smoke
+  spec), P10 (no measuring sitting), `@tailwindcss/node` in `devDependencies`, and the radio items built as one
+  segmented row (`theme-choice.tsx`, not `Seg`).
+- **The full run** on the final commit; its numbers are in the closing report.

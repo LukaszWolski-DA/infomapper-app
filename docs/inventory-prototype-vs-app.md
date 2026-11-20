@@ -1,4 +1,4 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 27's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 32's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
@@ -164,6 +164,18 @@ placeholder and the two checks (22, D-77).
 
 **Present since the earlier inventory:** back and forward with Alt+←/→ (6b; differences in its acceptance doc); a
 source system's panel as a selection and a history place (7a).
+
+**Slice 32, the person's menu's "Theme" section (D-85):** present, as the prototype (`THEMES`, `setTheme`, `seg-theme`):
+the heading "Theme" and Light, Dark and System in one row between "Workspace home" and "Sign out", the menu staying open
+on a choice. Deliberate differences from the prototype:
+- **Remembered:** the prototype keeps the choice in memory and loses it on a reload; the app keeps it in the browser's
+  cookie `im-theme`, which the server reads, so the first paint shows it.
+- **Radio items, not buttons:** the three choices are the menu's radio items (`menuitemradio` with `aria-checked`), not
+  buttons with `aria-pressed`, so the menu's keyboard reaches them (Radix keeps plain buttons out of a menu's keyboard
+  order). They look like the prototype's segmented row.
+- **The keys along the row are ↓ and ↑, not ← and →:** the row is part of the menu's vertical order (Light, Dark, System,
+  then "Sign out"); in a Radix menu ← and → open and close submenus. Enter or Space chooses.
+- **`color-scheme`:** the prototype sets none; the app's native controls, lists and scroll bars follow the theme.
 
 **Slice 13, deliberate differences from the prototype (PRD section 8, D-66):** the prototype is a one-person app with
 no save conflicts, drafts across saves or refusals. In the app every text field keeps its draft across fresh pages and

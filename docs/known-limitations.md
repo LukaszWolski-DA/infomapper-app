@@ -2015,6 +2015,29 @@ describe.
 
 ## The theme (slice 32)
 
+### The choice is per browser, not per account
+
+The theme is remembered in the cookie `im-theme` of the browser it was chosen in (D-85), not in the person's account:
+another browser, another device, a private window or a browser whose cookies were cleared starts at System, and two people
+who share one browser share its choice. Signing out keeps it, on purpose (the sign-in page follows it). The choice in the
+account is left for later (`docs/ideas.md`).
+
+### Another window that stays visible keeps its theme until it is shown again
+
+A choice shows at once in the page it was made in. Another tab of the same browser takes it when it is shown again
+(`visibilitychange`) or when it loads a page; a page restored from the back-forward cache takes it on `pageshow`
+(`src/ui/theme-sync.tsx`). A second window that stays visible the whole time (for example on a second screen) fires
+neither event, so it keeps its old theme until it is hidden and shown again, loads a page or renders the root layout
+again (a refused write's fresh page reads the cookie). Its menu marks what that page shows.
+
+### The focus ring can follow the mouse pointer in the menu
+
+The theme's three choices show the keyboard's focus ring (`focus-visible`), and a hovered choice only darkens its text, as
+in the prototype. Radix's menu moves the focus to the item under the mouse pointer, and the browser decides whether a
+focus ring shows for that move by how the menu was last used: once the menu was opened or moved through with the keyboard,
+the ring follows the pointer from choice to choice; opened and used with the mouse alone, it does not. The menu's other
+items mark the item under the pointer with their highlight in either case.
+
 ### The root error page shows System
 
 When the root layout itself fails, Next.js shows `src/app/global-error.tsx`, which brings its own `<html>` and is a client
