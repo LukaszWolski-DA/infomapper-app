@@ -18,7 +18,12 @@ import { can } from "@/domain/permissions";
 import { CanvasThumbnail } from "@/ui/canvas-thumbnail";
 import { ArchiveBox, UnarchiveButton } from "./_components/lifecycle";
 import { NewProjectTile } from "./_components/new-project-tile";
-import { AddPersonBox, OrganizationAccessBox, RemovePersonButton, RoleSelect } from "./_components/people";
+import { OrganizationAccessBox, RemovePersonButton, RoleSelect } from "./_components/people";
+import { InvitationButtons, InvitePersonBox, ResetLinkButton } from "./_components/invitations";
+import { pendingInvitations, resetRefusal } from "@/domain/commands/invitations";
+import { resetReachOf } from "@/app/_lib/people-links";
+import { invitationsReady, NOT_SET_UP } from "@/app/_lib/supabase-admin";
+import { inviteDate } from "@/ui/invite-date";
 import { SettingsForm } from "./_components/settings-form";
 import { Conventions } from "./_components/conventions";
 import { settingsBoxes } from "@/compose/settings";
@@ -68,6 +73,18 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     !archived && (organizationRole === "owner" || organizationRole === "admin")
       ? { version: (await store.organizations.getAccess(workspace.organization_id))?.version ?? null, link: await organizationLink(workspace.organization_id) }
       : null;
+
+  // slice 33: pending invitations (D6) and, online, who may get a reset link from this person (D1)
+  const online = shell.server.kind === "online";
+  const ready = invitationsReady();
+  const pending = managesPeople ? pendingInvitations(await store.invitations.listOpen(workspaceId), new Date().toISOString()) : [];
+  const resettable = new Set<string>();
+  if (online && ready && managesPeople) {
+    for (const m of members) {
+      const person = users.find((u) => u.id === m.user_id);
+      if (person && !resetRefusal(shell.user.id, access, person, members, await resetReachOf(store, person.id, shell.user.id))) resettable.add(person.id);
+    }
+  }
 
   const people = members.map((m) => {
     const user = users.find((u) => u.id === m.user_id)!;
@@ -247,7 +264,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                 Roles apply to this workspace only. Guests come from another organization.
                 {workspace.four_eyes ? " Four-eyes is on: nobody approves their own change." : ""}
               </p>
-              <table className="w-full border-collapse text-[13px]" data-testid="table-people">
+              <table className="w-full table-fixed border-collapse text-[13px]" data-testid="table-people">
+                <PeopleColumns managed={managesPeople} />
                 <thead>
                   <tr>
                     <Th>Person</Th>
@@ -258,7 +276,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                 <tbody>
                   {people.map(({ user, role, guestFrom }) => (
                     <tr key={user.id} data-testid="row-person">
-                      <Td>
+                      <Td className="[overflow-wrap:anywhere]">
                         <span className="mr-2 inline-grid size-7 place-items-center rounded-full bg-im-logical-soft text-[11px] font-semibold text-im-logical">
                           {initials(user.display_name)}
                         </span>
@@ -278,7 +296,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                         )}
                       </Td>
                       {managesPeople && (
-                        <Td className="text-right">
+                        <Td className="whitespace-nowrap">
+                          {resettable.has(user.id) && <ResetLinkButton workspaceId={workspace.id} userId={user.id} />}
                           {mayChange(user.id, role) && <RemovePersonButton workspaceId={workspace.id} userId={user.id} name={user.display_name} />}
                         </Td>
                       )}
@@ -286,7 +305,38 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                   ))}
                 </tbody>
               </table>
-              {managesPeople && <AddPersonBox workspaceId={workspace.id} online={shell.server.kind === "online"} />}
+              {managesPeople && <InvitePersonBox workspaceId={workspace.id} ready={ready} notReadyText={NOT_SET_UP} />}
+              {pending.length > 0 && (
+                <>
+                  <H3>Pending invitations</H3>
+                  <table className="w-full table-fixed border-collapse text-[13px]" data-testid="table-pending">
+                    <PeopleColumns managed />
+                    <thead>
+                      <tr>
+                        <Th>E-mail</Th>
+                        <Th>Role</Th>
+                        <Th>{null}</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pending.map((i) => (
+                        <tr key={i.id} data-testid="row-pending" data-expired={i.expired || undefined}>
+                          <Td className="[overflow-wrap:anywhere]">
+                            <span className="italic text-im-ink-3">{i.email}</span>{" "}
+                            <span data-testid="text-pending-expiry" className={i.expired ? "text-[12px] text-im-warn" : "text-[12px] text-im-ink-3"}>
+                              · {i.expired ? "expired" : "expires"} {inviteDate(i.expiresAt)}
+                            </span>
+                          </Td>
+                          <Td>{ROLE_LABEL[i.role]}</Td>
+                          <Td className="whitespace-nowrap">
+                            <InvitationButtons workspaceId={workspace.id} invitationId={i.id} email={i.email} roleLabel={ROLE_LABEL[i.role]} ready={ready} />
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
               {organizationAccess && <OrganizationAccessBox workspaceId={workspace.id} link={organizationAccess.link} version={organizationAccess.version} />}
               <H3>What each role can do</H3>
               <table className="w-full border-collapse text-[13px]">
@@ -300,7 +350,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                 <tbody>
                   {[
                     ["Owner", "edit", "yes", "yes", "everything, incl. delete and transfer"],
-                    ["Admin", "edit", "yes", "yes", "add people, roles (not owners), settings"],
+                    ["Admin", "edit", "yes", "yes", "invite people, roles (not owners), settings"],
                     ["Modeler", "edit", "no", "yes", "no"],
                     ["Reviewer", "read, comment", "yes", "notes", "no"],
                     ["Reader", "read", "no", "no", "no"],
@@ -378,6 +428,17 @@ function classificationUses(model: Parameters<typeof indexOf>[0]): Record<string
 async function organizationLink(organizationId: string) {
   const h = await headers();
   return `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}/sign-in?org=${organizationId}`;
+}
+
+/** The prototype's column widths for both people tables (P-a): the person, 140 px for the role, 236 px for the buttons. */
+function PeopleColumns({ managed }: { managed: boolean }) {
+  return (
+    <colgroup>
+      <col />
+      <col className="w-[140px]" />
+      {managed && <col className="w-[236px]" />}
+    </colgroup>
+  );
 }
 
 function initials(name: string) {

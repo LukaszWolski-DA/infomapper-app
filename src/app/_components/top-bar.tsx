@@ -25,6 +25,7 @@ import { signOut } from "../_actions/session";
 import { createProjectAction, createWorkspaceAction } from "../_actions/workspace";
 import { useAction } from "./use-action";
 import { ThemeChoice } from "./theme-choice";
+import { ChangePasswordDialog } from "./change-password";
 import type { ActionResult } from "../_lib/run-command";
 import type { ShellData } from "../_lib/shell";
 import { projectHref, workspaceHref } from "../_lib/paths";
@@ -316,6 +317,8 @@ function UserIndicator({ shell }: { shell: ShellData }) {
   // slice 29 (Q5, L5): a server that takes no writes says so, not "Archived"
   const label = workspace.archived ? "Archived" : ROLE_LABEL[role] + (guest ? " · guest" : "");
   const guestFrom = user.homeOrganizations.join(", ");
+  // slice 33 (PT4): "Change password…" online only, a dialog of its own outside the menu
+  const [changingPassword, setChangingPassword] = useState(false);
   const title = `${user.name}: ${workspace.archived ? "this workspace is archived (read-only)" : `${ROLE_LABEL[role]} in ${workspace.name}`}${guest ? `, guest from ${guestFrom}` : ""}`;
 
   return (
@@ -367,12 +370,20 @@ function UserIndicator({ shell }: { shell: ShellData }) {
         {/* slice 32 (D-85): Light, Dark or System */}
         <ThemeChoice headingClass={sectionClass} />
         <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+        {shell.server.kind === "online" && (
+          <DropdownMenuItem asChild className={itemClass} onSelect={() => setChangingPassword(true)}>
+            <button type="button" data-testid="button-change-password" className="w-full">
+              Change password…
+            </button>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild className={itemClass}>
           <button type="button" data-testid="button-sign-out" className="w-full" onClick={() => void signOut()}>
             Sign out
           </button>
         </DropdownMenuItem>
       </DropdownMenuContent>
+      {changingPassword && <ChangePasswordDialog email={user.email} onClose={() => setChangingPassword(false)} />}
     </DropdownMenu>
   );
 }
