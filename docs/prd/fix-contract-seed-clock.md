@@ -129,3 +129,33 @@ place stamps keep the file's order (AD-12)."
 **Closing prompt (on Łukasz's command):** `npm run pg:backup` on `dev`'s checkout first (AD-39's rule before every merge
 into `dev`); check CI and Schema passed on the last commit; merge the PR into `dev`; nothing else. Then slice 32 merges
 `dev` into `slice/32-theme` in its own session (its step 4).
+
+## 6. Step 2's results (20 November 2026)
+
+PR [LukaszWolski-DA/infomapper-app#86](https://github.com/LukaszWolski-DA/infomapper-app/pull/86) (draft) into `dev`.
+
+**The commits:**
+- `4e85eeb` `test:` the guard alone (`tests/seed-rows-clock.test.ts`).
+- `3244dbf` `fix:` `seedRows(now)` passes its time to `addSeedDemoData`; `contractClock(prefix, from = AT)` in
+  `tests/contract/shared.ts` (an hour after the seed's time, one second per command), used by `writes.test.ts` and
+  `copy.test.ts` (its 19 November dates gone, its file from `seedRows(AT)`); the guard's third case checks the clock.
+- this doc's results (Markdown only).
+
+**The guard failing, then passing:**
+- On `4e85eeb`: locally 2 of 2 failed, naming 32 fields of the 16 tables of section 1; CI run 44734814448, `check`
+  failed on exactly those two cases (197 files passed, 1 failed). The Schema run on it was cancelled by the next push.
+- On `3244dbf`: locally 3 of 3 passed (both moved clocks and the clock's case).
+
+**The checks on `3244dbf`:** `npm run lint` and `npm run typecheck` clean; `npm test` 198 files passed, 1 skipped
+(2,390 tests passed, 12 skipped). A first local `npm test` had one timeout in `tests/own-model-guard.test.ts` (5 s, a
+file scan while 199 files ran in parallel on the laptop); 3 runs on its own passed in about 1.2 s each, and the second
+whole `npm test` passed: a flake under load, not this change (CI's `check` passed it on both commits). CI run
+44735307323 (`check`) passed; Schema run 44735307499 passed: `migrations` with the contract suite on Postgres 42 of 42
+(`reads` 9, `copy` 8, `writes` 25), and `smoke`.
+
+**The full run:** E2E run 44736020710 on `3244dbf83cc5119c9c35b89b29f9a7726a891e48`, 17 min 48 s wall-clock
+(12:28:08 to 12:45:56 UTC), the tests 15 min 25 s: 844 passed, 0 failed, 0 flaky, 16 skipped, no expected failures.
+Parts (time, server heap peak, restarts): 1: 11 min, 1,199 MB, 0; 2: 11 min, 1,219 MB, 0; 3: 8 min, 1,185 MB, 0;
+4: 8 min, 1,294 MB, 0; 5: 10 min, 1,325 MB, 0; 6: 9 min, 1,811 MB, 0; 7: 6 min, 1,401 MB, 0; 8: 10 min, 1,135 MB, 0;
+9: 15 min, 1,252 MB, 0. Part 6's peak is near the 2 GB mark of CLAUDE.md's rule (heap peaks); a peak includes garbage
+not yet collected, so it is a note for the next recut, not this fix's.
