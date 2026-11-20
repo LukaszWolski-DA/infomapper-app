@@ -17,6 +17,7 @@ import {
   invitationPage,
   invitationStatus,
   listedInvitations,
+  pendingInvitations,
   PASSWORD_TOO_LONG,
   PASSWORD_TOO_SHORT,
   PASSWORDS_DIFFER,
@@ -353,5 +354,17 @@ describe("resetPage and redeemPasswordReset (PT5)", () => {
   it("refuses a used link and another actor", () => {
     expect(redeemPasswordReset(makeCtx(anna.id), { reset: { ...reset, used_at: T0 }, person: anna }, { tokenHash: H1, authUserId: null })).toMatchObject({ ok: false, error: { message: RESET_GONE } });
     expect(redeemPasswordReset(makeCtx(ids.actor), { reset, person: anna }, { tokenHash: H1, authUserId: null })).toMatchObject({ ok: false, error: { message: ACCOUNT_MISMATCH } });
+  });
+});
+
+describe("pendingInvitations (D6)", () => {
+  it("made first, first; the expired marked; accepted and revoked left out", () => {
+    const later = invitation({ id: "b", email: "b@example.com", created_at: "2026-10-01T09:00:00.000Z" });
+    const first = invitation({ id: "a", email: "a@example.com", expires_at: NOW });
+    const gone = invitation({ id: "c", revoked_at: T0 });
+    expect(pendingInvitations([later, gone, first], NOW)).toEqual([
+      { id: "a", email: "a@example.com", role: "reviewer", expiresAt: NOW, expired: true },
+      { id: "b", email: "b@example.com", role: "reviewer", expiresAt: invitation().expires_at, expired: false },
+    ]);
   });
 });

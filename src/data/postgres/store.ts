@@ -95,6 +95,7 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
       get: async (userId) => one(await read("app_user", "id = $1", userId)),
       getByEmail: async (email) => one(await read("app_user", "email = $1", email)),
       getByAuthUserId: async (authUserId) => one(await read("app_user", "auth_user_id = $1", authUserId)),
+      getAuthUserId: async (userId) => ((await pool.query<{ auth_user_id: string | null }>("select auth_user_id from app_user where id = $1", [userId])).rows[0]?.auth_user_id ?? null),
       listForWorkspace: async (workspaceId) => inTransaction(async (db) => workspacePeopleOf(asStored(await peopleRows(db, workspaceId)), workspaceId)),
     },
 

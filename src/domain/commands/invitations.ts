@@ -452,3 +452,19 @@ export function redeemPasswordReset(ctx: CommandContext, state: RedeemResetState
   if (linkedTo === null && p.authUserId !== null) writes.push({ kind: "update", table: "app_user", before: person, row: { ...person, auth_user_id: p.authUserId } });
   return { ok: true, value: { userId: person.id }, writeSet: buildWriteSet(ctx, reset.workspace_id, writes) };
 }
+
+/** A row of "Pending invitations" (D6): oldest first; an expired one marked. */
+export interface PendingInvitation {
+  id: Uuid;
+  email: string;
+  role: InvitationRole;
+  expiresAt: string;
+  expired: boolean;
+}
+
+/** "Pending invitations" in the order drawn (CLAUDE.md: a list that is drawn sorts in the domain): made first, first. */
+export function pendingInvitations(all: readonly Invitation[], now: string): PendingInvitation[] {
+  return listedInvitations(all)
+    .sort((a, b) => (a.created_at === b.created_at ? (a.id < b.id ? -1 : 1) : Date.parse(a.created_at) - Date.parse(b.created_at)))
+    .map((i) => ({ id: i.id, email: i.email, role: i.role, expiresAt: i.expires_at, expired: invitationStatus(i, now) === "expired" }));
+}

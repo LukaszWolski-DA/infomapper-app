@@ -121,6 +121,7 @@ export async function readEverything(store: DataStore, db: DevDb): Promise<Recor
   for (const u of users) {
     await all(`passwordResets.listOfUser ${u.id}`, () => store.passwordResets.listOfUser(u.id!));
     await all(`users.get ${u.id}`, () => store.users.get(u.id!));
+    await all(`users.getAuthUserId ${u.id}`, () => store.users.getAuthUserId(u.id!));
     await all(`users.getByEmail ${u.id}`, () => store.users.getByEmail(u.email as string));
     await all(`organizations.listForUser ${u.id}`, () => store.organizations.listForUser(u.id!));
     await all(`workspaces.listForUser ${u.id}`, () => store.workspaces.listForUser(u.id!));

@@ -52,6 +52,11 @@ export interface UserRepository {
    */
   getByAuthUserId(authUserId: Uuid): Promise<AppUser | null>;
   /**
+   * The Supabase Auth account linked to the person (slice 33, D5), or null; the one read that hands it out, for the link
+   * pages' commands only. The local adapter has no accounts and always answers null.
+   */
+  getAuthUserId(userId: Uuid): Promise<Uuid | null>;
+  /**
    * The people a workspace's pages may name (slice 8, F10): its members and everyone with a change event in it, removed
    * people included, so earlier work keeps its author's name. Never anyone else.
    */
