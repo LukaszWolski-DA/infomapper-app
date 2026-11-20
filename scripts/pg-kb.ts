@@ -92,7 +92,10 @@ async function main(): Promise<number> {
     }
     const started = Date.now();
     if (mode === "backup") {
-      const read = await readOrganization(client, STORE_SCHEMA, organizationId);
+      // slice 33 (step 4): a table this code knows but the database lacks yet (before its migration) is named, not guessed
+      const notInDatabase: string[] = [];
+      const read = await readOrganization(client, STORE_SCHEMA, organizationId, notInDatabase);
+      if (notInDatabase.length) console.log(`Not in the database yet, so left out (no rows of them can be there): ${notInDatabase.join(", ")}.`);
       fs.mkdirSync(BACKUPS_PG, { recursive: true });
       const file = backupName(new Date());
       fs.writeFileSync(file, JSON.stringify(localFileOf(read, STORE_SCHEMA)) + "\n", { flag: "wx" });

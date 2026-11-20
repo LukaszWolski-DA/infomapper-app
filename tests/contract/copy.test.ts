@@ -242,6 +242,11 @@ describe.runIf(!!CONTRACT_DB)("the copy on Postgres: one organization at a time,
     const [otherWs] = workspacesOf(otherOrg());
     const backup = await readOrganization(client, STORE_SCHEMA, org);
     expect(backup.organization_access).toBeUndefined();
+    // slice 33 (step 4): a table the code knows but the database lacks yet is left out and named, the rest read as before
+    const missing: string[] = [];
+    const ahead = { ...STORE_SCHEMA, rules: { ...STORE_SCHEMA.rules, table_of_a_later_migration: { key: ["id"], foreignKeys: {} } } };
+    expect(await readOrganization(client, ahead, org, missing)).toEqual(backup);
+    expect(missing).toEqual(["table_of_a_later_migration"]);
     expect(backup.app_user!.every((u) => !("auth_user_id" in u))).toBe(true);
     // the backup holds what the copy wrote: the organization's rows of the file, table by table
     const copied = rowsOf(org);
