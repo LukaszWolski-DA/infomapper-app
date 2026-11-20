@@ -5,9 +5,9 @@
 //   password is never copied (C1.2; on Postgres nothing reads it).
 // - The people its rows name (every column that refers to `app_user`, by the store's rules): its members and anyone who
 //   wrote there. A person named but missing from the file is refused.
-// - A change event of the organization's password whose images hold anything but the marker is refused: no hash leaves
-//   the laptop (`SECRET_COLUMNS`).
-import { SECRET_CHANGED, SECRET_UNCHANGED } from "../../src/domain/changes";
+// - A change event whose images hold a secret column's value instead of its marker is refused (`SECRET_COLUMNS`: the
+//   organization's password; since slice 33 a link's token hash and a person's Auth account): no hash leaves the laptop.
+import { SECRET_CHANGED, SECRET_COLUMNS, SECRET_UNCHANGED } from "../../src/domain/changes";
 import type { StoreSchema } from "../../src/data/rows";
 
 type Row = Record<string, unknown>;
@@ -34,10 +34,19 @@ export function organizationRows(db: Tables, organizationId: string, schema: Sto
   }
 
   for (const e of out.change_event ?? []) {
-    if (e.object_type !== "organization_access") continue;
+    // slice 33: every secret column (a link's token hash, a person's Auth account), not only the password
+    const secret = SECRET_COLUMNS[e.object_type as keyof typeof SECRET_COLUMNS];
+    if (!secret) continue;
     for (const image of [e.before_image, e.after_image] as (Row | null)[]) {
-      const v = image?.access_hash;
-      if (v !== undefined && v !== SECRET_CHANGED && v !== SECRET_UNCHANGED) throw new Error("A change event holds the organization's password instead of its marker: nothing was copied.");
+      for (const column of secret) {
+        const v = image?.[column];
+        if (v === undefined || v === SECRET_CHANGED || v === SECRET_UNCHANGED) continue;
+        throw new Error(
+          e.object_type === "organization_access"
+            ? "A change event holds the organization's password instead of its marker: nothing was copied."
+            : "A change event holds a secret value instead of its marker: nothing was copied.",
+        );
+      }
     }
   }
 

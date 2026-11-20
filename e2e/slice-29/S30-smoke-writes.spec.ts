@@ -1,6 +1,6 @@
 // Slice 30's smoke writes on Postgres (S30-01, S30-02, S30-08, S30-09): sign in, rename an entity and add an attribute
 // in its panel, reload and see them stored, then Undo from a new session; the badge says "Online", the pages are not
-// read only, and "Add person" is disabled with its reason.
+// read only, and (since slice 33) "Invite person" stands where the disabled "Add person" stood.
 //
 // F13: these specs write, so they run only against a database on this machine (CI's Supabase local stack, the Schema
 // workflow's smoke job); against `npm run dev:pg` or the preview, both on infomapper-dev, they are skipped. Each run of
@@ -84,14 +84,14 @@ test("S30-02: Undo in a new session undoes the person's latest step, and Redo br
   await context.close();
 });
 
-test("S30-08: online, Add person is shown and disabled with its reason; changing roles stays", async ({ page }) => {
+test("S30-08 (since slice 33): online, Invite person replaced the disabled Add person; changing roles stays", async ({ page }) => {
   await signIn(page, PEOPLE.lukasz);
   await page.goto(`/w/${await workspaceId(WS)}?tab=people`);
-  const box = page.getByTestId("box-add-person");
+  await expect(page.getByTestId("box-add-person")).toHaveCount(0);
+  const box = page.getByTestId("box-invite-person");
   await expect(box).toBeVisible();
-  await expect(box.getByTestId("input-add-person-name")).toBeDisabled();
-  await expect(box.getByTestId("input-add-person-email")).toBeDisabled();
-  await expect(box.getByTestId("select-add-person-role")).toBeDisabled();
-  await expect(box.getByTestId("button-add-person-continue")).toBeDisabled();
-  await expect(box.getByTestId("text-add-person-online")).toHaveText("People are added by an administrator on this server for now.");
+  // CI's stack gives the server its secret key, so invitations work (D10's line only without it)
+  await expect(box.getByTestId("button-create-invitation")).toBeEnabled();
+  await expect(box.getByTestId("text-invite-not-ready")).toHaveCount(0);
+  await expect(page.getByTestId("select-person-role").first()).toBeEnabled();
 });

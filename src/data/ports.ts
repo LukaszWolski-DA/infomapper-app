@@ -16,6 +16,7 @@ import type {
   CanvasItem,
   ChangeEvent,
   Frame,
+  Invitation,
   Label,
   LabelLink,
   Note,
@@ -24,6 +25,7 @@ import type {
   OrganizationAccess,
   OrganizationLicence,
   OrganizationMember,
+  PasswordReset,
   Project,
   ProjectCanvas,
   ProjectPinnedLabel,
@@ -49,6 +51,11 @@ export interface UserRepository {
    * the local adapter has no accounts and always answers null.
    */
   getByAuthUserId(authUserId: Uuid): Promise<AppUser | null>;
+  /**
+   * The Supabase Auth account linked to the person (slice 33, D5), or null; the one read that hands it out, for the link
+   * pages' commands only. The local adapter has no accounts and always answers null.
+   */
+  getAuthUserId(userId: Uuid): Promise<Uuid | null>;
   /**
    * The people a workspace's pages may name (slice 8, F10): its members and everyone with a change event in it, removed
    * people included, so earlier work keeps its author's name. Never anyone else.
@@ -97,6 +104,27 @@ export interface WorkspaceRepository {
   listForUser(userId: Uuid): Promise<Workspace[]>;
   getMember(workspaceId: Uuid, userId: Uuid): Promise<WorkspaceMember | null>;
   listMembers(workspaceId: Uuid): Promise<WorkspaceMember[]>;
+}
+
+/**
+ * Invitations by link (slice 33, AD-40). A link's page finds its invitation by the hash of its token, whatever its
+ * workspace: the token is the only key it has.
+ */
+export interface InvitationRepository {
+  /** The workspace's invitations neither accepted nor revoked, expired ones included (D6), in the stored order. */
+  listOpen(workspaceId: Uuid): Promise<Invitation[]>;
+  /** One of the workspace's invitations, in any state. */
+  get(workspaceId: Uuid, invitationId: Uuid): Promise<Invitation | null>;
+  /** The invitation whose token has this SHA-256, in any state, or null. */
+  getByTokenHash(tokenHash: string): Promise<Invitation | null>;
+}
+
+/** Password reset links (slice 33, PT4). */
+export interface PasswordResetRepository {
+  /** The link whose token has this SHA-256, in any state, or null. */
+  getByTokenHash(tokenHash: string): Promise<PasswordReset | null>;
+  /** Every link made for the person, in any workspace and state, in the stored order. */
+  listOfUser(userId: Uuid): Promise<PasswordReset[]>;
 }
 
 export interface ProjectRepository {
@@ -213,6 +241,8 @@ export interface DataStore {
   users: UserRepository;
   organizations: OrganizationRepository;
   workspaces: WorkspaceRepository;
+  invitations: InvitationRepository;
+  passwordResets: PasswordResetRepository;
   projects: ProjectRepository;
   canvases: CanvasRepository;
   model: ModelRepository;

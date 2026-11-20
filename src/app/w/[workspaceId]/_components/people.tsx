@@ -1,21 +1,13 @@
 "use client";
 
-// The People tab's controls (slice 8, items 10–13): "Add a person" with its summary, the role select and Remove per
-// member, and the "Organization access" box. The page decides who sees what (F12, F17); the server checks every write
+// The People tab's controls (slice 8, items 11–13): the role select and Remove per member, and the "Organization access" box. The page decides who sees what (F12, F17); the server checks every write
 // again and refuses with the domain's message, shown as a toast (AD-23).
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { changeOrganizationPasswordAction, previewOrganizationPasswordAction } from "@/app/_actions/organization";
-import {
-  addPersonAction,
-  changeRoleAction,
-  previewAddPersonAction,
-  previewRemovePersonAction,
-  removePersonAction,
-  type AddPersonFormInput,
-} from "@/app/_actions/people";
+import { changeRoleAction, previewRemovePersonAction, removePersonAction } from "@/app/_actions/people";
 import { useAction } from "@/app/_components/use-action";
-import { ADD_PERSON_ONLINE_TEXT, ROLE_LABEL } from "@/app/_lib/roles";
+import { ROLE_LABEL } from "@/app/_lib/roles";
 import type { RemovePersonPreview } from "@/domain/commands/people";
 import type { WorkspaceRole } from "@/domain/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
@@ -34,116 +26,6 @@ function FieldMessage({ text }: { text?: string }) {
       {text}
     </span>
   ) : null;
-}
-
-/**
- * "Add a person" (item 10): name, e-mail and role, then the summary (F11) with Back and Add. `online` (slice 30, B5): the
- * box shows with every field and Continue disabled, the reason as Continue's tooltip and as a line under it (L6), until
- * the people slice brings a way to add people online (a known limitation).
- */
-export function AddPersonBox({ workspaceId, online = false }: { workspaceId: string; online?: boolean }) {
-  const { run, pending } = useAction();
-  const empty: AddPersonFormInput = { workspaceId, name: "", email: "", role: "modeler" };
-  const [form, setForm] = useState(empty);
-  const [summary, setSummary] = useState<string[] | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const review = async (e: FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-    const r = await run(() => previewAddPersonAction(form), undefined, { read: true });
-    if (r.ok) setSummary(r.value.summary);
-    else if (r.fields) setErrors(r.fields);
-  };
-
-  const add = async () => {
-    const r = await run(() => addPersonAction(form), (v) => v.toast);
-    setSummary(null);
-    if (r.ok) setForm(empty);
-    else if (r.fields) setErrors(r.fields);
-  };
-
-  return (
-    <div className={boxClass} data-testid="box-add-person" data-disabled={online || undefined}>
-      <h4 className="m-0 mb-2 text-[13.5px] font-semibold">Add a person</h4>
-      {summary === null ? (
-        <form onSubmit={review} noValidate className="flex flex-wrap items-start gap-2">
-          <label className="block min-w-[180px] flex-1">
-            <input
-              data-testid="input-add-person-name"
-              disabled={online}
-              aria-label="Name"
-              placeholder="Name"
-              autoComplete="off"
-              className={inputClass + " w-full"}
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-            <FieldMessage text={errors.name} />
-          </label>
-          <label className="block min-w-[240px] flex-1">
-            <input
-              data-testid="input-add-person-email"
-              disabled={online}
-              aria-label="E-mail"
-              placeholder="name@company.com"
-              autoComplete="off"
-              className={inputClass + " w-full"}
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
-            <FieldMessage text={errors.email} />
-          </label>
-          <select
-            data-testid="select-add-person-role"
-              disabled={online}
-            aria-label="Role"
-            className={inputClass}
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-          >
-            {ADDABLE.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABEL[r]}
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            data-testid="button-add-person-continue"
-            className={btnClass}
-            disabled={pending || online}
-            title={online ? ADD_PERSON_ONLINE_TEXT : undefined}
-          >
-            Continue
-          </button>
-          {online && (
-            <p data-testid="text-add-person-online" className="m-0 w-full text-[12.5px] text-im-ink-3">
-              {ADD_PERSON_ONLINE_TEXT}
-            </p>
-          )}
-        </form>
-      ) : (
-        <>
-          <div data-testid="text-add-person-summary" className="text-[13px] leading-relaxed">
-            {summary.map((line) => (
-              <p key={line} className="m-0">
-                {line}
-              </p>
-            ))}
-          </div>
-          <div className="mt-2.5 flex gap-2">
-            <button type="button" data-testid="button-add-person-back" className={btnClass} disabled={pending} onClick={() => setSummary(null)}>
-              Back
-            </button>
-            <button type="button" data-testid="button-add-person" className={btnClass} disabled={pending} onClick={() => void add()}>
-              Add
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
 }
 
 /** The role select per member (item 11). Owner is offered to owners only (F12); a refusal leaves the shown role. */

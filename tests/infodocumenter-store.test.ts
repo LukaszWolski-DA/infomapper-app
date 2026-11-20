@@ -4,6 +4,7 @@
 // snapshot reads the model, the requirements, the cards and the modules' rows from one state of the file (F1), and
 // `model.load` reads the model by the same rule; the registered section kinds join both modules (F8).
 
+import { DEV_DB_FORMAT } from "@/data/local/schema";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -104,7 +105,7 @@ describe("documents in the local adapter", () => {
     const d = await created(SEED_IDS.userAnna);
     const db = await readDb(file);
     const format = (db as unknown as { format: number }).format;
-    expect(format).toBe(17);
+    expect(format).toBe(DEV_DB_FORMAT);
     const rows = (db as unknown as { document_definition: Record<string, unknown>[] }).document_definition;
     // the row as slice 25 stored it
     const old = rows.find((r) => r.id === d.id)!;
@@ -122,7 +123,7 @@ describe("documents in the local adapter", () => {
     expect(read!.sections.map((s) => [s.type, s.heading, s.newPage, "heading" in s.options])).toEqual(d.sections.map((s) => [s.type, s.type === "text" ? "Scope" : null, true, false]));
     // a read writes nothing: the file keeps its format and the old row until the next write
     const after = await readDb(file);
-    expect((after as unknown as { format: number }).format).toBe(17);
+    expect((after as unknown as { format: number }).format).toBe(DEV_DB_FORMAT);
     expect((after as unknown as { document_definition: Record<string, unknown>[] }).document_definition.find((r) => r.id === d.id)!.style).toBeUndefined();
   });
 

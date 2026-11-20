@@ -70,6 +70,18 @@ describe("the reads on the local adapter, against the rows themselves", () => {
     }
   });
 
+  it("lists the open invitations (expired ones too, D6) and finds a link's rows by their hash (slice 33)", () => {
+    const invitations = rowsOf("invitation");
+    expect(invitations).toHaveLength(4);
+    const ws = invitations[0]!.workspace_id!;
+    expect((localReads[`invitations.listOpen ${ws}`] as Row[]).map((i) => i.email)).toEqual(["expired.person@example.com", "pending.person@example.com"]);
+    for (const i of invitations) expect(localReads[`invitations.getByTokenHash ${i.id}`]).toEqual(i);
+    expect(localReads["invitations.getByTokenHash (unknown)"]).toBeNull();
+    const resets = rowsOf("password_reset");
+    expect(localReads[`passwordResets.listOfUser ${resets[0]!.app_user_id}`]).toEqual(resets);
+    expect(localReads["passwordResets.getByTokenHash (unknown)"]).toBeNull();
+  });
+
   it("names the lost original in model.load", () => {
     const lost = rowsOf("workspace").flatMap((w) => (localReads[`model.load ${w.id}`] as { lostOriginals: unknown[] }).lostOriginals);
     expect(lost.length).toBeGreaterThan(0);

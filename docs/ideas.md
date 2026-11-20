@@ -1114,3 +1114,22 @@ on `<html>` from the first paint, the dark values written once under Tailwind's 
 the attribute for a choice) and `color-scheme` following the choice. The thumbnails follow it with no change (AD-32);
 InfoDocumenter's pages stay light. Left for later: the choice stored in the person's account (it would follow across
 browsers and devices), a keyboard shortcut and a dark theme for InfoDocumenter's pages.
+
+## A line on the invitation page when someone else is signed in (slice 33, D8, for Łukasz to decide)
+
+Opening an invitation's link while signed in as someone else and joining signs the browser in as the invited person,
+replacing the session without a word. A line on the page would say so: "You are signed in as {name}. Joining signs you
+in as {e-mail} instead." Not in slice 33 (D8): the prototype has no such line.
+
+## "Organization access" online (slice 33, seen in the screenshots)
+
+On Postgres the People tab still shows the "Organization access" box (the organization's shared password and its link),
+which only the local adapter's sign-in uses (D-58's note of slice 29). The idea: hide it online, or make its link the
+start page's. Outside slice 33.
+
+## A full page load after an action that changes the session (slice 33's acceptance)
+
+After signing in, joining by a link or setting a password, the form moves on with the router (`router.push`). On
+`dev:pg` the sign-in once stayed on a blank page until a reload (`known-limitations.md`). A full load
+(`window.location.assign`) after these three actions would start the next page from the new session's cookies with
+nothing of the old one. Where it goes (slice 33 or a `fix/` branch) is Łukasz's call.

@@ -98,6 +98,10 @@ file was KB's master until Łukasz's switch on 20 November 2026; since then KB o
 Slice 32 (D-85, an exception to AD-31's "no new feature slices") is the theme: Light, Dark or System (the default) in the
 person's menu, remembered per browser in the cookie `im-theme` that the server reads, `data-theme` on `<html>` from the
 first paint, the dark values written once under Tailwind's `dark` variant, `color-scheme` following; no data changes.
+Slice 33 (AD-40) is the people slice: "Invite person" replaces "Add person" on both adapters (an e-mail and a role, a
+link the inviter copies, 7 days, once; "Pending invitations" with New link and Revoke); the person joins on
+`/invite/<token>` (online with their own password, the Supabase account made by the server with the secret key);
+online "Change password…" in the person's menu and a one-time "Password reset link" for 24 hours under D1's rule.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -492,7 +496,20 @@ local adapter no pool is made.
 - **Sign-in on Postgres** (AD-04's note): `src/app/_lib/supabase.ts` (`supabaseServer`: the request's cookies first, so
   no page is prerendered; only the sign-in and sign-out actions pass `write: true`), the proxy's `postgresProxy`
   (`getClaims`, never on `THUMBNAIL_PATH`), `getSession`'s `postgresSession` (`users.getByAuthUserId`, every organization
-  unlocked), `/sign-in`'s `AccountSignInForm` and `signInWithAccountAction`.
+  unlocked), `/sign-in`'s `AccountSignInForm` and `signInWithAccountAction`. Since slice 33 Join, "Sign in and join"
+  and "Set password" (`src/app/_actions/links.ts`) pass `write: true` too.
+- **Invitations and passwords** (slice 33, AD-40): the rows `invitation` and `password_reset` (people tables, outside
+  undo, format 18); the commands `src/domain/commands/invitations.ts` (the domain gets a link's SHA-256 only, never a
+  token or a password; `joinWrites` in `people.ts` is the membership rule); the ports `invitations`, `passwordResets`
+  and `users.getAuthUserId` (the one read that hands out an account's link; Postgres reads never return it with the row).
+  The server side: `src/app/_lib/supabase-admin.ts` (**the only reader of `SUPABASE_SECRET_KEY` in `src/`**,
+  server-only; `invitationsReady`), `link-tokens.ts` (32 random bytes, base64url; the request's own address),
+  `people-links.ts` (what the commands read), the People tab's actions in `src/app/_actions/people.ts` and the links'
+  public ones in `links.ts` (the Auth account first, removed again when the write is refused; the invitation read again
+  after any refusal). The pages `/invite/[token]` and `/reset/[token]` are outside the app shell; `src/proxy.ts` lets
+  `LINK_PATH` through without a session in both modes. **A later public page** gets the same exception and nothing else.
+  `scripts/check-client-bundle.ts` (CI's smoke job, after the build) fails when a client file holds the key, its name
+  or `supabase-admin`. **A token or a hash never goes into a change event** (`SECRET_COLUMNS`), a log or a page.
 - **The timing record** (`INFOMAPPER_TIMING=1` only): `src/data/timing.ts` (`timedStore`, the pool's timed clients;
   since slice 30 `countWrite`, a write's lock wait and transaction) and `src/app/_lib/timing.tsx` (`withTiming` for a
   route or an action, nested ones counting into the outer record; React's `cache` for a page, `TimingRecord` at a
@@ -596,8 +613,11 @@ local adapter no pool is made.
   "Kanton Basel" is a real business model he builds by hand to test and give feedback. **Since the switch on 20 November
   2026 (AD-39's note) KB online in `infomapper-dev` is the master**, worked in on `dev`'s preview with his own account;
   the local KB in `.data/dev-db.json` is no longer worked in and stays as a backup. The rules since then:
-  - **`pg:backup` before every merge into `dev`, before every acceptance on `dev:pg` and before every `pg:migrate`**; the
-    prompt for each says so. Łukasz runs `pg:backup` himself after a working session in KB online.
+  - **`pg:backup` before every `pg:migrate` and every merge into `dev`, and after a day of Łukasz's work in KB online**
+    (Łukasz, 20 November 2026, slice 33, amending AD-39's note); the prompt for each says so. **Not** before an acceptance
+    on `dev:pg` with the demo accounts (they do not see KB), and not again when KB has not changed since the last backup.
+    Before a migration that adds a table the backup runs from `dev`'s code, or from code whose `pg:backup` leaves out a
+    table the database does not have yet (since slice 33 it names it and reads the rest).
   - **Slice acceptances on `dev:pg` use the demo accounts only** (they do not see KB).
   - **`pg:kb` from the local file is not run after the switch** (it would overwrite the master with an older copy; the
     script has no guard against it yet, `docs/ideas.md`); a restore is `pg:restore` from `.data/backups/pg/`.
@@ -621,8 +641,11 @@ local adapter no pool is made.
   after `git check-ignore`) and in Vercel's Preview variables (Secret). Keep `.env.example` up to date with every
   variable, without values. Never print, log, commit or quote a key, a password or a connection string: name a database
   as host/database only (`targetName`).
-- The Supabase secret key (`SUPABASE_SECRET_KEY`, acting as `service_role`) is used by the accounts script only, never by
-  the app and never in Vercel. Row Level Security stays on for every table with no public policies unless a decision
+- The Supabase secret key (`SUPABASE_SECRET_KEY`, acting as `service_role`) is used by the scripts and, since slice 33
+  (AD-40), by the app on the server, only in `src/app/_lib/supabase-admin.ts`; never `NEXT_PUBLIC_`, never in a client
+  file (CI checks the build), never printed or logged. In Vercel it is a Preview variable scoped to `dev`, Sensitive; it
+  already existed there before slice 33 (when and why is not known), and since slice 33 it holds a key of its own,
+  `vercel_dev_preview`, which only the preview uses. Row Level Security stays on for every table with no public policies unless a decision
   says otherwise; `npm run schema:check -- --existing` checks it.
 - Never log personal data or rich-text content.
 
@@ -668,8 +691,8 @@ that slice's branch, and the prompt names the branch.
 - **The import wizard** detects `spikes/canvas-react-flow` and offers a multi-service project: import standalone, root
   `./`, and ignore its services prompt (`vercel.json` has no `services` key).
 - **Variables:** Preview only, branch-scoped; the three connection values (`INFOMAPPER_DATABASE_URL`, `SUPABASE_URL`,
-  `SUPABASE_PUBLISHABLE_KEY`) as Secret, `INFOMAPPER_DATA` and `INFOMAPPER_TIMING` as plain. **Never in Vercel:**
-  `SUPABASE_SECRET_KEY`, `INFOMAPPER_MIGRATION_URL`, `INFOMAPPER_DEMO_PASSWORD`, `INFOMAPPER_KB_EMAIL`,
+  `SUPABASE_PUBLISHABLE_KEY`) as Secret, `INFOMAPPER_DATA` and `INFOMAPPER_TIMING` as plain. `SUPABASE_SECRET_KEY` as Sensitive, scoped to `dev` (slice 33, its own key
+  `vercel_dev_preview`; see "Security"). **Never in Vercel:** `INFOMAPPER_MIGRATION_URL`, `INFOMAPPER_DEMO_PASSWORD`, `INFOMAPPER_KB_EMAIL`,
   `INFOMAPPER_KB_PASSWORD` (slice 31: only in `.env.postgres.local`). The bypass secret
   (`VERCEL_AUTOMATION_BYPASS_SECRET`) lives only in `.env.postgres.local`.
 - **A preview is protected** (Vercel Authentication, Standard Protection): reach it with the bypass header
@@ -796,6 +819,8 @@ npx tsx scripts/bench-thumbnails.ts                           # slice 12b: the h
 MEASURE=1 npx playwright test e2e/slice-25/S25-layout.spec.ts                             # slice 25: a full data dictionary of Performance test laid out by Paged.js, headless (reference figure)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-26/S26-10-figures.spec.ts  # slice 26: the editor on Performance test and the demo: the snapshot's bytes, the state, the tree, the first layout (reference figures)
 SCREENS=<folder> npx playwright test e2e/slice-26/S26-screens.spec.ts                     # slice 26: the editor (Auto, a section, Pages out of date), readiness, source tables, the dimensional entities, Formal A3 landscape, Compact in black and white
+SCREENS=<folder> npm run e2e -- e2e/slice-33/S33-screens.spec.ts                         # slice 33: the People tab with pending and expired invitations, the link dialog, the invite page (local)
+npx tsx scripts/check-client-bundle.ts                        # slice 33: after npm run build, no client file holds SUPABASE_SECRET_KEY's value, its name or supabase-admin
 SCREENS=<folder> npx playwright test e2e/slice-24/S24-screens.spec.ts                     # slice 24: the Entity stereotypes box, its remove dialog, the entity panel's select with the definition; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-23/S23-screens.spec.ts                     # slice 23: the Metadata conventions tab, the remove dialog, Settings' Model conventions, the new workspace's language; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts                     # slice 22: the unknown member's section (a value, a value that does not fit, off), Fact Sales' Dimensions; light and dark
@@ -1105,6 +1130,15 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   spec sees the page as before; each test's fresh context starts without the cookie. `emulateMedia({ colorScheme })` sets
   System's side only: under Light or Dark it changes nothing. The smoke set has `e2e/slice-29/S32-smoke-theme.spec.ts`
   (it writes nothing, so it runs against any target).
+
+  Slice 33's fixtures are slice 8's (the plain seed). Slice 8's helpers invite and accept through the domain
+  (`inviteAs`, `acceptAs`, `linkToken`; `addPerson` is the two, so the specs that use it stay), drive the box and the
+  dialog (`inviteInBox`, `closeLinkDialog`) and join by a link locally (`joinByLink`). Slice 33's add a pending row
+  (`pendingRow`), the one refused page (`expectGone`), an altered link (`altered`) and the e2e file's invitations and
+  changes (`storedInvitations`, `stored`, `changeDb`). Its Postgres specs are `e2e/slice-29/S33-smoke-people.spec.ts`
+  and `S33-smoke-screens.spec.ts`: they write Auth accounts, so they run only against a database on this machine (F13);
+  each run invites made-up addresses of its own and changes no demo account's password. CI keeps the online screenshots as
+  the artifact `smoke-screens`.
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,

@@ -211,7 +211,12 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): { report
   // slice 25 (F4): every workspace's InfoDocumenter off (no change events, no log line)
   if ((db.format as number) === 16) {
     for (const w of db.workspace) w.infodoc ??= false;
-    Object.assign(db, { format: DEV_DB_FORMAT });
+    Object.assign(db, { format: 17 });
+  }
+  // slice 33 (AD-40): the two people tables, empty (no change events, no log line)
+  if ((db.format as number) === 17) {
+    const tables = db as Partial<DevDb>;
+    Object.assign(db, { invitation: tables.invitation ?? [], password_reset: tables.password_reset ?? [], format: DEV_DB_FORMAT });
   }
   return { report, passwordsGiven, ownStereotypes };
 }

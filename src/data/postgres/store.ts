@@ -95,6 +95,7 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
       get: async (userId) => one(await read("app_user", "id = $1", userId)),
       getByEmail: async (email) => one(await read("app_user", "email = $1", email)),
       getByAuthUserId: async (authUserId) => one(await read("app_user", "auth_user_id = $1", authUserId)),
+      getAuthUserId: async (userId) => ((await pool.query<{ auth_user_id: string | null }>("select auth_user_id from app_user where id = $1", [userId])).rows[0]?.auth_user_id ?? null),
       listForWorkspace: async (workspaceId) => inTransaction(async (db) => workspacePeopleOf(asStored(await peopleRows(db, workspaceId)), workspaceId)),
     },
 
@@ -127,6 +128,17 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
         (await read("workspace", "deleted_at is null and id in (select workspace_id from workspace_member where user_id = $1)", userId)) as never,
       getMember: async (workspaceId, userId) => one(await read("workspace_member", "workspace_id = $1 and user_id = $2", workspaceId, userId)),
       listMembers: async (workspaceId) => (await ofWorkspace(pool, "workspace_member", workspaceId, false)) as never,
+    },
+
+    invitations: {
+      listOpen: async (workspaceId) => (await read("invitation", "workspace_id = $1 and accepted_at is null and revoked_at is null", workspaceId)) as never,
+      get: async (workspaceId, invitationId) => one(await read("invitation", "workspace_id = $1 and id = $2", workspaceId, invitationId)),
+      getByTokenHash: async (tokenHash) => one(await read("invitation", "token_hash = $1", tokenHash)),
+    },
+
+    passwordResets: {
+      getByTokenHash: async (tokenHash) => one(await read("password_reset", "token_hash = $1", tokenHash)),
+      listOfUser: async (userId) => (await read("password_reset", "app_user_id = $1", userId)) as never,
     },
 
     projects: {

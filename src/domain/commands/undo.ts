@@ -91,6 +91,9 @@ export const OUTSIDE_UNDO = [
   "organization_licence",
   "workspace",
   "workspace_member",
+  // slice 33: invitations and password reset links, people tables like the others (D-58: no undo step)
+  "invitation",
+  "password_reset",
 ] as const;
 
 // Every InfoMapper table is in the undo history or outside it, or the build fails (slice 15a): a table neither list

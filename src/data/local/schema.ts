@@ -15,6 +15,7 @@ import type {
   Concept,
   Entity,
   Frame,
+  Invitation,
   Label,
   LabelLink,
   Mapping,
@@ -22,6 +23,7 @@ import type {
   Note,
   Organization,
   ModuleTable,
+  PasswordReset,
   OrganizationAccess,
   OrganizationLicence,
   OrganizationMember,
@@ -76,6 +78,7 @@ import {
   SOURCE_RELATIONSHIP_KINDS,
   STEREOTYPE_ORIGINS,
   WORKSPACE_ROLES,
+  INVITATION_ROLES,
 } from "@/domain/types";
 
 /**
@@ -99,11 +102,11 @@ import {
  * their workspace's documentation language, and `naming_conventions` on workspaces, null; no change events, no log line), 16 = slice 24
  * (`stereotype`: every workspace's five built-in rows, English names, definitions in its documentation language, and an
  * own row for any other code an entity has, with one log line; no change events), 17 = slice 25 (`infodoc` on
- * workspaces, false; no change events, no log line). It is written back at once; an older file no upgrade reaches is refused with a hint to
+ * workspaces, false; no change events, no log line), 18 = slice 33 (`invitation` and `password_reset`, empty; no change events, no log line). It is written back at once; an older file no upgrade reaches is refused with a hint to
  * run "npm run reset-dev-data", a newer one (a newer branch wrote it) with the advice to switch back to that branch or
  * restore a backup, never a reset (`newerFormatMessage`, slice 15a). A module's tables are not part of the format (AD-33): a file without one has none of its rows yet.
  */
-export const DEV_DB_FORMAT = 17;
+export const DEV_DB_FORMAT = 18;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -114,6 +117,8 @@ export interface DevDb {
   organization_licence: OrganizationLicence[];
   workspace: Workspace[];
   workspace_member: WorkspaceMember[];
+  invitation: Invitation[];
+  password_reset: PasswordReset[];
   project: Project[];
   canvas: Canvas[];
   project_canvas: ProjectCanvas[];
@@ -168,6 +173,8 @@ export const emptyDb = (): DevDb => ({
   organization_licence: [],
   workspace: [],
   workspace_member: [],
+  invitation: [],
+  password_reset: [],
   project: [],
   canvas: [],
   project_canvas: [],
@@ -257,6 +264,25 @@ export const RULES: Record<DevTable, TableRules> = {
     key: ["workspace_id", "user_id"],
     foreignKeys: { workspace_id: "workspace", user_id: "app_user", added_by: "app_user" },
     checks: [{ name: "workspace_member_role_ck", test: oneOf(WORKSPACE_ROLES, "role") }],
+  },
+  // slice 33 (AD-40): invitations by link; one pending per workspace and e-mail (`invitation_pending_uq`), the token's hash unique
+  invitation: {
+    key: ["id"],
+    foreignKeys: { workspace_id: "workspace", invited_by: "app_user" },
+    unique: [
+      { columns: ["token_hash"] },
+      { columns: ["workspace_id", "email"], where: (r) => r.accepted_at === null && r.revoked_at === null },
+    ],
+    checks: [
+      { name: "invitation_email_lower", test: (r) => r.email === String(r.email).toLowerCase() },
+      { name: "invitation_role_ck", test: oneOf(INVITATION_ROLES, "role") },
+    ],
+  },
+  // slice 33 (PT4, F7): password reset links
+  password_reset: {
+    key: ["id"],
+    foreignKeys: { workspace_id: "workspace", app_user_id: "app_user", created_by: "app_user" },
+    unique: [{ columns: ["token_hash"] }],
   },
   project: { key: ["id"], foreignKeys: { workspace_id: "workspace", ...audit } },
   canvas: {

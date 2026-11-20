@@ -320,8 +320,16 @@ export async function replaceOrganization(
  * backup, as never in a copy), every row of its workspaces (soft-deleted rows included; the undo history, the store's own
  * table, left out) in the stored order, and the people its rows name without their Supabase link (`shaped`). Tables
  * without a row are left out. The local file's shape around it is the caller's.
+ *
+ * Slice 33 (step 4): a table the code knows but the database does not have yet (a backup before the migration that adds
+ * it) holds no rows there: it is left out and named in `notInDatabase`, never guessed whose its rows are.
  */
-export async function readOrganization(db: Queryable, schema: StoreSchema, organizationId: string): Promise<Record<string, AnyRow[]>> {
+export async function readOrganization(
+  db: Queryable,
+  schema: StoreSchema,
+  organizationId: string,
+  notInDatabase: string[] = [],
+): Promise<Record<string, AnyRow[]>> {
   await db.query("begin transaction isolation level repeatable read read only");
   try {
     const columns = await databaseColumns(db);
@@ -330,7 +338,12 @@ export async function readOrganization(db: Queryable, schema: StoreSchema, organ
     const out: Record<string, AnyRow[]> = {};
     for (const table of Object.keys(schema.rules)) {
       if (table === "organization_access") continue;
-      const how = ownership(table, columns.get(table) ?? new Set());
+      const known = columns.get(table);
+      if (!known) {
+        notInDatabase.push(table);
+        continue;
+      }
+      const how = ownership(table, known);
       if (how === "person") continue;
       const read =
         how === "workspace"

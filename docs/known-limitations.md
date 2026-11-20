@@ -1914,14 +1914,6 @@ The `migrations` job's service uses 5432, below the range, and is unchanged.
 
 ## The writes on Postgres (slice 30)
 
-### "Add person" is disabled online until the people slice
-
-On the Postgres adapter the People tab's "Add a person" box shows with every field and its Continue disabled, and the
-line "People are added by an administrator on this server for now." under it (B5, L6); the server refuses the action
-too. A person made there would have no Supabase Auth account and could never sign in. People are made by script
-(`npm run pg:accounts`). Changing a role and removing a person work online. **Later:** the people slice (invitations,
-after slice C) brings a working way to add people online and removes this. The local adapter keeps the box as it was.
-
 ### The save indicator: what it does not follow
 
 The top bar's indicator (slice 30, Q6) follows every write a workspace's pages send: the save chain, `run`, undo and
@@ -2044,3 +2036,40 @@ When the root layout itself fails, Next.js shows `src/app/global-error.tsx`, whi
 component: it cannot read the theme's cookie on the server, so it has no `data-theme` and follows the system's theme
 (System), whatever the person chose (P4, Łukasz, 20 November 2026). Every other page, the sign-in page and "not found"
 included, follows the choice from the first paint.
+
+## People: invitations and passwords (slice 33, AD-40)
+
+("Add person" disabled online, slice 30's entry, is gone: "Invite person" replaced it on both adapters.)
+
+### Links are copied by hand, and whoever makes one can open it
+
+The app sends no e-mail until slice D: the inviter copies an invitation's link (and an Owner or Admin a reset link) and
+sends it themselves. Whoever holds a link can use it, the person who made it included: an invitation for a new address
+makes an account under that address for whoever opens it first (an invitation's e-mail is not verified), and a reset link
+sets the person's password for whoever opens it. D1 limits a reset link to people the maker already rules everywhere;
+both links work once and for a short time (7 days, 24 hours). **Later:** e-mail and recovery by e-mail with slice D.
+
+### A reset link revoked at the moment it is used still sets the password
+
+"Set password" sets the new password in Supabase before it marks the link used: a link revoked (or used twice) in the
+moment between still leaves the password set, while its page answers the refused message. The window is the time of
+one request. Marking first would leave a used link and an unchanged password when Supabase refuses.
+
+### Ended sessions last up to an hour
+
+A reset ends the person's other sessions (D4), but the proxy checks access tokens on its own (`getClaims`, ES256), so a
+session ended elsewhere keeps working until its access token expires (Supabase's default: an hour). "Change password…"
+keeps the other sessions on purpose (D4, as D-58's organization password).
+
+### The preview has two gates
+
+`dev`'s preview is behind Vercel's Standard Protection, so a person outside Łukasz's Vercel team cannot open an
+invitation's link there: the preview is for checking with the demo accounts. Production (slice D) has only the app's
+sign-in.
+
+### A blank page after signing in on `dev:pg` (seen once, cause open)
+
+In slice 33's acceptance, signing in on `/sign-in` on `dev:pg` left the page blank on `/` with Next.js's development
+badge "Rendering" until a reload, although the server had answered the workspace's page twice without an error. The
+assumed cause is the form's soft navigation after an action that sets cookies racing Next.js's own refresh, made
+visible by `dev:pg`'s slow pages; not reproduced. Join and "Set password" navigate the same way. Ctrl+F5 helps.

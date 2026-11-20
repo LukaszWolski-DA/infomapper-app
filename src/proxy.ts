@@ -1,6 +1,7 @@
 // Runs before every page request:
 // - the measurement-only production build (AD-31) answers this machine only;
-// - optimistic session check: without a session cookie, every page except /sign-in redirects there
+// - optimistic session check: without a session cookie, every page except /sign-in and the links' pages (slice 33:
+//   /invite/… and /reset/…) redirects there
 //   (the real check, user exists and development only, runs on the server in getSession(): a signed cookie,
 //   a known user, development only; slice 8);
 // - remembers the last used workspace and project per workspace (AD-07) in preference cookies: on page loads only,
@@ -29,13 +30,20 @@ import {
   rememberProject,
 } from "@/app/_lib/preferences";
 
+/**
+ * An invitation's or a reset's link (slice 33, Q10, F12): public pages, outside the app, passed without a session in both
+ * modes, as `/sign-in` is; on Postgres without `getClaims` (their actions write the session's cookies themselves) and
+ * without the preference cookies.
+ */
+const LINK_PATH = /^\/(invite|reset)\/[^/]+$/;
+
 /** A thumbnail's drawing (`/w/{workspaceId}/thumbnail/{canvasId}`). */
 const THUMBNAIL_PATH = /^\/w\/[^/]+\/thumbnail\/[^/]+$/;
 
 export async function proxy(request: NextRequest) {
   if (isMeasurementBuild() && !isLocalHost(request.headers.get("host"))) return new NextResponse("Not found", { status: 404 });
   const { pathname } = request.nextUrl;
-  if (pathname === "/sign-in") return NextResponse.next();
+  if (pathname === "/sign-in" || LINK_PATH.test(pathname)) return NextResponse.next();
   const thumbnail = THUMBNAIL_PATH.test(pathname);
   if (isPostgresMode()) return postgresProxy(request, thumbnail);
   if (!request.cookies.has(DEV_SESSION_COOKIE)) return thumbnail ? new NextResponse(null, { status: 401 }) : NextResponse.redirect(new URL("/sign-in", request.url));

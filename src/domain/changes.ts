@@ -82,6 +82,10 @@ function objectId(write: Write): Uuid {
  */
 export const SECRET_COLUMNS: Partial<Record<WritableTable, readonly string[]>> = {
   organization_access: ["access_hash"],
+  // slice 33 (F6): a link's token hash, and a person's Supabase Auth account (never handed out with a person's row)
+  invitation: ["token_hash"],
+  password_reset: ["token_hash"],
+  app_user: ["auth_user_id"],
 };
 export const SECRET_CHANGED = "(changed)";
 export const SECRET_UNCHANGED = "(unchanged)";
@@ -91,6 +95,8 @@ function images(write: Write): { before: RowImage | null; after: RowImage | null
   // A removed link row has no after state (data model, change_event).
   const after = write.kind === "remove" ? null : image(write.row);
   for (const column of SECRET_COLUMNS[write.table] ?? []) {
+    // a column neither image has stays out (slice 33: `app_user` without an account, as on the local adapter)
+    if (!(before && column in before) && !(after && column in after)) continue;
     const changed = !before || !after || before[column] !== after[column];
     const marker = changed ? SECRET_CHANGED : SECRET_UNCHANGED;
     if (before) before[column] = marker;
