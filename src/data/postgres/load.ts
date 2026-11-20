@@ -1,5 +1,5 @@
 // Loading rows built in memory into Postgres (slice 29, Q7): the seed loader's and the contract suite's one way in.
-// Development and tests only; slice C's copy of a file will use it too.
+// Development and tests only; since slice 31 also one organization's rows from a file (`replaceOrganization`: pg:kb).
 //
 // - One transaction, one statement per table (`json_populate_recordset`, portable SQL that converts the types), the
 //   tables in the order of their foreign keys (from the store's schema; a table's references to itself are checked at
@@ -16,7 +16,7 @@
 
 import type { AnyRow, StoreSchema } from "../rows";
 import type { Queryable } from "./pool";
-import { timeColumnOf } from "./tables";
+import { readTable, timeColumnOf } from "./tables";
 
 export interface LoadReport {
   /** Per table: the rows given and the rows the database holds after the load. */
@@ -151,10 +151,221 @@ export async function hasRows(db: Queryable): Promise<boolean> {
 }
 
 /**
- * Loads `data` (table name → rows, in the file's order) into the database the client is connected to, in one
- * transaction. With `reset`, every public table is emptied first; without it, a database with rows is refused.
+ * The rows inserted table by table in `order` (the foreign keys' order), each table's rows spread and stamped by their
+ * places (the stored order); `app_user` rows that exist already (by id) are kept as they are when `keepPeople` (slice 31,
+ * F2: a person's Supabase link stays). One statement per table. Answers the crowded rows per table.
  */
-export async function loadRows(db: Queryable, schema: StoreSchema, data: Readonly<Record<string, readonly AnyRow[]>>, options: { reset?: boolean } = {}): Promise<LoadReport> {
+async function insertStamped(db: Queryable, order: readonly string[], data: Readonly<Record<string, readonly AnyRow[]>>, keepPeople = false, placed = false): Promise<Record<string, number>> {
+  const crowded: Record<string, number> = {};
+  for (const table of order) {
+    const given = data[table] ?? [];
+    if (!given.length) continue;
+    let rows: readonly AnyRow[] = given;
+    if (!placed) {
+      const stamped = stampPlaces(table, spreadCrowded(table, given));
+      if (stamped.crowded) crowded[table] = stamped.crowded;
+      rows = stamped.rows;
+    }
+    const conflict = keepPeople && table === "app_user" ? " on conflict (id) do nothing" : "";
+    await db.query(`insert into ${ident(table)} select * from json_populate_recordset(null::${ident(table)}, $1::json)${conflict}`, [JSON.stringify(rows)]);
+  }
+  return crowded;
+}
+
+/**
+ * Every table's rows spread and stamped by their places in the whole file (slice 31, T3): one organization's rows taken
+ * from it afterwards keep their places among every row of the file, so a copy of one organization into a database that
+ * holds others sorts as the file does (stamping only the organization's rows would give two organizations' rows of one
+ * millisecond the same places, and their key would order them). `replaceOrganization` takes such rows with `placed`.
+ */
+export function placeAll(data: Readonly<Record<string, unknown>>): { tables: Record<string, AnyRow[]>; crowded: Record<string, number> } {
+  const tables: Record<string, AnyRow[]> = {};
+  const crowded: Record<string, number> = {};
+  for (const [table, rows] of Object.entries(data)) {
+    if (!Array.isArray(rows)) continue;
+    const stamped = stampPlaces(table, spreadCrowded(table, rows as AnyRow[]));
+    if (stamped.crowded) crowded[table] = stamped.crowded;
+    tables[table] = stamped.rows;
+  }
+  return { tables, crowded };
+}
+
+/** How a table's rows belong to one organization: by their workspace, by the organization, or not at all (people). */
+function ownership(table: string, columns: ReadonlySet<string>): "workspace" | "organization" | "own" | "person" {
+  if (table === "app_user") return "person";
+  if (table === "organization") return "own";
+  if (columns.has("workspace_id")) return "workspace";
+  if (columns.has("organization_id")) return "organization";
+  throw new Error(`The table ${table} belongs to no workspace and no organization: the copy does not know whose its rows are.`);
+}
+
+export interface OrganizationReport {
+  /** Per table: the rows given and the organization's rows the database holds after the write (people: those given). */
+  counts: { table: string; given: number; stored: number }[];
+  /** People given who were in the database already and were kept as they are. */
+  peopleKept: number;
+  /** Per table: the organization's rows deleted before the insert (the undo history's table too). */
+  removed: Record<string, number>;
+  crowded: Record<string, number>;
+}
+
+/**
+ * Replaces one organization's rows in the database (slice 31, C2.2): in one transaction, its organization and workspace
+ * rows locked (`for update`, so a write of the app waits or is refused as busy), every row of its workspaces (the
+ * undo histories too), its organization's rows and the organization itself deleted, soft-deleted rows included, then
+ * `data`'s rows inserted in the foreign keys' order and stamped by their places (the stored order). People are never
+ * deleted (F2): a person given who exists is kept as is, with their Supabase link. With `placed` the rows' time columns
+ * carry their places already (`placeAll` over the whole file, T3); otherwise they are stamped here. `data: null` removes the
+ * organization only (`--remove`). Refused before anything is written: a table the store does not know, a field no column
+ * holds, a row of another organization, a person whose e-mail an online person with another id has (F1). Counts per
+ * table, of this organization's rows only, are compared with the rows given before the commit.
+ */
+export async function replaceOrganization(
+  db: Queryable,
+  schema: StoreSchema,
+  organizationId: string,
+  data: Readonly<Record<string, readonly AnyRow[]>> | null,
+  options: { placed?: boolean } = {},
+): Promise<OrganizationReport> {
+  const given = data ?? {};
+  for (const table of Object.keys(given)) {
+    if (table === "format") continue;
+    if (!schema.rules[table]) throw new Error(`The store does not know the table ${table}: nothing was written.`);
+  }
+  await db.query("begin");
+  try {
+    await db.query("set local lock_timeout = '15s'");
+    const columns = await databaseColumns(db);
+    const rows = Object.fromEntries(Object.entries(given).filter(([t]) => t !== "format"));
+    const stray = strayFields(rows, columns);
+    if (stray.length) throw new Error(`Fields no column holds, nothing was written: ${stray.join(", ")}`);
+
+    const fileWorkspaces = new Set((rows.workspace ?? []).map((w) => w.id as string));
+    for (const w of rows.workspace ?? []) if (w.organization_id !== organizationId) throw new Error("A workspace given belongs to another organization: nothing was written.");
+    for (const o of rows.organization ?? []) if (o.id !== organizationId) throw new Error("An organization given is another one: nothing was written.");
+    for (const [table, list] of Object.entries(rows)) {
+      const how = ownership(table, columns.get(table) ?? new Set());
+      for (const r of list) {
+        if (how === "workspace" && !fileWorkspaces.has(r.workspace_id as string)) throw new Error(`A row of ${table} belongs to a workspace not given: nothing was written.`);
+        if (how === "organization" && r.organization_id !== organizationId) throw new Error(`A row of ${table} belongs to another organization: nothing was written.`);
+      }
+    }
+
+    // F1: a person given whose e-mail an online person with another id has stops the copy
+    const people = rows.app_user ?? [];
+    if (people.length) {
+      const clash = await db.query<{ n: string }>(
+        `select count(*) as n from app_user u join json_to_recordset($1::json) as g(id uuid, email text) on lower(u.email) = lower(g.email) and u.id <> g.id`,
+        [JSON.stringify(people.map((p) => ({ id: p.id, email: p.email })))],
+      );
+      const n = Number(clash.rows[0]!.n);
+      if (n) throw new Error(`${n} ${n === 1 ? "person" : "people"} of the copy ${n === 1 ? "has" : "have"} the e-mail of an online person with another id: nothing was written.`);
+    }
+
+    await db.query("select id from organization where id = $1 for update", [organizationId]);
+    await db.query("select id from workspace where organization_id = $1 for update", [organizationId]);
+    const workspaces = [
+      ...new Set([
+        ...fileWorkspaces,
+        ...(await db.query<{ id: string }>("select id from workspace where organization_id = $1", [organizationId])).rows.map((r) => r.id),
+      ]),
+    ];
+
+    const order = tablesInKeyOrder(schema, await databaseReferences(db));
+    const known = new Set(order);
+    // tables only the database has (the undo history) go first, then the store's in the reverse of the keys' order
+    const extra = [...columns.keys()].filter((t) => !known.has(t)).sort();
+    const removed: Record<string, number> = {};
+    for (const table of [...extra, ...[...order].reverse()]) {
+      const how = ownership(table, columns.get(table) ?? new Set());
+      if (how === "person") continue;
+      const [where, param] = how === "workspace" ? ["workspace_id = any($1::uuid[])", workspaces] : how === "organization" ? ["organization_id = $1", organizationId] : ["id = $1", organizationId];
+      const r = await db.query<{ n: string }>(`with d as (delete from ${ident(table)} where ${where} returning 1) select count(*) as n from d`, [param]);
+      const n = Number(r.rows[0]!.n);
+      if (n) removed[table] = n;
+    }
+
+    const existingPeople = people.length
+      ? Number((await db.query<{ n: string }>("select count(*) as n from app_user where id = any($1::uuid[])", [people.map((p) => p.id)])).rows[0]!.n)
+      : 0;
+    const crowded = await insertStamped(db, order, rows, true, options.placed);
+
+    const counts: OrganizationReport["counts"] = [];
+    for (const table of order) {
+      const how = ownership(table, columns.get(table) ?? new Set());
+      const n = (sql: string, params: unknown[]) => db.query<{ n: string }>(sql, params).then((r) => Number(r.rows[0]!.n));
+      const stored =
+        how === "person"
+          ? await n(`select count(*) as n from app_user where id = any($1::uuid[])`, [people.map((p) => p.id)])
+          : how === "workspace"
+            ? await n(`select count(*) as n from ${ident(table)} where workspace_id = any($1::uuid[])`, [workspaces])
+            : how === "organization"
+              ? await n(`select count(*) as n from ${ident(table)} where organization_id = $1`, [organizationId])
+              : await n(`select count(*) as n from ${ident(table)} where id = $1`, [organizationId]);
+      counts.push({ table, given: rows[table]?.length ?? 0, stored });
+    }
+    const wrong = counts.filter((c) => c.given !== c.stored);
+    if (wrong.length) throw new Error(`Counts differ, nothing was written: ${wrong.map((c) => `${c.table} ${c.given} given, ${c.stored} stored`).join("; ")}`);
+    await db.query("commit");
+    return { counts, peopleKept: existingPeople, removed, crowded };
+  } catch (e) {
+    await db.query("rollback").catch(() => undefined);
+    throw e;
+  }
+}
+
+/**
+ * One organization's rows as the store reads them (slice 31, C2.1: `pg:backup`), from one state of the data (a read-only
+ * REPEATABLE READ transaction): its organization, its organization rows except `organization_access` (never in a
+ * backup, as never in a copy), every row of its workspaces (soft-deleted rows included; the undo history, the store's own
+ * table, left out) in the stored order, and the people its rows name without their Supabase link (`shaped`). Tables
+ * without a row are left out. The local file's shape around it is the caller's.
+ */
+export async function readOrganization(db: Queryable, schema: StoreSchema, organizationId: string): Promise<Record<string, AnyRow[]>> {
+  await db.query("begin transaction isolation level repeatable read read only");
+  try {
+    const columns = await databaseColumns(db);
+    if (!(await db.query("select 1 from organization where id = $1", [organizationId])).rows.length) throw new Error("The database has no such organization: nothing was read.");
+    const workspaces = (await db.query<{ id: string }>("select id from workspace where organization_id = $1", [organizationId])).rows.map((r) => r.id);
+    const out: Record<string, AnyRow[]> = {};
+    for (const table of Object.keys(schema.rules)) {
+      if (table === "organization_access") continue;
+      const how = ownership(table, columns.get(table) ?? new Set());
+      if (how === "person") continue;
+      const read =
+        how === "workspace"
+          ? { where: "workspace_id = any($1::uuid[])", params: [workspaces] }
+          : how === "organization"
+            ? { where: "organization_id = $1", params: [organizationId] }
+            : { where: "id = $1", params: [organizationId] };
+      const rows = await readTable(db, schema, table, read);
+      if (rows.length) out[table] = rows;
+    }
+    const named = new Set<string>();
+    for (const [table, rows] of Object.entries(out)) {
+      const refs = Object.entries(schema.rules[table]?.foreignKeys ?? {}).filter(([, target]) => target === "app_user").map(([c]) => c);
+      for (const r of rows) for (const c of refs) if (typeof r[c] === "string") named.add(r[c] as string);
+    }
+    if (named.size) out.app_user = await readTable(db, schema, "app_user", { where: "id = any($1::uuid[])", params: [[...named]] });
+    await db.query("commit");
+    return out;
+  } catch (e) {
+    await db.query("rollback").catch(() => undefined);
+    throw e;
+  }
+}
+
+/**
+ * Loads `data` (table name → rows, in the file's order) into the database the client is connected to, in one
+ * transaction. With `reset`, every public table is emptied first (unless `resetGuard` refuses); without it, a database
+ * with rows is refused.
+ */
+export async function loadRows(
+  db: Queryable,
+  schema: StoreSchema,
+  data: Readonly<Record<string, readonly AnyRow[]>>,
+  options: { reset?: boolean; resetGuard?: (db: Queryable) => Promise<string | null> } = {},
+): Promise<LoadReport> {
   for (const table of Object.keys(data)) {
     if (table === "format") continue;
     if (!schema.rules[table]) throw new Error(`The store does not know the table ${table}: nothing was loaded.`);
@@ -164,20 +375,16 @@ export async function loadRows(db: Queryable, schema: StoreSchema, data: Readonl
     const stray = strayFields(Object.fromEntries(Object.entries(data).filter(([t]) => t !== "format")), await databaseColumns(db));
     if (stray.length) throw new Error(`Fields no column holds, nothing was loaded: ${stray.join(", ")}`);
     if (options.reset) {
+      // slice 31 (Q8): a refusal inside the reset's transaction, before anything is emptied
+      const refused = options.resetGuard ? await options.resetGuard(db) : null;
+      if (refused) throw new Error(refused);
       const all = await publicTables(db);
       if (all.length) await db.query(`truncate table ${all.map(ident).join(", ")}`);
     } else if (await hasRows(db)) {
       throw new Error("The database has rows already: nothing was loaded. Run with --reset to replace them.");
     }
-    const crowded: Record<string, number> = {};
     const order = tablesInKeyOrder(schema, await databaseReferences(db));
-    for (const table of order) {
-      const given = data[table] ?? [];
-      if (!given.length) continue;
-      const stamped = stampPlaces(table, spreadCrowded(table, given));
-      if (stamped.crowded) crowded[table] = stamped.crowded;
-      await db.query(`insert into ${ident(table)} select * from json_populate_recordset(null::${ident(table)}, $1::json)`, [JSON.stringify(stamped.rows)]);
-    }
+    const crowded = await insertStamped(db, order, data);
     const counts: LoadReport["counts"] = [];
     for (const table of order) {
       const stored = Number((await db.query<{ n: string }>(`select count(*) as n from ${ident(table)}`)).rows[0]!.n);

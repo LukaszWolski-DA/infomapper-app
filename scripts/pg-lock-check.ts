@@ -1,13 +1,15 @@
 // npx tsx scripts/pg-lock-check.ts (slice 30, step 4): the writes' lock and a count rule through the database
 // `.env.postgres.local` names (environment 2: infomapper-dev through Supabase's transaction pooler), by the app's own
 // write path (the domain's commands and the Postgres adapter's `apply`), in a workspace of its own made for the check in
-// the demo's organization InfoMate. KB is not in infomapper-dev; the script reads and writes nothing of any other
-// workspace and never resets anything. It prints timings and answers only, never a value of the environment.
+// the demo's organization InfoMate. It reads and writes nothing of any other workspace or organization (since slice 31
+// infomapper-dev may hold a copy of Łukasz's own model) and never resets anything. It prints timings and answers only,
+// never a value of the environment.
 //
 // 1. One write (a project's rename): its transaction takes `for no key update` on the workspace's row and sets
 //    `set local lock_timeout`; it is stored.
 // 2. Another session holds the workspace's row (`for no key update`) for 2 s: the write waits, then is stored.
-// 3. It holds it past the lock timeout: the write is refused as busy, after the timeout, and writes nothing.
+// 3. It holds it past the lock timeout (18 s against 15 s since slice 31): the write is refused as busy, after the
+//    timeout, and writes nothing.
 // 4. Two sessions delete the workspace's last two projects at once: one is stored, the other refused with the last
 //    project's message; one project stays.
 // 5. The workspace is soft-deleted at the end (`deleted_at`; it stays in the table, hidden everywhere), unless --keep.
@@ -71,9 +73,9 @@ async function main() {
   };
   await hold(2_000);
   await timed("2. a write while another session holds the row for 2 s", () => rename("First project (waited)"));
-  await hold(13_000);
-  await timed(`3. a write while another session holds the row for 13 s (past ${LOCK_TIMEOUT})`, () => rename("First project (busy)"));
-  await new Promise((r) => setTimeout(r, 13_500));
+  await hold(18_000);
+  await timed(`3. a write while another session holds the row for 18 s (past ${LOCK_TIMEOUT})`, () => rename("First project (busy)"));
+  await new Promise((r) => setTimeout(r, 18_500));
   await holder.end();
   console.log("   the project's name after 3:", (await store.projects.list(ws))[0]!.name);
 

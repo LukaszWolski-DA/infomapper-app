@@ -20,6 +20,10 @@ const baseURL = process.env.PG_BASE_URL ?? (serve ? `http://127.0.0.1:${PORT}` :
 const onVercel = /.vercel.app$/.test(new URL(baseURL).hostname);
 const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 if (onVercel && !bypass) throw new Error("VERCEL_AUTOMATION_BYPASS_SECRET is not set: the preview is behind Deployment Protection.");
+// slice 31 (Q9): a measurement of the workspace MEASURE_WORKSPACE names records numbers only: no trace, screenshot or
+// video, no HTML report (it holds the console's output), whatever the target (`e2e/slice-29/measure-target.ts`)
+const ownMeasure = !!process.env.MEASURE_WORKSPACE;
+const nothingRecorded = { trace: "off", screenshot: "off", video: "off" } as const;
 
 export default defineConfig({
   testDir: "e2e/slice-29",
@@ -30,11 +34,12 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   forbidOnly: !!process.env.CI,
-  reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report-pg" }]],
-  outputDir: "test-results/pg",
+  reporter: ownMeasure ? [["list"]] : [["list"], ["html", { open: "never", outputFolder: "playwright-report-pg" }]],
+  // own mode: a failure's error context holds the page's text, so it stays under the git-ignored .data/
+  outputDir: ownMeasure ? ".data/measure/s31/results" : "test-results/pg",
   use: onVercel
-    ? { baseURL, trace: "off", extraHTTPHeaders: { "x-vercel-protection-bypass": bypass!, "x-vercel-set-bypass-cookie": "true" } }
-    : { baseURL, trace: "retain-on-failure" },
+    ? { baseURL, trace: "off", ...(ownMeasure ? nothingRecorded : {}), extraHTTPHeaders: { "x-vercel-protection-bypass": bypass!, "x-vercel-set-bypass-cookie": "true" } }
+    : { baseURL, ...(ownMeasure ? nothingRecorded : { trace: "retain-on-failure" as const }) },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   ...(serve
     ? {
