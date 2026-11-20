@@ -3,17 +3,15 @@ import { access, archived, ids, makeCtx, member, NOW, organization, organization
 import { ARCHIVED_MESSAGE } from "../errors";
 import type { AppUser, WorkspaceMember, WorkspaceRole } from "../types";
 import {
-  addPerson,
   changeRole,
-  checkAddPerson,
   checkRemovePerson,
+  joinWrites,
   OWN_REMOVAL_MESSAGE,
   OWN_ROLE_MESSAGE,
   OWNER_ONLY_CHANGE_MESSAGE,
   OWNER_ONLY_GIVE_MESSAGE,
   OWNER_ONLY_REMOVE_MESSAGE,
   removePerson,
-  type AddPersonState,
   type RemovePersonState,
 } from "./people";
 
@@ -21,106 +19,17 @@ const anna: AppUser = { id: ids.someoneElse, email: "anna@infomate.pl", display_
 const otherWs = "01900000-0000-7000-8000-000000000011";
 const third = "01900000-0000-7000-8000-000000000102";
 
-describe("addPerson (item 10)", () => {
-  const state: AddPersonState = {
-    access: access("admin"),
-    organization: organization(),
-    account: null,
-    accountOrganizationMember: null,
-    accountWorkspaceIds: [],
-  };
-  const input = { workspaceId: ids.ws, name: " Jan Test ", email: " Jan@Example.com", role: "reviewer" };
-
-  it("a new person: the account, a member row in the organization and the workspace membership, in one change group", () => {
-    const r = addPerson(makeCtx(), state, input);
-    if (!r.ok) throw new Error(r.error.message);
-    const [user, orgRow, wsRow] = r.writeSet.writes;
-    expect(user).toMatchObject({ kind: "insert", table: "app_user", row: { email: "jan@example.com", display_name: "Jan Test", created_at: NOW } });
-    const userId = r.value.userId;
-    expect(orgRow).toEqual({ kind: "insert", table: "organization_member", row: { organization_id: ids.org, user_id: userId, role: "member", created_at: NOW } });
-    expect(wsRow).toEqual({
-      kind: "insert",
-      table: "workspace_member",
-      row: { workspace_id: ids.ws, user_id: userId, role: "reviewer", added_by: ids.actor, created_at: NOW },
-    });
-    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
-    expect(r.writeSet.events.every((e) => e.workspace_id === ids.ws)).toBe(true);
-    expect(r.value.summary).toEqual([
-      "Jan Test (jan@example.com) gets the role Reviewer in Retail Co – DWH. They sign in with the link of InfoMate and its password.",
+describe("joinWrites (item 10's rule, shared by slice 33's invitations, F17)", () => {
+  it("a person with no link to the organization: a member row, then the membership", () => {
+    expect(joinWrites(makeCtx(), { organizationId: ids.org, workspaceId: ids.ws, userId: anna.id, role: "reviewer", addedBy: ids.actor, linked: false })).toEqual([
+      { kind: "insert", table: "organization_member", row: { organization_id: ids.org, user_id: anna.id, role: "member", created_at: NOW } },
+      { kind: "insert", table: "workspace_member", row: { workspace_id: ids.ws, user_id: anna.id, role: "reviewer", added_by: ids.actor, created_at: NOW } },
     ]);
-    expect(r.value.toast).toBe("Added Jan Test to Retail Co – DWH as Reviewer.");
   });
 
-  it("an account already in the organization: its name stays and is shown; no new organization row", () => {
-    const known = { ...state, account: anna, accountOrganizationMember: organizationMember({ user_id: anna.id }), accountWorkspaceIds: [otherWs] };
-    const r = addPerson(makeCtx(), known, { ...input, name: "A. Nowak", email: "anna@infomate.pl" });
-    if (!r.ok) throw new Error(r.error.message);
-    expect(r.writeSet.writes.map((w) => w.table)).toEqual(["workspace_member"]);
-    expect(r.value.summary).toEqual([
-      "Anna Nowak (anna@infomate.pl) gets the role Reviewer in Retail Co – DWH. They sign in with the link of InfoMate and its password.",
-      "anna@infomate.pl already has an account as Anna Nowak; that name stays.",
-    ]);
-    expect(r.value.toast).toBe("Added Anna Nowak to Retail Co – DWH as Reviewer.");
-  });
-
-  it("a guest of this organization stays a guest: only the workspace membership, and the name is shown (step 2's answers 2, 3)", () => {
-    const guest = { ...state, account: anna, accountWorkspaceIds: [otherWs] };
-    const r = addPerson(makeCtx(), guest, { ...input, email: "anna@infomate.pl" });
-    if (!r.ok) throw new Error(r.error.message);
-    expect(r.writeSet.writes.map((w) => w.table)).toEqual(["workspace_member"]);
-    expect(r.value.toast).toBe("Added Anna Nowak to Retail Co – DWH as Reviewer.");
-  });
-
-  it("a member of the organization without a workspace there is shown by name (Kasia in Retail Co, answer 3)", () => {
-    const rowOnly = { ...state, account: anna, accountOrganizationMember: organizationMember({ user_id: anna.id }), accountWorkspaceIds: [] };
-    const r = addPerson(makeCtx(), rowOnly, { ...input, email: "anna@infomate.pl" });
-    if (!r.ok) throw new Error(r.error.message);
-    expect(r.writeSet.writes.map((w) => w.table)).toEqual(["workspace_member"]);
-    expect(r.value.summary[1]).toBe("anna@infomate.pl already has an account as Anna Nowak; that name stays.");
-  });
-
-  it("an account from another organization: its name stays hidden (F11), and it becomes a member here", () => {
-    const stranger = { ...state, account: anna };
-    const preview = checkAddPerson(stranger, { ...input, email: "anna@infomate.pl" });
-    expect(preview).toEqual({
-      ok: true,
-      value: {
-        summary: [
-          "anna@infomate.pl gets the role Reviewer in Retail Co – DWH. They sign in with the link of InfoMate and its password.",
-          "anna@infomate.pl already has an account; they keep their own name.",
-        ],
-        toast: "Added anna@infomate.pl to Retail Co – DWH as Reviewer.",
-      },
-    });
-    expect(JSON.stringify(preview)).not.toContain("Anna Nowak");
-    const r = addPerson(makeCtx(), stranger, { ...input, email: "anna@infomate.pl" });
-    expect(r.ok && r.writeSet.writes.map((w) => w.table)).toEqual(["organization_member", "workspace_member"]);
-  });
-
-  it("refuses someone already in the workspace", () => {
-    const inside = { ...state, account: anna, accountOrganizationMember: organizationMember({ user_id: anna.id }), accountWorkspaceIds: [ids.ws] };
-    expect(checkAddPerson(inside, { ...input, email: "anna@infomate.pl" })).toEqual({
-      ok: false,
-      error: { code: "conflict", message: "Anna Nowak is already in Retail Co – DWH." },
-    });
-  });
-
-  it("offers Admin to Reader, not Owner; Modeler is the form's default", () => {
-    expect(addPerson(makeCtx(), state, { ...input, role: "owner" })).toMatchObject({ ok: false, error: { code: "invalid" } });
-    for (const role of ["admin", "modeler", "reader"]) expect(addPerson(makeCtx(), state, { ...input, role }).ok).toBe(true);
-  });
-
-  it("is for owners and admins, and never in an archived workspace", () => {
-    for (const role of ["modeler", "reviewer", "reader"] as const) {
-      expect(addPerson(makeCtx(), { ...state, access: access(role) }, input)).toMatchObject({ ok: false, error: { code: "forbidden" } });
-    }
-    expect(addPerson(makeCtx(), { ...state, access: access("owner", archived) }, input)).toMatchObject({ ok: false, error: { message: ARCHIVED_MESSAGE } });
-  });
-
-  it("checks the name and the e-mail address", () => {
-    expect(checkAddPerson(state, { ...input, name: " " })).toMatchObject({ ok: false, error: { message: "Enter a name." } });
-    expect(checkAddPerson(state, { ...input, email: "" })).toMatchObject({ ok: false, error: { message: "Enter an e-mail address." } });
-    expect(checkAddPerson(state, { ...input, email: "jan" })).toMatchObject({ ok: false, error: { message: "Enter a valid e-mail address." } });
+  it("a member, or a guest of this organization (a workspace here, no row): only the membership; a guest stays a guest", () => {
+    const writes = joinWrites(makeCtx(), { organizationId: ids.org, workspaceId: ids.ws, userId: anna.id, role: "modeler", addedBy: null, linked: true });
+    expect(writes.map((w) => w.table)).toEqual(["workspace_member"]);
   });
 });
 

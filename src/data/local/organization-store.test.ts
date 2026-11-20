@@ -4,7 +4,8 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildWriteSet, type CommandContext } from "@/domain/changes";
 import { createOrganization } from "@/domain/commands/organization";
-import { addPerson, changeRole, removePerson } from "@/domain/commands/people";
+import { acceptInvitation, createInvitation } from "@/domain/commands/invitations";
+import { changeRole, removePerson } from "@/domain/commands/people";
 import { STALE_VERSION_MESSAGE } from "@/domain/errors";
 import { uuidv7 } from "@/domain/ids";
 import type { DataStore } from "../ports";
@@ -117,16 +118,21 @@ describe("people rows through the adapter (slice 8, F4)", () => {
     expect(await store.apply(again.writeSet)).toMatchObject({ ok: false, error: { code: "conflict" } });
   });
 
-  it("adds a person, then removes them with their organization row from their last workspace", async () => {
+  it("a person joins by an invitation (slice 33), then is removed with their organization row from their last workspace", async () => {
     const ws = await workspaceNamed("Retail Co – DWH");
     const access = { workspace: ws, member: await store.workspaces.getMember(ws.id, SEED_IDS.userLukasz) };
     const organization = await store.organizations.get(ws.organization_id);
-    const added = addPerson(ctxFor(SEED_IDS.userLukasz), { access, organization, account: null, accountOrganizationMember: null, accountWorkspaceIds: [] }, {
-      workspaceId: ws.id,
-      name: "Jan Test",
-      email: "jan@example.com",
-      role: "reader",
-    });
+    const tokenHash = "a".repeat(64);
+    const invited = createInvitation(ctxFor(SEED_IDS.userLukasz), { access, account: null, members: await store.workspaces.listMembers(ws.id), invitations: [] }, { workspaceId: ws.id, email: "jan@example.com", role: "reader", tokenHash });
+    if (!invited.ok) throw new Error(invited.error.message);
+    expect(await store.apply(invited.writeSet)).toEqual({ ok: true });
+    const invitation = (await store.invitations.getByTokenHash(tokenHash))!;
+    const joiner = uuidv7();
+    const added = acceptInvitation(
+      ctxFor(joiner),
+      { invitation, workspace: ws, organization, inviter: await store.users.get(SEED_IDS.userLukasz), account: null, accountOrganizationMember: null, accountWorkspaceIds: [] },
+      { tokenHash, name: "Jan Test", authUserId: null },
+    );
     if (!added.ok) throw new Error(added.error.message);
     expect(await store.apply(added.writeSet)).toEqual({ ok: true });
     const jan = (await store.users.getByEmail("jan@example.com"))!;
@@ -147,9 +153,9 @@ describe("people rows through the adapter (slice 8, F4)", () => {
     expect(await store.apply(removed.writeSet)).toEqual({ ok: true });
     expect(await store.workspaces.getMember(ws.id, jan.id)).toBeNull();
     expect(await store.organizations.getMember(ws.organization_id, jan.id)).toBeNull();
-    // the account stays; Jan did nothing in the workspace, so its pages no longer name him (F10)
+    // the account stays; since slice 33 his Join is his own change event there, so its pages keep his name (F10)
     expect(await store.users.getByEmail("jan@example.com")).not.toBeNull();
-    expect((await store.users.listForWorkspace(ws.id)).map((u) => u.email)).not.toContain("jan@example.com");
+    expect((await store.users.listForWorkspace(ws.id)).map((u) => u.email)).toContain("jan@example.com");
   });
 });
 
