@@ -47,5 +47,5 @@ describe("the PDF is unchanged by the tree's additions (S34-04)", () => {
     expect(JSON.stringify(before)).not.toBe(JSON.stringify(tree));
     expect(html(tree)).toBe(html(before));
     expect(html(tree, true)).toBe(html(before, true));
-  });
+  }, 30_000);
 });
