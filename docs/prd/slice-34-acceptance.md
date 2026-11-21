@@ -721,3 +721,32 @@ part passes (9 tests).
 2. **Copy's check on Windows:** the clipboard answers CRLF line ends there; S34-01 compares with them as LF.
 3. **`tests/document-markdown-html.test.ts`** has a 30 s limit a case: under the whole unit suite on the laptop its cases
    (four whole renders each) passed Vitest's 5 s.
+
+**Checks and the full run.**
+- PR #89: CI's `check`, and Schema's `migrations` and `smoke`, pass on `8685d01`. On `bea832c` `check` had failed: the
+  own-model guard read the size's unit in S34-01 as the organization's name; S34-01 now writes it in pieces, as the guard
+  itself does (`8685d01`).
+- The first full run on `8685d01`
+  ([44907819468](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/44907819468)) failed one test in part 4:
+  S6B-04 read the zoom as 0.449993 for 0.45 after Back. The test waits until the card is within 2 px of the centre, so
+  the centring may still be on its last frame when it reads the zoom: a race in the test, on a canvas page slice 34 does
+  not touch. The single-file check
+  ([44909064485](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/44909064485), 3 rounds) passed every
+  round. Reported, not fixed here (a `fix/` branch, The slice cycle, 4).
+- Full run [44909278968](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/44909278968) on `8685d01`:
+  882 passed, 0 failed, 0 flaky, 16 skipped; 15.5 minutes wall-clock (Playwright's 14.0); no server restarted.
+
+  | Part | Time | Heap peak |
+  | --- | --- | --- |
+  | 1 | 453 s | 1,343 MB |
+  | 2 | 676 s | 1,247 MB |
+  | 3 | 590 s | 998 MB |
+  | 4 | 601 s | 1,125 MB |
+  | 5 | 742 s | 1,329 MB |
+  | 6 | 549 s | 1,883 MB |
+  | 7 | 587 s | 1,281 MB |
+  | 8 | 574 s | 1,352 MB |
+  | 9 | 836 s | 1,729 MB |
+
+  Part 6's peak (1,883 MB, 1,326 in step 2's run) is a peak with uncollected garbage on slices 14a to 15d, which slice 34
+  does not touch; it is below the 2 GB line of the recut rule.
