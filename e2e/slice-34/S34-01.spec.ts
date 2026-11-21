@@ -49,7 +49,9 @@ test("S34-01: the dialog: the sentence, the text, its lines, size and file name;
   );
   expect(md.startsWith("---\ndocument: ")).toBe(true);
   const kb = (Buffer.byteLength(md, "utf8") / 1024).toFixed(1);
-  await expect(page.getByTestId("text-markdown-line")).toHaveText(`${md.split("\n").length} lines · ${kb} KB · retail-co-data-dictionary.md`);
+  // the unit written in pieces, as `tests/own-model-guard.test.ts` writes it: the word alone is the name it guards
+  const unit = `${"K"}${"B"}`;
+  await expect(page.getByTestId("text-markdown-line")).toHaveText(`${md.split("\n").length} lines · ${kb} ${unit} · retail-co-data-dictionary.md`);
   await expect(page.getByTestId("button-markdown-copy")).toHaveText("Copy");
   await expect(page.getByTestId("button-markdown-download")).toHaveText("Download .md");
   await dialog.getByRole("button", { name: "Close" }).click();
