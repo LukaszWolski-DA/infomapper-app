@@ -176,8 +176,10 @@ export function buildDictionary(input: SectionBuildInput): DocNode[] {
       columns: head,
       rows: attributes.map((a) => {
         const below = definitions ? definitionRuns(a) : EMPTY;
-        return { cells: columns.map((c) => dictionaryCell(state, a, c, scope, t)), ...(below.length ? { below: [below] } : {}) };
+        return { cells: columns.map((c) => dictionaryCell(state, a, c, scope, t)), ...(below.length ? { below: [below] } : {}), ...(definitions ? { longCells: [below] } : {}) };
       }),
+      // slice 34 (F2): the definition under each row is a long column a renderer may draw at the table's end
+      ...(definitions ? { long: [{ key: "definition", label: t("def") }] } : {}),
     };
   };
 

@@ -65,9 +65,11 @@ export function longTextTable(columns: readonly LongColumn[], rows: readonly (re
       return { cells: out };
     }
     const below = texts.map((x) => (labelled ? [strong(`${x.label}: `), ...x.runs] : x.runs));
-    return { cells: short.map((i) => cells[i] ?? EMPTY), ...(below.length ? { below } : {}) };
+    // slice 34 (F2): the long texts by their columns too, unlabelled, for a renderer that keeps the row whole
+    const longCells = long.map((i) => (hasText(cells[i]) ? cells[i]! : EMPTY));
+    return { cells: short.map((i) => cells[i] ?? EMPTY), ...(below.length ? { below } : {}), longCells };
   });
-  const out: DocNode[] = [{ kind: "table", columns: head(short), rows: body, ...(style ? { style } : {}) }];
+  const out: DocNode[] = [{ kind: "table", columns: head(short), rows: body, ...(style ? { style } : {}), ...(mode === "row" ? { long: head(long) } : {}) }];
   if (notes.length) out.push({ kind: "list", ordered: true, items: notes });
   return out;
 }

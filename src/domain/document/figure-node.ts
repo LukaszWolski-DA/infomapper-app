@@ -66,6 +66,7 @@ export function figureNodes(input: FigureInput, page: FigurePage, words: FigureN
     parts: layout.parts.map((p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, wmm: p.wmm, hmm: p.hmm })),
     partTexts: n > 1 ? layout.parts.map((_, i) => words.part(i + 1, n)) : [],
     summary: figureSummary([layout], f.smallestPt ?? page.smallestPt),
+    content: drawing.content,
   };
   return { nodes: [{ kind: "figure", figure }], layout };
 }

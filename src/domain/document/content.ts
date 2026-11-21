@@ -54,6 +54,11 @@ export interface DocRow {
   readonly cells: readonly DocRuns[];
   /** Full-width text under the row (a definition, a rule, a note: one layout for long texts, D9). */
   readonly below?: readonly DocRuns[];
+  /**
+   * Slice 34 (F2): the row's long texts by the table's `long` columns, aligned with them (empty runs where none), beside
+   * `below`, which drops a single long column's label. Only on a table with `long`; the HTML never reads it.
+   */
+  readonly longCells?: readonly DocRuns[];
 }
 
 export type DocNode =
@@ -73,6 +78,11 @@ export type DocNode =
        * (the bus matrix: centred cells).
        */
       readonly style?: "narrow" | "fixed" | "checks" | "legend" | "matrix";
+      /**
+       * Slice 34 (F2): the long-text columns whose texts the rows carry under them (`below`), in order; a renderer that
+       * keeps a row whole (Markdown) draws them as columns at the table's end from each row's `longCells`.
+       */
+      readonly long?: readonly DocColumn[];
     }
   /**
    * Slice 26 (F6): a list. `ordered`: numbered (the notes after a table, "Definitions in full"); `columns`: in two
@@ -145,4 +155,80 @@ export interface DocFigure {
   readonly summary: string;
   /** Slice 27, step 3: a placed figure's name before its line in the editor ("Fact Sales"); a stored figure has none. */
   readonly label?: string;
+  /** Slice 34 (F1): what the figure drew, as plain data from the same pass as its SVG; the HTML never reads it. */
+  readonly content?: FigureContent;
+}
+
+/**
+ * What one figure drew (slice 34, F1), for a renderer that writes it as text (Markdown's Mermaid block and its list):
+ * the cards with their shown names and rows, the frames, and the lines of the kinds drawn. Ids are the cards' (canvas
+ * item) ids; names are as the figure shows them (names or aliases).
+ */
+export interface FigureContent {
+  readonly cards: readonly FigureContentCard[];
+  readonly frames: readonly FigureContentFrame[];
+  /** Relationships between entity cards (a bundle into a collapsed frame as its single relationships). */
+  readonly relationships: readonly FigureContentRelationship[];
+  /** Foreign keys between source table cards. */
+  readonly sourceKeys: readonly { readonly from: string; readonly to: string; readonly columns: readonly { readonly from: string; readonly to: string }[] }[];
+  readonly mappings: readonly FigureContentMapping[];
+  /** A module's lines between entity rows (InfoCube's dimensional mappings). */
+  readonly moduleLines: readonly { readonly inputs: readonly string[]; readonly target: string; readonly status: "draft" | "review" | "approved" | null; readonly chip?: string }[];
+  /** Requirement cards and the elements their trace lines reach on the figure. */
+  readonly requirements: readonly { readonly key: string; readonly name: string; readonly traces: readonly string[] }[];
+}
+
+export interface FigureContentCard {
+  readonly id: string;
+  readonly kind: "ent" | "src";
+  /** The header's name (name or alias). */
+  readonly name: string;
+  /** A fact's or a dimension's role text (`Fact · Transaction`); absent for a logical entity and a table. */
+  readonly role?: string;
+  /** Its rows as the figure shows them; none when the card is collapsed or a member of a collapsed frame. */
+  readonly rows: readonly FigureContentRow[];
+  /** A member of a collapsed frame: drawn inside the frame's block, not as a card. */
+  readonly inBlock: boolean;
+}
+
+export interface FigureContentRow {
+  readonly name: string;
+  /** The shown type (`String(100)`, `varchar(20)`). */
+  readonly type: string;
+  readonly pk: boolean;
+  readonly fk: boolean;
+  readonly pii: boolean;
+  readonly bk: boolean;
+  readonly calc: boolean;
+}
+
+export interface FigureContentFrame {
+  readonly name: string;
+  readonly kind: "concept" | "source_system" | "free";
+  readonly collapsed: boolean;
+  /** Its cards' ids, in the figure's order. */
+  readonly members: readonly string[];
+}
+
+export interface FigureContentRelationship {
+  readonly from: string;
+  readonly to: string;
+  readonly fromMin: 0 | 1;
+  readonly fromMany: boolean;
+  readonly toMin: 0 | 1;
+  readonly toMany: boolean;
+  /** The pill's text: the roles, else the verb phrase; null without. */
+  readonly label: string | null;
+}
+
+export interface FigureContentMapping {
+  /** `table.column` per input on the figure, in rule order. */
+  readonly inputs: readonly string[];
+  /** `Entity.attribute`. */
+  readonly target: string;
+  /** Null when the figure does not show statuses. */
+  readonly status: "draft" | "review" | "approved" | null;
+  readonly transform: boolean;
+  readonly rule: string | null;
+  readonly warn: boolean;
 }

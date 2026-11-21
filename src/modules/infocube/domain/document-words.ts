@@ -17,6 +17,8 @@ export interface CubeDocWords {
   readonly role: string;
   readonly key: string;
   readonly noMatch: string;
+  /** Slice 34 (F2): a dimension's definition as a column's name (Markdown). */
+  readonly definition: string;
   readonly def: string;
   readonly measures: string;
   readonly attribute: string;
@@ -66,6 +68,7 @@ const EN: CubeDocWords = {
   role: "Role",
   key: "Key",
   noMatch: "No match →",
+  definition: "Definition",
   def: "Definition",
   measures: "Measures",
   attribute: "Attribute",
@@ -110,6 +113,7 @@ const PL: CubeDocWords = {
   role: "Rola",
   key: "Klucz",
   noMatch: "Brak dopasowania →",
+  definition: "Definicja",
   def: "Definicja",
   measures: "Miary",
   attribute: "Atrybut",
@@ -163,6 +167,7 @@ const DE: CubeDocWords = {
   role: "Rolle",
   key: "Schlüssel",
   noMatch: "Kein Treffer →",
+  definition: "Definition",
   def: "Definition",
   measures: "Kennzahlen",
   attribute: "Attribut",
