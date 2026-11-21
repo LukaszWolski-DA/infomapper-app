@@ -1,6 +1,6 @@
 # Fix – A blank page after sign-in (slice 33's acceptance)
 
-Status: **step 1, reconnaissance** (20 November 2026); no application code. Branch `fix/blank-page-after-sign-in` from
+Status: **step 1, reconnaissance** (20 November 2026); decisions in section 7 (21 November 2026); step 2 builds them. Branch `fix/blank-page-after-sign-in` from
 `dev` at `bc5329d` (slice 33's merge). A fix outside slices (CLAUDE.md, the slice cycle, 4): the session's forms are
 shared by slices 8, 29 and 33.
 
@@ -141,9 +141,11 @@ The existing specs that sign in this way keep passing unchanged (`signInWithPass
   run again unless only Markdown changed), CI green on the last commit, `pg:backup` per the backup rule (nothing here
   migrates, so only if KB changed since the last one). No tag (a fix branch has none).
 
-## 7. For Łukasz to decide
+## 7. Decided (Łukasz, 21 November 2026; Claude's calls, for his approval at the closing)
 
-- **D1:** which forms: (a) the session forms only (recommended), or (b) with the two that create an organization and
-  their toast carried across the load.
-- **D2:** whether Claude tries to reproduce it on `dev:pg` before the fix (it needs `infomapper-dev`; not needed for the
-  fix, since the test proves the conditions are gone), or Łukasz does by hand (section 3), or neither.
+- **D1: (a), the session forms only:** the three sign-in forms (`SignInSteps`, `OrganizationLinkForm`,
+  `AccountSignInForm`), Join and "Sign in and join" (`useLinkAction`'s `JoinForm`) and Set password (`ResetForm`). The two
+  forms that create an organization (`CreateOrganizationForm`, "New organization…") stay as they are, with
+  `router.push` and their toast; they go to `docs/ideas.md`.
+- **D2: neither:** no reproduction on `dev:pg` before the fix, by Claude or by hand. The tests show the conditions gone
+  (section 5).
