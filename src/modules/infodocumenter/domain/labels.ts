@@ -206,6 +206,17 @@ const EN = {
   lg_cube: "Dimensional mapping (logical → fact or dimension)",
   lg_src: "Foreign key between source tables",
   lg_dot: "Row fed (filled) or not (ring)",
+  // slice 34: the Markdown file (its line under the title, a figure's lists, a diagram too large for Mermaid)
+  md_note: "Diagrams are Mermaid code blocks: open the file in any Markdown tool that renders Mermaid (VS Code, Obsidian, GitLab, mermaid.live).",
+  md_frames: "Frames",
+  md_mappings: "Mappings",
+  md_cube: "Dimensional mappings",
+  md_reqs: "Requirements",
+  md_roles: "Roles",
+  md_entities: "Entities",
+  md_typeProblem: "type problem",
+  md_tooLarge: "This diagram is too large for Mermaid: attributes are left out.",
+  md_tooLargeAll: "This diagram is too large for Mermaid: it is left out; its entities are listed below.",
 } as const;
 
 export type LabelKey = keyof typeof EN;
@@ -405,6 +416,16 @@ const PL: Labels = {
   lg_cube: "Mapowanie wymiarowe (logiczny → fakt lub wymiar)",
   lg_src: "Klucz obcy między tabelami źródłowymi",
   lg_dot: "Wiersz zasilony (pełny) lub nie (pusty)",
+  md_note: "Diagramy są blokami kodu Mermaid: otwórz plik w dowolnym narzędziu Markdown, które wyświetla Mermaid (VS Code, Obsidian, GitLab, mermaid.live).",
+  md_frames: "Ramki",
+  md_mappings: "Mapowania",
+  md_cube: "Mapowania wymiarowe",
+  md_reqs: "Wymagania",
+  md_roles: "Role",
+  md_entities: "Encje",
+  md_typeProblem: "problem z typem",
+  md_tooLarge: "Ten diagram jest za duży dla Mermaid: atrybuty pominięto.",
+  md_tooLargeAll: "Ten diagram jest za duży dla Mermaid: pominięto go; jego encje są wymienione poniżej.",
 };
 
 /** German: for Łukasz's review (PRD section 7). */
@@ -602,6 +623,16 @@ const DE: Labels = {
   lg_cube: "Dimensionales Mapping (logisch → Fakt oder Dimension)",
   lg_src: "Fremdschlüssel zwischen Quelltabellen",
   lg_dot: "Zeile befüllt (voll) oder nicht (Ring)",
+  md_note: "Diagramme sind Mermaid-Codeblöcke: Öffnen Sie die Datei in einem Markdown-Werkzeug, das Mermaid darstellt (VS Code, Obsidian, GitLab, mermaid.live).",
+  md_frames: "Rahmen",
+  md_mappings: "Mappings",
+  md_cube: "Dimensionale Mappings",
+  md_reqs: "Anforderungen",
+  md_roles: "Rollen",
+  md_entities: "Entitäten",
+  md_typeProblem: "Typproblem",
+  md_tooLarge: "Dieses Diagramm ist für Mermaid zu groß: Attribute sind weggelassen.",
+  md_tooLargeAll: "Dieses Diagramm ist für Mermaid zu groß: Es ist weggelassen; seine Entitäten sind unten aufgeführt.",
 };
 
 export const LABELS: Readonly<Record<DocLanguage, Labels>> = { en: EN, pl: PL, de: DE };
