@@ -544,3 +544,110 @@ change in `figureDrawing` reaches every figure and the e2e runs are cheap in CI.
    step 3 (recommended: the slice's folder then lands in the recut part), or after the slice.
 9. **Azure DevOps** (S34-02, S34-03 name it): can you open the Markdown in an Azure DevOps wiki or repository in step 3?
    CC cannot; without it, Azure DevOps rests on Q4's documented syntax and version only (a known limitation).
+
+## 8. Łukasz's answers (21 November 2026)
+
+Łukasz decided D2, D3, D4, D5, F7, F9, F18 and the purpose; the technical calls (D1, the three tree additions, the
+parsers, F11, F13, F15, F16, F17, F23, F25 and the e2e recut) are CC's, quoted for his approval at the closing.
+
+- **The purpose (Łukasz):** the `.md` file is for exchange: he gives it to someone who renders it in their own tool (VS
+  Code, Obsidian, Typora, GitLab, Notion, a Confluence plugin, mermaid.live). **GitHub and Azure DevOps are not targets.**
+  The Mermaid must be as portable as possible: only syntax that parses on old and new versions. Item 9 (Azure DevOps)
+  falls away.
+- **The parsers:** `mermaid@9.4.3`, `mermaid@10.9.5` and `mermaid@12.3.0` as dev dependencies (npm aliases); every block
+  must parse on all three (replaces Q4's proposal of two).
+- **D4: yes**, with a threshold sensible for any tool, not GitHub's (step 2 proposes it).
+- **A line under the title**, in the document's language: "Diagrams are Mermaid code blocks: open the file in any
+  Markdown tool that renders Mermaid (VS Code, Obsidian, GitLab, mermaid.live)."
+- **S34-02 and S34-03:** "reads well and renders in common Mermaid tools; every block parses on old and new Mermaid", in
+  place of naming GitHub and Azure DevOps.
+- **D1: yes**, from the editor's tree at the click, no request; S34-01 reworded to match.
+- **D2:** a column at the table's end. **D3:** yes. **D5:** the count row unnamed, the PDF as it is.
+- **The three tree additions (F1, F2, F20): accepted**, with a test that the HTML is unchanged.
+- **F9: yes**; S34-01's "title" becomes "name". **F7, F11, F13, F15, F16, F17, F18** (a known limitation), **F23, F25:
+  accepted.**
+- **The e2e recut:** on its own `chore/` branch with its own full run, before step 3; CC says so before starting it.
+- **Step 3's acceptance:** VS Code's Markdown preview with a Mermaid extension, and mermaid.live (demo data only).
+
+## 9. Step 2: the renderer and its tests (21 November 2026)
+
+**What was built.**
+- **The tree's three additions** (F1, F2, F20), read by no HTML code:
+  - `DocFigure.content` (`FigureContent` in `src/domain/document/content.ts`) is filled by `figureDrawing` (`figureContent`
+    in `figure.ts`) from the same cards, frames and lines as the SVG. It holds:
+    - the cards with their shown names, roles and rows (none for a collapsed card or a collapsed frame's member);
+    - the frames;
+    - the relationships (a bundle as its single relationships) and the source keys with their columns;
+    - the mappings with status, transformation, rule and type problem;
+    - the module lines;
+    - the requirement cards with what their trace lines reach.
+  - A table's `long` and a row's `longCells` come from `longTextTable` (in "Under row" mode), from the dictionary's
+    definitions and from InfoCube's dimension definitions. InfoCube's words gain `definition` (Definition, Definicja,
+    Definition).
+  - `ModuleLineData.status` is optional and set by InfoCube's `cubeLines`.
+- **The renderer:**
+  - `src/modules/infodocumenter/domain/markdown.ts`: `documentMarkdown`, `markdownFileName`, `localTimestamp`,
+    `escapeText`, `codeSpan`.
+  - `mermaid.ts`: `erDiagram`, `figureDiagram`, `MERMAID_MAX_CHARS`, `attributeWord`, `typeWord`, `mermaidMarkers`.
+  - Both are pure and in InfoDocumenter's domain.
+  - New words in `labels.ts`: `md_note`, `md_frames`, `md_mappings`, `md_cube`, `md_reqs`, `md_roles`, `md_entities`,
+    `md_typeProblem`, `md_tooLarge` and `md_tooLargeAll`. The German ones are for Łukasz's review.
+- **The parsers:** dev dependencies `mermaid-v9` (9.4.3), `mermaid-v10` (10.9.5) and `mermaid-v12` (12.3.0), as npm
+  aliases. Each one's `parse` runs in Vitest's Node environment, with no DOM.
+- **The tests:**
+  - `tests/document-markdown.test.ts` (33 tests): the nine rules as checks over the text. They run on:
+    - the demo's three documents;
+    - every section type in each dictionary layout and long-text mode (9 documents);
+    - Polish and German;
+    - requirements as a table with traceability as a matrix;
+    - frames with Polish names, in English and Polish;
+    - the sample's stage 1 document;
+    - Performance test's 100 cards (D4).
+
+    Every block is parsed on all three versions, and a refused block proves the check can fail.
+  - `tests/document-markdown-html.test.ts`: the HTML, both the pages and the quick sheet, is equal with and without the
+    additions on 13 documents.
+  - `tests/contract/reads.test.ts`: the demo documents' Markdown from each adapter's snapshot is equal (F23; on Postgres in
+    the Schema workflow).
+  - The shared documents are in `tests/lib/markdown-documents.ts`.
+- **The PDF against `dev`'s own code:** a one-off run rendered the HTML of 14 documents, as pages and quick sheet, both
+  with `dev` at `76b4bfb` (a temporary worktree) and on this branch. All 28 SHA-256 values were equal.
+- **The output:** `docs/prd/slice-34-output.md`. It is the sample's "Retail Co – stage 1 documentation" on the demo data:
+  the sample's sections in its order, with Diagrams showing every canvas as on the canvas.
+
+**D4's threshold (proposal for Łukasz): 40,000 characters a block.**
+- Why that number: Mermaid's `maxTextSize` is 50,000 by default in every version. The tools that render Mermaid keep the
+  default, and above it a tool draws an error instead of the diagram. 40,000 leaves room for a tool that counts the
+  fence or the line ends.
+- Over 40,000, the block is written with headers only, and the line `md_tooLarge` stands under it. If even that is over,
+  there is no block: the line `md_tooLargeAll` and a list of the entities take its place.
+- Measured:
+  - every demo block is under 25,000 (the largest is PERF-2 with all rows, 24,589);
+  - Performance test's 100-card canvas is 79,396 with attributes and 4,390 with headers only, so it is written with
+    headers only.
+  - The demo's every-section document is 44 KB and takes 14 ms; Performance test's figures are 165 KB and take 24 ms.
+
+**Where the build differs from the plan.**
+1. **`d3` pinned for the parsers:** `overrides.d3 = "7.9.0"` in `package.json`.
+   - Why: Mermaid's newest `d3` (7.9.2) requires the newer patch versions of nine `d3-*` packages. React Flow uses those
+     packages, so npm moved the canvas's `d3-zoom`, `d3-selection`, `d3-drag` and others (e.g. 3.0.0 to 3.0.1).
+   - With the override, no package of the app's tree changes version. A script compared the lockfile's entries before and
+     after: 0 changed. `npm ci` passes.
+2. **A `"` in a Mermaid name** becomes `'`. The plan also wrote the real name in a `%%` comment; I left that out, because
+   the apostrophe reads the same.
+3. **The front matter** has a `title` when the cover's title differs from the document's name (MT1 names only
+   `document`).
+4. **The line on Mermaid** stands under the title in every document, as decided, including one without a figure.
+5. **`md_busUsers`** was not added (D5: the count row stays unnamed). The planned `md_srcKeys` is unused: source keys are
+   relationships inside the block, so no list is needed.
+6. **A dimensional mapping's chip** is written as the figure draws it: "· ƒ", and "· L" for a lookup.
+7. **Mermaid's markers in a table** are code with `|` escaped. Without the escape, a `|` inside code still splits a GFM
+   cell.
+8. **The output file** cannot be "the demo's 'Retail Co – stage 1 documentation'": the demo has no such document (its
+   three are the dictionary, S2T and Anna's). I built it from the sample's section list, with "Changes since …" left out
+   (baselines come later).
+9. **A type with a comma** (`decimal(18,2)`) is written as its name (`decimal`), the full type in the attribute's comment.
+   The same holds for `varchar(max)`: the length has to be digits.
+
+**Earlier tests changed:** none. The whole unit suite passes unchanged (2,468 tests), and the contract suite's local
+part passes (9 tests).
