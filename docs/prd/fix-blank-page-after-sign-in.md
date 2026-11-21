@@ -149,3 +149,29 @@ The existing specs that sign in this way keep passing unchanged (`signInWithPass
   `router.push` and their toast; they go to `docs/ideas.md`.
 - **D2: neither:** no reproduction on `dev:pg` before the fix, by Claude or by hand. The tests show the conditions gone
   (section 5).
+
+## 8. Step 2 (21 November 2026)
+
+**The fix:** `afterSessionChange(href)` (`src/ui/after-session-change.ts`, `window.location.assign`), called by
+`SignInSteps`, `OrganizationLinkForm`, `AccountSignInForm` (`src/app/sign-in/start-forms.tsx`) and `useLinkAction`
+(`src/app/_components/link-page.tsx`: Join, "Sign in and join", Set password). In `useLinkAction` the button stays
+disabled after a success until the next page (`leaving`), as it did while `router.push` ran inside the transition. The
+two forms that create an organization are unchanged (D1); the idea is in `docs/ideas.md`.
+
+**The tests, failing first on `dev`'s code** (commit `7309686`, tests only):
+- `e2e/fixes/session-change-full-load.spec.ts`: the single-file check, run 44877699955: 3 failed (each with the marker
+  still set, one RSC request to the landing and no document request). Locally the same.
+- `e2e/slice-29/fix-smoke-session-full-load.spec.ts` in the Schema workflow's smoke job, run 44877695763: the account
+  form and Join failed the same way; Set password did not run (the "writes" block is serial and needs Join's person),
+  so it was not shown failing on its own.
+
+**Earlier specs that changed** (not foreseen in section 5): after a full load the top bar is drawn by the server before
+the page's code runs, so a click right after it could go nowhere. S33-04 failed so (the workspace switcher opened no
+menu). The helpers that end with these forms now wait for the page to hydrate (`landed`, `e2e/session-full-load.ts`:
+the top bar and Back enabled, as slice 9's `hydrated`): slice 8's `signInWithPassword` and `joinByLink`, slice 29's
+`signIn`, and four places in `S33-smoke-people.spec.ts` that click or sign out right after Join, Set password or a
+sign-in. No assertion changed.
+
+**Seen on the laptop, not from this fix:** S0-10 (the dev server restarted, then the development list's sign-in) failed
+locally on this branch and on `dev`'s code alike (the bar never showed after the restart); `signInAsDevUser` is not
+touched here. The full run in CI decides.

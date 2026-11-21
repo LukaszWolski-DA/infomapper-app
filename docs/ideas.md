@@ -1127,9 +1127,12 @@ On Postgres the People tab still shows the "Organization access" box (the organi
 which only the local adapter's sign-in uses (D-58's note of slice 29). The idea: hide it online, or make its link the
 start page's. Outside slice 33.
 
-## A full page load after an action that changes the session (slice 33's acceptance)
+## A full page load after creating an organization (fix/blank-page-after-sign-in, D1)
 
-After signing in, joining by a link or setting a password, the form moves on with the router (`router.push`). On
-`dev:pg` the sign-in once stayed on a blank page until a reload (`known-limitations.md`). A full load
-(`window.location.assign`) after these three actions would start the next page from the new session's cookies with
-nothing of the old one. Where it goes (slice 33 or a `fix/` branch) is Łukasz's call.
+The sign-in forms, Join and Set password leave their page by a full page load since fix/blank-page-after-sign-in
+(`afterSessionChange`, `src/ui/after-session-change.ts`). The two forms that create an organization ("Create an
+organization" on the start page, "New organization…" in the organization menu) change the session cookie too and still
+move on with `router.push`, so the same race with the action's own refresh is possible there. A full load would lose
+their toast ("Organization created …"), which would then have to cross the load (for example in `sessionStorage`, read
+once by the next page). Local adapter only (no organization is created online); nothing was seen there. For Łukasz to
+decide.

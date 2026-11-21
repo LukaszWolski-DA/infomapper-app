@@ -2067,9 +2067,14 @@ keeps the other sessions on purpose (D4, as D-58's organization password).
 invitation's link there: the preview is for checking with the demo accounts. Production (slice D) has only the app's
 sign-in.
 
-### A blank page after signing in on `dev:pg` (seen once, cause open)
+### A blank page after signing in on `dev:pg` (seen once; fixed by fix/blank-page-after-sign-in)
 
 In slice 33's acceptance, signing in on `/sign-in` on `dev:pg` left the page blank on `/` with Next.js's development
-badge "Rendering" until a reload, although the server had answered the workspace's page twice without an error. The
-assumed cause is the form's soft navigation after an action that sets cookies racing Next.js's own refresh, made
-visible by `dev:pg`'s slow pages; not reproduced. Join and "Set password" navigate the same way. Ctrl+F5 helps.
+badge "Rendering" until a reload, while the server answered the workspace's page twice. Never reproduced (18 probes with
+slowed and failing requests, `docs/prd/fix-blank-page-after-sign-in.md`). What was found: the forms moved on with
+`router.push` right after an action that set the session's cookies; Next.js counts such an action as a revalidation and
+resolves it before its own refresh, so the push discarded that refresh and queued another, and a landing on `/` (the
+account form, Set password) asked for the workspace's page twice at once. Since the fix the three sign-in forms, Join and
+Set password leave by a full page load (`afterSessionChange`), so none of this happens; the two forms that create an
+organization still use the router (`docs/ideas.md`). A test that clicks right after one of these forms waits for the page
+to hydrate (`landed`, `e2e/session-full-load.ts`): the top bar is now drawn before the page's code runs.
