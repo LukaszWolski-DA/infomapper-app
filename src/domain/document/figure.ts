@@ -31,6 +31,7 @@ import type { RequirementIndex } from "@/domain/model/requirement-index";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type { CanvasItem, DocLanguage, MappingStatus, ModuleTable, WorkspaceModel } from "@/domain/types";
 import { statusShown } from "./blocks";
+import type { FigureContent } from "./content";
 import type { SectionScope } from "./sections";
 
 /** "Rows as on canvas", "Keys only", "All rows", "Headers only" (the prototype's `rows`: canvas, keys, all, none). */
@@ -127,6 +128,8 @@ export type FigureDrawing =
       readonly faces: readonly FigureFace[];
       /** How many cards are drawn (blocks and requirement cards not counted). */
       readonly cards: number;
+      /** Slice 34 (F1): what it drew, as plain data (a text renderer's Mermaid block and list). */
+      readonly content: FigureContent;
     };
 
 /** The prototype's figure palette (`PAL`): colour, and black and white. */
@@ -411,6 +414,7 @@ export function figureDrawing(input: FigureInput, spec: FigureSpec): FigureDrawi
   }
   const box = figureBoxOf(rects);
   if (!box) return { kind: "empty" };
+  const content = figureContent({ model, cards, frames, kinds, status, all, moduleLines, reqCards, requirements: input.requirements, hiddenIn });
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box.x} ${box.y} ${box.w} ${box.h}" width="${box.w}" height="${box.h}">` +
     `<style>${figureCss(P)}</style>` +
@@ -419,7 +423,89 @@ export function figureDrawing(input: FigureInput, spec: FigureSpec): FigureDrawi
     lineSvg +
     cardSvg +
     `</svg>`;
-  return { kind: "drawn", svg, box, rects, faces: FIGURE_FACES.filter((f) => faces.has(f)), cards: drawn.length };
+  return { kind: "drawn", svg, box, rects, faces: FIGURE_FACES.filter((f) => faces.has(f)), cards: drawn.length, content };
+}
+
+/**
+ * What a figure drew (slice 34, F1), from the same cards, frames and lines as its SVG: the drawn cards with their shown
+ * rows, a collapsed frame's members without rows, the frames holding a drawn card, the lines of the kinds drawn (a
+ * bundle as its single lines), the requirement cards with what their trace lines reach. Names as the figure shows them.
+ */
+function figureContent(o: {
+  model: WorkspaceModel;
+  cards: readonly CardData[];
+  frames: readonly FrameData[];
+  kinds: FigureLines;
+  status: boolean;
+  all: CanvasLines;
+  moduleLines: readonly ModuleLineData[];
+  reqCards: readonly RequirementCardData[];
+  requirements: RequirementIndex;
+  hiddenIn: ReadonlyMap<string, string>;
+}): FigureContent {
+  const { model, cards } = o;
+  const cardById = new Map(cards.map((c) => [c.id, c]));
+  const rowName = new Map<string, string>();
+  for (const c of cards) for (const r of c.rows) rowName.set(`${c.id}|${r.id}`, `${shownText(c)}.${shownText(r)}`);
+  const nameOf = (cardId: string, rowId: string) => rowName.get(`${cardId}|${rowId}`) ?? "?";
+  const contentCards = cards.map((c) => {
+    const inBlock = o.hiddenIn.has(c.id);
+    const rows = inBlock || c.collapsed ? [] : visibleRows(c).map((r) => ({ name: shownText(r), type: r.type, pk: r.pk, fk: r.fk, pii: r.pii, bk: r.bk, calc: !!r.calc }));
+    return { id: c.id, kind: c.kind === "src" ? ("src" as const) : ("ent" as const), name: shownText(c), ...(c.role?.text ? { role: c.role.text } : {}), rows, inBlock };
+  });
+  const frames = o.frames.map((f) => ({ name: f.name, kind: f.kind, collapsed: f.collapsed, members: cards.filter((c) => c.frameId === f.id).map((c) => c.id) }));
+  const relationships = o.kinds.rel
+    ? o.all.relationships.map((r) => ({ from: r.fromCardId, to: r.toCardId, fromMin: r.fromMin, fromMany: r.fromMax === "n", toMin: r.toMin, toMany: r.toMax === "n", label: r.label }))
+    : [];
+  const pairs = new Map<string, { from: string; to: string }[]>();
+  for (const p of [...model.sourceRelationshipColumns].sort((a, b) => a.sort_order - b.sort_order)) {
+    if (p.deleted_at !== null) continue;
+    pairs.set(p.source_relationship_id, [...(pairs.get(p.source_relationship_id) ?? []), { from: p.from_column_id, to: p.to_column_id }]);
+  }
+  const column = new Map(model.sourceColumns.map((c) => [c.id, c.name]));
+  const sourceKeys = o.kinds.src
+    ? (o.all.sources ?? []).map((s) => ({
+        from: s.fromCardId,
+        to: s.toCardId,
+        columns: (pairs.get(s.id) ?? []).map((p) => ({ from: column.get(p.from) ?? "?", to: column.get(p.to) ?? "?" })),
+      }))
+    : [];
+  const mappingRow = new Map(model.mappings.map((m) => [m.id, m]));
+  const mappings = o.kinds.map
+    ? o.all.mappings.map((m) => ({
+        inputs: m.inputs.map((i) => nameOf(i.cardId, i.columnId)),
+        target: nameOf(m.cardId, m.attributeId),
+        status: o.status ? m.status : null,
+        transform: m.kind === "transform",
+        rule: mappingRow.get(m.id)?.rule_expression?.trim() || null,
+        warn: o.status && m.warn,
+      }))
+    : [];
+  const moduleLines = o.moduleLines.map((l) => ({
+    inputs: l.inputs.map((i) => nameOf(i.cardId, i.rowId)),
+    target: nameOf(l.target.cardId, l.target.rowId),
+    status: o.status ? (l.status ?? null) : null,
+    ...(l.chip ? { chip: l.chip } : {}),
+  }));
+  // a requirement card's traces: the elements its trace lines reach on this figure, by their shown names
+  const cardOf = new Map(cards.map((c) => [`${c.kind}:${c.targetId}`, c.id]));
+  const entityOf = new Map(model.attributes.map((a) => [a.id, a.entity_id]));
+  const tableOf = new Map(model.sourceColumns.map((c) => [c.id, c.source_table_id]));
+  const mapped = new Map(mappings.map((m, i) => [o.all.mappings[i]!.id, `${m.inputs.join(" + ")} → ${m.target}`]));
+  const traces = buildTraces(o.reqCards, o.requirements.linksOf, {
+    cardOf: (kind, id) => cardOf.get(`${kind}:${id}`),
+    entityOf: (id) => entityOf.get(id),
+    tableOf: (id) => tableOf.get(id),
+    hasMapping: (id) => mapped.has(id),
+  });
+  const requirements = o.reqCards.map((r) => ({
+    key: r.key,
+    name: r.name,
+    traces: traces
+      .filter((t) => t.reqCardId === r.id)
+      .map((t) => (t.target.t === "card" ? (cardById.get(t.target.cardId) ? shownText(cardById.get(t.target.cardId)!) : "?") : t.target.t === "row" ? nameOf(t.target.cardId, t.target.rowId) : (mapped.get(t.target.mappingId) ?? "?"))),
+  }));
+  return { cards: contentCards, frames, relationships, sourceKeys, mappings, moduleLines, requirements };
 }
 
 /** The figure's own styles: the faces by name (the page embeds the files, Q2) and the lines' looks (the prototype's). */

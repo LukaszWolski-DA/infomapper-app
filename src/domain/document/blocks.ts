@@ -46,28 +46,42 @@ export interface LongColumn {
  * A table whose long columns go where `mode` says (the prototype's `ltable`). Under each row: the row keeps the short
  * columns and each long text gets a line under it, labelled when there are several long columns; after the table: the
  * row's last short cell carries "→ 1, 2" and the texts follow as a numbered list, each with its column's label; as a
- * column: one plain table. An empty long text is left out. No rows: `none`.
+ * column: one plain table. An empty long text is left out. No rows: `none`. Slice 34: `aligned` gives a row its cells with
+ * every value in its own column where its `cells` differ (by the row's index; `DocRow.alignedCells`, cut as `cells` is).
  */
-export function longTextTable(columns: readonly LongColumn[], rows: readonly (readonly DocRuns[])[], mode: LongTexts, none: string, style?: "narrow" | "fixed"): DocNode[] {
+export function longTextTable(
+  columns: readonly LongColumn[],
+  rows: readonly (readonly DocRuns[])[],
+  mode: LongTexts,
+  none: string,
+  style?: "narrow" | "fixed",
+  aligned?: ReadonlyMap<number, readonly DocRuns[]>,
+): DocNode[] {
   if (!rows.length) return [{ kind: "paragraph", runs: [muted(none)] }];
   const long = columns.map((c, i) => (c.long ? i : -1)).filter((i) => i >= 0);
   const head = (idx: readonly number[]): DocColumn[] => idx.map((i) => ({ key: columns[i]!.key, label: columns[i]!.label }));
-  if (mode === "column" || !long.length) return [{ kind: "table", columns: head(columns.map((_, i) => i)), rows: rows.map((cells) => ({ cells })), ...(style ? { style } : {}) }];
+  if (mode === "column" || !long.length) return [{ kind: "table", columns: head(columns.map((_, i) => i)), rows: rows.map((cells, r) => ({ cells, ...(aligned?.has(r) ? { alignedCells: aligned.get(r)! } : {}) })), ...(style ? { style } : {}) }];
   const short = columns.map((_, i) => i).filter((i) => !long.includes(i));
   const labelled = long.length > 1;
   const notes: { label: DocRuns; runs: DocRuns }[] = [];
-  const body = rows.map((cells): DocRow => {
+  const body = rows.map((cells, r): DocRow => {
+    const al = aligned?.get(r);
     const texts = long.map((i) => ({ label: columns[i]!.label, runs: cells[i] ?? EMPTY })).filter((x) => hasText(x.runs));
     if (mode === "after") {
       const refs = texts.map((x) => notes.push({ label: [strong(`${x.label}:`)], runs: x.runs }));
       const out = short.map((i) => cells[i] ?? EMPTY);
-      if (refs.length && out.length) out[out.length - 1] = [...out[out.length - 1]!, text(" "), { text: `→ ${refs.join(", ")}`, ref: true }];
-      return { cells: out };
+      const ref = (cs: DocRuns[]) => {
+        if (refs.length && cs.length) cs[cs.length - 1] = [...cs[cs.length - 1]!, text(" "), { text: `→ ${refs.join(", ")}`, ref: true }];
+        return cs;
+      };
+      return { cells: ref(out), ...(al ? { alignedCells: ref(short.map((i) => al[i] ?? EMPTY)) } : {}) };
     }
     const below = texts.map((x) => (labelled ? [strong(`${x.label}: `), ...x.runs] : x.runs));
-    return { cells: short.map((i) => cells[i] ?? EMPTY), ...(below.length ? { below } : {}) };
+    // slice 34 (F2): the long texts by their columns too, unlabelled, for a renderer that keeps the row whole
+    const longCells = long.map((i) => (hasText(cells[i]) ? cells[i]! : EMPTY));
+    return { cells: short.map((i) => cells[i] ?? EMPTY), ...(below.length ? { below } : {}), longCells, ...(al ? { alignedCells: short.map((i) => al[i] ?? EMPTY) } : {}) };
   });
-  const out: DocNode[] = [{ kind: "table", columns: head(short), rows: body, ...(style ? { style } : {}) }];
+  const out: DocNode[] = [{ kind: "table", columns: head(short), rows: body, ...(style ? { style } : {}), ...(mode === "row" ? { long: head(long) } : {}) }];
   if (notes.length) out.push({ kind: "list", ordered: true, items: notes });
   return out;
 }

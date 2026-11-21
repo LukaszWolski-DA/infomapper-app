@@ -46,6 +46,7 @@ export function cubeLines(
       inputs,
       target: { rowId: m.attribute_id, cardId: targetCard },
       cls: `cmap ${m.status}`,
+      status: m.status,
       colour: colour.get(conceptOf.get(entityId) ?? "") ?? NO_CONCEPT_COLOR,
       endMark: "diamond",
       // slice 18: "L" on a lookup (prototype l. 2245); its relationship is in the panel, the line has no title (Q-C)

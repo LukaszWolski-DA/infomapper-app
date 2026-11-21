@@ -490,8 +490,8 @@ once in a dimension's delete preview; paste within one level only (the prototype
 
 ## InfoDocumenter
 
-The prototype is slice 27's (`docs/prd/slice-27-infodocumenter-figures.md`, section 4; 955,142 bytes). What it has that
-the app does not:
+The prototype is slice 34's (`docs/prd/slice-34-markdown.md`; 980,246 bytes: slice 27's with the Markdown dialog). What
+it has that the app does not:
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
@@ -500,7 +500,6 @@ the app does not:
 | Documents from a baseline | a document's source a baseline; "Changes since a baseline"; the sign-off preset | the Documentation tab, the Baselines tab | idea (baselines' slice) |
 | Settings for links and guests | "Modelers may share links", "Guests may generate versions, print and share links" | InfoDocumenter's box | idea (slice D) |
 | Light markup in Text | "- " lists, **bold**, _italic_ | the Text section | idea (D-81: plain text for now) |
-| Markdown export | | – | idea (slice E) |
 
 **Present (slices 25 and 26, D-80, D-81):** InfoDocumenter's box in Settings; the Documentation tab with New document and
 its three presets (the prototype's without figures and baselines); the editor (the sections with add, remove, move, the
@@ -558,6 +557,15 @@ side panels hidden and shown, with the canvas's limits and defaults, and "Fit wi
   `visibility`); "Fit width" scales the laid-out pages (the prototype draws the preview again 200 ms after a change);
   the toggles' names are their titles, as the canvas's (the prototype: "Sections panel", "Options panel"); the right
   toggle is after "Print / PDF" (no "Generate version" yet).
+- **The Markdown (slice 34, D-86; present):** "Markdown" between "Print / PDF" and the save pair, enabled as Print /
+  PDF (the prototype's `can.exp()` and its title: the app has no export right, D-80); the app's dialog component (the
+  prototype: a native `<dialog>`); Copy toasts "Markdown copied." only once the browser took the text, else "The browser
+  did not allow copying. Select the text and copy it." (the prototype toasts either way); the text is built from the
+  document's content tree (the prototype walks the rendered HTML), so each figure is its own `erDiagram` block in syntax
+  Mermaid 9.4.3 to 12.3.0 parse, with its lists under it (the prototype draws the model's first 12 logical entities in
+  every block); the front matter's `language` is a code and `generated` has its offset (the prototype: "English",
+  "2026-11-21 08:05"); the file name transliterates Polish and German letters (the prototype turns "Słownik danych"
+  into `s-ownik-danych.md`); the nine rules of Łukasz's review of the prototype's sample hold (the sample breaks them).
 - **The editor's right panel (slice 28, D-83; the review's findings 1 to 12; the prototype is not changed for them):**
   every field, select, text area and group is named from its label (the prototype's labels are not tied to their
   controls); the Document panel folds Scope, Style, Header and footer, Cover and Sharing, in that order, with Header and

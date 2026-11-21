@@ -1784,7 +1784,8 @@ Slice 26's specs joined part 8 (the recut rule). Its heap peaked at 2,088 MB in 
 The German labels of documents (the prototype's `LBL`, `src/modules/infodocumenter/domain/labels.ts`) and InfoCube's
 German words for documents (fact types, additivity, histories, kinds, the role's long text, the Bus matrix,
 `src/modules/infocube/domain/document-words.ts`) are a first draft; Łukasz reviews them. Slice 26's new German words are
-listed in `docs/prd/slice-26-acceptance.md` (step 3). Polish and English are the prototype's, with the new words (the
+listed in `docs/prd/slice-26-acceptance.md` (step 3); slice 34's (the Markdown's `md_…` words and InfoCube's
+"Definition") in `docs/prd/slice-34-acceptance.md` (step 2). Polish and English are the prototype's, with the new words (the
 requirements' kinds, statuses and priorities, the readiness note) listed there too.
 
 ### The demo's plain seed has almost no attribute definitions
@@ -1911,6 +1912,27 @@ pulls just before, can hold one as its local port. The job now reserves 54320-54
 (`net.ipv4.ip_local_reserved_ports`) and prints the range and the reservation. The cause is an assumption: if the start
 fails again, the step "On failure, show the port range and what holds the stack's ports" lists the sockets on 5432x.
 The `migrations` job's service uses 5432, below the range, and is unchanged.
+
+### A document as Markdown: what Mermaid cannot show (slice 34, D-86)
+
+The Markdown writes each figure as one Mermaid `erDiagram` block in syntax that Mermaid 9.4.3, 10.9.5 and 12.3.0 all
+parse (the file is for exchange, read in any tool). That syntax sets the limits:
+- **Crow's foot only:** a document in UML notation still gets crow's foot markers in its blocks; the PDF's "1..*" labels
+  have no `erDiagram` form (F18). The cardinality is in the table of relationships as the PDF writes it.
+- **Mappings, dimensional mappings, frames, roles and requirement cards are lists under the block,** not lines or boxes in
+  it: an `erDiagram` has no mapping line, no group and no note. Source keys are relationships between the source tables.
+- **Names and types:** an attribute's type and name are one word each in Mermaid; any other character becomes `_` and the
+  real value stands in the attribute's comment (`decimal(18,2)` is written `decimal`, `varchar(max)` `varchar`). A `"` in
+  an entity's name or a label is written `'`.
+- **Large figures:** a block over 40,000 characters (Mermaid's default `maxTextSize` is 50,000, which the tools that render
+  Mermaid keep) is written with the entities' headers only, and the line "This diagram is too large for Mermaid:
+  attributes are left out." under it; still over, the block gives way to a line and the list of its entities. A whole
+  canvas of "Performance test" (100 cards, 79,396 characters with attributes) is written with headers only.
+- **The contents' links** use GitHub's rule for heading anchors (lower case, spaces as hyphens, punctuation dropped, a
+  repeated heading `-1`, `-2`); a tool with another rule opens the file's top for a link that misses (F12).
+- **The text is the editor's at the click:** the model as read when the editor opened, as the PDF; a change made elsewhere
+  since then shows after the editor is opened again.
+- **No Markdown of a version or a baseline yet** (baselines come later), and no set of files.
 
 ## The writes on Postgres (slice 30)
 

@@ -88,6 +88,8 @@ export interface ModuleLineData {
   endMark: "diamond";
   /** A chip on the first input's path (`ƒ`); absent: none. */
   chip?: string;
+  /** Slice 34 (F20): the object's status, for a text that names it (a figure's list); absent: none. Not drawn. */
+  status?: "draft" | "review" | "approved";
 }
 
 export interface CanvasLines {

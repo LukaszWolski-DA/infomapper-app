@@ -176,8 +176,10 @@ export function buildDictionary(input: SectionBuildInput): DocNode[] {
       columns: head,
       rows: attributes.map((a) => {
         const below = definitions ? definitionRuns(a) : EMPTY;
-        return { cells: columns.map((c) => dictionaryCell(state, a, c, scope, t)), ...(below.length ? { below: [below] } : {}) };
+        return { cells: columns.map((c) => dictionaryCell(state, a, c, scope, t)), ...(below.length ? { below: [below] } : {}), ...(definitions ? { longCells: [below] } : {}) };
       }),
+      // slice 34 (F2): the definition under each row is a long column a renderer may draw at the table's end
+      ...(definitions ? { long: [{ key: "definition", label: t("def") }] } : {}),
     };
   };
 
@@ -285,8 +287,15 @@ export function buildS2T({ state, scope, options, language }: SectionBuildInput)
   // the rule and the note are the long texts (D1): under the row, after the table numbered, or a column
   const head = o.columns.map((c) => ({ key: c, label: t(S2T_LABEL[c]), long: S2T_BELOW.has(c) }));
   const rowOf = (m: Mapping): DocRuns[] => o.columns.map((c) => s2tCell(state, m, c, t));
-  const table = (rows: readonly DocRuns[][]): DocNode[] => longTextTable(head, rows, o.longTexts, t("none"));
+  const table = (rows: readonly DocRuns[][], aligned?: ReadonlyMap<number, DocRuns[]>): DocNode[] => longTextTable(head, rows, o.longTexts, t("none"), undefined, aligned);
   const firstShort = o.columns.findIndex((c) => !S2T_BELOW.has(c) && c !== "target");
+  // slice 34: where "Not mapped" stands with every value in its own column: Source column, else the first other short
+  // column; with neither, after the target's type
+  const home = o.columns.includes("sourceColumn") ? o.columns.indexOf("sourceColumn") : o.columns.findIndex((c) => !S2T_BELOW.has(c) && c !== "target" && c !== "targetType");
+  const unmappedAligned = (a: Attribute): DocRuns[] =>
+    o.columns.map((c, i) =>
+      c === "target" ? [mono(a.name)] : i === home ? [warn(t("notMapped"))] : c === "targetType" ? (home < 0 ? [...typeRuns(a), text(" · "), warn(t("notMapped"))] : typeRuns(a)) : EMPTY,
+    );
   const entities = [...logicalEntities(state, scope).values()].flat();
   const shownOf = (a: Attribute) => (state.lookup.mappingsOfAttribute.get(a.id) ?? []).filter((m) => statusShown(scope.mappings, m.status));
   const out: DocNode[] = [];
@@ -306,14 +315,16 @@ export function buildS2T({ state, scope, options, language }: SectionBuildInput)
   } else {
     for (const e of entities) {
       const rows: DocRuns[][] = [];
+      const aligned = new Map<number, DocRuns[]>();
       for (const a of attributesOf(state, e.id)) {
         const ms = shownOf(a);
         rows.push(...ms.map(rowOf));
         if (!ms.length && o.unmapped) {
+          aligned.set(rows.length, unmappedAligned(a));
           rows.push(o.columns.map((c, i) => (c === "target" ? [mono(a.name)] : i === firstShort ? [warn(t("notMapped"))] : EMPTY)));
         }
       }
-      if (rows.length) out.push({ kind: "heading", level: 2, text: e.name }, ...table(rows));
+      if (rows.length) out.push({ kind: "heading", level: 2, text: e.name }, ...table(rows, aligned));
     }
   }
   return out.length ? out : [NONE(t)];

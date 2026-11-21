@@ -202,9 +202,11 @@ export function buildCubeSection({ state, scope, options, language, figures }: S
         return {
           cells: [[strong(ix.nameOf(k.dimensionId))], k.role ? [text(k.role)] : EMPTY, k.key ? [mono(k.key.name)] : [text("–")], noMatch(k.dimensionId)],
           ...(definition ? { below: [[text(definition)]] } : {}),
+          ...(o.dimensionDefinitions ? { longCells: [definition ? [text(definition)] : EMPTY] } : {}),
         };
       });
-      out.push({ kind: "heading", level: 4, text: w.dims }, table([w.dimension, w.role, w.key, w.noMatch], body));
+      const dims = table([w.dimension, w.role, w.key, w.noMatch], body);
+      out.push({ kind: "heading", level: 4, text: w.dims }, o.dimensionDefinitions && dims.kind === "table" ? { ...dims, long: [{ key: "definition", label: w.definition }] } : dims);
     }
     if (o.measures) {
       const measures = ix.attributesOf(e.id).filter((a) => ix.measureOf(a.id));
