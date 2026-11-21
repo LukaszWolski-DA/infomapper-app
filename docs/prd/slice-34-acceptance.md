@@ -801,3 +801,25 @@ slice 34's helpers; the screenshot command), `docs/ideas.md` (slice E done and w
 slice; S6B-04's flake for a `fix/` branch; the PDF's "Not mapped" for Łukasz), `docs/known-limitations.md` (what Mermaid
 cannot show; the German words with the earlier review), `docs/inventory-prototype-vs-app.md` (the prototype is slice
 34's; the Markdown present with its differences), README.
+
+**Checks and the full run.**
+- PR #89: CI's `check`, and Schema's `migrations` and `smoke`, pass on `fe72ec0`.
+- Full run [44915828042](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/44915828042) on `fe72ec0`:
+  882 passed, 0 failed, 0 flaky, 16 skipped; 17.3 minutes wall-clock (Playwright's 15.6); no server restarted.
+
+  | Part | Time | Heap peak |
+  | --- | --- | --- |
+  | 1 | 707 s | 1,252 MB |
+  | 2 | 663 s | 1,112 MB |
+  | 3 | 457 s | 1,379 MB |
+  | 4 | 461 s | 1,362 MB |
+  | 5 | 500 s | 1,902 MB |
+  | 6 | 572 s | 1,937 MB |
+  | 7 | 609 s | 1,289 MB |
+  | 8 | 624 s | 1,129 MB |
+  | 9 | 930 s | 1,601 MB |
+
+  Parts 5 and 6 peaked near 1.9 GB (1,329 and 1,883 MB in step 3's run, on slices this one does not touch): peaks with
+  uncollected garbage, close to the recut rule's "about 2 GB". The recut after this slice should look at them as well as
+  part 9's time.
+- The commit after the run changes only this file (`git diff --stat fe72ec0..HEAD`), so the run counts for it.
