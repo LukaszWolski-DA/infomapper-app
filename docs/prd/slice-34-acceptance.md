@@ -651,3 +651,26 @@ parsers, F11, F13, F15, F16, F17, F23, F25 and the e2e recut) are CC's, quoted f
 
 **Earlier tests changed:** none. The whole unit suite passes unchanged (2,468 tests), and the contract suite's local
 part passes (9 tests).
+
+**Checks and the full run.**
+- PR #89 (draft, into `dev`): CI's `check`, and Schema's `migrations` and `smoke`, pass on `eb227cc`. The contract suite
+  ran all 12 of `reads.test.ts`'s tests on Postgres, so both adapters give the same Markdown.
+- Full run [44897852644](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/44897852644) on `eb227cc`:
+  - 870 passed, 0 failed, 0 flaky, 16 skipped;
+  - 19 minutes wall-clock (Playwright's 17.1);
+  - no server restarted.
+- Parts' times and heap peaks:
+
+  | Part | Time | Heap peak |
+  | --- | --- | --- |
+  | 1 | 583 s | 1,207 MB |
+  | 2 | 485 s | 1,530 MB |
+  | 3 | 415 s | 1,488 MB |
+  | 4 | 390 s | 1,433 MB |
+  | 5 | 729 s | 1,396 MB |
+  | 6 | 818 s | 1,326 MB |
+  | 7 | 389 s | 1,483 MB |
+  | 8 | 644 s | 1,031 MB |
+  | 9 | **999 s** | **1,642 MB** |
+
+  Part 9 is again the longest, by 181 s over part 6, which supports the recut before step 3.
