@@ -10,6 +10,7 @@ import { useToast } from "@/ui/components/toast";
 import { organizationsForEmailAction, signInWithAccountAction, signInWithPasswordAction, type SignInOrganization } from "../_actions/session";
 import { createOrganizationAction, previewCreateOrganizationAction, type CreateOrganizationFormInput } from "../_actions/organization";
 import type { ActionResult } from "../_lib/run-command";
+import { afterSessionChange } from "@/ui/after-session-change";
 import { DOC_LANGUAGE_LABEL, DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
 
 const input = "h-[30px] w-full rounded-md border border-im-line bg-im-surface px-2 text-[13px]";
@@ -59,7 +60,6 @@ function useStartAction() {
 
 /** "Sign in": e-mail, then the person's organizations (skipped when there is one), then that organization's password. */
 export function SignInSteps({ next }: { next: string | null }) {
-  const router = useRouter();
   const { run, pending } = useStartAction();
   const [email, setEmail] = useState("");
   const [organizations, setOrganizations] = useState<SignInOrganization[] | null>(null);
@@ -82,7 +82,7 @@ export function SignInSteps({ next }: { next: string | null }) {
     setMessage(null);
     const r = await run(() => signInWithPasswordAction({ email, organizationId: chosen.id, password, next }));
     if (!r.ok) return setMessage(r.message);
-    router.push(r.value.href);
+    afterSessionChange(r.value.href);
   };
 
   const back = () => {
@@ -160,7 +160,6 @@ export function SignInSteps({ next }: { next: string | null }) {
  * name, the e-mail address and the password in one step.
  */
 export function OrganizationLinkForm({ organization, email: initialEmail, next }: { organization: { id: string; name: string }; email: string; next: string | null }) {
-  const router = useRouter();
   const { run, pending } = useStartAction();
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
@@ -171,7 +170,7 @@ export function OrganizationLinkForm({ organization, email: initialEmail, next }
     setMessage(null);
     const r = await run(() => signInWithPasswordAction({ email, organizationId: organization.id, password, next }));
     if (!r.ok) return setMessage(r.message);
-    router.push(r.value.href);
+    afterSessionChange(r.value.href);
   };
 
   return (
@@ -304,7 +303,6 @@ export function CreateOrganizationForm() {
  * step, no "Create an organization" and no test users: organizations and accounts are made by script (DB10).
  */
 export function AccountSignInForm({ next }: { next: string | null }) {
-  const router = useRouter();
   const { run, pending } = useStartAction();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -315,7 +313,7 @@ export function AccountSignInForm({ next }: { next: string | null }) {
     setMessage(null);
     const r = await run(() => signInWithAccountAction({ email, password, next }));
     if (!r.ok) return setMessage(r.message);
-    router.push(r.value.href);
+    afterSessionChange(r.value.href);
   };
 
   return (

@@ -7,6 +7,7 @@
 // infomapper-dev, they are skipped. They change only the passwords of the people they invite (made-up addresses, a new
 // one each run), never a demo account's; never Łukasz's own model.
 import { expect, test, type Page } from "@playwright/test";
+import { landed } from "../session-full-load";
 import { fillSignIn, PEOPLE, query, signIn, workspaceId } from "./helpers";
 
 const LOCAL = ["localhost", "127.0.0.1", "::1", "[::1]"];
@@ -81,6 +82,7 @@ test("S33-02 online: a new person joins with a password, lands signed in, and si
   await them.getByTestId("button-join").click();
   await expect(them).toHaveURL(new RegExp(`/w/${ws}$`));
   await expect(them.getByTestId("indicator-user-role")).toHaveText("Reviewer");
+  await landed(them);
   // the account is linked to its person
   const [row] = await query<{ linked: boolean }>("select auth_user_id is not null as linked from app_user where email = $1", [NEWCOMER]);
   expect(row?.linked).toBe(true);
@@ -99,6 +101,7 @@ test("S33-03 online: Change password… — a wrong current password changes not
   const them = await context.newPage();
   await fillSignIn(them, NEWCOMER, FIRST);
   await expect(them).not.toHaveURL(/\/sign-in/);
+  await landed(them);
   await them.getByTestId("indicator-user").click();
   await them.getByTestId("button-change-password").click();
   const dialog = them.getByTestId("dialog-change-password");
@@ -145,7 +148,7 @@ test("S33-03 online: a reset link from an Owner; the person sets a new password 
   await them.getByTestId("input-reset-password-again").fill(THIRD);
   await them.getByTestId("button-set-password").click();
   await expect(them).not.toHaveURL(/\/(reset|sign-in)/);
-  await expect(them.getByTestId("bar-top")).toBeVisible();
+  await landed(them);
   await them.goto(link);
   await expect(them.getByTestId("text-link-gone")).toContainText(RESET_GONE);
   await signOut(them);
@@ -198,6 +201,7 @@ test("S33-02 online: an existing account signs in and joins another workspace; a
   await them.getByTestId("button-join").click();
   await expect(them).toHaveURL(new RegExp(`/w/${second}$`));
   await expect(them.getByTestId("indicator-user-role")).toHaveText("Reader");
+  await landed(them);
   await them.getByTestId("switcher-workspace").click();
   await expect(them.getByTestId("menu-item-workspace")).toHaveCount(2);
   await context.close();

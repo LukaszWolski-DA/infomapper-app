@@ -4,6 +4,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Client } from "pg";
 import { pgClientConfig } from "../../src/data/postgres/config";
+import { landed } from "../session-full-load";
 
 export const PEOPLE = {
   lukasz: "lukasz@infomate.pl",
@@ -65,4 +66,5 @@ export async function fillSignIn(page: Page, email: string, password: string = d
 export async function signIn(page: Page, email: string) {
   await fillSignIn(page, email);
   await expect(page).not.toHaveURL(/\/sign-in/);
+  await landed(page);
 }
