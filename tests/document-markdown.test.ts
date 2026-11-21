@@ -283,6 +283,38 @@ describe("the text itself", () => {
     expect(after).toMatch(/^1\. \*\*(Rule|Note):\*\* /m);
   });
 
+  // Łukasz's acceptance of step 3: in Source-to-target an unmapped attribute wrote "Not mapped" into "Target type", where
+  // the PDF's tree puts it; the Markdown keeps every value in its own column
+  it("keeps every value in its own column: an unmapped attribute's target type, Not mapped under Source column (S2T)", () => {
+    const s2tTables = (md: string, language: "en" | "pl" | "de" = "en") =>
+      tablesOf(md).filter((t) => t[0]!.includes(label(language, "target")) && t[0]!.includes(label(language, "ttype")));
+    const notMapped = (language: "en" | "pl" | "de") => label(language, "notMapped");
+    let unmappedRows = 0;
+    for (const c of cases) {
+      const language = c.tree.language as "en" | "pl" | "de";
+      for (const t of s2tTables(c.md, language)) {
+        const type = t[0]!.indexOf(label(language, "ttype"));
+        for (const row of t.slice(2)) {
+          expect(row[type], `${c.name}: ${row.join(" | ")}`).not.toBe(notMapped(language));
+          if (row.includes(notMapped(language))) unmappedRows++;
+        }
+      }
+    }
+    expect(unmappedRows).toBeGreaterThan(0);
+
+    // the demo's Customer.segment_code: its type, then "Not mapped" under Source column
+    const row = (md: string, name: string) => s2tTables(md).flatMap((t) => t.slice(2).map((r) => Object.fromEntries(t[0]!.map((h, i) => [h, r[i]])))).find((r) => r.Target === `\`${name}\``)!;
+    expect(row(every, "segment_code")).toMatchObject({ Target: "`segment_code`", "Target type": "`string(3)`", "Source column": "Not mapped" });
+
+    // without Source column: the first other short column; with only the target's two: after the type
+    const without = (columns: string[]) =>
+      documentMarkdown({ tree: treeOf(documentOf([{ type: "s2t", options: { columns, unmapped: true } }]), demo), name: "S2T", generated: GENERATED });
+    expect(row(without(["target", "targetType", "system", "status"]), "segment_code")).toMatchObject({ "Target type": "`string(3)`", System: "Not mapped", Status: "" });
+    expect(row(without(["target", "targetType"]), "segment_code")).toMatchObject({ "Target type": "`string(3)` · Not mapped" });
+    // an entity with no mapping keeps its Source column (a column stays when any row fills it)
+    expect(without(["target", "targetType", "sourceColumn"])).toMatch(/\| Target \| Target type \| Source column \|\n\| --- \| --- \| --- \|\n\| `[a-z_]+` \| `[^`]+` \| Not mapped \|/);
+  });
+
   it("writes icons as text: markers and dots; drops a column of lines (rule 4)", () => {
     expect(every).toContain("| `\\|\\|` / `\\|\\|` | Exactly one |");
     expect(every).toContain("| ● ○ |");

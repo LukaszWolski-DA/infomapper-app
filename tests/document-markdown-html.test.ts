@@ -23,7 +23,10 @@ function withoutAdditions(tree: DocumentTree): DocumentTree {
       if (n.kind === "table") {
         const table = { ...n, rows: n.rows.map((r) => ({ ...r })) };
         delete table.long;
-        for (const r of table.rows) delete r.longCells;
+        for (const r of table.rows) {
+          delete r.longCells;
+          delete r.alignedCells;
+        }
         return table;
       }
       return n;

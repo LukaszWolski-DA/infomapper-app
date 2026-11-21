@@ -59,6 +59,12 @@ export interface DocRow {
    * `below`, which drops a single long column's label. Only on a table with `long`; the HTML never reads it.
    */
   readonly longCells?: readonly DocRuns[];
+  /**
+   * Slice 34 (Łukasz's acceptance of step 3): the row's cells with every value in its own column, aligned with `cells`,
+   * where `cells` puts a placeholder over another column (Source-to-target's unmapped attribute: "Not mapped" in "Target
+   * type" in the PDF). Only on such a row; the HTML never reads it.
+   */
+  readonly alignedCells?: readonly DocRuns[];
 }
 
 export type DocNode =
