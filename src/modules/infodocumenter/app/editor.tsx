@@ -48,6 +48,8 @@ import { HANDLE_CSS, PanelHandles, PanelToggle, useDocPanels } from "./panel-han
 import { hasSpec, ModuleOptions, SectionOptions, type OptionContext } from "./section-options";
 import type { SectionOptionField } from "@/domain/document/sections";
 import { StylePanel } from "./style-panel";
+import { MARKDOWN_TEXTS, MarkdownDialog, type MarkdownShown } from "./markdown-dialog";
+import { documentMarkdown, localTimestamp, markdownFileName } from "../domain/markdown";
 import { DocumentPreview, LAYOUT_THRESHOLD_MS, PREVIEW_TEXTS, type PreviewHandle, type PreviewMode, type PreviewZoom } from "./preview";
 
 /** A registered section type as the editor lists it (the server computes it for the workspace). */
@@ -251,6 +253,16 @@ export function DocumentEditor(props: EditorProps) {
     setBuilt((before) => ({ tree, ms: performance.now() - started, n: (before?.n ?? 0) + 1 }));
   }, [state, drawn, date]);
 
+  // slice 34 (D1): the Markdown at the click, from the editor's tree as the preview builds it (the snapshot read when the
+  // editor opened, the recipe with the text fields' drafts, so a keystroke still in its typing pause is in it too)
+  const [markdown, setMarkdown] = useState<MarkdownShown | null>(null);
+  const openMarkdown = () => {
+    if (!state) return;
+    const recipe = withDrafts(docNow.current, drafts.current);
+    const tree = buildDocument({ definition: recipe, state: state.state, types: DOCUMENT_SECTION_TYPES, date });
+    setMarkdown({ text: documentMarkdown({ tree, name: recipe.name, generated: localTimestamp(new Date()) }), file: markdownFileName(recipe.name) });
+  };
+
   // slice 27: the canvases and frames a figure may show (the projects' tab order, then the rest), and each figure's line
   const figureSources = useMemo((): FigureSource[] => {
     if (!snapshot) return [];
@@ -406,6 +418,10 @@ export function DocumentEditor(props: EditorProps) {
         <button type="button" className={smallButton} data-testid="button-print" disabled={!built} onClick={() => preview.current?.print()}>
           {EDITOR_TEXTS.print}
         </button>
+        <button type="button" className={smallButton} data-testid="button-markdown" disabled={!built} onClick={openMarkdown}>
+          {MARKDOWN_TEXTS.button}
+        </button>
+        <MarkdownDialog shown={markdown} onClose={() => setMarkdown(null)} />
         <SavePair server={server} />
         <PanelToggle side="right" panels={docPanels} />
       </div>
