@@ -1007,7 +1007,7 @@ on release (D-54); and the editor has no narrow screens' overlay (it stacks up t
 - **German words of slices 25 to 27** (the document labels, InfoCube's document words, slice 26's new ones listed in
   `docs/prd/slice-26-acceptance.md`, slice 27's in `docs/prd/slice-27-acceptance.md`, step 3: "Diagramme",
   "Abbildungsverzeichnis", "Legende", the legend's lines, "Beziehung (UML-Multiplizitäten)", "Sternschema von {n}",
-  "{a} von {b} Dimensionen gezeigt; alle stehen in der Tabelle darunter", and step 2's words on a figure): still awaiting
+  "{a} von {b} Dimensionen gezeigt; alle stehen in der Tabelle darunter", and step 2's words on a figure; slice 34's Markdown words, `md_…` in `labels.ts`, and InfoCube's "Definition"): still awaiting
   Łukasz's review, then a small `fix/` branch.
 - **The model checks' texts in Polish and German** (about 40 texts in the core, `CHECK_TEXTS` and the rules' `text()`,
   and InfoCube's checks), with the German words' review; until then a Polish or German document prints them in English

@@ -674,3 +674,50 @@ part passes (9 tests).
   | 9 | **999 s** | **1,642 MB** |
 
   Part 9 is again the longest, by 181 s over part 6, which supports the recut before step 3.
+
+## 10. Łukasz's answers on step 2 (21 November 2026)
+
+- **Step 2 accepted**, with its differences from the plan: `d3` held at 7.9.0, the made-up stage 1 document, `'` for `"`
+  in names, the `title` line, the Mermaid line in every document, escaped markers, types with a comma, "· L", no
+  `md_busUsers` or `md_srcKeys`.
+- **D4's threshold: 40,000 characters a block**; above it, headers only and a line saying so.
+- **German:** slice 34's new German words wait for his review, recorded with the earlier German review
+  (`docs/known-limitations.md`, "German document labels…"; `docs/ideas.md`, "German words of slices 25 to 27").
+- **The e2e recut** (CC's call, changed by Łukasz): after this slice, on its own `chore/` branch, not before step 3. The
+  heap peaks are below 1.7 GB; part 9 is only the longest. Slice 34's folder joins part 9.
+
+## 11. Step 3: the button and the dialog (21 November 2026)
+
+**What was built.**
+- **"Markdown"** in the editor's top bar, right after "Print / PDF" (`editor.tsx`): the same class, `disabled={!built}` as
+  Print, no title, read-only documents included (F7).
+- **The dialog** (`src/modules/infodocumenter/app/markdown-dialog.tsx`, the app's `Dialog`): the title "Markdown", the
+  prototype's sentence, the text in a scrolling monospaced box (`max-height: 56vh`, wrapped), the line
+  "{n} lines · {size} KB · {file}" (the UTF-8 bytes, one decimal, as the prototype), **Copy** and **Download .md**
+  (primary), the dialog's close button "Close".
+  - **Copy:** "Markdown copied." only once the browser took the text; a refusal or no clipboard says "The browser did not
+    allow copying. Select the text and copy it." and the box stays (F25).
+  - **Download .md:** a `text/markdown;charset=utf-8` file named by `markdownFileName` (F9).
+- **At the click (D1):** the editor builds the tree from its recipe with the text fields' drafts (`withDrafts`) over the
+  snapshot read when it opened, then `documentMarkdown` with the name (drafted too) and `localTimestamp(new Date())`. No
+  request. The text stays as made while the dialog is open.
+- **e2e** (`e2e/slice-34/`):
+  - S34-01 (7 tests): the button after Print / PDF, disabled while Print is (the snapshot's answer held) and enabled after;
+    enabled for a guest's read-only document; the dialog's texts and its line; Close; Copy read back from the clipboard
+    with its toast; a refused copy; Download's name and content equal to the box; a name typed and the button pressed
+    within the 500 ms pause (the text and the file name follow it, Polish letters transliterated).
+  - S34-02 (3 tests): the demo's three documents: the front matter, the title, the line on Mermaid, the `##` headings
+    equal to the PDF's sections in order (the preview's source), every table row as many cells as its header, no heading
+    skipping a level, the cover's fields (D3), the mappings' statuses as words.
+  - S34-03 (2 tests, the seed with the star): one `erDiagram` block per figure of the dictionary's PDF, names quoted, and
+    every block of the dictionary and the S2T document parsed in the test's Node process on Mermaid 9.4.3, 10.9.5 and
+    12.3.0.
+  - `S34-screens.spec.ts` (on demand, `SCREENS=<folder>`): the bar and the dialog, light and dark.
+
+**Where the build differs from the plan.**
+1. **The tree is built again at the click** from the recipe with the drafts, not taken from the preview's last build: the
+   preview rebuilds only 500 ms after the last keystroke, so a draft typed just before the click would otherwise be
+   missing. Same inputs, same function; 14 to 24 ms on the demo and Performance test (step 2's figures).
+2. **Copy's check on Windows:** the clipboard answers CRLF line ends there; S34-01 compares with them as LF.
+3. **`tests/document-markdown-html.test.ts`** has a 30 s limit a case: under the whole unit suite on the laptop its cases
+   (four whole renders each) passed Vitest's 5 s.

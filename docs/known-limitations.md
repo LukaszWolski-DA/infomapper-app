@@ -1784,7 +1784,8 @@ Slice 26's specs joined part 8 (the recut rule). Its heap peaked at 2,088 MB in 
 The German labels of documents (the prototype's `LBL`, `src/modules/infodocumenter/domain/labels.ts`) and InfoCube's
 German words for documents (fact types, additivity, histories, kinds, the role's long text, the Bus matrix,
 `src/modules/infocube/domain/document-words.ts`) are a first draft; Łukasz reviews them. Slice 26's new German words are
-listed in `docs/prd/slice-26-acceptance.md` (step 3). Polish and English are the prototype's, with the new words (the
+listed in `docs/prd/slice-26-acceptance.md` (step 3); slice 34's (the Markdown's `md_…` words and InfoCube's
+"Definition") in `docs/prd/slice-34-acceptance.md` (step 2). Polish and English are the prototype's, with the new words (the
 requirements' kinds, statuses and priorities, the readiness note) listed there too.
 
 ### The demo's plain seed has almost no attribute definitions
