@@ -14,6 +14,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES, documentStateFor } from "@/compose/documents";
 import { STORE_SCHEMA } from "@/compose/tables";
 import type { DevDb } from "@/data/local/schema";
 import { createLocalDataStore } from "@/data/local/store";
@@ -21,11 +22,30 @@ import type { DataStore } from "@/data/ports";
 import { spreadCrowded, stampPlaces } from "@/data/postgres/load";
 import { getPool } from "@/data/postgres/pool";
 import { createPostgresDataStore } from "@/data/postgres/store";
+import { buildDocument } from "@/modules/infodocumenter/domain/document";
+import { documentMarkdown } from "@/modules/infodocumenter/domain/markdown";
+import type { DocumentDefinition } from "@/modules/infodocumenter/domain/types";
 import { contractRows, preparePostgres, readEverything, spreadAll, type Row } from "./shared";
 
 let db: DevDb;
 let localReads: Record<string, unknown>;
+let localStore: DataStore;
 let tmp: string;
+
+/**
+ * Slice 34 (F23, S34-04): each live document's Markdown, built as the editor builds it from the store's snapshot (the
+ * same tree, the same renderer), with a fixed time: both adapters must give the same text.
+ */
+async function markdownFrom(store: DataStore): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const documents = ((db as unknown as Record<string, DocumentDefinition[]>).document_definition ?? []).filter((d) => d.deleted_at === null);
+  for (const d of documents) {
+    const snapshot = await store.snapshot(d.workspace_id, DOCUMENT_TABLES);
+    const tree = buildDocument({ definition: d, state: documentStateFor(snapshot!), types: DOCUMENT_SECTION_TYPES, date: "2026-11-21" });
+    out[d.id] = documentMarkdown({ tree, name: d.name, generated: "2026-11-21T09:05+01:00" });
+  }
+  return out;
+}
 
 beforeAll(async () => {
   // slice 30 (L8): the loader spreads a crowded millisecond into the next ones; the local adapter gets the same times
@@ -33,7 +53,8 @@ beforeAll(async () => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), "im-contract-"));
   const file = path.join(tmp, "contract-db.json");
   fs.writeFileSync(file, JSON.stringify(db));
-  localReads = await readEverything(createLocalDataStore(file, STORE_SCHEMA), db);
+  localStore = createLocalDataStore(file, STORE_SCHEMA);
+  localReads = await readEverything(localStore, db);
 }, 120_000);
 
 afterAll(() => {
@@ -86,6 +107,12 @@ describe("the reads on the local adapter, against the rows themselves", () => {
     const lost = rowsOf("workspace").flatMap((w) => (localReads[`model.load ${w.id}`] as { lostOriginals: unknown[] }).lostOriginals);
     expect(lost.length).toBeGreaterThan(0);
   });
+
+  it("builds every demo document's Markdown from its snapshot (slice 34)", async () => {
+    const md = Object.values(await markdownFrom(localStore));
+    expect(md).toHaveLength(3);
+    for (const text of md) expect(text).toMatch(/^---\ndocument: "/);
+  });
 });
 
 const CONTRACT_DB = process.env.INFOMAPPER_CONTRACT_DB;
@@ -126,6 +153,12 @@ describe.runIf(!!CONTRACT_DB)("the reads on Postgres: the same as the local adap
         else expect.soft(pg[table], `${name} ${table}`).toEqual(local[table]);
       }
     }
+  });
+
+  it("gives every document's Markdown the local adapter's text (slice 34, F23)", async () => {
+    const local = await markdownFrom(localStore);
+    expect(Object.keys(local).length).toBeGreaterThan(0);
+    expect(await markdownFrom(store)).toEqual(local);
   });
 
 });
