@@ -848,6 +848,8 @@ body.wsmode #dtabs{display:none}
 .pplerr{color:var(--warn);font-size:12.5px;margin:10px 0 0}
 .pplfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 #pplDlg .fld input:disabled{opacity:.6;cursor:default}
+#mdDlg{width:min(860px,94vw)}
+#mdDlg pre{margin:12px 0 0;max-height:56vh;overflow:auto;padding:12px 14px;border:1px solid var(--line);border-radius:6px;background:var(--panel);font:12px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
 .bl{display:grid;grid-template-columns:1fr auto;gap:6px 16px;padding:12px 14px;background:var(--surface);border-radius:10px;box-shadow:0 0 0 1px var(--line);margin-bottom:10px}
 .bl .t{font-weight:600}
 .bl .m{color:var(--ink-3);font-size:12px}
@@ -1685,6 +1687,7 @@ table.dt.drels{margin-top:1mm}
 <dialog class="wiz iw" id="wiz" aria-labelledby="wizTitle"></dialog>
 <dialog class="set iw" id="setDlg" aria-labelledby="setTitle"></dialog>
 <dialog class="set iw" id="pplDlg" aria-labelledby="pplTitle" data-testid="ppl-dialog"></dialog>
+<dialog class="set iw" id="mdDlg" aria-labelledby="mdTitle" data-testid="md-dialog"></dialog>
 <script>
 "use strict";
 /* =========================================================
@@ -6531,6 +6534,70 @@ function renderUserBtn() {
    data-theme on <html>, which the dark tokens already honour. In the app it is a cookie the server reads; here memory. */
 const THEMES = [["light", "Light"], ["dark", "Dark"], ["system", "System"]];
 let THEME = "system";
+/* Markdown (the Markdown slice): the document as one .md file, for people and for AI. The same sections, language and
+   presets as the PDF; print-only options left out; figures as Mermaid blocks; front matter on top. In the prototype the
+   text is made from the rendered pages; in the app from the document's own tree. */
+const mdDlg = $("#mdDlg");
+const MD = (() => {
+  const cell = s => s.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+  const mid = s => s.replace(/[^A-Za-z0-9_]/g, "_").replace(/^_+|_+$/g, "") || "x";
+  function mermaid() {
+    const ents = S.entities.filter(e => e.level !== "dimensional").slice(0, 12), ids = new Set(ents.map(e => e.id));
+    const card = (min, max, side) => { const many = max === "N" || max > 1; return side === "l" ? (min ? (many ? "}|" : "||") : (many ? "}o" : "|o")) : (min ? (many ? "|{" : "||") : (many ? "o{" : "o|")); };
+    const lines = ["```mermaid", "erDiagram"];
+    S.relationships.filter(r => ids.has(r.from) && ids.has(r.to)).forEach(r => { const a = S.entities.find(e => e.id === r.from), b = S.entities.find(e => e.id === r.to);
+      lines.push(`  ${mid(a.name)} ${card(r.fromMin, r.fromMax, "l")}--${card(r.toMin, r.toMax, "r")} ${mid(b.name)} : "${(r.label || "relates to").replace(/"/g, "'")}"`); });
+    ents.forEach(e => { const at = S.attributes.filter(a => a.entityId === e.id).sort((x, y) => (x.order || 0) - (y.order || 0)).slice(0, 6);
+      if (!at.length) return; lines.push(`  ${mid(e.name)} {`); at.forEach(a => lines.push(`    ${mid(a.dataType || "text")} ${mid(a.name)}${a.isPrimaryKey ? " PK" : a.isForeignKey ? " FK" : ""}`)); lines.push("  }"); });
+    lines.push("```"); return lines.join("\n");
+  }
+  function walk(el, out) {
+    for (const n of el.childNodes) {
+      if (n.nodeType === 3) { const s = n.textContent.replace(/\s+/g, " "); if (s.trim()) out.push({t:"txt", s}); continue; }
+      if (n.nodeType !== 1) continue;
+      const tag = n.tagName.toLowerCase();
+      if (n.matches(".dsheet.dcover,.dsheet.dtoc,.dhead,.dfoot,.dwm,.dmod,.dn,.dn2,style,script")) continue;
+      if (/^h[1-6]$/.test(tag)) { out.push({t:"blk", s:"#".repeat(Math.min(6, +tag[1])) + " " + n.textContent.replace(/\s+/g, " ").trim()}); continue; }
+      if (tag === "figure") { const cap = n.querySelector("figcaption"); out.push({t:"blk", s:mermaid() + (cap ? "\n\n*" + cap.textContent.replace(/\s+/g, " ").trim() + "*" : "")}); continue; }
+      if (tag === "table") { const rows = [...n.rows].map(r => [...r.cells].map(c => cell(c.textContent))); if (!rows.length) continue;
+        const w = Math.max(...rows.map(r => r.length)); rows.forEach(r => { while (r.length < w) r.push(""); });
+        out.push({t:"blk", s:["| " + rows[0].join(" | ") + " |", "|" + rows[0].map(() => " --- ").join("|") + "|", ...rows.slice(1).map(r => "| " + r.join(" | ") + " |")].join("\n")}); continue; }
+      if (tag === "ul" || tag === "ol") { out.push({t:"blk", s:[...n.children].filter(x => x.tagName === "LI").map((li, i) => (tag === "ol" ? `${i + 1}. ` : "- ") + li.textContent.replace(/\s+/g, " ").trim()).join("\n")}); continue; }
+      if (tag === "p" || tag === "div" && n.children.length === 0) { const s = n.textContent.replace(/\s+/g, " ").trim(); if (s) out.push({t:"blk", s}); continue; }
+      if (tag === "b" || tag === "strong") { out.push({t:"txt", s:"**" + n.textContent.trim() + "**"}); continue; }
+      walk(n, out);
+    }
+  }
+  function make(d, r) {
+    const host = document.createElement("div"); host.innerHTML = r.html;
+    host.querySelectorAll(".dn,.dn2,style,script").forEach(x => x.remove());
+    const NOTE = {"Exactly one":"`||`", "Zero or one":"`|o`", "One or more":"`}|`", "Zero or more":"`}o`"};
+    host.querySelectorAll("td svg,th svg").forEach(s => { const c = s.closest("td,th"), nx = c.nextElementSibling; s.remove(); if (!c.textContent.trim() && nx && NOTE[nx.textContent.trim()]) c.textContent = NOTE[nx.textContent.trim()]; });
+    host.querySelectorAll("svg:not(figure svg)").forEach(x => x.remove());
+    const out = []; walk(host, out);
+    const blocks = []; let line = "";
+    out.forEach(x => { if (x.t === "txt") line += x.s; else { if (line.trim()) blocks.push(line.trim()); line = ""; blocks.push(x.s); } });
+    if (line.trim()) blocks.push(line.trim());
+    const w = curWs(), when = new Date().toISOString().slice(0, 16).replace("T", " ");
+    const fm = ["---", `document: "${d.name.replace(/"/g, "'")}"`, `workspace: "${w.name}"`, `organization: "${curOrg().name}"`, `language: ${d.style.lang || "English"}`,
+      `source: ${d.source.kind === "baseline" ? "baseline" : "live model"}`, `generated: ${when}`, "generator: InfoMapper (InfoDocumenter)", "---"].join("\n");
+    const heads = blocks.filter(b => /^## /.test(b)).map(b => b.slice(3));
+    const toc = d.style.toc && heads.length ? "## Contents\n\n" + heads.map(h => `- [${h}](#${h.toLowerCase().replace(/[^a-z0-9 -]/g, "").replace(/ /g, "-")})`).join("\n") : "";
+    return [fm, "# " + d.name, toc, ...blocks].filter(Boolean).join("\n\n") + "\n";
+  }
+  function open(d, r) {
+    const text = make(d, r), file = d.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".md";
+    mdDlg.innerHTML = `<div class="whead"><h2 id="mdTitle">Markdown</h2><button class="tb" data-mdclose aria-label="Close" style="border:0;background:none;cursor:pointer;color:var(--ink-2)">✕</button></div>
+<div class="setbody"><p style="margin-top:12px">This document as one Markdown file: the same sections and language as the PDF; diagrams as Mermaid blocks, page layout left out. For people (a wiki, Git) and for AI.</p>
+<pre data-testid="md-text">${esc(text)}</pre><p class="hint" style="margin-top:8px">${text.split("\n").length} lines · ${(new Blob([text]).size / 1024).toFixed(1)} KB · ${esc(file)}</p>
+<div class="pplfoot"><button class="btn" data-mdcopy>Copy</button><button class="btn primary" data-mddl>Download .md</button></div></div>`;
+    mdDlg.querySelector("[data-mdclose]").onclick = () => mdDlg.close();
+    mdDlg.querySelector("[data-mdcopy]").onclick = async () => { try { await navigator.clipboard.writeText(text); } catch (e) { /* the preview may refuse */ } toast("Markdown copied."); };
+    mdDlg.querySelector("[data-mddl]").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], {type:"text/markdown"})); a.download = file; document.body.appendChild(a); a.click(); a.remove(); };
+    mdDlg.showModal();
+  }
+  return {open, make};
+})();
 /* People (the people slice): invitation and password reset links copied by the inviter, Change password…, the pages a
    link opens. In the app the links are one-time tokens (only their hash is stored); here they are made up. */
 function inDays(n) { return new Date(Date.now() + n * 864e5).toLocaleDateString("en-GB", {day:"numeric", month:"short", year:"numeric"}); }
@@ -10288,7 +10355,7 @@ ${admin ? `<label class="btn sm">${w.clientLogo ? "Replace" : "Upload"}<input ty
 <div class="de-title"><input class="de-name" data-dprop="name" value="${esc(d.name)}" ${ro} aria-label="Document name"><div class="de-url">infomapper.app/${esc(snake(w.name).replace(/_/g, "-"))}/docs/${esc(d.id.slice(5))}</div></div>
 <span class="de-badge ${d.shared ? "sh" : ""}">${d.shared ? "Shared" : "Private"}</span>${ro ? `<span class="de-badge ro">Read only</span>` : ""}
 <span class="sp" style="flex:1"></span><span class="de-busy" id="de-busy" hidden>Laying out pages…</span><span class="de-zoom"><select data-de="pages" aria-label="Preview pages" title="Auto: real pages while they lay out quickly, otherwise the quick sheet until you update them. Exact: real pages after every change. Quick: one sheet per page break, at once."><option value="auto" ${(ST.pages || "auto") === "auto" && window.Paged ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Auto</option><option value="exact" ${ST.pages === "exact" ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Exact pages</option><option value="quick" ${ST.pages === "quick" || !window.Paged ? "selected" : ""}>Quick preview</option></select></span><span class="de-zoom"><select data-de="zoom" aria-label="Preview zoom"><option value="fit">Fit width</option><option value="0.75">75 %</option><option value="1">100 %</option></select></span>
-<button class="btn sm" data-de="print" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Print / PDF</button><button class="btn sm pri" data-de="gen" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Generate version</button>${SAVE.slots()}<button class="tb de-tog" data-de="togr" aria-pressed="${!PANELS.hidden("r")}" title="Show or hide the options panel" aria-label="Options panel"><svg class="i" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M10 2.5v11"/></svg></button></div>
+<button class="btn sm" data-de="print" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Print / PDF</button><button class="btn sm" data-de="md" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Markdown</button><button class="btn sm pri" data-de="gen" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Generate version</button>${SAVE.slots()}<button class="tb de-tog" data-de="togr" aria-pressed="${!PANELS.hidden("r")}" title="Show or hide the options panel" aria-label="Options panel"><svg class="i" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M10 2.5v11"/></svg></button></div>
 ${ro ? `<div class="de-ro">${esc(whyNot.edit(d))}${can.create() ? ` <button class="btn sm" data-de="dup">Duplicate as my document</button>` : ""}</div>` : ""}
 <div class="de-body${PANELS.cls()}" id="de-body" style="${PANELS.style()}"><div class="de-left" id="de-left" ${PANELS.hidden("l") ? "inert" : ""}></div><div class="de-mid" id="de-mid"></div><div class="de-right" id="de-right" ${PANELS.hidden("r") ? "inert" : ""}></div><div class="de-rz l" data-rz="l" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Width of the sections panel" title="Drag to widen; double-click for the default width"></div><div class="de-rz r" data-rz="r" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Width of the options panel" title="Drag to widen; double-click for the default width"></div></div>`;
     box.querySelector('[data-de="zoom"]').value = String(ST.zoom);
@@ -10399,6 +10466,7 @@ ${[["hL", "Header, left"], ["hR", "Header, right"], ["fL", "Footer, left"], ["fR
       else if (a === "gen") { const v = generate(cur()); if (v) drawEditor(); }
       else if (a === "upd") { ST.force = true; drawPreview(); }
       else if (a === "print") { const d = cur(), r = render(d, {}), rp = render(d, {paged:true}); printHTML(r.html, r.cls, pageCSS(d), rp.html, rp.pcss); }
+      else if (a === "md") { const d = cur(); MD.open(d, render(d, {})); }
       else if (a === "dup") { const nd = dup(ST.defId); openEditor(nd.id); }
       else if (a === "add") { ST.addOpen = !ST.addOpen; drawLeft(); }
       return; }
