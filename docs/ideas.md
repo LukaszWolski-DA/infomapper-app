@@ -985,8 +985,10 @@ on release (D-54); and the editor has no narrow screens' overlay (it stacks up t
 2. **Slice D – versions and links:** a version stores the generated file (where PDFs are made: browser or server),
    links for people outside the workspace (a new AD: access without a session, expiry, revoke), guests' restriction on
    versions and links (the export setting), logos (organization and client; needs file storage).
-3. **Slice E – Markdown export:** metadata instead of images (an AI agent or Mermaid draws the diagrams); one file or a
-   set of files (open).
+3. **Slice E – Markdown export: done in slice 34** (D-86): "Markdown" beside "Print / PDF", one file built at the click
+   from the editor's tree, figures as Mermaid `erDiagram` blocks that Mermaid 9.4.3 to 12.3.0 parse, the PDF unchanged.
+   Left for later: a set of files or a zip (e.g. for dbt), Markdown of a generated version and of a baseline (with
+   baselines), the dbt channel, Word or HTML export.
 
 **Later, noted:**
 - Live label canvases in documents from a baseline (option a: freeze the labels and label links that drive them).
@@ -1136,3 +1138,18 @@ move on with `router.push`, so the same race with the action's own refresh is po
 their toast ("Organization created …"), which would then have to cross the load (for example in `sessionStorage`, read
 once by the next page). Local adapter only (no organization is created online); nothing was seen there. For Łukasz to
 decide.
+
+## Slice 34's follow-ups (21 November 2026)
+
+- **The e2e recut** (Łukasz, step 2): after slice 34, on its own `chore/` branch with its own full run. Part 9 was the
+  longest in slice 34's runs (999 s in step 2's, 836 s in step 3's, against 818 and 742 s for the next), with heap peaks
+  below 2 GB.
+- **S6B-04 is flaky** (slice 34, step 3's first full run, 44907819468): after Back it read the canvas's zoom as 0.449993
+  for 0.45. The test waits until the card is within 2 px of the centre and then reads the zoom, which the centring may
+  still be animating; the single-file check passed 3 rounds. A `fix/` branch: wait for the zoom the user sees (the
+  transform equal to the zoom before) instead of reading it once, the assertion unchanged.
+- **The PDF's Source-to-target writes "Not mapped" into "Target type"** (found in Łukasz's acceptance of step 3): an
+  unmapped attribute's row puts the word in the first short column after the target, so the PDF does not show the
+  target's type there; the prototype spans the word over the source's columns. The Markdown keeps the type since slice 34
+  (`DocRow.alignedCells`). For Łukasz to decide: the PDF the same way (the type kept, the word under Source column or
+  spanning the source's columns), a visible change of the PDF.

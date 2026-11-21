@@ -102,6 +102,10 @@ Slice 33 (AD-40) is the people slice: "Invite person" replaces "Add person" on b
 link the inviter copies, 7 days, once; "Pending invitations" with New link and Revoke); the person joins on
 `/invite/<token>` (online with their own password, the Supabase account made by the server with the secret key);
 online "Change password…" in the person's menu and a one-time "Password reset link" for 24 hours under D1's rule.
+Slice 34 (D-86, InfoDocumenter's slice E; feature slices return, AD-31's note) gives the document editor "Markdown" beside
+"Print / PDF": a dialog with the document as one Markdown file built at the click from the editor's tree, Copy and
+Download .md; figures as Mermaid `erDiagram` blocks in syntax Mermaid 9.4.3, 10.9.5 and 12.3.0 all parse; the PDF
+unchanged. The file is for exchange in any Markdown tool; GitHub and Azure DevOps are not targets.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -383,6 +387,22 @@ list up to date in each sub-slice):
     rule: ticked, and nothing in the document uses it.
   - **The double-click** (`open` in `editor.tsx`) shows the options panel, scrolls it to its top and focuses the first
     control of `[data-de-props]` (the section's own options).
+  **Slice 34 (D-86): the Markdown.**
+  - **The renderer** is pure, in InfoDocumenter's domain: `domain/markdown.ts` (`documentMarkdown`, `markdownFileName`,
+    `localTimestamp`, the escaping) and `domain/mermaid.ts` (`figureDiagram`, `erDiagram`, `MERMAID_MAX_CHARS` 40,000).
+    It reads the same content tree as the HTML; the dialog is `app/markdown-dialog.tsx`, the text built at the click
+    (`openMarkdown` in `editor.tsx`, the recipe with its drafts over the editor's snapshot).
+  - **The tree's additions the HTML never reads:** `DocFigure.content` (`FigureContent`, filled by `figureDrawing`: the
+    cards with their shown rows, frames, relationships, source keys, mappings, module lines, requirement cards), a
+    table's `long` with each row's `longCells` (the "Under row" long texts by column, from `longTextTable`), and a row's
+    `alignedCells` (every value in its own column where `cells` puts a placeholder over another;
+    Source-to-target's unmapped attribute). `ModuleLineData.status` (InfoCube's lines). **A later section kind** writes
+    Markdown through the tree; a later tree field the Markdown needs is added the same way, with
+    `tests/document-markdown-html.test.ts` showing the HTML unchanged.
+  - **The rules as tests:** `tests/document-markdown.test.ts` (the nine rules over the text, every Mermaid block parsed
+    on the dev dependencies `mermaid-v9`, `mermaid-v10` and `mermaid-v12`; `overrides.d3` holds `d3` at 7.9.0 so React
+    Flow's `d3-*` packages do not move) on the documents of `tests/lib/markdown-documents.ts`; both adapters in
+    `tests/contract/reads.test.ts`.
 - **A module's own pages** (slice 25, step 4): the routes stay in `src/app` (`/w/{ws}/d/{id}` and `/view`), load the
   shell and render a module's pages through `src/compose/documents-pages.tsx`; `loadShell`'s `rest` keeps such a path for
   the locked organization's return (F27). The pages render `AppShell` with a `trail` (the breadcrumbs after the
@@ -612,7 +632,9 @@ local adapter no pool is made.
 - **Łukasz's test model** (since slice 8's manual acceptance, 28 October 2026): the organization KB with the workspace
   "Kanton Basel" is a real business model he builds by hand to test and give feedback. **Since the switch on 20 November
   2026 (AD-39's note) KB online in `infomapper-dev` is the master**, worked in on `dev`'s preview with his own account;
-  the local KB in `.data/dev-db.json` is no longer worked in and stays as a backup. The rules since then:
+  the local KB in `.data/dev-db.json` is **an untouched archive since 21 November 2026** (slice 34, option a): Łukasz no
+  longer works in it and nothing changes it (no reset, no format upgrade, no `seed:large`, no write through a dev
+  server). The rules since the switch:
   - **`pg:backup` before every `pg:migrate` and every merge into `dev`, and after a day of Łukasz's work in KB online**
     (Łukasz, 20 November 2026, slice 33, amending AD-39's note); the prompt for each says so. **Not** before an acceptance
     on `dev:pg` with the demo accounts (they do not see KB), and not again when KB has not changed since the last backup.
@@ -622,18 +644,15 @@ local adapter no pool is made.
   - **`pg:kb` from the local file is not run after the switch** (it would overwrite the master with an older copy; the
     script has no guard against it yet, `docs/ideas.md`); a restore is `pg:restore` from `.data/backups/pg/`.
 
-  What follows was written before the switch and still holds for the file: later acceptance sessions used it. Never run `npm run reset-dev-data` on that file without a fresh backup and his OK; back it
-  up on request and before a slice that changes the local file's format (`.data/backups/dev-db-<yyyymmdd-hhmm>.json`,
-  the newest also `.data/backups/kb-model-latest.json`; git-ignored). It holds his real e-mail and KB's organization
-  password hash, so it is never committed. **Since slice 31 (C1.2, amending his decision of 28 October 2026) KB may be
-  copied into `infomapper-dev`** (`pg:kb`, AD-39): its content and his e-mail, never the password hash; he signs in online
-  with his own Supabase account. The file is still read only on a copy of a backup (the scripts refuse
-  `.data/dev-db.json` itself and any path outside `.data/backups/`) and was KB's master until the switch (C1.1, 20 November 2026).
-  **No e2e, smoke or measuring run opens KB or signs in with his real e-mail where its artifacts are public**; the
-  measurement of KB runs from the laptop only. KB online is changed only by his own use and by `pg:restore` and
-  `pg:kb -- --remove` on his command (since the switch never `pg:kb` from the local file); never reset (the reset refuses while KB is there). **Since 10 November 2026 his file
-  is changed only on his explicit command** (a format upgrade included): a dev server of his that serves this checkout
-  runs the branch's code on it, so before a step that changes the format, check that none does (slice 24, step 3).
+  **The archive** (`.data/dev-db.json`): it holds his real e-mail and KB's organization password hash, so it is never
+  committed and read only on a copy of a backup (the scripts refuse `.data/dev-db.json` itself and any path outside
+  `.data/backups/`; counts only). Its backups stay under `.data/backups/` (`dev-db-<yyyymmdd-hhmm>.json`, the newest also
+  `kb-model-latest.json`; git-ignored). KB was copied from it into `infomapper-dev` in slice 31 (C1.2, `pg:kb`, AD-39: its
+  content and his e-mail, never the password hash; he signs in online with his own Supabase account); it was KB's master
+  until the switch (C1.1, 20 November 2026). **No e2e, smoke or measuring run opens KB or signs in with his real e-mail
+  where its artifacts are public**; the measurement of KB runs from the laptop only. KB online is changed only by his own
+  use and by `pg:restore` and `pg:kb -- --remove` on his command (since the switch never `pg:kb` from the local file);
+  never reset (the reset refuses while KB is there).
 
 ## Security
 
@@ -819,6 +838,7 @@ npx tsx scripts/bench-thumbnails.ts                           # slice 12b: the h
 MEASURE=1 npx playwright test e2e/slice-25/S25-layout.spec.ts                             # slice 25: a full data dictionary of Performance test laid out by Paged.js, headless (reference figure)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-26/S26-10-figures.spec.ts  # slice 26: the editor on Performance test and the demo: the snapshot's bytes, the state, the tree, the first layout (reference figures)
 SCREENS=<folder> npx playwright test e2e/slice-26/S26-screens.spec.ts                     # slice 26: the editor (Auto, a section, Pages out of date), readiness, source tables, the dimensional entities, Formal A3 landscape, Compact in black and white
+SCREENS=<folder> npm run e2e -- e2e/slice-34/S34-screens.spec.ts                         # slice 34: the editor's bar and the Markdown dialog on the dictionary with the star, light and dark
 SCREENS=<folder> npm run e2e -- e2e/slice-33/S33-screens.spec.ts                         # slice 33: the People tab with pending and expired invitations, the link dialog, the invite page (local)
 npx tsx scripts/check-client-bundle.ts                        # slice 33: after npm run build, no client file holds SUPABASE_SECRET_KEY's value, its name or supabase-admin
 SCREENS=<folder> npx playwright test e2e/slice-24/S24-screens.spec.ts                     # slice 24: the Entity stereotypes box, its remove dialog, the entity panel's select with the definition; light and dark
@@ -1139,6 +1159,13 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   and `S33-smoke-screens.spec.ts`: they write Auth accounts, so they run only against a database on this machine (F13);
   each run invites made-up addresses of its own and changes no demo account's password. CI keeps the online screenshots as
   the artifact `smoke-screens`.
+
+  Slice 34's fixtures are slice 28's (`seed` "docs", "plain" or "full"; S34-03 uses "full", the star). Its helpers open
+  the dialog and read its text (`markdownButton`, `markdownDialog`, `openMarkdown`, `markdownText`), the Markdown's and
+  the PDF's section headings (`sectionHeadings`, `pdfHeadings`, from the preview's source) and the Mermaid blocks, parsed
+  in the test's Node process on the three versions (`mermaidBlocks`, `parsedOnEvery`). Windows' clipboard answers CRLF:
+  compare a copied text with its line ends as LF. The size's unit in a spec is written in pieces (`${"K"}${"B"}`), as
+  the own-model guard writes it.
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,

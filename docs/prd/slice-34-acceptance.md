@@ -750,3 +750,54 @@ part passes (9 tests).
 
   Part 6's peak (1,883 MB, 1,326 in step 2's run) is a peak with uncollected garbage on slices 14a to 15d, which slice 34
   does not touch; it is below the 2 GB line of the recut rule.
+
+## 12. Łukasz's acceptance of step 3 (21 November 2026)
+
+On `npm run dev:pg` with the demo account of Łukasz (no VS Code on his laptop: the diagrams checked in mermaid.live):
+- **"Retail Co – data dictionary":** Markdown, Copy (complete in Notepad), Download; all three diagrams drew in
+  mermaid.live.
+- **"Order management – S2T for the ETL team":** the text read well (mappings with their rules as a column, the
+  dimensional model, stars with roles); its diagrams drew in mermaid.live.
+- **"Anna's working dictionary":** not checked by hand (the e2e specs cover its rights).
+- **One fault, fixed in step 4:** in Source-to-target an unmapped attribute wrote "Not mapped" into "Target type", so the
+  target's own type was lost (`segment_code` | Not mapped |, its type `string(3)`); an entity with no mapping got only
+  "Target" and "Target type". The target type must stay; "Not mapped" goes into "Source column"; a table keeps a column
+  that any row fills. Every other table where a placeholder may land in another value's column is to be checked.
+- "REQ-106 test2" in the demo is his own leftover test: ignored.
+
+## 13. Step 4: the closing (21 November 2026)
+
+**The fix (Source-to-target's unmapped attribute).**
+- **Cause:** `buildS2T` (`builders.ts`) writes an unmapped attribute's row as the target's name and "Not mapped" in the
+  first short column after it, which is "Target type" whenever that column is chosen; the PDF draws that cell as it is
+  (there is no spanning cell in the app's PDF: the prototype spans the word over three columns, the app never did). So
+  the PDF loses the type too; the Markdown took the cell as it stood.
+- **The test first:** `tests/document-markdown.test.ts`, "keeps every value in its own column": on every test document
+  no Source-to-target row has "Not mapped" under "Target type" (and at least one row says "Not mapped"); the demo's
+  `segment_code` reads `string(3)` under Target type and "Not mapped" under Source column; without Source column the word
+  goes into the first other short column (System), with only Target and Target type after the type
+  ("`string(3)` · Not mapped"); an entity with no mapping keeps its Source column. Before the fix it failed on the demo's
+  S2T document:
+  `AssertionError: demo: Order management – S2T for the ETL team: `segment_code` | Not mapped |  |  |  |  |  | : expected 'Not mapped' not to be 'Not mapped'`.
+  After the fix it passes, with the whole unit suite.
+- **The fix, the PDF unchanged:** a row may carry `alignedCells` (`DocRow`, `content.ts`): its cells with every value in
+  its own column, where `cells` puts a placeholder over another. `buildS2T` gives one to each unmapped row;
+  `longTextTable` cuts it as it cuts `cells` (under the row, after the table, as a column); the Markdown reads it. The
+  HTML never reads it (`tests/document-markdown-html.test.ts` strips it too: the HTML is the same). The PDF keeps its cell
+  as it is; whether it should change too is for Łukasz (`docs/ideas.md`, "Slice 34's follow-ups").
+- **The other tables checked:** every builder of InfoDocumenter and InfoCube (`builders.ts`, `sections-model.ts`,
+  `sections-requirements.ts`, `sections-sources.ts`, `readiness.ts`, InfoCube's `document-section.ts`). Only Source-to-
+  target puts a placeholder in another value's column. "Not mapped" in the dictionary's and the requirements' "Mapped
+  from" and InfoCube's "Fed from" stands in its own column; the bus matrix's count row leaves its first cell empty (D5);
+  readiness's ✓ stands in its count column.
+- `docs/prd/slice-34-output.md` is unchanged: its Source-to-target section leaves unmapped attributes out (the section's
+  default).
+
+**`dev`** has not moved since the branch last contained it (`76b4bfb`): no merge.
+
+**The docs:** `docs/decisions.md` (D-86 new, AD-31's note), CLAUDE.md (slice 34 in the overview; the Markdown under the
+document sections' extension point; "Łukasz's test model": the local file an untouched archive since 21 November 2026;
+slice 34's helpers; the screenshot command), `docs/ideas.md` (slice E done and what is left; the e2e recut after this
+slice; S6B-04's flake for a `fix/` branch; the PDF's "Not mapped" for Łukasz), `docs/known-limitations.md` (what Mermaid
+cannot show; the German words with the earlier review), `docs/inventory-prototype-vs-app.md` (the prototype is slice
+34's; the Markdown present with its differences), README.
