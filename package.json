@@ -65,6 +65,9 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "eslint-plugin-boundaries": "^7.2.0",
+    "mermaid-v10": "npm:mermaid@10.9.5",
+    "mermaid-v12": "npm:mermaid@12.3.0",
+    "mermaid-v9": "npm:mermaid@9.4.3",
     "shadcn": "^4.21.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
@@ -76,6 +79,7 @@
     "@tiptap/react": {
       "fast-equals": "5.4.3"
     },
-    "handlebars": "4.7.10"
+    "handlebars": "4.7.10",
+    "d3": "7.9.0"
   }
 }
