@@ -3,7 +3,7 @@
 // The invitation and reset pages' forms (slice 33, PT3, PT5; the prototype's `PPL.join` and `PPL.reset`): outside the
 // app shell, in the sign-in page's card. One error line above the buttons (D9); the hint under a new password.
 
-import { useRouter } from "next/navigation";
+import { afterSessionChange } from "@/ui/after-session-change";
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { joinAction, setPasswordAction } from "@/app/_actions/links";
 import type { ActionResult } from "@/app/_lib/run-command";
@@ -45,8 +45,9 @@ function ErrorLine({ text }: { text: string | null }) {
 }
 
 function useLinkAction() {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // the full page load after a success (fix/blank-page-after-sign-in): the button stays disabled until the next page
+  const [leaving, setLeaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [gone, setGone] = useState<string | null>(null);
   const run = (action: () => Promise<ActionResult<{ href: string }>>, goneCode = "not_found") =>
@@ -58,12 +59,15 @@ function useLinkAction() {
       } catch {
         r = { ok: false, code: "unexpected", message: "Something went wrong. Nothing was changed." };
       }
-      if (r.ok) return router.push(r.value.href);
+      if (r.ok) {
+        setLeaving(true);
+        return afterSessionChange(r.value.href);
+      }
       // a link that no longer works (or a workspace archived meanwhile) turns the page into its message
       if (r.code === goneCode || r.code === "archived") return setGone(r.message);
       setMessage(r.message);
     });
-  return { run, pending, message, gone };
+  return { run, pending: pending || leaving, message, gone };
 }
 
 /** The one refused page: the message and what to do, no button (P-l). */

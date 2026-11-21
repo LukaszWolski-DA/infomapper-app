@@ -36,3 +36,13 @@ export async function watchSessionChange(page: Page) {
     },
   };
 }
+
+/**
+ * Waits until the page a session's form landed on can be used: its top bar shown and hydrated (Back enabled, as slice 9's
+ * `hydrated`). Since the full page load, the top bar is drawn by the server before the page's code runs, so a click
+ * right after it may go nowhere (S33-04's switcher, fix/blank-page-after-sign-in).
+ */
+export async function landed(page: Page) {
+  await expect(page.getByTestId("bar-top")).toBeVisible();
+  await expect(page.getByTestId("button-back")).toBeEnabled();
+}

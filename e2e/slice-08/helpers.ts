@@ -7,6 +7,7 @@ import { expect, type Page } from "@playwright/test";
 import { createLocalDataStore } from "../../src/data/local/store";
 import { DEMO_PASSWORD, DEMO_PASSWORD_HASH } from "../../src/data/local/demo-password";
 import { scryptHasher } from "../../src/data/password";
+import { landed } from "../session-full-load";
 import { createOrganization as createOrganizationCommand, normalizeEmail } from "../../src/domain/commands/organization";
 import { acceptInvitation, createInvitation } from "../../src/domain/commands/invitations";
 import { changeRole as changeRoleCommand } from "../../src/domain/commands/people";
@@ -35,7 +36,7 @@ export async function signInWithPassword(page: Page, email: string, organization
   }
   await field.fill(password);
   await panel.getByTestId("button-sign-in").click();
-  await expect(page.getByTestId("bar-top")).toBeVisible();
+  await landed(page);
 }
 
 const store = () => createLocalDataStore(E2E_DB);
@@ -166,5 +167,5 @@ export async function joinByLink(page: Page, link: string, name?: string) {
   await expect(page.getByTestId("form-join")).toBeVisible();
   if (name !== undefined) await page.getByTestId("input-join-name").fill(name);
   await page.getByTestId("button-join").click();
-  await expect(page.getByTestId("bar-top")).toBeVisible();
+  await landed(page);
 }
