@@ -563,3 +563,118 @@ recommendations F1 to F7, F10, F12, F14, F17, F19, F20, and those of Q2 to Q5, Q
 - **S35-05:** "Locally each snapshot is its own file in a folder beside the data file and KB's local backup includes that
   folder" becomes "Locally each snapshot is its own file in a folder beside the data file; a pg:backup of an
   organization holds its baselines with their snapshots, and pg:restore brings them back."
+
+## 9. Step 2: the domain and the data (24 November 2026)
+
+Draft PR [#93](https://github.com/LukaszWolski-DA/infomapper-app/pull/93) into `dev`; commits `ddf10d7`, `ada1479`,
+`c1643ba`, `11f284b` (tested). No page changes; no connection to `infomapper-dev`; no `pg:migrate`.
+
+### What was built, by file
+
+- **The type and the rights:** `Baseline` in `src/domain/types.ts` (AD-12's columns, `name`, `name_key`, `note`,
+  `snapshot_schema`, the three counts; never the content) and in `CoreWritableRows`; `baseline.create`, `baseline.rename`
+  (owners, admins, modelers), `baseline.delete` (owners, admins), none when archived (`src/domain/permissions.ts`);
+  `baseline` in `OUTSIDE_UNDO` (`src/domain/commands/undo.ts`).
+- **`src/domain/baseline/`:** `tables.ts` (every InfoMapper table's flag, `Record<CoreTable, …>`), `content.ts`
+  (`BaselineContent`, `baselineContentOf` over `WorkspaceSnapshot`, `CONTENT_TABLES`, `baselineSummary`, `BaselineInsert`,
+  `snapshotWriteRefusal`), `upgrade.ts` (`SNAPSHOT_SCHEMA` 1, the steps, `upgradeBaselineContent`), `compare.ts`
+  (`compareBaselines`, `filterChanges`, `olderFirst`; the seven kinds and Q5's fields), `words.ts` (`COMPARE_WORDS` by
+  documentation language, English for all three until slice 36; `valueText`, `fieldText`, `whatChanged`), `names.ts`
+  (the name key, the messages, `newestBaselineFirst`), `__fixtures__/` (the schema 1 content fixture, the recorded columns).
+- **The commands:** `src/domain/commands/baseline.ts` (`createBaseline`, `renameBaseline`, `deleteBaseline`).
+- **The images:** `IMAGE_LEFT_OUT` in `src/domain/changes.ts` (the content is never copied into a change event).
+- **The modules' flags:** `INFOCUBE_BASELINE` (all six "in"), `INFODOC_BASELINE` (`document_definition` "out", F3);
+  `BASELINE_FLAGS` and `BASELINE_MODULE_TABLES` in `src/compose/tables.ts`.
+- **The migration:** `supabase/migrations/20261124120000_baselines.sql` (`version`, `updated_at/by`, `deleted_at`,
+  `name_key` with `baseline_name_uq` on live rows, the counts, `baseline_name_ck`, `baseline_note_ck`,
+  `baseline_snapshot_ck`, `baseline_counts_ck`). The schema check: `NOT_IN_DOMAIN_YET` is empty and `STORE_ONLY_COLUMNS`
+  names `baseline.snapshot` (`tests/schema/compare-schema.ts`).
+- **The port:** `baselines` in `src/data/ports.ts` (`list` newest first, `listAll`, `get`, `content`); the shared read rule
+  `src/data/baselines.ts` (`shapedBaselineContent`: the chain, then each module table's upgrade and defaults).
+- **The local adapter:** `baseline` in `DevDb` (an older file reads as none, no format step) and its rules
+  (`src/data/local/schema.ts`); `file.ts`: `baselineFolder`, each content written to `<file>.baselines/<id>.json` before the
+  data file, `readBaselineContent`, `removeBaselineFolder` (a reset and a removal empty it), and a content written into the
+  data file itself moved to its own file on read; `store.ts`: the port and the write rule.
+- **The Postgres adapter:** `STORE_ONLY_COLUMNS` and named columns for a baseline's rows (`src/data/postgres/tables.ts`), the
+  content read alone (`store.ts`), the write rule (`write.ts`), a backup reading the content with its row (`load.ts`,
+  `readOrganization`). `document_definition.baseline_id` now has its key in the local rules too.
+- **Backups and the copy:** `withBaselineContents` (`scripts/lib/backup-file.ts`): `readBackupCopy` takes a local file's
+  contents from the folder beside it and refuses a baseline without one; a pg backup holds them inline already.
+- **Composition:** `src/compose/baselines.ts` (`baselineContentNow`, `baselineContentOfRows`, `compareWith`);
+  `addBaselinesDemoData` and `DEMO_BASELINE` in `src/compose/seed.ts`, run last by `addSeedDemoData`.
+- **Scripts:** `scripts/bench-baselines.ts`; `scripts/kb-counts.ts`' baseline lines (per live workspace by number: rows,
+  bytes, time, summary; KB's baselines live and deleted). Tried on a made-up file (the demo with an organization renamed
+  "KB", removed afterwards), never on KB.
+- **Tests:** `src/domain/commands/baseline.test.ts`, `tests/baseline-compare.test.ts`, `tests/baseline-upgrade.test.ts`,
+  `tests/baseline-shape.test.ts` (the guard), `tests/baseline-store.test.ts`; the contract suite's reads (`shared.ts`), writes
+  (`writes.test.ts`: taken before every write and unchanged after them and after its rename; rename, stale rename, the
+  unique name past the command, an update carrying a content, delete, the name free again) and copy (`copy.test.ts`: a
+  backup holds the contents).
+
+### Earlier tests changed, with the reason
+
+- `src/domain/permissions.test.ts`: the role matrix gets the three new actions.
+- `tests/seed-rows-clock.test.ts`: the demo baseline's time is a fixed constant in the past (`DEMO_BASELINE.at`), not the
+  clock; the test allows exactly it.
+- `tests/infodocumenter-store.test.ts`: `document_definition.baseline_id` now has its key locally, so a source pointing to no
+  baseline is refused by the key or by the check; the test accepts either.
+- `tests/schema/compare-schema.test.ts`: `baseline` is a domain table.
+- `tests/table-registry.test.ts`: a case for the flags (every migrated table flagged; the "in" tables are the content's).
+- `tests/contract/shared.ts`, `writes.test.ts`, `copy.test.ts`: the baselines' reads, writes and backup (above).
+- No e2e spec changed.
+
+### The checks and the full run (commit `11f284b`)
+
+- CI `check` passed; Schema `migrations` and `smoke` passed (PR 93's checks).
+- Locally before the push: lint, typecheck, `npm test` (210 files, 2,520 tests passed, 13 skipped), the schema check on an
+  empty Postgres 18 (47 tables, 626 columns, RLS on every table) and the contract suite with Postgres 18 on this machine
+  (47 tests passed: reads, writes and the copy on both adapters). The throwaway server is stopped.
+- **Full run** [45425975437](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45425975437), started by hand
+  (shared infrastructure: the table registry, the local adapter, the change events' images): **882 passed, 16 skipped, 0
+  failed, 0 flaky**; wall-clock 15 min 37 s (15:28:48 to 15:44:25 UTC).
+
+| Part | Time | Heap peak |
+| --- | --- | --- |
+| 1 | 12 min | 1,391 MB |
+| 2 | 8 min | 1,203 MB |
+| 3 | 11 min | 1,126 MB |
+| 4 | 9 min | 1,659 MB |
+| 5 | 6 min | 1,642 MB |
+| 6 | 12 min | 1,163 MB |
+| 7 | 8 min | 1,700 MB |
+| 8 | 10 min | 1,062 MB |
+| 9 | 12 min | 1,351 MB |
+| 10 | 9 min | 1,189 MB |
+
+Every part is under the 2 GB mark.
+
+### The bench (`npx tsx scripts/bench-baselines.ts`, the laptop, reference figures, no bar)
+
+| | Demo, Retail Co – DWH | Performance test |
+| --- | --- | --- |
+| Rows, JSON, gzipped | about 324, 188.1 KB, 16.3 KB | about 3,569, 2,204.7 KB, 128.8 KB |
+| Content from the rows | 1.5 ms | 17.5 ms |
+| JSON of the content / parse | 0.6 ms / 0.8 ms | 11.3 ms / 8.9 ms |
+| Compare two states (5 % of attributes and columns changed) | 1.4 ms (3 changes) | 14.0 ms (83 changes) |
+| Filter | under 0.1 ms | under 0.1 ms |
+| Take one through the local adapter (read, command, write) | 13.0 ms | 86.8 ms |
+| List the baselines (no content) | 0.4 ms | 0.3 ms |
+
+The demo's "Stage 1 sign-off" compared with Now gives exactly S35-04's case: `Customer.segment_code` and REQ-105 added,
+the mapping `customers.cust_no → Customer.customer_number` "status: Draft → Approved", and `CRM · customers.cust_no`
+"type: varchar(10) → varchar(20)" (`tests/baseline-compare.test.ts`).
+
+### What differs from the plan
+
+- **The port** is `baselines.list`, `listAll` (a command's names, deleted rows too), `get` and `content` (not
+  `snapshot(id)`): the content comes back in its current shape.
+- **Two additions for files the folder does not travel with:** the local adapter moves a content written into its data
+  file into the folder on read (the contract suite and hand-made files write the file whole), and a copy from a local file
+  (`pg:kb`, `readBackupCopy`) reads the folder beside the file and refuses a baseline without its content.
+- **F20's message** for a name taken by a write at the same moment: both adapters refuse it as `conflict` "This already
+  exists" (the contract suite); the step 3 action answers that refusal with "A baseline named {name} already exists in this
+  workspace.".
+- **Rights** are checked by the domain's unit tests (every role, archived, not a member); the adapters do not decide them,
+  so the contract suite does not repeat them.
+- **The docs** (`decisions.md`, `data-model-v2.md`, CLAUDE.md's extension points and commands, README) are the closing's,
+  as planned.
