@@ -4,7 +4,8 @@
 // and the tab's number goes up. A name another baseline has in any letter case is refused and nothing is made. Every
 // member sees the list (a Reviewer, a Reader who is a guest); they do not see the form; in an archived workspace nobody does.
 import { test, expect } from "./fixtures";
-import { archive, createInBox, DEMO_BASELINE, expectToast, minute, openBaselines, rowNamed, rows, signInAs, storedBaseline, storedBaselines, tabLabel } from "./helpers";
+import { withoutScript } from "../slice-32/helpers";
+import { archive, baselinesUrl, createInBox, DEMO_BASELINE, expectToast, minute, openBaselines, rowNamed, rows, signInAs, storedBaseline, storedBaselines, tabLabel } from "./helpers";
 
 test.use({ seed: "full" });
 
@@ -65,4 +66,34 @@ test("S35-01: the tab, taking a baseline, the refused names, every member's list
   await openBaselines(page);
   await expect(rows(page)).toHaveCount(3);
   await expect(page.getByTestId("box-new-baseline")).toHaveCount(0);
+});
+
+// Step 3's acceptance: the server's HTML shows no time in any zone; the time's place keeps its width, so nothing moves when
+// the browser's time replaces it (the page with JavaScript off is what the server's HTML alone paints).
+test("S35-01: before the browser's time is known, nothing in the time's place, at the same width", async ({ page, browser, context }) => {
+  await signInAs(page, "Łukasz");
+  await openBaselines(page);
+  const time = rowNamed(page, DEMO_BASELINE.name).getByTestId("baseline-time");
+  await expect(time).toHaveText(minute(DEMO_BASELINE.at));
+  const live = (await time.boundingBox())!;
+  const utc = new Date(DEMO_BASELINE.at).toISOString().slice(0, 16).replace("T", " ");
+
+  const html = await (await page.request.get(baselinesUrl())).text();
+  expect(html).not.toContain(utc);
+  expect(html).not.toContain(minute(DEMO_BASELINE.at));
+  expect(html).toContain('data-testid="baseline-time-pending"');
+
+  const bare = await withoutScript(browser, context, "light");
+  try {
+    await bare.page.setViewportSize({ width: 1440, height: 900 });
+    await bare.page.goto(baselinesUrl());
+    const pending = rowNamed(bare.page, DEMO_BASELINE.name).getByTestId("baseline-time-pending");
+    await expect(pending).toBeHidden();
+    const width = await pending.evaluate((el) => el.getBoundingClientRect().width);
+    expect(Math.abs(width - live.width)).toBeLessThan(0.5);
+    const by = rowNamed(bare.page, DEMO_BASELINE.name).getByTestId("baseline-meta");
+    await expect(by).toContainText(" by Łukasz · ");
+  } finally {
+    await bare.context.close();
+  }
 });

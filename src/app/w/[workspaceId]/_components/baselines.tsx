@@ -42,19 +42,37 @@ export interface BaselineItem {
 }
 
 const two = (n: number) => String(n).padStart(2, "0");
-/** "yyyy-mm-dd hh:mm" in the browser's time zone; on the server (before hydration) in UTC. */
-function minuteText(iso: string, local: boolean): string {
+/** "yyyy-mm-dd hh:mm" in the browser's time zone. */
+function minuteText(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return local
-    ? `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`
-    : `${d.getUTCFullYear()}-${two(d.getUTCMonth() + 1)}-${two(d.getUTCDate())} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`;
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
 }
 const noStore = () => () => undefined;
-/** The times' formatter: the browser's time zone once hydrated (the server's HTML has UTC, replaced at hydration). */
+/** Whether the browser's time zone is known: false on the server and during hydration, true after it. */
+const useLocalTime = () => useSyncExternalStore(noStore, () => true, () => false);
+/** The times' formatter for text the browser alone draws (the dialogs open after a click): "" until the browser's time is known. */
 function useMinute(): (iso: string) => string {
-  const local = useSyncExternalStore(noStore, () => true, () => false);
-  return (iso) => minuteText(iso, local);
+  const local = useLocalTime();
+  return (iso) => (local ? minuteText(iso) : "");
+}
+// as wide as any time (tabular figures), so nothing moves when the time replaces it
+const TIME_PLACEHOLDER = "0000-00-00 00:00";
+/**
+ * A time in the list: the browser's time once known; until then (the server's HTML, hydration) nothing visible in its place,
+ * an invisible placeholder of the same width, never a time in another zone.
+ */
+function Minute({ iso }: { iso: string }) {
+  const local = useLocalTime();
+  return local ? (
+    <span className="tabular-nums" data-testid="baseline-time">
+      {minuteText(iso)}
+    </span>
+  ) : (
+    <span className="invisible tabular-nums" aria-hidden="true" data-testid="baseline-time-pending">
+      {TIME_PLACEHOLDER}
+    </span>
+  );
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
@@ -104,7 +122,7 @@ export function BaselinesTab({
                   {b.name}
                 </div>
                 <div className="text-xs text-im-ink-3" data-testid="baseline-meta">
-                  {minute(b.created_at)} by {b.by}
+                  <Minute iso={b.created_at} /> by {b.by}
                   {b.note ? ` · ${b.note}` : ""} · {plural(b.entity_count, "entity", "entities")}, {plural(b.mapping_count, "mapping")}, {plural(b.requirement_count, "requirement")}
                 </div>
               </div>

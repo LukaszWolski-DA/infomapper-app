@@ -4,6 +4,8 @@
 // changes and the list's counts stay; a rename of the baseline changes only its name and note (the same comparison
 // before and after). The content is its own file and holds what the design lists, without labels, notes or people.
 // The demo without the star ("docs"): deleting an entity needs no InfoCube cascade here.
+// The second case is driven through the page alone (Łukasz, step 3's acceptance): a Modeler's delete on the canvas, the
+// top bar's Undo and Redo, then Compare… with Now; no write goes through a test helper.
 import fs from "node:fs";
 import path from "node:path";
 import { test, expect } from "./fixtures";
@@ -22,6 +24,9 @@ import { buildPlan } from "../../src/domain/import/plan";
 import { readStandard } from "../../src/domain/import/standard";
 import { baselineContentNow } from "../../src/compose/baselines";
 import { E2E_DB } from "../config";
+import { canvasUrl, card, openCanvas } from "../slice-01a/helpers";
+import { deleteFromModel } from "../slice-15a/helpers";
+import { redoButton, undoButton } from "../slice-12a/helpers";
 import { sample } from "../slice-07a/helpers";
 import { asPersonHere, compareRows, composedStore, createInBox, expectToast, openBaselines, openCompare, renameDialog, RETAIL, rowNamed, SEED_IDS, signInAs, storedBaseline } from "./helpers";
 
@@ -138,4 +143,34 @@ test("S35-03: a baseline's content never changes: model edits, an import, undo a
     });
     return out;
   }
+});
+
+test("S35-03: through the page alone, a Modeler's delete on the canvas, Undo and Redo, then Compare… with Now", async ({ page }) => {
+  await signInAs(page, "Anna Nowak");
+  await openBaselines(page);
+  await createInBox(page, "Before the delete");
+  await expectToast(page, "Created the baseline Before the delete.");
+
+  // the delete on the canvas, through the entity's impact dialog
+  await openCanvas(page, canvasUrl());
+  await deleteFromModel(page, "Sales Order");
+  await expect(card(page, "Sales Order")).toHaveCount(0);
+  // the top bar's Undo: the entity is back
+  await expect(undoButton(page)).toBeEnabled();
+  await undoButton(page).click();
+  await expect(page.getByTestId("toast").filter({ hasText: /^Undone: / })).toBeVisible();
+  await expect(card(page, "Sales Order")).toHaveCount(1);
+  // the top bar's Redo: the app's own redo succeeds, the entity goes again
+  await expect(redoButton(page)).toBeEnabled();
+  await redoButton(page).click();
+  await expect(page.getByTestId("toast").filter({ hasText: /^Redone: / })).toBeVisible();
+  await expect(card(page, "Sales Order")).toHaveCount(0);
+  const m = await composedStore().model.load(RETAIL);
+  expect(m.entities.some((e) => e.name === "Sales Order")).toBe(false);
+
+  // Compare… with Now shows the entity removed
+  await openBaselines(page);
+  const dialog = await openCompare(page, "Before the delete");
+  const removed = await compareRows(dialog.getByTestId("compare-group-removed"));
+  expect(removed.some((r) => r.startsWith("Entity | Sales Order"))).toBe(true);
 });
