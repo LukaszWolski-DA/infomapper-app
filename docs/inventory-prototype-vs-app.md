@@ -1,4 +1,4 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 32's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 35's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
@@ -6,7 +6,7 @@ every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
 them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`); at slice 15b's close (5 November 2026) the fact's and dimension's descriptions and role-playing dimensions were marked present, with their deliberate differences; at slice 15c's close (5 November 2026) dimensional mappings and "fed" coverage were marked present, with their deliberate differences. At slice 16's close (6 November 2026) the prototype was replaced by its version with the canvas menus (`docs/prd/slice-16-canvas-menus.md`), and its items 1 to 3 and 7 were marked present, with their deliberate differences (`docs/prd/slice-16-acceptance.md`). At slice 17's close (8 November 2026) the prototype was replaced by its version with the modelling ergonomics (`docs/prd/slice-17-modelling-ergonomics.md`), and its five items were marked present, with their deliberate differences (`docs/prd/slice-17-acceptance.md`, P1 to P12). At slice 18's close (8 November 2026) the prototype was replaced by its version with derivations (`docs/prd/slice-18-derivations.md`): calculated attributes and lookups were marked present, with their deliberate differences (`docs/prd/slice-18-acceptance.md`, P1 to P13). At slice 23's close (10 November 2026) the prototype was replaced by its version with the Metadata conventions tab (`docs/prd/slice-23-metadata-conventions.md`): the tab, Settings' "Model conventions" box and the language at a workspace's creation were marked present, with their deliberate differences (`docs/prd/slice-23-acceptance.md`). At slice 27's close (15 November 2026) the prototype was replaced by its version with the editor's resizable side panels (`docs/prd/slice-27-infodocumenter-figures.md`): InfoDocumenter's figures, the star diagram, the list of figures, the smallest names, the canvas's page outline and the resizable side panels were marked present, with their deliberate differences (`docs/prd/slice-27-acceptance.md`). The earlier inventory (15 October 2026,
-against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
+against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history. At slice 35's close (24 November 2026) the prototype was replaced by its version with the Baselines tab (`docs/prd/slice-35-baselines.md`; 990,528 bytes): baselines were marked present, with their deliberate differences (`docs/prd/slice-35-acceptance.md`, sections 4 and 10); documents from a baseline stay planned (slice 36).
 
 **How it was checked**
 - **The new prototype is the old one plus the source importer.** Slice 7a's step 1 compared the two files hunk by hunk
@@ -33,9 +33,9 @@ docs (some are repeated below where they explain an item).
 | Mappings | suggested mappings; re-pointing a mapping to another attribute | – |
 | Sources | only ideas: slice 7c's ideas (see Sources) | idea |
 | Labels and notes | rich text in notes | known limitation |
-| Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer | baselines: decision only (AD-03, AD-14); the rest: – |
+| Projects and workspace | workspace export, export and delete, duplicate, transfer | – |
 | Settings and roles | inviting people by e-mail (slice 8 adds them at once instead) | database (AD-04) |
-| InfoDocumenter | logos, versions, links, documents from a baseline, changes since a baseline, Markdown | idea (slices C to E, baselines; `docs/ideas.md`) |
+| InfoDocumenter | logos, versions, links, documents from a baseline, changes since a baseline | idea (slice D; documents from a baseline: slice 36) |
 
 ## Canvas
 
@@ -356,7 +356,6 @@ nothing, D-26), notes, and their chips in the view-state bar (6a).
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Baselines | a named frozen snapshot; "Compare with now", "Mapping specification", "Data dictionary", delete | `wsTab` "baselines", `diffModels`, `compareBaseline`, `docFromBaseline` | decision only (AD-03, AD-14) |
 | Workspace export | the whole workspace as one JSON file | `data-wa="export"` | – |
 | Export and delete a workspace | delete after showing the full export (Owner only) | `data-wa="delete"` | – |
 | Duplicate a workspace | a copy of the workspace | `data-wa="dup"` | – **(uncertain** what the copy includes) |
@@ -367,6 +366,23 @@ nothing, D-26), notes, and their chips in the view-state bar (6a).
 | Thumbnails on the canvas tiles | a sketch of each canvas's layout in its tile's strip; "Empty canvas" | `thumb`, `renderHome` | **done** (slice 12b, D-29, AD-32) |
 | A canvas tile's frame count | "{n} cards, {m} frames. Also in …" | `renderHome` | **done** (slice 12b, D-29) |
 | A project tile's thumbnail on the workspace home | the project's first canvas | `renderWsHome` (`thumb(cs[0])`) | **done** (slice 12b, P8) |
+
+**Present (slice 35, D-87):** the Baselines tab (the intro, the New baseline box, the list with its counts, Compare…,
+Rename, Delete baseline) and the Compare dialog (Compared with, Filter, Kind; Added, Changed, Removed). The deliberate
+differences (`docs/prd/slice-35-acceptance.md`, section 10):
+- the workspace home is a page of its own, without the canvas's side panels, so the tab is wider;
+- "Create baseline" and Save are in the app's primary colour (the prototype's mapping green);
+- "New document from it" and "Make a document" are slice 36's;
+- the counts are logical entities, source-to-logical mappings and requirements, as the Overview (the prototype counts
+  facts and dimensions too);
+- the demo's "Stage 1 sign-off" is today's demo minus four items, so Compare shows 4 changes (the prototype's predates its
+  star and shows 57) and 5 requirements (the prototype's 4: REQ-210 is the star's);
+- People (n) counts members (the prototype counts a pending invitee);
+- the times are the browser's, nothing in their place until it is known (the prototype's are fixed texts);
+- "Comparing…" while the server compares (the prototype compares in the page);
+- references are compared by id and shown by name: a rename is one change (the prototype compares names, so a rename
+  changes every row that names it);
+- long unbroken names break anywhere in the dialogs and the list (the prototype lets them run on).
 
 **Present:** workspaces, projects and canvases as in the earlier inventory; the empty workspace's next steps name
 importing sources (7a); "New organization…" in the organization menu (slice 8, item 9), with a password, the first
@@ -490,14 +506,14 @@ once in a dimension's delete preview; paste within one level only (the prototype
 
 ## InfoDocumenter
 
-The prototype is slice 34's (`docs/prd/slice-34-markdown.md`; 980,246 bytes: slice 27's with the Markdown dialog). What
+The prototype is slice 35's (`docs/prd/slice-35-baselines.md`; 990,528 bytes: slice 34's with the Baselines tab). What
 it has that the app does not:
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
 | Logos | the organization's and the client's, on the title page and in the header; "Also in the page header" | the editor's Document panel, InfoDocumenter's box | idea (slice D) |
 | Versions and links | "Generate version", the versions list, links for people outside the workspace, the recipient's view | the Documentation tab, the editor's top bar | idea (slice D) |
-| Documents from a baseline | a document's source a baseline; "Changes since a baseline"; the sign-off preset | the Documentation tab, the Baselines tab | idea (baselines' slice) |
+| Documents from a baseline | a document's source a baseline; "Changes since a baseline"; the sign-off preset; "New document from it" and "Make a document" | the Documentation tab, the Baselines tab | slice 36 |
 | Settings for links and guests | "Modelers may share links", "Guests may generate versions, print and share links" | InfoDocumenter's box | idea (slice D) |
 | Light markup in Text | "- " lists, **bold**, _italic_ | the Text section | idea (D-81: plain text for now) |
 

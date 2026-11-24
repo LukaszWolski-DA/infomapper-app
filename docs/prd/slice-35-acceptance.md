@@ -811,6 +811,23 @@ controls, the line, the groups' headings and colours, the tables' columns, "Noth
 
 Łukasz's acceptance on `dev:pg` with the demo accounts found two bugs; both are fixed in `8f8cc0c` on draft PR #93.
 
+### The acceptance, criterion by criterion (Łukasz, 24 November 2026, on `dev:pg` with the demo accounts)
+
+- **S35-01:** accepted.
+- **S35-02:** accepted:
+  - a rename with a taken name is refused;
+  - a rename and a note are saved, and Cancel saves nothing;
+  - a delete with Cancel, then Delete; the name is free again;
+  - Ctrl+Z leaves the baselines untouched;
+  - Anna as Modeler has no Delete;
+  - Kasia as Reader has the list and Compare only.
+- **S35-03 and S35-04:** accepted after the two fixes of `8f8cc0c` (below).
+- **S35-05:** Łukasz's step 4 on `infomapper-dev`:
+  - `pg:backup` wrote `kb-20261124-1922.json` (4,871 rows);
+  - `pg:migrate` applied `20261124120000_baselines.sql` (24 migrations before it);
+  - `pg:backup` wrote `kb-20261124-1924.json` (4,871 rows, every table's count the same as before the migration).
+- **The archived workspace** is left to the e2e specs (S35-01, S35-02, S35-04).
+
 ### Bug 1: renames showed as changes on every row that points to the renamed one
 
 **What Łukasz saw:** he renamed the entity Customer and approved customers.dob → Customer.birth_date (In review →

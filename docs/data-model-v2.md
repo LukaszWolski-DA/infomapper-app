@@ -704,16 +704,41 @@ history in the server's memory (Q4 (a)). Migration `20261119120000_undo_step.sql
 | `created_at` | timestamptz | no | |
 
 ### `baseline`
-A frozen, named snapshot of the model part of a workspace (AD-03, AD-14).
+A frozen, named snapshot of the model part of a workspace (AD-03, AD-14, D-87; built in slice 35, migration
+`20261124120000_baselines.sql`). A row is created whole, renamed (name and note only) and soft-deleted; its content never
+changes. Outside undo; every write has its change event, whose images leave `snapshot` out.
 
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
 | `id`, `workspace_id` | uuid | no | |
-| `name` | text | no | e.g. “Stage 1 sign-off” |
-| `note` | text | yes | |
-| `created_at`, `created_by` | | no | |
-| `snapshot` | jsonb | no | concepts, entities, attributes, relationships, sources, mappings with inputs, requirements with links |
-| `snapshot_schema` | integer | no | version of the snapshot format, starts at 1 |
+| `version` | integer | no | AD-12; a rename is saved with the version the page read |
+| `name` | text | no | trimmed, 1 to 120 characters (CHECK `baseline_name_ck`), e.g. “Stage 1 sign-off” |
+| `name_key` | text | no | written by the server: the name trimmed, in lower case, repeated spaces as one; unique among live rows of a workspace (`baseline_name_uq`, partial on `deleted_at is null`; the local adapter's uniqueness rule the same) |
+| `note` | text | yes | trimmed, 1 to 1,000 characters, or null (CHECK `baseline_note_ck`) |
+| `created_at`, `created_by` | | no | when and by whom it was taken |
+| `updated_at`, `updated_by` | | no | the last rename or the delete (who deleted it) |
+| `deleted_at` | timestamptz | yes | soft delete (AD-12); the name is free again |
+| `snapshot` | jsonb | no | the content (below), a JSON object (CHECK `baseline_snapshot_ck`); written by the insert only, never read with the row |
+| `snapshot_schema` | integer | no | the content's format, 1 since slice 35; read through the upgrade chain |
+| `entity_count`, `mapping_count`, `requirement_count` | integer | no | the list's summary, written with the row and never changed: logical entities, source-to-logical mappings, requirements (as the Overview counts them); CHECK `baseline_counts_ck` (≥ 0, and `snapshot_schema` ≥ 1) |
+
+**The content** (`BaselineContent`, `src/domain/baseline/content.ts`, projected from `store.snapshot`, one consistent
+read): the live rows of the tables the table registry flags "in" (`BASELINE_TABLES`, `BASELINE_FLAGS`; a table without a
+flag fails the guard test), with both ends live for link tables: the model (concepts, entities, attributes with their
+calculation inputs, relationships, stereotypes, source systems, tables and columns, their keys, classifications and their
+links, mappings with inputs, the deleted originals that live copies point to as id, name and entity name), requirements
+and their links, projects, canvases, their items and frames, every module's model tables (InfoCube's;
+InfoDocumenter's `document_definition` is "out"), and the settings `dv2_mode`, `four_eyes`, `naming_conventions` and
+`infocube`. Left out: labels and their links, project pins, notes, change events, source changes and imports, people,
+members and access.
+
+**Where it is stored:** on Postgres in `snapshot`; read alone, by its id, only when compared; the baselines' reads name
+their columns without it (`ROW_COLUMNS`, `STORE_ONLY_COLUMNS`). In the local file each content is its own file
+`<data file>.baselines/<id>.json`, written before the data file; a content found inline in the data file (a hand-made or
+copied file) is moved into the folder on read; no format step (the table is optional in a format-18 file).
+`pg:backup` and `pg:restore` carry each baseline with its content inline.
+
+---
 
 ---
 
