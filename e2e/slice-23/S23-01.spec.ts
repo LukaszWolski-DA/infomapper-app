@@ -15,7 +15,8 @@ const codesIn = (page: Page, scope: "column" | "table") =>
 
 test("S23-01: the tab between People and Settings with every built-in row, codes, English definitions and uses", async ({ page }) => {
   await openConventions(page);
-  await expect(page.locator('[role="tablist"] [role="tab"]')).toHaveText(["Overview", /^People \(\d+\)$/, "Metadata conventions", "Settings"]);
+  // slice 35 (B1.1): Baselines, a home tab of its own, before People
+  await expect(page.locator('[role="tablist"] [role="tab"]')).toHaveText(["Overview", /^Baselines \(\d+\)$/, /^People \(\d+\)$/, "Metadata conventions", "Settings"]);
   await expect(page.getByTestId("tab-conventions")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("text-conventions-intro")).toHaveText(
     "The workspace's conventions, in one place. The import matches classifications by their name or code; table and column panels set them; entity panels offer the stereotypes; documents and exports print their definitions.",
