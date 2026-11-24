@@ -746,6 +746,28 @@ export interface Note extends StandardColumns {
 
 export type RowImage = Record<string, unknown>;
 
+/**
+ * A baseline (slice 35, D-87; AD-03, AD-14): the state of a whole workspace's model at a moment, with a name. Only the name
+ * and the note change (each with the row's version, D-59); a delete is soft. Outside undo; every write a change event. Its
+ * content (`baseline.snapshot` in SQL, a file of its own locally) is never part of this row: only the insert's write
+ * carries it (`BaselineInsert`), the change events leave it out (`IMAGE_LEFT_OUT`) and the store reads it apart
+ * (`baselines.snapshot`), so a rename never writes it and a list never reads it. The three counts are the list's summary,
+ * written with the row and never changed: logical entities, mappings and requirements, as the Overview counts them.
+ */
+export interface Baseline extends StandardColumns {
+  /** Trimmed, 1 to 120 characters. */
+  name: string;
+  /** The name in lower case with repeated spaces as one: unique among the workspace's live baselines. */
+  name_key: string;
+  /** Trimmed, at most 1,000 characters; null when empty. */
+  note: string | null;
+  /** The content's format when it was taken (`SNAPSHOT_SCHEMA`, `src/domain/baseline/upgrade.ts`). */
+  snapshot_schema: number;
+  entity_count: number;
+  mapping_count: number;
+  requirement_count: number;
+}
+
 export interface ChangeEvent {
   id: Uuid;
   workspace_id: Uuid;
@@ -799,6 +821,7 @@ export interface CoreWritableRows {
   label_link: LabelLink;
   project_pinned_label: ProjectPinnedLabel;
   note: Note;
+  baseline: Baseline;
 }
 export type CoreTable = keyof CoreWritableRows;
 

@@ -87,13 +87,19 @@ export const SECRET_COLUMNS: Partial<Record<WritableTable, readonly string[]>> =
   password_reset: ["token_hash"],
   app_user: ["auth_user_id"],
 };
+/**
+ * Columns a change event's images leave out entirely (slice 35, step 1's F2): a baseline's content, which only its
+ * insert carries. Not secret, only large: the history says that a baseline was taken, renamed or deleted.
+ */
+export const IMAGE_LEFT_OUT: Partial<Record<WritableTable, readonly string[]>> = { baseline: ["snapshot"] };
 export const SECRET_CHANGED = "(changed)";
 export const SECRET_UNCHANGED = "(unchanged)";
 
 function images(write: Write): { before: RowImage | null; after: RowImage | null } {
-  const before = write.kind === "insert" ? null : image(write.before);
+  const leftOut = IMAGE_LEFT_OUT[write.table] ?? [];
+  const before = write.kind === "insert" ? null : image(write.before, leftOut);
   // A removed link row has no after state (data model, change_event).
-  const after = write.kind === "remove" ? null : image(write.row);
+  const after = write.kind === "remove" ? null : image(write.row, leftOut);
   for (const column of SECRET_COLUMNS[write.table] ?? []) {
     // a column neither image has stays out (slice 33: `app_user` without an account, as on the local adapter)
     if (!(before && column in before) && !(after && column in after)) continue;
@@ -115,7 +121,9 @@ function operation(write: Write): ChangeOperation {
   return "update";
 }
 
-const image = (row: object): RowImage => structuredClone(row) as RowImage;
+/** A row's image: a copy, without the columns left out (copied first, so a baseline's content is never cloned). */
+const image = (row: object, leftOut: readonly string[] = []): RowImage =>
+  structuredClone(leftOut.length ? Object.fromEntries(Object.entries(row).filter(([k]) => !leftOut.includes(k))) : row) as RowImage;
 
 /** Builds the write set for one user action: one change event per written row, one change group. */
 export function buildWriteSet(ctx: CommandContext, workspaceId: Uuid, writes: Write[]): WriteSet {

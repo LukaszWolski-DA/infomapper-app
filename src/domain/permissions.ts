@@ -27,6 +27,10 @@ export const WORKSPACE_ACTIONS = [
   "requirement.set_status",
   "people.edit",
   "module.own_objects",
+  // slice 35 (D-87): baselines
+  "baseline.create",
+  "baseline.rename",
+  "baseline.delete",
 ] as const;
 export type WorkspaceAction = (typeof WORKSPACE_ACTIONS)[number];
 
@@ -66,6 +70,11 @@ export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]>
   // InfoDocumenter private document); every role, never in an archived workspace. What else a module allows on its
   // objects is the module's own rule (InfoDocumenter's rights).
   "module.own_objects": ALL_ROLES,
+  // slice 35 (D-87, the design of 11 November 2026): taking and renaming a baseline for editors, deleting it for owners
+  // and admins; reading the list and comparing is `workspace.view`
+  "baseline.create": EDITORS,
+  "baseline.rename": EDITORS,
+  "baseline.delete": ["owner", "admin"],
 };
 
 /** Actions that remain possible while the workspace is archived (AD-09). */
@@ -93,6 +102,9 @@ const ACTION_TEXT: Record<WorkspaceAction, string> = {
   "requirement.set_status": "change requirements",
   "people.edit": "change who has access",
   "module.own_objects": "make your own documents",
+  "baseline.create": "create baselines",
+  "baseline.rename": "rename baselines",
+  "baseline.delete": "delete baselines",
 };
 
 /** Refusals worded for the role rather than the action (slice 4a, PRD item 12). */

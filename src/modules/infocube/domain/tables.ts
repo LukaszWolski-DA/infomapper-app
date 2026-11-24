@@ -1,6 +1,7 @@
 // How undo treats InfoCube's tables (slice 15a, AD-33, E1; `cube_key` since slice 15b, the dimensional mappings since 15c): all are in the undo history, so deleting an entity or an
 // attribute together with its InfoCube rows is one step that one undo brings back (X-4).
 
+import type { BaselineFlag } from "@/domain/baseline/tables";
 import { statusOnlyEvent, type ModuleRevertRefusal, type ModuleTableClass } from "@/domain/commands/undo";
 import { AGGREGATE_TEXTS, aggregateIndex } from "./aggregates";
 import type { CubeEntity, InfoCubeTable } from "./types";
@@ -31,6 +32,16 @@ export const aggregateRevertRefusal: ModuleRevertRefusal = (rows, touched) => {
 /** A lookup whose relationship is deleted (slice 18, F16): an approved one goes back to review; any other is left. */
 export const lookupLosesRelationship = (row: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> | null =>
   row.kind === "lookup" && row.status === "approved" ? { status: "review", approved_by: null, approved_at: null } : null;
+
+/** InfoCube's tables in a baseline (slice 35, D-87): all of them, its description of the dimensional model. */
+export const INFOCUBE_BASELINE: Readonly<Record<InfoCubeTable, BaselineFlag>> = {
+  cube_entity: "in",
+  cube_measure: "in",
+  cube_key: "in",
+  cube_mapping: "in",
+  cube_mapping_input: "in",
+  cube_attribute: "in",
+};
 
 export const INFOCUBE_UNDO: Readonly<Record<InfoCubeTable, ModuleTableClass>> = {
   cube_entity: {
