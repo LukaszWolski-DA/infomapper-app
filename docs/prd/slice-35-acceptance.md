@@ -770,9 +770,9 @@ difference, with its reason:
    changes; the prototype's baseline predates its star and shows 57.
 6. **People (4)** against the prototype's (5): the prototype counts a pending invitee; the app counts members (slice 33,
    unchanged).
-7. **The times** are the browser's (Łukasz's answer 1); before hydration the server's HTML shows UTC for a moment.
+7. **The times** are the browser's (Łukasz's answer 1); until the browser's time is known nothing shows in their place (the fix below).
 8. **"Comparing…"** shows in the list while the server answers (the prototype compares in the page at once).
-9. **Requirements in the counts** differ by one from the prototype's demo (the app's demo has REQ-210, slice 15d).
+9. **Requirements in the counts:** 5 in the app against the prototype's 4: both baselines leave out REQ-105, and the app's, built from today's demo, holds REQ-210 (the Sales star's, slice 15d), which the prototype's baseline predates.
 
 Nothing else differs: the intro's text, the box's two fields and their sizes, the row's grid (name, the line under it,
 the buttons below), the buttons' order (Compare…, Rename, Delete baseline), the danger colour, the dialogs' subtitles,
@@ -787,3 +787,22 @@ controls, the line, the groups' headings and colours, the tables' columns, "Noth
   runs too), so the helper's history differs from the app's. Not the app's behaviour; noted, not chased in this slice.
 - **The dialogs' paragraphs** got the prototype's 1em margins in a commit after the first push (`e58cc93`), so the full
   run was started again on it.
+
+### Step 3's two fixes (Łukasz's acceptance, 24 November 2026; commit `ff95fe1`)
+
+- **The redo, through the page alone:** a second case in `S35-03` drives everything through the page, with no test
+  helper writing the model. Anna Nowak (Modeler) takes a baseline in the box, deletes "Sales Order" on "Customer & orders"
+  through its impact dialog, and uses the top bar's Undo ("Undone: …", the card back) and Redo ("Redone: …", the card
+  gone, the entity deleted in the data). Compare… with Now then lists "Entity | Sales Order" under Removed. **The app's own
+  redo succeeds:** the refusal seen in step 3 came from the test's helper, which skips `runCommand`'s live-canvas step. No
+  bug, nothing fixed in the app.
+- **No time before hydration:** the list's time (`Minute` in `baselines.tsx`) renders, until the browser's time is known,
+  an invisible placeholder `0000-00-00 00:00` (`aria-hidden`, tabular figures, the same width as any time), never a time
+  in another zone. The dialogs open only after a click, so their times (the Rename dialog's sentence, Compare's line and
+  "Compared with") are always the browser's; their formatter gives "" before then. A second case in `S35-01` checks it:
+  the server's HTML holds neither the UTC nor the local time and has the placeholder, and with JavaScript off the
+  placeholder is hidden and as wide as the time in the live page (within 0.5 px).
+- **Requirement counts:** item 9 above now gives the reason (the app's baseline holds REQ-210, the prototype's predates
+  the star).
+- **Checks on `ff95fe1`:** CI `check`, Schema `migrations` and `smoke` passed. Locally: lint, typecheck, `npm test`
+  (2,520 passed, 13 skipped), `e2e/slice-35` with S23-01 (11 passed). No full run for these two (the closing's follows).
