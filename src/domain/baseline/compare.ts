@@ -2,7 +2,10 @@
 // pure function, two contents in, the changes out, shared with slice 36's section. Seven kinds, both model levels (a
 // fact or a dimension is an Entity, its attributes Attributes; InfoCube's own rows are not compared). Added, changed and
 // removed by id; a change lists every field that differs, a short value as old → new and a long text as "(changed)".
-// Ids are shown by name, each in the state it belongs to. Order, places, times, versions, ids and who changed are not
+// Ids are shown by name, each in the state it belongs to, and compared as ids (step 5, Łukasz's acceptance): a reference
+// field (a mapping's target and source columns, an entity's concept and stereotype, a table's system, a requirement's
+// parent, the classifications) differs only when it points to other rows, a list as a set; a rename is one change, on the
+// renamed row. Order, places, times, versions, ids and who changed are not
 // compared. The words are `words.ts`'s; nothing here is English text but the model's own names.
 
 import { stereotypeIndex } from "../model/stereotypes";
@@ -44,11 +47,17 @@ export interface BaselineChange {
   readonly fields: readonly FieldChange[];
 }
 
+/**
+ * A short field: its name, the value shown, and for a reference what it is compared by (its id, or its ids sorted as a
+ * set); without one the value shown is compared.
+ */
+type Short = readonly [FieldName, CompareValue] | readonly [FieldName, CompareValue, Uuid | string | null | readonly string[]];
+
 /** An item as compared: its short fields and its long texts (compared, never shown). */
 interface Item {
   readonly id: Uuid;
   readonly label: string;
-  readonly short: readonly (readonly [FieldName, CompareValue])[];
+  readonly short: readonly Short[];
   readonly long: readonly (readonly [FieldName, string | null])[];
 }
 
@@ -67,16 +76,19 @@ function itemsOf(c: BaselineContent): Record<ItemKind, Item[]> {
   const requirement = new Map(c.requirements.map((r) => [r.id, r]));
   const stereotypes = stereotypeIndex(m.stereotypes);
   const classification = new Map(m.classifications.map((x) => [x.id, x.name]));
-  const classesOf = new Map<Uuid, string[]>();
+  const classesOf = new Map<Uuid, Uuid[]>();
   for (const k of m.classificationLinks) {
     const target = k.source_column_id ?? k.source_table_id;
-    const name = classification.get(k.classification_id);
-    if (!target || name === undefined) continue;
+    if (!target || !classification.has(k.classification_id)) continue;
     const list = classesOf.get(target) ?? [];
-    list.push(name);
+    list.push(k.classification_id);
     classesOf.set(target, list);
   }
-  const classes = (id: Uuid): string[] => [...(classesOf.get(id) ?? [])].sort((a, b) => a.localeCompare(b));
+  /** A table's or a column's classifications: shown by name, compared as the set of their ids. */
+  const classes = (id: Uuid): Short => {
+    const ids = classesOf.get(id) ?? [];
+    return ["classifications", ids.map((x) => classification.get(x)!).sort((a, b) => a.localeCompare(b)), setOf(ids)];
+  };
   const entityName = (id: Uuid) => entity.get(id)?.name ?? "?";
   const attributeLabel = (id: Uuid) => {
     const a = attribute.get(id);
@@ -90,10 +102,10 @@ function itemsOf(c: BaselineContent): Record<ItemKind, Item[]> {
     const x = column.get(id);
     return x ? `${table.get(x.source_table_id)?.name ?? "?"}.${x.name}` : "?";
   };
-  const inputs = new Map<Uuid, string[]>();
+  const inputs = new Map<Uuid, Uuid[]>();
   for (const i of m.mappingInputs) {
     const list = inputs.get(i.mapping_id) ?? [];
-    list.push(columnShort(i.source_column_id));
+    list.push(i.source_column_id);
     inputs.set(i.mapping_id, list);
   }
 
@@ -101,7 +113,12 @@ function itemsOf(c: BaselineContent): Record<ItemKind, Item[]> {
     entity: m.entities.map((e) => ({
       id: e.id,
       label: e.name,
-      short: [["name", e.name], ["alias", text(e.alias)], ["stereotype", stereotypes.name(e.stereotype)], ["concept", concept.get(e.concept_id) ?? "?"]],
+      short: [
+        ["name", e.name],
+        ["alias", text(e.alias)],
+        ["stereotype", stereotypes.name(e.stereotype), e.stereotype],
+        ["concept", concept.get(e.concept_id) ?? "?", e.concept_id],
+      ],
       long: [["definition", text(e.definition_html)]],
     })),
     attribute: m.attributes.map((a) => ({
@@ -121,15 +138,16 @@ function itemsOf(c: BaselineContent): Record<ItemKind, Item[]> {
       long: [["definition", text(a.definition_html)], ["rule", text(a.calc_rule)]],
     })),
     mapping: m.mappings.map((x) => {
-      const from = inputs.get(x.id) ?? [];
+      const ids = inputs.get(x.id) ?? [];
+      const from = ids.map(columnShort);
       return {
         id: x.id,
         label: `${from.join(", ") || "?"} → ${attributeLabel(x.attribute_id)}`,
         short: [
           ["status", coded("mapping_status", x.status)],
           ["kind", coded("mapping_kind", x.kind)],
-          ["source_columns", from],
-          ["target_attribute", attributeLabel(x.attribute_id)],
+          ["source_columns", from, setOf(ids)],
+          ["target_attribute", attributeLabel(x.attribute_id), x.attribute_id],
         ],
         long: [["rule", text(x.rule_expression)], ["note", text(x.note_html)]],
       };
@@ -159,7 +177,7 @@ function itemsOf(c: BaselineContent): Record<ItemKind, Item[]> {
         ["severity", coded("requirement_severity", r.severity)],
         ["owner", text(r.owner_name)],
         ["external_ref", text(r.external_ref)],
-        ["parent", r.parent_id === null ? null : (requirement.get(r.parent_id)?.key ?? "?")],
+        ["parent", r.parent_id === null ? null : (requirement.get(r.parent_id)?.key ?? "?"), r.parent_id],
       ],
       long: [["description", text(r.description_html)], ["expression", text(r.expression)]],
     })),
@@ -168,13 +186,13 @@ function itemsOf(c: BaselineContent): Record<ItemKind, Item[]> {
       label: tableLabel(t.id),
       short: [
         ["name", t.name],
-        ["system", system.get(t.source_system_id) ?? "?"],
+        ["system", system.get(t.source_system_id) ?? "?", t.source_system_id],
         ["database", text(t.database_name)],
         ["schema", text(t.schema_name)],
         ["object_type", coded("object_type", t.object_type)],
         ["file_format", text(t.file_format)],
         ["missing", t.missing_since !== null],
-        ["classifications", classes(t.id)],
+        classes(t.id),
       ],
       long: [["comment", text(t.comment)], ["note", text(t.note_html)]],
     })),
@@ -190,7 +208,7 @@ function itemsOf(c: BaselineContent): Record<ItemKind, Item[]> {
         ["default", text(x.default_value)],
         ["not_needed", x.not_needed],
         ["missing", x.missing_since !== null],
-        ["classifications", classes(x.id)],
+        classes(x.id),
       ],
       long: [["comment", text(x.comment)], ["note", text(x.note_html)]],
     })),
@@ -198,6 +216,12 @@ function itemsOf(c: BaselineContent): Record<ItemKind, Item[]> {
 }
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+/** Ids as a set: sorted, each once. */
+function setOf(ids: readonly Uuid[]): string[] {
+  return [...new Set(ids)].sort();
+}
+/** What a short field is compared by: its reference's id or ids, else the value shown. */
+const keyOf = (s: Short): unknown => (s.length === 3 ? s[2] : s[1]);
 const byLabel = (a: BaselineChange, b: BaselineChange) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
 
 /**
@@ -221,9 +245,9 @@ export function compareBaselines(older: BaselineContent, newer: BaselineContent)
         continue;
       }
       const fields: FieldChange[] = [];
-      for (const [i, [field, value]] of y.short.entries()) {
-        const old = x.short[i]![1];
-        if (!same(old, value)) fields.push({ field, before: old, after: value });
+      for (const [i, now] of y.short.entries()) {
+        const then = x.short[i]!;
+        if (!same(keyOf(then), keyOf(now))) fields.push({ field: now[0], before: then[1], after: now[1] });
       }
       for (const [i, [field, value]] of y.long.entries()) if (!same(x.long[i]![1], value)) fields.push({ field, long: true });
       if (fields.length) changed.push({ kind, change: "changed", id: y.id, label: y.label, fields });

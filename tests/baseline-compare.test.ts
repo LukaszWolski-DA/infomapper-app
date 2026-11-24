@@ -163,3 +163,79 @@ describe("comparing (B4.2, B4.6)", () => {
     expect(olderFirst(null, b)).toEqual([b, null]);
   });
 });
+
+// Step 5 (Łukasz's acceptance): a reference is compared by its id and shown by name; a rename is one change, on the
+// renamed row, never on the rows that point to it.
+describe("references compared by id, shown by name (step 5)", () => {
+  type Model = { [K in keyof BaselineContent["model"]]: BaselineContent["model"][K] extends readonly (infer R)[] ? R[] : never };
+  function edited(edit: (m: Model, c: Mutable) => void): { now: BaselineContent; changes: BaselineChange[] } {
+    const { now } = demo();
+    const after = mutable(now);
+    edit(after.model as unknown as Model, after);
+    return { now, changes: compareBaselines(now, after as unknown as BaselineContent) };
+  }
+  const only = (changes: BaselineChange[]) => {
+    expect(changes).toHaveLength(1);
+    return changes[0]!;
+  };
+
+  it("an entity renamed: one change, its name; its attributes, mappings and relationships unchanged", () => {
+    const c = only(edited((m) => { m.entities.find((e) => e.name === "Customer" && e.model_level === "logical")!.name = "Client"; }).changes);
+    expect(line(c)).toBe("changed Entity Client: name: Customer → Client");
+  });
+  it("an attribute renamed: one change; the mappings to it unchanged", () => {
+    const c = only(edited((m) => { const e = m.entities.find((x) => x.name === "Customer" && x.model_level === "logical")!; m.attributes.find((a) => a.entity_id === e.id && a.name === "birth_date")!.name = "date_of_birth"; }).changes);
+    expect(line(c)).toBe("changed Attribute Customer.date_of_birth: name: birth_date → date_of_birth");
+  });
+  it("a source table renamed: one change; its columns and the mappings reading them unchanged", () => {
+    const c = only(edited((m) => { m.sourceTables.find((t) => t.name === "customers")!.name = "clients"; }).changes);
+    expect(line(c)).toBe("changed Source table CRM · clients: name: customers → clients");
+  });
+  it("a source column renamed: one change; the mappings reading it unchanged", () => {
+    const c = only(edited((m) => { m.sourceColumns.find((x) => x.name === "dob")!.name = "birth_dt"; }).changes);
+    expect(line(c)).toBe("changed Source column CRM · customers.birth_dt: name: dob → birth_dt");
+  });
+  it("a concept renamed: no entity changes (concepts are not compared as items)", () => {
+    expect(edited((m) => { const e = m.entities.find((x) => x.name === "Customer" && x.model_level === "logical")!; m.concepts.find((x) => x.id === e.concept_id)!.name = "Party"; }).changes).toEqual([]);
+  });
+  it("a stereotype renamed: no entity changes", () => {
+    const { now } = demo();
+    const used = now.model.entities.find((e) => e.stereotype !== null)!.stereotype!;
+    const { changes } = edited((m) => { m.stereotypes.find((x) => x.code === used)!.name = "Renamed stereotype"; });
+    expect(changes).toEqual([]);
+  });
+  it("a classification renamed: no table or column changes", () => {
+    expect(edited((m) => { m.classifications.find((x) => x.code === "PII")!.name = "Sensitive"; }).changes).toEqual([]);
+  });
+
+  it("a mapping pointed at another attribute: its target old → new by name", () => {
+    const { changes } = edited((m) => {
+      const e = m.entities.find((x) => x.name === "Customer" && x.model_level === "logical")!;
+      const birth = m.attributes.find((a) => a.entity_id === e.id && a.name === "birth_date")!;
+      const email = m.attributes.find((a) => a.entity_id === e.id && a.name === "email")!;
+      m.mappings.find((x) => x.attribute_id === birth.id)!.attribute_id = email.id;
+    });
+    expect(line(only(changes))).toBe("changed Mapping customers.dob → Customer.email: target attribute: Customer.birth_date → Customer.email");
+  });
+  it("a column's classifications changed: old → new by name", () => {
+    const { changes } = edited((m) => {
+      const col = m.sourceColumns.find((x) => x.name === "dob")!;
+      const bk = m.classifications.find((x) => x.code === "BK" && x.deleted_at === null)!;
+      m.classificationLinks.push({ ...m.classificationLinks[0]!, id: "01a0f9e9-2035-7000-8000-00000000c002", classification_id: bk.id, source_table_id: null, source_column_id: col.id });
+    });
+    expect(line(only(changes))).toBe("changed Source column CRM · customers.dob: classifications: Personal data → Business key, Personal data");
+  });
+
+  it("Łukasz's case: Customer renamed and customers.dob → Customer.birth_date approved: exactly two changes", () => {
+    const { changes } = edited((m) => {
+      const e = m.entities.find((x) => x.name === "Customer" && x.model_level === "logical")!;
+      e.name = "Client";
+      const birth = m.attributes.find((a) => a.entity_id === e.id && a.name === "birth_date")!;
+      m.mappings.find((x) => x.attribute_id === birth.id)!.status = "approved";
+    });
+    expect(changes.map(line)).toEqual([
+      "changed Entity Client: name: Customer → Client",
+      "changed Mapping customers.dob → Client.birth_date: status: In review → Approved",
+    ]);
+  });
+});

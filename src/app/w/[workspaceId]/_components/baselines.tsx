@@ -115,7 +115,7 @@ export function BaselinesTab({
               key={b.id}
               data-testid="baseline-row"
               data-id={b.id}
-              className="mb-2.5 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 rounded-[10px] bg-im-surface px-3.5 py-3 shadow-[0_0_0_1px_var(--im-line)]"
+              className="mb-2.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 [overflow-wrap:anywhere] gap-y-1.5 rounded-[10px] bg-im-surface px-3.5 py-3 shadow-[0_0_0_1px_var(--im-line)]"
             >
               <div>
                 <div className="font-semibold" data-testid="baseline-name">
@@ -221,7 +221,7 @@ function WsModal({ subtitle, title, testId, onClose, footer, children }: { subti
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[90] bg-[rgba(15,20,30,.45)]" />
         <DialogPrimitive.Content
-          className={`fixed left-1/2 top-1/2 z-[90] flex max-h-[90vh] w-[min(760px,96vw)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl bg-im-surface text-im-ink shadow-[0_0_0_1px_var(--im-line),0_24px_60px_-20px_rgba(0,0,0,.45)] outline-none`}
+          className={`fixed left-1/2 top-1/2 z-[90] flex max-h-[90vh] w-[min(760px,96vw)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl bg-im-surface text-im-ink [overflow-wrap:anywhere] shadow-[0_0_0_1px_var(--im-line),0_24px_60px_-20px_rgba(0,0,0,.45)] outline-none`}
           data-testid={testId}
           aria-describedby={undefined}
         >
@@ -236,8 +236,12 @@ function WsModal({ subtitle, title, testId, onClose, footer, children }: { subti
               ✕
             </DialogPrimitive.Close>
           </div>
-          <div className="max-h-[66vh] overflow-auto px-[18px] py-3.5 text-[13px]">{children}</div>
-          <div className="flex items-center gap-2 border-t border-im-line px-4 py-2.5 text-xs text-im-ink-3">
+          {/* a long unbroken name (a source's technical names) breaks anywhere, so nothing is wider than the dialog: a table
+              wider than the body put a horizontal scroll bar over the list's last line (step 5, Łukasz's acceptance) */}
+          <div className="max-h-[66vh] overflow-auto px-[18px] py-3.5 text-[13px]" data-testid="dialog-body">
+            {children}
+          </div>
+          <div className="flex items-center gap-2 border-t border-im-line px-4 py-2.5 text-xs text-im-ink-3" data-testid="dialog-footer">
             <span className="flex-1" />
             {footer}
           </div>
