@@ -351,7 +351,8 @@ export async function readOrganization(
           : how === "organization"
             ? { where: "organization_id = $1", params: [organizationId] }
             : { where: "id = $1", params: [organizationId] };
-      const rows = await readTable(db, schema, table, read);
+      // slice 35: a backup holds a baseline's content in its row (step 1's Q4)
+      const rows = await readTable(db, schema, table, { ...read, storeOnly: true });
       if (rows.length) out[table] = rows;
     }
     const named = new Set<string>();

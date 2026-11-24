@@ -15,7 +15,10 @@ import { byTabOrder, liveLabelLinksOf, liveProjectCanvasesOf, liveProjectPinsOf,
 import type { ModuleTable, WritableRows } from "@/domain/types";
 import type { ApplyOptions, ApplyResult, DataStore } from "../ports";
 import { newestImportFirst, oldestChangeFirst } from "../order";
-import { assertNotProduction, readDbCached, readDbStamped, writeDb } from "./file";
+import { assertNotProduction, readBaselineContent, readDbCached, readDbStamped, writeDb } from "./file";
+import { shapedBaselineContent } from "../baselines";
+import { snapshotWriteRefusal } from "@/domain/baseline/content";
+import { newestBaselineFirst } from "@/domain/baseline/names";
 import { CORE_SCHEMA, findViolation, keyOf, readRows, rowsOf, upgradeRows, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
 
 const live = <R extends { deleted_at: string | null }>(rows: R[]): R[] => rows.filter((r) => r.deleted_at === null);
@@ -99,6 +102,19 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
       getAccess: async (organizationId) =>
         (await load()).organization_access.find((a) => a.organization_id === organizationId) ?? null,
       listLicences: async (organizationId) => live((await load()).organization_licence).filter((l) => l.organization_id === organizationId),
+    },
+
+    // slice 35 (D-87): the rows from the data file, a content from its own file (`baselineFolder`)
+    baselines: {
+      list: async (workspaceId) => live((await load()).baseline.filter((b) => b.workspace_id === workspaceId)).sort(newestBaselineFirst),
+      listAll: async (workspaceId) => (await load()).baseline.filter((b) => b.workspace_id === workspaceId),
+      get: async (workspaceId, baselineId) => (await load()).baseline.find((b) => b.id === baselineId && b.workspace_id === workspaceId && b.deleted_at === null) ?? null,
+      content: async (workspaceId, baselineId) => {
+        const row = (await load()).baseline.find((b) => b.id === baselineId && b.workspace_id === workspaceId && b.deleted_at === null);
+        if (!row) return null;
+        const stored = await readBaselineContent(file, baselineId);
+        return stored === null ? null : shapedBaselineContent(stored, row.snapshot_schema, schema);
+      },
     },
 
     modules: {
@@ -284,6 +300,9 @@ async function applyOnce(file: string, writeSet: WriteSet, schema: LocalSchema, 
   // slice 15a: a table this store does not know is refused before anything is written, never skipped
   const unknown = [...touched].find((t) => !schema.rules[t]);
   if (unknown) return { ok: false, error: domainError("invalid", `The store does not know the table ${unknown}.`) };
+  // slice 35 (F2): a baseline's content is written by its insert only
+  const rewrite = snapshotWriteRefusal(writeSet.writes);
+  if (rewrite) return { ok: false, error: domainError("invalid", rewrite) };
   const rowsOfNext = next as unknown as Record<StoreTable, unknown[]>;
   // a module's table may not be in the file yet: its first write starts it
   for (const table of touched) rowsOfNext[table] = [...((current as unknown as Record<string, readonly unknown[] | undefined>)[table] ?? [])];

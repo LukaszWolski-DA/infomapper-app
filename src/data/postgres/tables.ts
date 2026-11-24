@@ -38,7 +38,22 @@ export interface TableRead {
   /** The rows' filter, written with `$1`, `$2`…; none: every row (only the tenancy tables). */
   where?: string;
   params?: readonly unknown[];
+  /** The columns a row never carries too (`STORE_ONLY_COLUMNS`): only a backup reads them (`readOrganization`). */
+  storeOnly?: boolean;
 }
+
+/**
+ * Columns no row read carries (slice 35, step 1's F2): a baseline's content, read alone by `baselines.content` and by
+ * a backup. Their tables are read with their other columns named, so a list never fetches a content (`select *` would).
+ */
+export const STORE_ONLY_COLUMNS: Readonly<Record<string, readonly string[]>> = { baseline: ["snapshot"] };
+/** The columns a row of such a table carries: `Baseline` in `src/domain/types.ts` (the contract suite compares the rows). */
+const ROW_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+  baseline: [
+    "id", "workspace_id", "version", "created_at", "created_by", "updated_at", "updated_by", "deleted_at",
+    "name", "name_key", "note", "snapshot_schema", "entity_count", "mapping_count", "requirement_count",
+  ],
+};
 
 /**
  * The table's rows in the stored order, as a command reads them: a module's defaults for columns a row lacks and its
@@ -46,7 +61,8 @@ export interface TableRead {
  */
 export async function readTable(db: Queryable, schema: StoreSchema, table: string, read: TableRead = {}): Promise<AnyRow[]> {
   if (!schema.rules[table]) throw new Error(`The store does not know the table ${table}.`);
-  const sql = `select * from ${ident(table)}${read.where ? ` where ${read.where}` : ""} ${storedOrderSql(schema, table)}`;
+  const columns = !read.storeOnly && ROW_COLUMNS[table] ? ROW_COLUMNS[table].map(ident).join(", ") : "*";
+  const sql = `select ${columns} from ${ident(table)}${read.where ? ` where ${read.where}` : ""} ${storedOrderSql(schema, table)}`;
   const { rows } = await db.query(sql, read.params ? [...read.params] : []);
   return shaped(schema, table, rows);
 }
