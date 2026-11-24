@@ -1238,6 +1238,7 @@ body.im-chgmode #lines .lnk.map.im-hit .s{stroke-width:2.6px}
 .dtwrap{overflow-x:auto}
 .dpresets{display:grid;gap:8px}
 .dpre{display:flex;flex-direction:column;gap:3px;text-align:left;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface)}
+.dpre:disabled,.dpre:disabled:hover{opacity:.55;cursor:not-allowed;border-color:var(--line);background:var(--surface)}
 .dpre:hover{border-color:var(--logical);background:var(--logical-soft)}
 .dpre span{font-size:12.5px;color:var(--ink-2)}
 .dmod{display:inline-block;margin-left:6px;font:500 10.5px/16px var(--sans);padding:0 6px;border-radius:8px;background:var(--hover);color:var(--ink-2);vertical-align:1px;letter-spacing:0}
@@ -6180,7 +6181,7 @@ function emptyModel(name) {
   return {version:2, concepts:[{id:uid("conc"), name:"General", color:"#2F7DD1"}], entities:[], attributes:[], sources:[], mappings:[], relationships:[],
     diagrams:[dia], labels:[], labelLinks:[], projects:[{id:uid("prj"), name:name || "First project", desc:"", canvasIds:[dia.id], pinned:[]}], requirements:[], reqLinks:[]};
 }
-const modelPart = m => JSON.parse(JSON.stringify({concepts:m.concepts, entities:m.entities, attributes:m.attributes, sources:m.sources, mappings:m.mappings, relationships:m.relationships, requirements:m.requirements || [], reqLinks:m.reqLinks || []}));
+const modelPart = m => JSON.parse(JSON.stringify({concepts:m.concepts, entities:m.entities, attributes:m.attributes, sources:m.sources, mappings:m.mappings, relationships:m.relationships, requirements:m.requirements || [], reqLinks:m.reqLinks || [], diagrams:m.diagrams || []}));   // B3.3: canvases and frames as they were
 function seedRoot(mainModel, fresh) {
   const you = {id:ME, you:true, name:"Łukasz (you)", email:"lukasz@infomate.pl"};
   if (fresh) mainModel.__fresh = true;
@@ -6188,6 +6189,7 @@ function seedRoot(mainModel, fresh) {
   const before = modelPart(mainModel);
   before.requirements = before.requirements.filter(r => r.id !== "req_105"); before.reqLinks = before.reqLinks.filter(k => k.reqId !== "req_105");
   const m0 = before.mappings.find(m => m.status === "approved"); if (m0) m0.status = "draft";
+  const c0 = before.sources.flatMap(t => t.columns).find(c => c.id === "src_customers__cust_no"); if (c0) c0.dataType = "varchar(10)";   // B2.3: a source change to compare
   before.attributes = before.attributes.filter(a => a.id !== "latr_customer_segment_code"); before.mappings = before.mappings.filter(m => m.attributeId !== "latr_customer_segment_code");
   const bank = seed(); bank.__fresh = true; const sales = seed(); sales.__fresh = true;
   return {
@@ -6198,7 +6200,7 @@ function seedRoot(mainModel, fresh) {
        settings:{dv2:false, fourEyes:false, infocube:true}, archived:false, data:mainModel, ui:{}, created:"2026-05-04",
        members:[{...you, role:"Owner"}, {id:"m2", name:"Anna Nowak", email:"anna.nowak@infomate.pl", role:"Modeler"}, {id:"m3", name:"Piotr Wiśniewski", email:"piotr.w@infomate.pl", role:"Reviewer"},
                 {id:"m4", name:"Kasia Zielińska", email:"k.zielinska@retailco.com", role:"Reader", guest:"Retail Co"}, {id:"m5", name:"", email:"data.owner@retailco.com", role:"Reviewer", guest:"Retail Co", pending:true}],
-       baselines:[{id:"bl_s1", name:"Stage 1 sign-off", note:"Agreed with Retail Co on 15 September.", created:"2026-09-15", by:"Łukasz", model:before}]},
+       baselines:[{id:"bl_s1", name:"Stage 1 sign-off", note:"Agreed with Retail Co on 15 September.", created:"2026-09-15 10:12", by:"Łukasz", model:before}]},
       {id:"ws_bank_risk", orgId:"org_infomate", name:"Bank X – Risk DWH", client:"Bank X", desc:"Credit risk data mart. Project closed in August 2026; kept for reference.", lang:"English",
        settings:{dv2:true, fourEyes:true}, archived:true, data:bank, ui:{}, created:"2025-11-20",
        members:[{...you, role:"Owner"}, {id:"m6", name:"Anna Nowak", email:"anna.nowak@infomate.pl", role:"Modeler"}], baselines:[]},
@@ -6260,14 +6262,30 @@ ${unmapped.length ? `<div style="margin-top:4px;color:var(--ink-3)">Not in a sat
 <div style="margin-top:6px;font-size:11.5px;color:var(--ink-3)">Hints from the Data Vault 2.0 mode of this workspace. Nothing is generated or enforced.</div></div>`;
 }
 /* ---------- baselines (AD-03) ---------- */
-function diffModels(a, b) {   // a = baseline, b = now
+/* B4.2: short values as old → new, long texts as "(changed)"; ids shown by name */
+const DIFF_FL = {name:"name", stereotype:"stereotype", conceptId:"concept", description:"definition", dataType:"type", isPrimaryKey:"PK", isForeignKey:"FK", isPII:"personal data",
+  isNullable:"nullable", nullable:"nullable", status:"status", kind:"kind", rule:"rule", columnId:"source column", attributeId:"target attribute", label:"label",
+  fromMin:"from min", fromMax:"from max", toMin:"to min", toMax:"to max", priority:"priority", desc:"description", expr:"expression", system:"system",
+  database:"database", schema:"schema", objectType:"object type", tags:"tags"};
+const DIFF_LONG = new Set(["description", "desc", "rule", "expr"]);
+function diffDet(k, ov, nv, a, b) {
+  const f = DIFF_FL[k] || k; if (DIFF_LONG.has(k)) return f + " (changed)";
+  const show = (v, m) => { if (v === null || v === undefined || v === "") return "–"; if (typeof v === "boolean") return v ? "yes" : "no"; if (Array.isArray(v)) return v.length ? v.join(", ") : "–";
+    if (k === "conceptId") return m.concepts.find(c => c.id === v)?.name || "?";
+    if (k === "columnId") { for (const t of m.sources) { const c = t.columns.find(y => y.id === v); if (c) return t.name + "." + c.name; } return "?"; }
+    if (k === "attributeId") { const x = m.attributes.find(y => y.id === v); return x ? (m.entities.find(e => e.id === x.entityId)?.name || "?") + "." + x.name : "?"; }
+    return String(v); };
+  return `${f}: ${show(ov, a)} → ${show(nv, b)}`;
+}
+const diffWhat = x => x.det ? x.det.join(", ") : x.what ? x.what.join(", ") : "";
+function diffModels(a, b) {   // a = before, b = after
   const out = [];
   const cmp = (kind, A, B, label, keys) => {
     const ma = new Map(A.map(x => [x.id, x])), mb = new Map(B.map(x => [x.id, x]));
     mb.forEach((x, id) => { if (!ma.has(id)) out.push({kind, ch:"added", label:label(x, b)}); });
     ma.forEach((x, id) => { if (!mb.has(id)) out.push({kind, ch:"removed", label:label(x, a)});
       else { const y = mb.get(id), what = keys.filter(k => JSON.stringify(x[k] ?? null) !== JSON.stringify(y[k] ?? null));
-        if (what.length) out.push({kind, ch:"changed", label:label(y, b), what}); } });
+        if (what.length) out.push({kind, ch:"changed", label:label(y, b), what, det:what.map(k => diffDet(k, x[k], y[k], a, b))}); } });
   };
   const en = (m, id) => m.entities.find(e => e.id === id)?.name || "?";
   const at = (m, id) => { const x = m.attributes.find(y => y.id === id); return x ? en(m, x.entityId) + "." + x.name : "?"; };
@@ -6277,6 +6295,10 @@ function diffModels(a, b) {   // a = baseline, b = now
   cmp("Mapping", a.mappings, b.mappings, (x, m) => cl(m, x.columnId) + " → " + at(m, x.attributeId), ["status", "kind", "rule", "columnId", "attributeId"]);
   cmp("Relationship", a.relationships, b.relationships, (x, m) => en(m, x.from) + " – " + en(m, x.to), ["label", "fromMin", "fromMax", "toMin", "toMax"]);
   cmp("Requirement", a.requirements || [], b.requirements || [], x => x.key + " " + x.name, ["name", "kind", "status", "priority", "desc", "expr"]);
+  // B2.3: source tables and their columns
+  cmp("Source table", a.sources, b.sources, x => x.system + " · " + x.name, ["name", "system", "database", "schema", "objectType"]);
+  const cols = m => m.sources.flatMap(t => t.columns.map(c => ({...c, _t:t.system + " · " + t.name})));
+  cmp("Source column", cols(a), cols(b), x => x._t + "." + x.name, ["name", "dataType", "nullable", "isPrimaryKey", "isForeignKey", "tags"]);
   return out;
 }
 function showModal(sub, title, body, foot) {
@@ -6293,13 +6315,65 @@ $("#wsmodal").addEventListener("click", ev => {
     toast(`Deleted the workspace ${w.name}.`); }
 });
 window.addEventListener("keydown", ev => { if (ev.key === "Escape" && !$("#wsmodal").hidden) { $("#wsmodal").hidden = true; ev.stopImmediatePropagation(); } }, true);
-function compareBaseline(b) {
-  const d = diffModels(b.model, modelPart(S));
-  const groups = ["added", "changed", "removed"].map(ch => [ch, d.filter(x => x.ch === ch)]).filter(([, l]) => l.length);
-  const body = d.length ? `<p>${d.length} change${d.length > 1 ? "s" : ""} since <b>${esc(b.name)}</b> (${esc(b.created)}).</p>` + groups.map(([ch, l]) => `<h4 class="diff-${ch === "added" ? "add" : ch === "removed" ? "del" : "chg"}">${ch[0].toUpperCase() + ch.slice(1)} (${l.length})</h4><table><tr><th>Kind</th><th>Item</th><th>What changed</th></tr>${l.map(x => `<tr><td>${x.kind}</td><td class="mono">${esc(x.label)}</td><td>${x.what ? esc(x.what.join(", ")) : ""}</td></tr>`).join("")}</table>`).join("")
-    : `<p>No changes since <b>${esc(b.name)}</b>.</p>`;
-  showModal(curWs().name, `Compare “${b.name}” with now`, body);
+/* B1.3: a baseline's name is unique in its workspace, case-insensitive; Rename changes the name and the note */
+function blNameTaken(n, exceptId) { const k = n.trim().toLowerCase(); return curWs().baselines.some(x => x.id !== exceptId && x.name.trim().toLowerCase() === k); }
+function renameBaseline(b) {
+  showModal(`${curWs().name} · baseline`, `Rename “${b.name}”`,
+    `<p style="color:var(--ink-2)">Only the name and the note change. What the baseline holds stays as it was taken on ${esc(b.created)}.</p>
+<div class="fld"><label for="blr-name">Name</label><input id="blr-name" maxlength="120" value="${esc(b.name)}"></div>
+<div class="fld"><label for="blr-note">Note (optional)</label><textarea id="blr-note" maxlength="1000" rows="3">${esc(b.note || "")}</textarea></div>`,
+    `<span class="sp"></span><button class="btn" data-wsm="close">Cancel</button><button class="btn pri" data-wsm="bl-ren" data-id="${b.id}">Save</button>`);
+  $("#blr-name").focus(); $("#blr-name").select();
 }
+$("#wsmodal").addEventListener("click", ev => {
+  const sv = ev.target.closest('[data-wsm="bl-ren"]'); if (!sv) return;
+  const b = curWs().baselines.find(x => x.id === sv.dataset.id); if (!b) return;
+  const n = $("#blr-name").value.trim(), note = $("#blr-note").value.trim();
+  if (!n) { $("#blr-name").focus(); toast("Give the baseline a name."); return; }
+  if (blNameTaken(n, b.id)) { $("#blr-name").focus(); toast(`A baseline named ${n} already exists in this workspace.`); return; }
+  $("#wsmodal").hidden = true;
+  if (n === b.name && note === (b.note || "")) return;
+  const old = b.name; rootChange(() => { b.name = n; b.note = note; }, n === old ? `Changed the note of the baseline ${n}.` : `Renamed the baseline ${old} to ${n}.`);
+});
+/* B2.1, B2.2: deleting asks first; documents made from the baseline stay and say it no longer exists */
+function askDeleteBaseline(b) {
+  const n = (curWs().docs?.defs || []).filter(d => d.source?.kind === "baseline" && d.source.baselineId === b.id).length;
+  showModal(`${curWs().name} · baseline`, `Delete the baseline “${b.name}”?`,
+    `<p>It cannot be brought back here.</p>${n ? `<p>${n === 1 ? "One document is" : n + " documents are"} made from it. ${n === 1 ? "It stays and says" : "They stay and say"} that the baseline no longer exists; ${n === 1 ? "its" : "their"} author can choose another source.</p>` : ""}`,
+    `<span class="sp"></span><button class="btn" data-wsm="close">Cancel</button><button class="btn danger" data-wsm="bl-del" data-id="${b.id}">Delete baseline</button>`);
+}
+$("#wsmodal").addEventListener("click", ev => {
+  const x = ev.target.closest('[data-wsm="bl-del"]'); if (!x) return;
+  const b = curWs().baselines.find(y => y.id === x.dataset.id); $("#wsmodal").hidden = true; if (!b) return;
+  rootChange(() => { curWs().baselines = curWs().baselines.filter(y => y.id !== b.id); }, `Deleted the baseline ${b.name}.`);
+});
+/* B4.6: compare a baseline with now or with any other baseline; the older state is always "before" */
+const blAt = id => id === "now" ? {id:"now", name:"now", created:"9999", model:modelPart(S)} : curWs().baselines.find(x => x.id === id);
+function blPair(x, y) { const A = blAt(x), B = blAt(y); return A.created <= B.created ? [A, B] : [B, A]; }
+const blTxt = b => b.id === "now" ? "now" : `“${b.name}” (${b.created})`;
+function compareBaseline(b) {
+  const others = curWs().baselines.filter(x => x.id !== b.id).slice().reverse();
+  showModal(curWs().name, `Compare “${b.name}”`,
+    `<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+<div class="fld" style="margin:0;flex:0 0 260px"><label for="cmp-with">Compared with</label><select id="cmp-with"><option value="now">Now (the live model)</option>${others.map(x => `<option value="${x.id}">${esc(x.name)} (${esc(x.created)})</option>`).join("")}</select></div>
+<div class="fld" style="margin:0;flex:1 1 200px"><label for="cmp-q">Filter</label><input id="cmp-q" type="search" placeholder="A name, e.g. Customer or cust_no"></div>
+<div class="fld" style="margin:0;flex:0 0 160px"><label for="cmp-kind">Kind</label><select id="cmp-kind"><option value="">All kinds</option>${["Entity", "Attribute", "Mapping", "Relationship", "Requirement", "Source table", "Source column"].map(k => `<option>${k}</option>`).join("")}</select></div></div>
+<div id="cmp-list"></div>`,
+    `<span class="sp"></span>${typeof DOC !== "undefined" && DOC.on() && DOC.can.create() ? `<button class="btn" data-wsm="bl-mkdoc" data-id="${b.id}" title="A document from the newer state with one section: Changes since the older one">Make a document</button>` : ""}<button class="btn" data-wsm="close">Close</button>`);
+  const draw = () => {
+    const [A, B] = blPair(b.id, $("#cmp-with").value), q = $("#cmp-q").value.trim().toLowerCase(), k = $("#cmp-kind").value;
+    const all = diffModels(A.model, B.model), d = all.filter(x => (!k || x.kind === k) && (!q || x.label.toLowerCase().includes(q)));
+    const groups = ["added", "changed", "removed"].map(ch => [ch, d.filter(x => x.ch === ch)]).filter(([, l]) => l.length);
+    const head = `<p>${all.length ? `${all.length} change${all.length > 1 ? "s" : ""}` : "No changes"} from <b>${esc(blTxt(A))}</b> to <b>${esc(blTxt(B))}</b>${d.length !== all.length ? `; ${d.length} shown by the filter` : ""}.</p>`;
+    $("#cmp-list").innerHTML = head + groups.map(([ch, l]) => `<h4 class="diff-${ch === "added" ? "add" : ch === "removed" ? "del" : "chg"}">${ch[0].toUpperCase() + ch.slice(1)} (${l.length})</h4><table><tr><th>Kind</th><th>Item</th><th>What changed</th></tr>${l.map(x => `<tr><td>${x.kind}</td><td class="mono">${esc(x.label)}</td><td>${esc(diffWhat(x))}</td></tr>`).join("")}</table>`).join("")
+      + (all.length && !d.length ? `<p style="color:var(--ink-3)">Nothing matches the filter.</p>` : "");
+  };
+  $("#cmp-with").addEventListener("change", draw); $("#cmp-kind").addEventListener("change", draw); $("#cmp-q").addEventListener("input", draw); draw();
+}
+$("#wsmodal").addEventListener("click", ev => {
+  const x = ev.target.closest('[data-wsm="bl-mkdoc"]'); if (!x) return;
+  const [A, B] = blPair(x.dataset.id, $("#cmp-with").value); $("#wsmodal").hidden = true; DOC.fromChanges(A.id, B.id === "now" ? null : B.id);
+});
 function docFromBaseline(b, kind) {
   const m = b.model, en = id => m.entities.find(e => e.id === id), con = id => m.concepts.find(c => c.id === id)?.name || "";
   const col = id => { for (const t of m.sources) { const c = t.columns.find(y => y.id === id); if (c) return {t, c}; } return null; };
@@ -6350,9 +6424,9 @@ ${["Owner", "Admin"].includes(myRole()) ? `<h3>Workspace lifecycle</h3><div clas
     body = DOC.tab();
   } else if (tab === "baselines") {
     body = `<p style="color:var(--ink-2);margin-top:14px">A baseline freezes the model (entities, attributes, sources, mappings, relationships, requirements) with a name, e.g. for a sign-off. Compare it with today, or produce documentation exactly as it was.</p>
-${perm === "full" ? `<div class="box" style="margin:12px 0 18px"><h4>New baseline</h4><div class="row2"><input type="text" id="bl-name" placeholder="Name, e.g. Stage 2 sign-off" style="flex:1;min-width:220px"><input type="text" id="bl-note" placeholder="Note (optional)" style="flex:2;min-width:220px"><button class="btn sm pri" data-wa="baseline">Create baseline</button></div></div>` : ""}
+${perm === "full" ? `<div class="box" style="margin:12px 0 18px"><h4>New baseline</h4><div class="row2"><input type="text" id="bl-name" maxlength="120" placeholder="Name, e.g. Stage 2 sign-off" style="flex:1;min-width:220px"><input type="text" id="bl-note" maxlength="1000" placeholder="Note (optional)" style="flex:2;min-width:220px"><button class="btn sm pri" data-wa="baseline">Create baseline</button></div></div>` : ""}
 ${w.baselines.length ? w.baselines.slice().reverse().map(b => `<div class="bl"><div><div class="t">${esc(b.name)}</div><div class="m">${esc(b.created)} by ${esc(b.by)}${b.note ? " · " + esc(b.note) : ""} · ${b.model.entities.length} entities, ${b.model.mappings.length} mappings, ${(b.model.requirements || []).length} requirements</div></div><div></div>
-<div class="acts"><button class="btn sm" data-bl="cmp" data-id="${b.id}">Compare with now</button>${DOC.blBtn(b)}${perm === "full" ? `<button class="btn sm danger" data-bl="del" data-id="${b.id}">Delete baseline</button>` : ""}</div></div>`).join("")
+<div class="acts"><button class="btn sm" data-bl="cmp" data-id="${b.id}">Compare…</button>${DOC.blBtn(b)}${perm === "full" ? `<button class="btn sm" data-bl="ren" data-id="${b.id}">Rename</button>` : ""}${admin ? `<button class="btn sm danger" data-bl="del" data-id="${b.id}">Delete baseline</button>` : ""}</div></div>`).join("")
   : `<p style="color:var(--ink-3)">No baselines yet.</p>`}`;
   } else if (tab === "people") {
     body = `<p style="color:var(--ink-2);margin-top:14px">Roles apply to this workspace only. Guests come from another organization.${w.settings?.fourEyes ? " Four-eyes is on: nobody approves their own change." : ""}</p>
@@ -6411,7 +6485,8 @@ wsBox.addEventListener("click", ev => {
   const bl = ev.target.closest("[data-bl]");
   if (bl) { const b = curWs().baselines.find(x => x.id === bl.dataset.id); if (!b) return;
     if (bl.dataset.bl === "cmp") compareBaseline(b); else if (bl.dataset.bl === "map") docFromBaseline(b, "map"); else if (bl.dataset.bl === "dict") docFromBaseline(b, "dict");
-    else if (bl.dataset.bl === "del") rootChange(() => { curWs().baselines = curWs().baselines.filter(x => x.id !== b.id); }, `Deleted the baseline ${b.name}.`);
+    else if (bl.dataset.bl === "ren") renameBaseline(b);
+    else if (bl.dataset.bl === "del") askDeleteBaseline(b);
     return; }
   const cc = ev.target.closest("[data-ccol]"); if (cc && !cc.disabled) { const id = cc.dataset.ccol, v = cc.dataset.v; const cn = S.concepts.find(c => c.id === id); if (String(cn.color).toUpperCase() === v) return;
     mutate(() => { cn.color = v; }); toast(`Changed the colour of ${cn.name}.`, true); return; }   // slice 21: model.edit, one undo step
@@ -6428,7 +6503,8 @@ wsBox.addEventListener("click", ev => {
   if (a.dataset.wa === "delete") { showModal(w.name, "Export and delete", `<p>Below is the full export of <b>${esc(w.name)}</b>. Keep it if you might need the model again; deleting cannot be undone.</p><pre>${esc(JSON.stringify({...w, ui:undefined}, null, 2).slice(0, 8000))}\n…</pre>`,
       `<span class="sp"></span><button class="btn" data-wsm="close">Cancel</button><button class="btn danger" data-wsm="delete">Delete ${esc(w.name)} permanently</button>`); return; }
   if (a.dataset.wa === "baseline") { const n = $("#bl-name").value.trim(); if (!n) { $("#bl-name").focus(); toast("Give the baseline a name."); return; }
-    rootChange(() => { w.baselines.push({id:uid("bl"), name:n, note:$("#bl-note").value.trim(), created:new Date().toISOString().slice(0, 10), by:ROOT.user.name, model:modelPart(S)}); }, `Created the baseline ${n}.`); return; }
+    if (blNameTaken(n)) { $("#bl-name").focus(); toast(`A baseline named ${n} already exists in this workspace.`); return; }
+    rootChange(() => { w.baselines.push({id:uid("bl"), name:n, note:$("#bl-note").value.trim(), created:(() => { const d = new Date(), z = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; })(), by:ROOT.user.name, model:modelPart(S)}); }, `Created the baseline ${n}.`); return; }
   if (a.dataset.wa === "invite") { const mail = $("#inv-mail").value.trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { $("#inv-mail").focus(); toast("Enter an e-mail address."); return; }
     if (w.members.some(m => m.email.toLowerCase() === mail.toLowerCase())) { toast(`${mail} is already in this workspace or invited.`); return; }
     const role = $("#inv-role").value;
@@ -9265,7 +9341,7 @@ const DOC = (() => {
       kind:"Kind", prio:"Priority", cov:"Coverage", scope:"Scope", desc:"Description", yes:"Yes", no:"No", direct:"Direct copy", transform:"Transformation",
       lookup:"Lookup", notMapped:"Not mapped", draft:"Draft", review:"In review", approved:"Approved", concept:"Concept", entities:"Entities",
       tables:"Source tables", mappings:"Mappings", reqN:"Requirements", added:"Added", changed:"Changed", removed:"Removed", item:"Item",
-      what:"What changed", noChanges:"No changes.", grain:"Grain", ftype:"Fact type", history:"History", dims:"Dimensions", measures:"Measures",
+      what:"What changed", noChanges:"No changes.", noBase:"Nothing to compare with yet.", grain:"Grain", ftype:"Fact type", history:"History", dims:"Dimensions", measures:"Measures",
       additivity:"Additivity", role:"Role", fact:"Fact", dimension:"Dimension", legend:"Legend", mappedCnt:"{a} of {b} attributes mapped",
       noDims:"There are no facts or dimensions in this model state.", empty:"Nothing from this canvas is in the document's scope.",
       other:"Cards outside frames", factless:"factless", aggOf:"aggregate of {n}", none:"None.", stereotype:"Stereotype", covered:"covered",
@@ -9302,7 +9378,7 @@ const DOC = (() => {
       kind:"Rodzaj", prio:"Priorytet", cov:"Pokrycie", scope:"Zakres", desc:"Opis", yes:"Tak", no:"Nie", direct:"Kopia bezpośrednia", transform:"Transformacja",
       lookup:"Lookup", notMapped:"Brak mapowania", draft:"Szkic", review:"W przeglądzie", approved:"Zatwierdzone", concept:"Koncept", entities:"Encje",
       tables:"Tabele źródłowe", mappings:"Mapowania", reqN:"Wymagania", added:"Dodane", changed:"Zmienione", removed:"Usunięte", item:"Element",
-      what:"Co się zmieniło", noChanges:"Brak zmian.", grain:"Ziarno", ftype:"Typ faktu", history:"Historia", dims:"Wymiary", measures:"Miary",
+      what:"Co się zmieniło", noChanges:"Brak zmian.", noBase:"Na razie nie ma z czym porównać.", grain:"Ziarno", ftype:"Typ faktu", history:"Historia", dims:"Wymiary", measures:"Miary",
       additivity:"Addytywność", role:"Rola", fact:"Fakt", dimension:"Wymiar", legend:"Legenda", mappedCnt:"{a} z {b} atrybutów zmapowanych",
       noDims:"W tym stanie modelu nie ma faktów ani wymiarów.", empty:"Nic z tej kanwy nie mieści się w zakresie dokumentu.",
       other:"Karty poza ramkami", factless:"bez miar", aggOf:"agregat faktu {n}", none:"Brak.", stereotype:"Stereotyp", covered:"pokryte",
@@ -9339,7 +9415,7 @@ Deutsch:{toc:"Inhalt", fig:"Abbildung", part:"Teil {i} von {n}", ver:"Version", 
       kind:"Art", prio:"Priorität", cov:"Abdeckung", scope:"Umfang", desc:"Beschreibung", yes:"Ja", no:"Nein", direct:"Direkte Übernahme", transform:"Transformation",
       lookup:"Lookup", notMapped:"Nicht gemappt", draft:"Entwurf", review:"In Prüfung", approved:"Freigegeben", concept:"Konzept", entities:"Entitäten",
       tables:"Quelltabellen", mappings:"Mappings", reqN:"Anforderungen", added:"Hinzugefügt", changed:"Geändert", removed:"Entfernt", item:"Element",
-      what:"Was sich geändert hat", noChanges:"Keine Änderungen.", grain:"Granularität", ftype:"Fakttyp", history:"Historie", dims:"Dimensionen", measures:"Kennzahlen",
+      what:"Was sich geändert hat", noChanges:"Keine Änderungen.", noBase:"Noch nichts zum Vergleichen.", grain:"Granularität", ftype:"Fakttyp", history:"Historie", dims:"Dimensionen", measures:"Kennzahlen",
       additivity:"Additivität", role:"Rolle", fact:"Fakt", dimension:"Dimension", legend:"Legende", mappedCnt:"{a} von {b} Attributen gemappt",
       noDims:"In diesem Modellstand gibt es keine Fakten oder Dimensionen.", empty:"Nichts von dieser Arbeitsfläche liegt im Umfang des Dokuments.",
       other:"Karten außerhalb von Rahmen", factless:"ohne Kennzahlen", aggOf:"Aggregat von {n}", none:"Keine.", stereotype:"Stereotyp",
@@ -9418,6 +9494,9 @@ Deutsch:{toc:"Inhalt", fig:"Abbildung", part:"Teil {i} von {n}", ver:"Version", 
     pub: () => can.exp() && (["Owner", "Admin"].includes(me().role) || (me().role === "Modeler" && !!curWs().settings.docModPub)) && !curWs().archived,
     see: d => d.shared || d.owner === me().id
   };
+  /* B3.5: no print or export while the document's baseline is gone; it never falls back to the live model */
+  const goneBl = d => d.source.kind === "baseline" && !curWs().baselines.some(b => b.id === d.source.baselineId);
+  const expOff = d => goneBl(d) ? `disabled title="This document points to a baseline that no longer exists. Choose another source under Model state."` : can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`;
   const whyNot = {
     exp: () => "Guests cannot export or generate versions in this workspace. An owner or admin can allow it in Settings.",
     pub: () => me().guest && !curWs().settings.docGuests ? whyNot.exp() : "Only owners and admins publish links" + (curWs().settings.docModPub ? "" : " (modelers too, when the workspace allows it)") + ".",
@@ -9962,13 +10041,18 @@ ${s.o.dv && curWs().settings.dv2 ? dvRead(x, cx) : ""}</div>`; }).join("") || `<
         return `<div class="dreq"><h4>${s.o.cols.includes("key") ? `<span class="dreqk">${esc(r.key)}</span>` : ""}${s.o.cols.includes("name") ? esc(r.name) : ""}</h4>${meta.length ? `<div class="dreqm">${meta.join("")}</div>` : ""}
 ${par ? `<div class="dmeta">↳ ${esc(par.key)} ${esc(par.name)}</div>` : ""}${s.o.cols.includes("desc") && r.desc ? `<div class="ddef">${plain(r.desc)}</div>` : ""}${r.kind === "dq" && r.expr ? `<div class="dmeta"><span class="dmono">${esc(r.expr)}</span></div>` : ""}</div>`; }).join(""); }});
 
+  /* B4.1: an empty "Compared with" means the previous baseline: the newest one older than the document's source */
+  const prevBl = def => { const bl = curWs().baselines, src = def && def.source.kind === "baseline" ? bl.find(x => x.id === def.source.baselineId) : null;
+    const older = src ? bl.filter(x => x.id !== src.id && x.created <= src.created) : bl; return older.slice().sort((x, y) => x.created < y.created ? -1 : 1).at(-1) || null; };
+  const againstOf = (s, def) => s.o.against ? curWs().baselines.find(x => x.id === s.o.against) : prevBl(def);
   reg(CORE, {type:"changes", label:"Changes since a baseline", desc:"What was added, changed and removed since a baseline you choose.", defaults:() => ({against:""}),
-    title:s => { const b = curWs().baselines.find(x => x.id === s.o.against); return t("t_changes", {n:b ? "“" + b.name + "”" : "…"}); },
-    props:(s, ro) => `<div class="dfld"><label>Compared with</label><select data-so="against" ${ro}><option value="">Choose a baseline</option>${curWs().baselines.map(b => `<option value="${b.id}" ${s.o.against === b.id ? "selected" : ""}>${esc(b.name)} (${esc(b.created)})</option>`).join("")}</select><div class="dhint">Compares that baseline with the document's own model state.</div></div>`,
-    render:(s, cx) => { const b = curWs().baselines.find(x => x.id === s.o.against);
-      if (!b) return `<p class="dmuted dph">Choose the baseline to compare with in the panel on the right.</p>`;
-      const d = diffModels(b.model, modelPart(S)); if (!d.length) return `<p>${t("noChanges")}</p>`;
-      return ["added", "changed", "removed"].map(ch => [ch, d.filter(x => x.ch === ch)]).filter(([, l]) => l.length).map(([ch, l]) => `<h3 class="dh3">${t(ch)} (${l.length})</h3>` + table([t("kind"), t("item"), t("what")], l.map(x => [esc(x.kind), `<span class="dmono">${esc(x.label)}</span>`, x.what ? esc(x.what.join(", ")) : ""]))).join(""); }});
+    title:s => { const b = againstOf(s, cur()); return t("t_changes", {n:b ? "“" + b.name + "”" : "…"}); },
+    props:(s, ro) => { const p = prevBl(cur()); return `<div class="dfld"><label>Compared with</label><select data-so="against" ${ro}><option value="">${p ? `Previous baseline: ${esc(p.name)} (${esc(p.created)})` : "Previous baseline (none yet)"}</option>${curWs().baselines.map(b => `<option value="${b.id}" ${s.o.against === b.id ? "selected" : ""}>${esc(b.name)} (${esc(b.created)})</option>`).join("")}</select><div class="dhint">Compares that baseline with the document's own model state; the older one is always the starting point.</div></div>`; },
+    render:(s, cx) => { const b = againstOf(s, cx.def);
+      if (!b) return `<p>${t("noBase")}</p>`;
+      const src = cx.def.source.kind === "baseline" ? curWs().baselines.find(x => x.id === cx.def.source.baselineId) : null, now = modelPart(S);
+      const srcAt = src ? src.created : "9999", d = b.created <= srcAt ? diffModels(b.model, now) : diffModels(now, b.model); if (!d.length) return `<p>${t("noChanges")}</p>`;
+      return ["added", "changed", "removed"].map(ch => [ch, d.filter(x => x.ch === ch)]).filter(([, l]) => l.length).map(([ch, l]) => `<h3 class="dh3">${t(ch)} (${l.length})</h3>` + table([t("kind"), t("item"), t("what")], l.map(x => [esc(x.kind), `<span class="dmono">${esc(x.label)}</span>`, esc(diffWhat(x))]))).join(""); }});
 
   /* ---------- iteration 2: readiness, conventions, traceability, data quality rules ---------- */
   const words = v => String(v || "").replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/g, " ").trim().split(/\s+/).filter(Boolean);
@@ -10301,8 +10385,13 @@ ${admin ? `<label class="btn sm">${w.clientLogo ? "Replace" : "Upload"}<input ty
     const id = b.dataset.ddelok; $("#wsmodal").hidden = true; rootChange(() => { W().defs = W().defs.filter(d => d.id !== id); }, "Document deleted."); });
 
   function pickPreset() {
-    showModal(curWs().name, "New document", `<p>Start from a preset; everything can be changed afterwards. A new document is private until you share it.</p><div class="dpresets">${Object.entries(PRESETS).map(([k, p]) => `<button class="dpre" data-dpre="${k}"><b>${esc(p.label)}</b><span>${esc(p.desc)}</span></button>`).join("")}</div>`);
+    showModal(curWs().name, "New document", `<p>Start from a preset; everything can be changed afterwards. A new document is private until you share it.</p><div class="dpresets">${Object.entries(PRESETS).map(([k, p]) => { const off = k === "signoff" && !curWs().baselines.length; return `<button class="dpre" data-dpre="${k}" ${off ? 'disabled title="Create a baseline first."' : ""}><b>${esc(p.label)}</b><span>${esc(p.desc)}</span>${off ? `<span style="color:var(--warn)">Create a baseline first.</span>` : ""}</button>`; }).join("")}</div>`);
     $("#wsm-body").querySelectorAll("[data-dpre]").forEach(b => b.addEventListener("click", () => { $("#wsmodal").hidden = true; const d = newDef(b.dataset.dpre); rootChange(() => W().defs.push(d)); openEditor(d.id); }));
+  }
+  function fromChanges(olderId, newerId) {   // B4.6: the compare dialog's "Make a document"
+    const w = curWs(), o = w.baselines.find(x => x.id === olderId), n = newerId ? w.baselines.find(x => x.id === newerId) : null, d = newDef("blank");
+    d.source = n ? {kind:"baseline", baselineId:n.id} : {kind:"live", baselineId:null}; d.name = `Changes since “${o.name}”` + (n ? ` to “${n.name}”` : "");
+    d.sections = [sec("changes", {against:o.id})]; d.audience = ""; rootChange(() => W().defs.push(d)); openEditor(d.id);
   }
   function dup(id) { const s = W().defs.find(d => d.id === id), d = JSON.parse(JSON.stringify(s)); Object.assign(d, {id:uid("ddef"), name:s.name + " (copy)", owner:me().id, shared:false, updated:nowT()});
     d.sections.forEach(x => x.id = uid("dsec")); rootChange(() => W().defs.push(d), `Duplicated as your private document “${d.name}”.`); return d; }
@@ -10355,7 +10444,7 @@ ${admin ? `<label class="btn sm">${w.clientLogo ? "Replace" : "Upload"}<input ty
 <div class="de-title"><input class="de-name" data-dprop="name" value="${esc(d.name)}" ${ro} aria-label="Document name"><div class="de-url">infomapper.app/${esc(snake(w.name).replace(/_/g, "-"))}/docs/${esc(d.id.slice(5))}</div></div>
 <span class="de-badge ${d.shared ? "sh" : ""}">${d.shared ? "Shared" : "Private"}</span>${ro ? `<span class="de-badge ro">Read only</span>` : ""}
 <span class="sp" style="flex:1"></span><span class="de-busy" id="de-busy" hidden>Laying out pages…</span><span class="de-zoom"><select data-de="pages" aria-label="Preview pages" title="Auto: real pages while they lay out quickly, otherwise the quick sheet until you update them. Exact: real pages after every change. Quick: one sheet per page break, at once."><option value="auto" ${(ST.pages || "auto") === "auto" && window.Paged ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Auto</option><option value="exact" ${ST.pages === "exact" ? "selected" : ""} ${window.Paged ? "" : "disabled"}>Exact pages</option><option value="quick" ${ST.pages === "quick" || !window.Paged ? "selected" : ""}>Quick preview</option></select></span><span class="de-zoom"><select data-de="zoom" aria-label="Preview zoom"><option value="fit">Fit width</option><option value="0.75">75 %</option><option value="1">100 %</option></select></span>
-<button class="btn sm" data-de="print" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Print / PDF</button><button class="btn sm" data-de="md" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Markdown</button><button class="btn sm pri" data-de="gen" ${can.exp() ? "" : `disabled title="${esc(whyNot.exp())}"`}>Generate version</button>${SAVE.slots()}<button class="tb de-tog" data-de="togr" aria-pressed="${!PANELS.hidden("r")}" title="Show or hide the options panel" aria-label="Options panel"><svg class="i" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M10 2.5v11"/></svg></button></div>
+<button class="btn sm" data-de="print" ${expOff(d)}>Print / PDF</button><button class="btn sm" data-de="md" ${expOff(d)}>Markdown</button><button class="btn sm pri" data-de="gen" ${expOff(d)}>Generate version</button>${SAVE.slots()}<button class="tb de-tog" data-de="togr" aria-pressed="${!PANELS.hidden("r")}" title="Show or hide the options panel" aria-label="Options panel"><svg class="i" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M10 2.5v11"/></svg></button></div>
 ${ro ? `<div class="de-ro">${esc(whyNot.edit(d))}${can.create() ? ` <button class="btn sm" data-de="dup">Duplicate as my document</button>` : ""}</div>` : ""}
 <div class="de-body${PANELS.cls()}" id="de-body" style="${PANELS.style()}"><div class="de-left" id="de-left" ${PANELS.hidden("l") ? "inert" : ""}></div><div class="de-mid" id="de-mid"></div><div class="de-right" id="de-right" ${PANELS.hidden("r") ? "inert" : ""}></div><div class="de-rz l" data-rz="l" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Width of the sections panel" title="Drag to widen; double-click for the default width"></div><div class="de-rz r" data-rz="r" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Width of the options panel" title="Drag to widen; double-click for the default width"></div></div>`;
     box.querySelector('[data-de="zoom"]').value = String(ST.zoom);
@@ -10393,7 +10482,7 @@ ${ro ? "" : `<button class="btn sm de-add" data-de="add">+ Add section</button>$
     const slow = mode === "auto" && ST.lastMs != null && ST.lastMs >= LAYOUT_MS() && !ST.force;
     const exact = mode === "exact" || (mode === "auto" && !slow); ST.force = false;
     const r = render(d, {preview:true, paged:exact}), pg = pageCSS(d);
-    const notes = `${slow ? `<div class="de-note de-stale">Pages out of date: this document took ${(ST.lastMs / 1000).toFixed(1)} s to lay out, so the preview shows the quick sheet while you edit. <button class="btn sm" data-de="upd">Update pages</button></div>` : ""}${r.warn.map(x => `<div class="de-warn">${esc(x)}</div>`).join("")}${d.source.kind === "baseline" ? `<div class="de-note">Tables come from the baseline. Diagrams use today's canvas layout with the baseline's objects: baselines do not freeze canvases yet.</div>` : ""}`;
+    const notes = `${slow ? `<div class="de-note de-stale">Pages out of date: this document took ${(ST.lastMs / 1000).toFixed(1)} s to lay out, so the preview shows the quick sheet while you edit. <button class="btn sm" data-de="upd">Update pages</button></div>` : ""}${r.warn.map(x => `<div class="de-warn">${esc(x)}</div>`).join("")}${d.source.kind === "baseline" && !goneBl(d) ? `<div class="de-note">Tables and diagrams come from the baseline as it was taken. Label canvases are not drawn from a baseline.</div>` : ""}`;
     if (!exact) { ++PJ; const b0 = $("#de-busy"); if (b0) b0.hidden = true;   /* a layout still running is dropped; no page count on the quick sheet */
       const avail = mid.clientWidth - 48, z = ST.zoom === "fit" ? Math.min(1, avail / (pg.w * 3.7795)) : +ST.zoom, top = mid.scrollTop;
       mid.innerHTML = notes + `<div class="dpages ${r.cls || ""}" style="zoom:${z.toFixed(3)};--pw:${pg.w}mm;--ph:${pg.h}mm">${r.html}</div>`; mid.scrollTop = top; drawRight(true); return; }
@@ -10416,7 +10505,7 @@ ${ro ? "" : `<button class="btn sm de-add" data-de="add">+ Add section</button>$
       const w = curWs(), cubeOK = !!I.cube && cubeOn();
       const segD = (k, o, l, grp = "style") => `<div class="dfld"><label>${l}</label><div class="dseg">${o.map(([v, x]) => `<button data-dseg="${grp}.${k}" data-v="${v}" aria-pressed="${String(grp === "root" ? d[k] : d[grp][k]) === v}" ${ro}>${x}</button>`).join("")}</div></div>`;
       R.innerHTML = `<h3>Model state</h3>
-<div class="dfld"><select data-dsrc ${ro}><option value="live" ${d.source.kind === "live" ? "selected" : ""}>Live model (changes as people work)</option>${w.baselines.map(b => `<option value="${b.id}" ${d.source.baselineId === b.id && d.source.kind === "baseline" ? "selected" : ""}>Baseline “${esc(b.name)}” (${esc(b.created)})</option>`).join("")}</select>
+<div class="dfld"><select data-dsrc ${ro}>${goneBl(d) ? `<option value="" selected disabled>Baseline no longer exists: choose another source</option>` : ""}<option value="live" ${d.source.kind === "live" ? "selected" : ""}>Live model (changes as people work)</option>${w.baselines.map(b => `<option value="${b.id}" ${d.source.baselineId === b.id && d.source.kind === "baseline" ? "selected" : ""}>Baseline “${esc(b.name)}” (${esc(b.created)})</option>`).join("")}</select>
 <div class="dhint">A baseline gives the same document every time; the live model always shows today.</div></div>
 <h3>Scope</h3>
 <div class="dfld"><label>Projects</label>${S.projects.map(p => `<label class="dck"><input type="checkbox" data-dscope="projects" data-v="${p.id}" ${d.scope.projects.includes(p.id) ? "checked" : ""} ${ro}> ${esc(p.name)}</label>`).join("")}<div class="dhint">None ticked: the whole model. Otherwise what the projects' canvases show.</div></div>
@@ -10600,7 +10689,7 @@ ${pa.size !== "off" ? `<div class="dseg" style="margin-top:6px">${[["portrait", 
   }
   document.addEventListener("click", ev => { const b = ev.target.closest("[data-dpage]"); if (!b) return; const d = CV(); const k = b.dataset.dpage, v = b.dataset.v;
     d.page = {size:"off", orient:"portrait", pt:7, ...(d.page || {}), [k]:k === "pt" ? +v : v}; save(); pageArea(); if (typeof renderInspector === "function") renderInspector(); else rebuild(); });
-  return {on, tab, click, change, settingsBox, blBtn, ensure, render, PRESETS, can, me, open:openEditor, pageArea, pageCtl};
+  return {on, tab, click, change, settingsBox, blBtn, fromChanges, ensure, render, PRESETS, can, me, open:openEditor, pageArea, pageCtl};
 })();
 const DOC_IC = '<svg viewBox="0 0 12 12"><path d="M3 1.2h4.2L9.6 3.6v7.2H3z"/><path d="M7 1.2v2.6h2.6M4.6 6h3.2M4.6 8h3.2"/></svg>';
 /* =========================================================
