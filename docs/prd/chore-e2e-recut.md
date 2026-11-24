@@ -178,4 +178,40 @@ commit, a merge into `dev`. No tag: a chore has none.
 
 ## 7. Step 2: the change and the full run
 
-(Results below.)
+**The change** (`8c02e07`): `e2e/parts.ts` (`PART_STARTS` as option C, its header), `tests/e2e-parts.test.ts` ("has ten
+parts", the folders of each part, "E2E_PART must be 1 to 10"), `scripts/e2e.ts`'s comment, CLAUDE.md (the full run's
+parts, `--part`, "The full run in ten parts"), README (the status line, the e2e rows), `docs/ideas.md` (the recut entries
+done). `npm run e2e -- --list`: ten parts, 60, 41, 53, 59, 42, 57, 66, 54, 49 and 42 files, 523 in all (the same files
+as before). `npm run lint`, `npm run typecheck` and `npm test` (2,469 passed, 13 skipped) pass.
+
+**Checks:** draft PR #90 into `dev`; CI's `check`, Schema's `migrations` and `smoke` pass on `8c02e07`.
+
+**Full run** [45355521101](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45355521101) on `8c02e07`:
+882 passed, 0 failed, 0 flaky, 16 skipped; 17.9 minutes wall-clock (Playwright's 15.1); no server restarted.
+
+| Part | Folders | Tests | Expected time | Time (e2e step) | Expected peak | Heap peak |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | `fixes` to `slice-01b` | 89 | 586 s | 567 s | ~1.5 GB | 1,326 MB |
+| 2 | `slice-02a` to `slice-02c` | 57 | 501 s | 351 s | ~1.5 GB | 1,417 MB |
+| 3 | `slice-03a` to `slice-04b1` | 61 | 518 s | **629 s** | ~1.6 GB | 1,093 MB |
+| 4 | `slice-04b2` to `slice-07a` | 108 | 574 s | 539 s | ~1.6 GB | 1,550 MB |
+| 5 | `slice-07b` to `slice-08` | 80 | 556 s | 439 s | ~1.5 GB | 1,451 MB |
+| 6 | `slice-09` to `slice-11` | 116 | 556 s | 490 s | ~1.7 GB | 1,600 MB |
+| 7 | `slice-12a` to `slice-15a` | 93 | 530 s | 554 s | ~1.6 GB | 1,264 MB |
+| 8 | `slice-15b` to `slice-18` | 96 | 621 s | 442 s | ~1.6 GB | 1,538 MB |
+| 9 | `slice-19` to `slice-25` | 97 | 622 s | 460 s | ~1.7 GB | **1,813 MB** |
+| 10 | `slice-26` to `slice-34` | 101 | 581 s | 448 s | ~1.2 GB | 1,174 MB |
+
+- **Time:** the longest e2e step is 629 s (part 3; expected 518 s, this run's runner was slow there: `slice-03b` 187 s
+  against its median 140 s), from 930 s; every part is under the stop line of 750 s. The last part (448 s) is not the
+  longest.
+- **Heap:** every peak is under the stop line of 1.9 GB. Part 9's 1,813 MB is above its expected ~1.7 GB, but as garbage:
+  its retained heap when its last folder starts is 967 MB (`slice-25`), the model's ~1,180 MB at its end being on the
+  high side. Today's parts 5 and 6 (1,902 and 1,937 MB in 44915828042) are now parts 5 to 7 at 1,451, 1,600 and
+  1,264 MB.
+- **The wall-clock** is not the parts' doing: in parts 4, 6, 9 and 10 `npx playwright install --with-deps chromium` took
+  354 to 372 s (15 to 25 s in the other six and in earlier runs). In part 4's log the system packages came from Ubuntu's
+  mirror at 77 kB/s ("Fetched 21.9 MB in 4min 43s"); Chromium itself downloaded in 3 s. Those four jobs ended last
+  (882 to 970 s). Without it the longest job would have been part 3's 717 s, a run of about 13 to 14 minutes as
+  expected. Runner time: 119 minutes of part jobs, about 23 of them the slow mirror. Not changed here (the workflow is
+  shared infrastructure; `docs/ideas.md`, "The slow apt mirror in the E2E workflow").
