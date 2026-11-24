@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest";
 import { chosenHomeTab, homeTabOrder } from "./home-tabs";
 
 describe("the workspace home's tabs", () => {
-  it("puts a module's tabs after Overview, before the home's other tabs", () => {
-    expect(homeTabOrder([])).toEqual(["overview", "people", "conventions", "settings"]);
-    expect(homeTabOrder([{ id: "docs" }])).toEqual(["overview", "docs", "people", "conventions", "settings"]);
+  // slice 35 (B1.1): Baselines, a home tab of its own, after the modules' tabs and before People
+  it("puts a module's tabs after Overview, before the home's other tabs (Baselines first of them)", () => {
+    expect(homeTabOrder([])).toEqual(["overview", "baselines", "people", "conventions", "settings"]);
+    expect(homeTabOrder([{ id: "docs" }])).toEqual(["overview", "docs", "baselines", "people", "conventions", "settings"]);
+    expect(chosenHomeTab("baselines", [])).toBe("baselines");
   });
 
   it("chooses a shown tab, and Overview for anything else", () => {
