@@ -539,3 +539,27 @@ F20, the shape (Q2), the chain and its guard (Q3), the migration (Q4), the serve
 
 Housekeeping for the closing (PRD section 8): AD-39's note on Supabase's own backups and the simplified backup rule, and
 PR 92's decisions (1 and 3 approved, 2 (b)), quoted in full then.
+
+## 8. Łukasz's answers (24 November 2026)
+
+He accepts all eight recommendations of section 7:
+1. (a) the browser's time zone;
+2. (a) logical entities, source-to-logical mappings and requirements, as the Overview;
+3. (a) a column's and a table's classifications compared as a list field;
+4. (a) the fields of Q5's table;
+5. (a) facts and dimensions compared as entities and attributes, InfoCube's own rows not;
+6. (a) no demo baseline online, S35-04's case made by hand at the acceptance;
+7. (a) no history view in this slice;
+8. F16's filter sentence adopted.
+
+**Claude's calls on the technical points** (approved by Łukasz's delegation, to be quoted at the closing): the
+recommendations F1 to F7, F10, F12, F14, F17, F19, F20, and those of Q2 to Q5, Q7 and Q8 (the demo's mapping
+`cust_no → customer_number`), as written above.
+
+**The criteria as changed** (the PRD file stays as copied; these texts replace its cells):
+- **S35-04:** the filter example reads "'cust' finds customers.cust_no, Customer.segment_code and the mapping from
+  cust_no"; the last sentence reads "Locally the demo's 'Stage 1 sign-off' compared with Now shows the mapping whose
+  status changed and customers.cust_no's type; online the same case is made by hand at the acceptance."
+- **S35-05:** "Locally each snapshot is its own file in a folder beside the data file and KB's local backup includes that
+  folder" becomes "Locally each snapshot is its own file in a folder beside the data file; a pg:backup of an
+  organization holds its baselines with their snapshots, and pg:restore brings them back."
