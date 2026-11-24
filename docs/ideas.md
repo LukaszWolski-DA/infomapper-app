@@ -1153,9 +1153,9 @@ decide.
 - **S6B-04 is flaky** (slice 34, step 3's first full run, 44907819468): after Back it read the canvas's zoom as 0.449993
   for 0.45. The test waits until the card is within 2 px of the centre and then reads the zoom, which the centring may
   still be animating; the single-file check passed 3 rounds. A `fix/` branch: wait for the zoom the user sees (the
-  transform equal to the zoom before) instead of reading it once, the assertion unchanged. **Under way in
-  fix/s6b-04-zoom-flake** (`docs/prd/fix-s6b-04-zoom-flake.md`): confirmed, the test reads too early; the view ends at
-  the exact zoom.
+  transform equal to the zoom before) instead of reading it once, the assertion unchanged. **Done in
+  fix/s6b-04-zoom-flake** (`docs/prd/fix-s6b-04-zoom-flake.md`): the test read too early (the view ends at the exact
+  zoom); its poll after Back waits for the card centred and the zoom it had, the assertion unchanged.
 - **The canvas's animated view moves zoom out on the way** (found in fix/s6b-04-zoom-flake, step 1): `rf.setViewport`
   and `rf.fitBounds` with `duration: 250` use d3's "smooth" fly-to (`interpolateZoom`), which zooms out and back in even
   at an unchanged zoom (on S6B-04's pan from 45 % to about 10 to 30 % and back in 250 ms); the prototype's `centerOn` pans

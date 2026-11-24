@@ -1,6 +1,10 @@
 # Fix – S6B-04 reads the zoom while the centring still runs
 
-Status: **step 1 done** (24 November 2026): the cause, the proposal and the proof; no code. Branch
+Status: **step 1 done** (24 November 2026): the cause, the proposal and the proof; no code. **Łukasz's answers to
+section 5** (24 November 2026): 1, the test-only fix as proposed, and 3, the two fixed waits kept, are Claude's calls,
+for his approval at the closing; 2, the fly-to's zoom-out, is his, and his message left it open (`<a/b>`: a, its own
+branch `fix/canvas-linear-view-moves` after this one; b, leave it): still to answer, not needed for this branch. **Step 2 done** (24 November 2026): the fix in S6B-04 and its proof
+(section 4's numbers), the checks and the full run (section 7). Branch
 `fix/s6b-04-zoom-flake` from `dev` at `b3eb8fd`. Found in slice 34's first full run of step 3
 ([44907819468](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/44907819468), commit `8685d01`, part 4):
 `expect((await viewportTransform(page)).zoom).toBe(zoom)` received 0.449993 for 0.45; the single-file check passed 3
@@ -79,6 +83,23 @@ no state to wait for, and 400 ms is longer than any 250 ms move it would catch (
 4. The single-file check in CI (`gh workflow run e2e.yml --ref fix/s6b-04-zoom-flake -f
    files="e2e/slice-06b/S6B-04.spec.ts" -f rounds=3`), lint, typecheck, `npm test`, then one full run on a commit that
    contains `dev`'s head.
+
+### The proof's numbers (step 2, 24 November 2026, on the laptop)
+
+1. **Slowed clock** (`npm run e2e -- PROOF-old.spec.ts PROOF-new.spec.ts --repeat-each 10`, the two copies removed
+   again): the unchanged spec **failed 5 of 10**, every time on `toBe(zoom)` (received 0.449548, 0.448012, 0.449508,
+   0.44995, 0.445754); the fixed spec **passed 10 of 10**. The window is narrow even with a slowed clock (the poll
+   reads every 100 to 1,000 ms), so half the runs missed it.
+2. **The fixed spec at the real clock, `--repeat-each 10 --trace on`:** 10 of 10 passed.
+3. **The traces** (a script over each run's `test.trace`, in the scratchpad: Playwright keeps every failed poll read's
+   diff, so the received `{ centred, zoom }` of each read): 4 runs needed 2 reads, 6 needed 1. The 4 first reads were
+   during the move (not centred, zoom 0.45, 0.449744, 0.449367 and 0.420832), so the poll waited through it. No read
+   found the card centred at another zoom (the old spec's failure window) at the real clock. In all 10 the passing read
+   was 350 to 568 ms after Back's click began, longer than the 250 ms move. **A correction to section 4's criterion:**
+   measured from the click's end it was 115 to 395 ms; the traversal and the move start inside the click, which itself
+   took 103 to 441 ms (Playwright waits for the navigation it starts), so the time is counted from the click's start.
+   A read that is both centred and at the exact zoom can only come after the move: before it the card is off screen,
+   and during it d3 reaches the exact zoom only on the last frame.
 
 ## 5. For Łukasz to decide
 
