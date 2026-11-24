@@ -63,7 +63,12 @@ export function tablesFromPg(rows: readonly PgColumnRow[]): { tables: TableShape
  * they are skipped, and listing one that the domain now describes, or that the database lacks, is a mismatch too,
  * so the list cannot go stale.
  */
-export function compareSchemas(domain: readonly TableShape[], database: readonly TableShape[], notInDomainYet: readonly string[]): string[] {
+export function compareSchemas(
+  domain: readonly TableShape[],
+  database: readonly TableShape[],
+  notInDomainYet: readonly string[],
+  storeOnly: Readonly<Record<string, readonly string[]>> = STORE_ONLY_COLUMNS,
+): string[] {
   const out: string[] = [];
   const dbTables = new Map(database.map((t) => [t.table, t]));
   const domainTables = new Map(domain.map((t) => [t.table, t]));
@@ -88,7 +93,11 @@ export function compareSchemas(domain: readonly TableShape[], database: readonly
       }
     }
     const domainColumns = new Set(t.columns.map((c) => c.name));
-    for (const d of db.columns) if (!domainColumns.has(d.name)) out.push(`${t.table}.${d.name}: in the database, missing in the domain`);
+    for (const name of storeOnly[t.table] ?? []) if (!dbColumns.has(name)) out.push(`${t.table}.${name}: a store-only column the database lacks`);
+    for (const d of db.columns) {
+      if (domainColumns.has(d.name) || (storeOnly[t.table] ?? []).includes(d.name)) continue;
+      out.push(`${t.table}.${d.name}: in the database, missing in the domain`);
+    }
   }
 
   for (const db of database) {
@@ -103,6 +112,11 @@ export function compareSchemas(domain: readonly TableShape[], database: readonly
 }
 
 /** Tables the migrations create that no slice has built yet; each comes off this list in the slice that builds it. */
-export const NOT_IN_DOMAIN_YET = [
-  "baseline",
-] as const;
+// slice 35: `baseline` is built; the list is empty
+export const NOT_IN_DOMAIN_YET: readonly string[] = [];
+
+/**
+ * Columns the database has that no domain row carries (slice 35, step 1's F2): a baseline's content, written by its
+ * insert only and read alone by the store (`STORE_ONLY_COLUMNS` in `src/data/postgres/tables.ts`).
+ */
+export const STORE_ONLY_COLUMNS: Readonly<Record<string, readonly string[]>> = { baseline: ["snapshot"] };

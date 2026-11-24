@@ -103,6 +103,8 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
         "cube_attribute",
         // slice 25: InfoDocumenter's document definitions
         "document_definition",
+        // slice 35: baselines (their content is a store-only column, `STORE_ONLY_COLUMNS`)
+        "baseline",
       ].sort(),
     );
     for (const t of NOT_IN_DOMAIN_YET) expect(tables.map((x) => x.table)).not.toContain(t);
