@@ -182,6 +182,13 @@ export async function readEverything(store: DataStore, db: DevDb): Promise<Recor
     for (const m of of("mapping").slice(0, 3)) await all(`changeEvents.listForMapping ${ws} ${m.id}`, () => store.changeEvents.listForMapping(ws, m.id!));
     for (const u of users) await all(`undoHistory.state ${ws} ${u.id}`, () => store.undoHistory.state(ws, u.id!));
     await all(`snapshot ${ws}`, () => store.snapshot(ws, MODULE_TABLES));
+    // slice 35: the rows never carry a content; a content alone, live baselines only
+    await all(`baselines.list ${ws}`, () => store.baselines.list(ws));
+    await all(`baselines.listAll ${ws}`, () => store.baselines.listAll(ws));
+    for (const b of of("baseline")) {
+      await all(`baselines.get ${ws} ${b.id}`, () => store.baselines.get(ws, b.id!));
+      await all(`baselines.content ${ws} ${b.id}`, () => store.baselines.content(ws, b.id!));
+    }
   }
   await all("snapshot (no such workspace)", () => store.snapshot("01a0f9e9-0000-7000-8000-000000000000", []));
   return out;

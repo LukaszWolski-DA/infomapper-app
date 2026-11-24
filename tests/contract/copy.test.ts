@@ -34,7 +34,7 @@ import { pgClientConfig } from "@/data/postgres/config";
 import { loadRows, placeAll, readOrganization, replaceOrganization } from "@/data/postgres/load";
 import { getPool } from "@/data/postgres/pool";
 import { createPostgresDataStore } from "@/data/postgres/store";
-import { localFileOf, upgradedFrom } from "../../scripts/lib/backup-file";
+import { localFileOf, upgradedFrom, withBaselineContents } from "../../scripts/lib/backup-file";
 import { organizationRows, type Tables } from "../../scripts/lib/organization-rows";
 import { resetRefusal } from "../../scripts/lib/seed-organizations";
 import { seedRows } from "../../scripts/lib/seed-rows";
@@ -80,7 +80,8 @@ async function demoFileText(dir: string): Promise<string> {
     "crmprod,dbo,customers,table,,184120,,phone_copy,99,varchar(30),,,,yes,no,,,,,,",
   ].join("\n");
   await importInto(store, ctxOf(ANNA), second, "crm-2.csv", { systemId: system.id });
-  return fs.readFileSync(file, "utf8");
+  // slice 35: the demo baseline's content is in the folder beside the file; a copy reads it from there
+  return JSON.stringify(withBaselineContents(JSON.parse(fs.readFileSync(file, "utf8")) as DevDb, file));
 }
 
 async function copyDatabase(): Promise<string> {
@@ -276,6 +277,9 @@ describe.runIf(!!CONTRACT_DB)("the copy on Postgres: one organization at a time,
   it("a backup reads the same on both adapters: the local adapter over the backup's file, Postgres after it is copied in again", async () => {
     const org = retailOrg();
     const backup = upgradedFrom(JSON.stringify(localFileOf(await readOrganization(client, STORE_SCHEMA, org), STORE_SCHEMA))).db;
+    // slice 35 (S35-05 as changed): a backup holds the organization's baselines with their contents
+    expect(backup.baseline.length).toBeGreaterThan(0);
+    for (const b of backup.baseline) expect((b as { snapshot?: { model?: unknown } }).snapshot?.model, b.name).toBeDefined();
     const backupFile = path.join(dir, "backup.json");
     fs.writeFileSync(backupFile, JSON.stringify(backup));
     const local = await readEverything(createLocalDataStore(backupFile, STORE_SCHEMA), backup);
@@ -285,5 +289,6 @@ describe.runIf(!!CONTRACT_DB)("the copy on Postgres: one organization at a time,
     const names = Object.keys(local).filter((n) => mine.some((w) => n.includes(w)));
     expect(names.length).toBeGreaterThan(50);
     for (const name of names) expect.soft(pg[name], name).toEqual(local[name]);
+    expect(names.some((n) => n.startsWith("baselines.content "))).toBe(true);
   }, 300_000);
 });
