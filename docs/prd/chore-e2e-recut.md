@@ -169,6 +169,13 @@ reason for this chore; a recut on nine parts would be due again within a slice o
 moved (and the full run again on that commit unless only Markdown in `docs/` and the root changed), CI passed on the last
 commit, a merge into `dev`. No tag: a chore has none.
 
-## 6. Results
+## 6. Łukasz's answers on step 1 (24 November 2026)
 
-(Step 2.)
+- **Option C: ten parts**, `PART_STARTS` `slice-02a`, `slice-03a`, `slice-04b2`, `slice-07b`, `slice-09`, `slice-12a`,
+  `slice-15b`, `slice-19`, `slice-26` (CC's call, for Łukasz's approval at the closing).
+- **Concurrency:** 13 jobs on a push (ten parts, CI and Schema) fit the free plan's 20 concurrent jobs; no check needed.
+- Step 2 as planned.
+
+## 7. Step 2: the change and the full run
+
+(Results below.)

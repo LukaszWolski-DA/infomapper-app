@@ -1086,8 +1086,8 @@ slice.
 - **Explicit orders where an order means something to a person** (slice 29, F2's condition 6): the first project in the
   top bar, and other lists read in the stored order, should come from an explicit domain rule, not the order rows were
   stored in. Not now: it would reorder KB.
-- **Part 9's heap peaks** (1,717 and 1,825 MB in slice 29's full runs): recut the e2e parts on a `chore/` branch when the
-  median of three full runs reaches about 2 GB.
+- **Part 9's heap peaks** (1,717 and 1,825 MB in slice 29's full runs): recut on `chore/e2e-recut` into ten parts (below,
+  "Slice 34's follow-ups").
 - **`overflow: clip` on `.im-canvas`** (fix/e2e-visible-clicks): `.im-canvas` is `overflow: hidden`, so a programmatic
   scroll (Playwright's scroll into view did it in e2e) can shift the whole canvas, and nothing scrolls it back. With
   `overflow: clip` it could not scroll at all. Only programmatic scrolls could shift it, and none in the app does today.
@@ -1141,9 +1141,10 @@ decide.
 
 ## Slice 34's follow-ups (21 November 2026)
 
-- **The e2e recut** (Łukasz, step 2): after slice 34, on its own `chore/` branch with its own full run. Part 9 was the
-  longest in slice 34's runs (999 s in step 2's, 836 s in step 3's, against 818 and 742 s for the next), with heap peaks
-  below 2 GB.
+- **The e2e recut: done on `chore/e2e-recut`** (`docs/prd/chore-e2e-recut.md`): ten parts (`PART_STARTS`: `slice-02a`,
+  `slice-03a`, `slice-04b2`, `slice-07b`, `slice-09`, `slice-12a`, `slice-15b`, `slice-19`, `slice-26`), by the median
+  folder times and retained heap growth of the full runs 44915828042, 44909278968 and 44897852644. Part 9 had been the
+  longest (median 930 s against 729 s), and parts 5 and 6 had peaked at 1,902 and 1,937 MB.
 - **S6B-04 is flaky** (slice 34, step 3's first full run, 44907819468): after Back it read the canvas's zoom as 0.449993
   for 0.45. The test waits until the card is within 2 px of the centre and then reads the zoom, which the centring may
   still be animating; the single-file check passed 3 rounds. A `fix/` branch: wait for the zoom the user sees (the
