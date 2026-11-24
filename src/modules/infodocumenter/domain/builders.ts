@@ -287,12 +287,11 @@ export function buildS2T({ state, scope, options, language }: SectionBuildInput)
   // the rule and the note are the long texts (D1): under the row, after the table numbered, or a column
   const head = o.columns.map((c) => ({ key: c, label: t(S2T_LABEL[c]), long: S2T_BELOW.has(c) }));
   const rowOf = (m: Mapping): DocRuns[] => o.columns.map((c) => s2tCell(state, m, c, t));
-  const table = (rows: readonly DocRuns[][], aligned?: ReadonlyMap<number, DocRuns[]>): DocNode[] => longTextTable(head, rows, o.longTexts, t("none"), undefined, aligned);
-  const firstShort = o.columns.findIndex((c) => !S2T_BELOW.has(c) && c !== "target");
-  // slice 34: where "Not mapped" stands with every value in its own column: Source column, else the first other short
-  // column; with neither, after the target's type
+  const table = (rows: readonly DocRuns[][]): DocNode[] => longTextTable(head, rows, o.longTexts, t("none"));
+  // an attribute with no mapping keeps its type; "Not mapped" stands under Source column, else in the first other short
+  // column, with neither after the target's type (slice 34's Markdown, fix/pdf-s2t-not-mapped for the PDF; D-80's note)
   const home = o.columns.includes("sourceColumn") ? o.columns.indexOf("sourceColumn") : o.columns.findIndex((c) => !S2T_BELOW.has(c) && c !== "target" && c !== "targetType");
-  const unmappedAligned = (a: Attribute): DocRuns[] =>
+  const unmappedRow = (a: Attribute): DocRuns[] =>
     o.columns.map((c, i) =>
       c === "target" ? [mono(a.name)] : i === home ? [warn(t("notMapped"))] : c === "targetType" ? (home < 0 ? [...typeRuns(a), text(" · "), warn(t("notMapped"))] : typeRuns(a)) : EMPTY,
     );
@@ -315,16 +314,12 @@ export function buildS2T({ state, scope, options, language }: SectionBuildInput)
   } else {
     for (const e of entities) {
       const rows: DocRuns[][] = [];
-      const aligned = new Map<number, DocRuns[]>();
       for (const a of attributesOf(state, e.id)) {
         const ms = shownOf(a);
         rows.push(...ms.map(rowOf));
-        if (!ms.length && o.unmapped) {
-          aligned.set(rows.length, unmappedAligned(a));
-          rows.push(o.columns.map((c, i) => (c === "target" ? [mono(a.name)] : i === firstShort ? [warn(t("notMapped"))] : EMPTY)));
-        }
+        if (!ms.length && o.unmapped) rows.push(unmappedRow(a));
       }
-      if (rows.length) out.push({ kind: "heading", level: 2, text: e.name }, ...table(rows, aligned));
+      if (rows.length) out.push({ kind: "heading", level: 2, text: e.name }, ...table(rows));
     }
   }
   return out.length ? out : [NONE(t)];
