@@ -23,12 +23,15 @@ test("S6B-04: Back to a selection keeps a hidden details panel hidden, centres a
   const zoom = (await viewportTransform(page)).zoom;
   await backButton(page).click();
   await expectSelected(page, "entity:Customer");
+  // the centring's end as the person sees it: the card in the middle and the zoom it had. React Flow's fly-to zooms out
+  // and back in on the way and reaches the zoom exactly on its last frame, after the card is already within 2 px
+  // (fix/s6b-04-zoom-flake), so the poll waits for both; a wrong zoom still fails here, with the zoom it read.
   await expect
     .poll(async () => {
       const b = (await page.locator(".react-flow__node").filter({ has: page.getByTestId("card-name").getByText("Customer", { exact: true }) }).boundingBox())!;
-      return Math.abs(b.x + b.width / 2 - (pane.x + pane.width / 2)) < 2;
+      return { centred: Math.abs(b.x + b.width / 2 - (pane.x + pane.width / 2)) < 2, zoom: (await viewportTransform(page)).zoom };
     })
-    .toBe(true);
+    .toEqual({ centred: true, zoom });
   expect((await viewportTransform(page)).zoom).toBe(zoom);
   await expectHidden(page, "right");
 
