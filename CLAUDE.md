@@ -568,7 +568,7 @@ local adapter no pool is made.
     `smoke`. The E2E workflow's jobs are named `e2e-plan`, `e2e-part`, `e2e-report` and `e2e-check`, so that none shares
     a name with a required check (a skipped job counts as passed). The full run stays a rule of this file, not a
     required check.
-  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its nine parts
+  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its ten parts
     (`e2e/parts.ts`) side by side on GitHub's Linux runners, each with its own fresh dev server, no retries; one job
     merges their reports. Start it by hand (`gh workflow run e2e.yml --ref <branch>`, or "Run workflow" on the Actions
     page) or with the label `full-e2e` on the pull request (it tests the branch's head commit). A push starts none; a
@@ -763,7 +763,7 @@ npm run lint             # ESLint, including the layer rules (eslint-plugin-boun
 npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
 npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
-npm run e2e -- --part 2   # one of the full run's nine parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
+npm run e2e -- --part 2   # one of the full run's ten parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
 npm run e2e -- --list    # each part's files, as CI runs them (--part <n>: one part); starts no server
 gh workflow run e2e.yml --ref <branch>                                          # the full run in GitHub Actions (or the label full-e2e on the pull request)
 gh workflow run e2e.yml --ref <branch> -f files="e2e/slice-06a/S6A-07.spec.ts" -f rounds=3   # a single-file check: 3 jobs side by side, each with a fresh server
@@ -1254,10 +1254,11 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   and total objects, paint, layerize; as `S6A-09-hand.spec.ts` does) rather than unprepared medians to the screen, whose
   run-to-run spread (up to 12 ms in slice 6a) is larger than what is measured.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
-- **The full run in nine parts** (chore e2e reliability, P2 B; seven since chore CI e2e; eight since chore e2e eight
-  parts; recut by chore recut e2e parts; nine since chore ninth e2e part): `npm run e2e` (`scripts/e2e.ts`) runs the
-  folders in nine parts (`e2e/parts.ts`, `PART_STARTS`: from `slice-02a`, `slice-03b`, `slice-05a`, `slice-07b`,
-  `slice-10a`, `slice-14a`, `slice-16`, `slice-22`; `tests/e2e-parts.test.ts`),
+- **The full run in ten parts** (chore e2e reliability, P2 B; seven since chore CI e2e; eight since chore e2e eight
+  parts; recut by chore recut e2e parts; nine since chore ninth e2e part; ten since chore e2e recut,
+  `docs/prd/chore-e2e-recut.md`): `npm run e2e` (`scripts/e2e.ts`) runs the folders in ten parts (`e2e/parts.ts`,
+  `PART_STARTS`: from `slice-02a`, `slice-03a`, `slice-04b2`, `slice-07b`, `slice-09`, `slice-12a`, `slice-15b`,
+  `slice-19`, `slice-26`; `tests/e2e-parts.test.ts`),
   each with its own fresh dev server, one
   after another locally and side by side in CI, and merges their blob reports into one result (`playwright-report/`);
   failure traces and the server's output (`server.log`, `scripts/e2e-server.ts`) are in `test-results/part-<n>/`.

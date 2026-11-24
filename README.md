@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 29 are built, and so are the e2e reliability, CI e2e, eight-part and nine-part e2e chores, the Next.js 16.4 updates and the fixes since; each slice is merged and tagged (`slice-NN`) when Łukasz accepts it. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 29 are built, and so are the e2e reliability, CI e2e, eight-part, nine-part and ten-part e2e chores, the Next.js 16.4 updates and the fixes since; each slice is merged and tagged (`slice-NN`) when Łukasz accepts it. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -220,10 +220,10 @@ is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at 
 | `npm run lint` | ESLint, including the layer rules (AD-19) |
 | `npm run typecheck` | Route types, then TypeScript (strict) |
 | `npm test` | Vitest unit tests (`src/**/*.test.ts`, `tests/`) |
-| `npm run e2e` | Playwright end-to-end tests (`e2e/`) in nine parts by folder (`e2e/parts.ts`), each with its own fresh dev server on port 3200 and `.data/e2e-db.json`, freshly seeded before every test; one merged result (`playwright-report/`), failure traces in `test-results/part-<n>/`. It refuses to start while something listens on port 3200 |
+| `npm run e2e` | Playwright end-to-end tests (`e2e/`) in ten parts by folder (`e2e/parts.ts`), each with its own fresh dev server on port 3200 and `.data/e2e-db.json`, freshly seeded before every test; one merged result (`playwright-report/`), failure traces in `test-results/part-<n>/`. It refuses to start while something listens on port 3200 |
 | `npm run e2e -- --part <n>` | One part on its own; `npm run e2e -- <files or folders>` is one run as before |
 | `npm run e2e -- --list` | Each part's files, as CI runs them (`--part <n>`: one part); starts no server |
-| `gh workflow run e2e.yml --ref <branch>` | **The full run:** the workflow "E2E" (`.github/workflows/e2e.yml`) runs the nine parts side by side on GitHub's Linux runners, each with its own fresh dev server, no retries, and merges their reports (about 12 minutes). Also by the label `full-e2e` on a pull request; never on a push. The run's page has the summary (each part's time, heap peak and restarts) and, for 14 days, the artifacts `report` (merged HTML report with traces), `part-<n>` (traces, `server.log`, memory log) |
+| `gh workflow run e2e.yml --ref <branch>` | **The full run:** the workflow "E2E" (`.github/workflows/e2e.yml`) runs the ten parts side by side on GitHub's Linux runners, each with its own fresh dev server, no retries, and merges their reports (about 12 minutes). Also by the label `full-e2e` on a pull request; never on a push. The run's page has the summary (each part's time, heap peak and restarts) and, for 14 days, the artifacts `report` (merged HTML report with traces), `part-<n>` (traces, `server.log`, memory log) |
 | `gh workflow run e2e.yml --ref <branch> -f files="e2e/<folder>/<spec>.ts" -f rounds=3` | A single-file check: `rounds` jobs side by side, each with a fresh dev server, each running the files once (artifacts `check-round-<n>`). The input `parts` (e.g. `1 7`) runs some parts only, for trying the workflow: not a full run |
 | `E2E_MEMORY_LOG=1 npm run e2e` | The same with a memory log: the e2e server's heap and resident memory and the machine's available memory, page file and paging every 5 s, per part in `.data/e2e-memory-<time>-part<n>.*`; read it with `npx tsx scripts/e2e-memory-report.ts .data/e2e-memory-<time>-part<n>` |
 | `npm run seed` | Creates the demo data in `.data/dev-db.json` if it does not exist yet |
