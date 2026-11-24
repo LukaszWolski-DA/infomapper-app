@@ -134,4 +134,11 @@ centring, a fit or Zoom to frame (`centred`, `press("f")`, `Zoom to frame`, `Sho
   third parts, a draft PR into `dev`, lint, typecheck, `npm test`, CI and the single-file check, `docs/ideas.md`'s entry
   marked done, this document's status; then one full run (E2E workflow) on a commit that contains `dev`'s head, with its
   link, commit, wall-clock, the parts' times and heap peaks, and the counts. Stop.
+  **Done** (24 November 2026), PR #92 into `dev`: lint, typecheck and `npm test` (205 files, 2,474 tests passed, 13
+  skipped) on the laptop; CI's `check` and Schema's `migrations` and `smoke` green; the single-file check
+  ([45386293045](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45386293045)) 3 of 3 rounds; the full
+  run [45386980180](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45386980180) on `e5f6bab` (which
+  contains `dev`'s head `b3eb8fd`): 882 passed, 0 failed, 0 flaky, 16 skipped, 15 min 38 s wall-clock; the parts 9.3, 6.6,
+  6.7, 8.8, 7.7, 12.5, 7.4, 7.2, 11.5 and 11.1 min, heap peaks 1,377, 1,198, 1,554, 1,565, 1,450, 1,175, 1,710, 1,516,
+  1,514 and 1,082 MB. A later commit touching only Markdown in `docs/` keeps the run valid.
 - **Closing:** a prompt with the merge into `dev` only, on Łukasz's command (no tag: a `fix/` branch has none).
