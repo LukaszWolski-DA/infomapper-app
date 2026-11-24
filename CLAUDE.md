@@ -393,10 +393,9 @@ list up to date in each sub-slice):
     It reads the same content tree as the HTML; the dialog is `app/markdown-dialog.tsx`, the text built at the click
     (`openMarkdown` in `editor.tsx`, the recipe with its drafts over the editor's snapshot).
   - **The tree's additions the HTML never reads:** `DocFigure.content` (`FigureContent`, filled by `figureDrawing`: the
-    cards with their shown rows, frames, relationships, source keys, mappings, module lines, requirement cards), a
-    table's `long` with each row's `longCells` (the "Under row" long texts by column, from `longTextTable`), and a row's
-    `alignedCells` (every value in its own column where `cells` puts a placeholder over another;
-    Source-to-target's unmapped attribute). `ModuleLineData.status` (InfoCube's lines). **A later section kind** writes
+    cards with their shown rows, frames, relationships, source keys, mappings, module lines, requirement cards) and a
+    table's `long` with each row's `longCells` (the "Under row" long texts by column, from `longTextTable`).
+    `ModuleLineData.status` (InfoCube's lines). **A later section kind** writes
     Markdown through the tree; a later tree field the Markdown needs is added the same way, with
     `tests/document-markdown-html.test.ts` showing the HTML unchanged.
   - **The rules as tests:** `tests/document-markdown.test.ts` (the nine rules over the text, every Mermaid block parsed

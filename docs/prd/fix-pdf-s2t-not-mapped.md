@@ -1,6 +1,9 @@
 # Fix – The PDF's Source-to-target keeps an unmapped attribute's target type
 
-Status: **step 1 done** (24 November 2026): the cause, the proposal and the proof; no application code. Branch
+Status: **step 1 done** (24 November 2026): the cause, the proposal and the proof; no application code. **Łukasz chose
+option A** (24 November 2026): the unmapped row's cells become what the Markdown shows (the type under Target type, "Not
+mapped" under Source column; else the first other short column; else "type · Not mapped"); `alignedCells` goes. The
+decision texts as proposed in section 3 (a note under D-80, the exception in D-86), quoted in full at the closing. Branch
 `fix/pdf-s2t-not-mapped` from `dev` at `215facf`. A visible change of the PDF and the preview, found in Łukasz's
 acceptance of slice 34's step 3 and left to him (`docs/ideas.md`, "Slice 34's follow-ups"). No `pg:` script, no
 connection to `infomapper-dev`, the local file and its backups not read: the screenshots come from `npm run demo`
