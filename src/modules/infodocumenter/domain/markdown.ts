@@ -215,7 +215,7 @@ function table(node: Extract<DocNode, { kind: "table" }>, ctx: Ctx): string[] {
   const w = ctx.words;
   const long = node.long ?? [];
   const columns: DocColumn[] = [...node.columns, ...long];
-  const rowCells = (r: DocRow): DocRuns[] => [...(r.alignedCells ?? r.cells), ...long.map((_, i) => r.longCells?.[i] ?? [])];
+  const rowCells = (r: DocRow): DocRuns[] => [...r.cells, ...long.map((_, i) => r.longCells?.[i] ?? [])];
   const body = node.rows.map((r) => rowCells(r).map((c) => inline(c, "cell")));
   // a column with nothing in any row says nothing (rule 4): left out
   const keep = columns.map((_, i) => !node.rows.length || body.some((cells) => (cells[i] ?? "").trim()));

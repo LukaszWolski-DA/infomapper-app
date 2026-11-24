@@ -263,7 +263,8 @@ describe("the source-to-target mapping", () => {
     const second = customer.rows.filter((r) => words(r.cells[0]!) === "email")[1]!;
     expect(second.cells.map(words)).toEqual(["email", "string(120)", "WEB", "web_users.email", "varchar(255)", "Draft", "varchar(255) does not fit string(120): values can be longer than 120 characters.", ""]);
     expect(second.below!.map(words)).toEqual(["Rule: Direct copy", "Note: Second source for e-mail. Decide the priority rule with the data owner."]);
-    expect(rowNamed(customer.rows, "segment_code").cells.map(words)).toEqual(["segment_code", "Not mapped", "", "", "", "", "", ""]);
+    // fix/pdf-s2t-not-mapped (D-80's note): the target's type kept, "Not mapped" under Source column
+    expect(rowNamed(customer.rows, "segment_code").cells.map(words)).toEqual(["segment_code", "string(3)", "", "Not mapped", "", "", "", ""]);
   });
 
   it("labels nothing under the row when only one long text is chosen, and shows a transformation's rule", () => {

@@ -1158,4 +1158,6 @@ decide.
   unmapped attribute's row puts the word in the first short column after the target, so the PDF does not show the
   target's type there; the prototype spans the word over the source's columns. The Markdown keeps the type since slice 34
   (`DocRow.alignedCells`). For Łukasz to decide: the PDF the same way (the type kept, the word under Source column or
-  spanning the source's columns), a visible change of the PDF.
+  spanning the source's columns), a visible change of the PDF. **Done in fix/pdf-s2t-not-mapped** (D-80's note): the
+  PDF, the preview and the quick sheet keep the type with "Not mapped" under Source column, as the Markdown; the prototype
+  did not span the word either (only its older baseline document does); `alignedCells` is gone.

@@ -25,7 +25,6 @@ function withoutAdditions(tree: DocumentTree): DocumentTree {
         delete table.long;
         for (const r of table.rows) {
           delete r.longCells;
-          delete r.alignedCells;
         }
         return table;
       }
