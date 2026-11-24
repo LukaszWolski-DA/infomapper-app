@@ -914,3 +914,30 @@ toast is the app's shared component (shared infrastructure, The slice cycle, 4).
   - `npm test`: 2,530 passed, 13 skipped;
   - `e2e/slice-35`: 15 passed.
 - No full run (the closing's follows).
+
+## 12. Step 6: the closing (24 November 2026)
+
+- **Docs** (`d6ba340`): `decisions.md` (D-87 and its note with the delegated technical decisions; notes on AD-03, AD-14,
+  AD-39 (Supabase's paid plan and the backup rule); PR 92's decisions as notes on AD-21 (1 and 3) and AD-24 (2 (b))),
+  `data-model-v2.md` (`### baseline` as built), `ideas.md`, `known-limitations.md`, `inventory-prototype-vs-app.md`,
+  README and CLAUDE.md; Łukasz's acceptance in section 11.
+- **Full run** [45487488095](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45487488095) on `d6ba340`
+  (which contains `dev`'s head): **897 passed, 16 skipped, 0 failed, 0 flaky**; wall-clock 15 min 42 s (21:05:23 to
+  21:21:05 UTC). A later commit that touches only Markdown in `docs/` keeps it valid (`git diff --stat d6ba340..HEAD`).
+
+| Part | Time | Heap peak |
+| --- | --- | --- |
+| 1 | 11 min | 1,193 MB |
+| 2 | 10 min | 1,119 MB |
+| 3 | 8 min | 1,431 MB |
+| 4 | 10 min | 1,393 MB |
+| 5 | 8 min | 1,729 MB |
+| 6 | 14 min | 1,330 MB |
+| 7 | 11 min | 1,255 MB |
+| 8 | 12 min | 1,080 MB |
+| 9 | 9 min | **1,864 MB** |
+| 10 | 13 min | 1,584 MB |
+
+Part 9 (`slice-19` to `slice-25`, none of them this slice's but S23-01's one line) passed 1,850 MB, as it came near 2 GB
+in step 3's run (1,941 MB). Proposed: a `chore/` recut after the merge (`PART_STARTS`, the recut rule), with its own
+full run; not recut here.
