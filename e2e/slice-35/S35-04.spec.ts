@@ -32,8 +32,9 @@ test("S35-04: Compare… with Now and with another baseline, the line, the group
   await expect(dialog.locator("[data-testid=compare-group-added] th")).toHaveText(["Kind", "Item", "What changed"]);
   expect(await compareRows(dialog)).toEqual([STAGE1[0], STAGE1[2], STAGE1[1], STAGE1[3]]);
   // the controls in one row at 1440 px: the same top for all three
-  const tops = await Promise.all(["select-compare-with", "input-compare-filter", "select-compare-kind"].map(async (id) => (await dialog.getByTestId(id).boundingBox())!.y));
-  expect(new Set(tops.map(Math.round)).size).toBe(1);
+  const tops = await topsOf(dialog);
+  // a search input and a select may differ by half a pixel
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(2);
   await expect(dialog.getByTestId("select-compare-with").locator("option")).toHaveText(["Now (the live model)"]);
   await expect(dialog.getByTestId("select-compare-kind").locator("option")).toHaveText(["All kinds", "Entity", "Attribute", "Mapping", "Relationship", "Requirement", "Source table", "Source column"]);
   await expect(dialog.getByTestId("input-compare-filter")).toHaveAttribute("placeholder", "A name, e.g. Customer or cust_no");
@@ -89,8 +90,12 @@ test("S35-04: on a narrow window the three controls wrap", async ({ page }) => {
   await signInAs(page, "Łukasz");
   await openBaselines(page);
   const dialog = await openCompare(page, DEMO_BASELINE.name);
-  const tops = await Promise.all(["select-compare-with", "input-compare-filter", "select-compare-kind"].map(async (id) => (await dialog.getByTestId(id).boundingBox())!.y));
-  expect(new Set(tops.map(Math.round)).size).toBeGreaterThan(1);
+  const tops = await topsOf(dialog);
+  expect(Math.max(...tops) - Math.min(...tops)).toBeGreaterThan(20);
   // the page has no horizontal scroll
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+/** The three controls' tops, read in one go (the centred dialog moves while its list grows). */
+const topsOf = (dialog: import("@playwright/test").Locator) =>
+  dialog.evaluate((d) => ["select-compare-with", "input-compare-filter", "select-compare-kind"].map((id) => d.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().top));

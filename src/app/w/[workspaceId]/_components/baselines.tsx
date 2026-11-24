@@ -277,7 +277,7 @@ function RenameDialog({ workspaceId, workspaceName, baseline: b, taken, onClose 
           void save();
         }}
       >
-        <p className="m-0 text-im-ink-2" data-testid="text-rename-baseline">
+        <p className="my-[1em] text-im-ink-2" data-testid="text-rename-baseline">
           Only the name and the note change. What the baseline holds stays as it was taken on {taken}.
         </p>
         <div className="mt-3">
@@ -338,7 +338,7 @@ function DeleteDialog({ workspaceId, workspaceName, baseline: b, onClose }: { wo
         </>
       }
     >
-      <p className="m-0" data-testid="text-delete-baseline">
+      <p className="my-[1em]" data-testid="text-delete-baseline">
         It cannot be brought back here.
       </p>
     </WsModal>
@@ -429,10 +429,10 @@ function CompareDialog({ workspaceId, workspaceName, baseline: b, baselines, onC
       </div>
       <div data-testid="compare-list" aria-busy={!shown}>
         {!shown ? (
-          <p className="text-im-ink-3">Comparing…</p>
+          <p className="my-[1em] text-im-ink-3">Comparing…</p>
         ) : (
           <>
-            <p data-testid="text-compare-line">
+            <p className="my-[1em]" data-testid="text-compare-line">
               {all ? (
                 <>
                   {all} change{all > 1 ? "s" : ""} from <b>{side(shown.older)}</b> to <b>{side(shown.newer)}</b>
@@ -480,7 +480,7 @@ function CompareDialog({ workspaceId, workspaceName, baseline: b, baselines, onC
               );
             })}
             {all > 0 && !changes.length && (
-              <p className="text-im-ink-3" data-testid="text-compare-nothing">
+              <p className="my-[1em] text-im-ink-3" data-testid="text-compare-nothing">
                 Nothing matches the filter.
               </p>
             )}
