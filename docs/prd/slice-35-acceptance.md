@@ -678,3 +678,112 @@ the mapping `customers.cust_no → Customer.customer_number` "status: Draft → 
   so the contract suite does not repeat them.
 - **The docs** (`decisions.md`, `data-model-v2.md`, CLAUDE.md's extension points and commands, README) are the closing's,
   as planned.
+
+## 10. Step 3: the tab and the dialogs (24 November 2026)
+
+Draft PR [#93](https://github.com/LukaszWolski-DA/infomapper-app/pull/93); commits `bd0f38b`, `8ad131a`, `e58cc93`
+(tested). No connection to `infomapper-dev`; no `pg:migrate`. No part of slice 36.
+
+### What was built, by file
+
+- **`src/app/_actions/baselines.ts`:** `createBaselineAction` (the workspace's state read once through
+  `baselineContentNow`, then the command), `renameBaselineAction` and `deleteBaselineAction` (against the row's version,
+  `Saved`), all through `runCommand`; a name taken by a write at the same moment ("This already exists", step 2) answered
+  with "A baseline named {name} already exists in this workspace." (F20). `compareBaselineAction`: a read for every member
+  (session, membership, an unlocked organization, as `modelRead`), the comparison on the server (`compareWith`), the
+  changes only to the browser; a baseline gone meanwhile answers "This baseline no longer exists." (F17).
+- **`src/app/w/[workspaceId]/_components/baselines.tsx`:** the tab (`BaselinesTab`): the intro, the "New baseline" box
+  (owners, admins, modelers, not archived), the list newest first with the time in the browser's time zone (the server's
+  HTML has UTC, replaced at hydration: `useSyncExternalStore`), the creator's name and the stored counts; the buttons
+  Compare… (everyone), Rename (owners, admins, modelers), Delete baseline (owners, admins), none but Compare… when
+  archived; `WsModal` (the prototype's `#wsmodal`: 760 px, subtitle, title, ✕, body, footer); the Rename, Delete and Compare
+  dialogs. Compare: "Compared with", "Filter" and "Kind" in one row (260 px, the rest, 160 px; wrapping on a narrow
+  window), one request per "Compared with", the filter and the kind in the browser (`filterChanges`), the line, the groups
+  Added, Changed and Removed in their colours, Kind / Item (monospaced) / What changed (`whatChanged`).
+- **`src/app/w/[workspaceId]/page.tsx`:** the baselines' rows read with the home's other reads (`store.baselines.list`,
+  never a content), the tab "Baselines (n)", its body with the rights from `can`.
+- **`src/ui/home-tabs.ts`:** `CORE_HOME_TABS` with `baselines` after Overview, so the order is Overview, the modules'
+  tabs, Baselines, People, Metadata conventions, Settings (B1.1).
+- **`e2e/slice-35/`:** `fixtures.ts` (slice 25's, 1440 × 900), `helpers.ts`, `S35-01` to `S35-04` (as changed in section 8;
+  Piotr as Reviewer, Kasia as Reader and guest), `S35-timing`, `S35-screens` (on demand, `SCREENS=<folder>`: the app and
+  the prototype side by side).
+
+### Earlier tests changed, with the reason
+
+- `e2e/slice-23/S23-01.spec.ts`: it asserts the whole tab list; "Baselines (n)" is now between Overview and People.
+- `src/ui/home-tabs.test.ts`: the tab order has Baselines after the modules' tabs and before People.
+
+### The checks and the full run (commit `e58cc93`)
+
+- CI `check`, Schema `migrations` and `smoke`: passed.
+- Locally: lint, typecheck, `npm test` (210 files, 2,520 tests passed, 13 skipped), `e2e/slice-35` (7 passed with
+  `SCREENS`), S23-01 (3 passed).
+- **Full run** [45440728536](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45440728536): **888 passed,
+  16 skipped (S35-screens among them), 0 failed, 0 flaky**; wall-clock 15 min 4 s (16:45:02 to 17:00:06 UTC). The run
+  45438391193 on `8ad131a` was cancelled on purpose when `e58cc93` (the dialogs' margins) followed.
+
+| Part | Time | Heap peak |
+| --- | --- | --- |
+| 1 | 8 min | 1,410 MB |
+| 2 | 6 min | 1,338 MB |
+| 3 | 10 min | 1,083 MB |
+| 4 | 12 min | 1,188 MB |
+| 5 | 9 min | 1,202 MB |
+| 6 | 8 min | 1,651 MB |
+| 7 | 7 min | 1,716 MB |
+| 8 | 8 min | 1,389 MB |
+| 9 | 8 min | **1,941 MB** |
+| 10 | 8 min | 1,306 MB |
+
+Part 9 (`slice-19` to `slice-25`, none of them this slice's but S23-01's one line) came near the 2 GB mark (1,351 MB in
+step 2's run): a peak with uncollected garbage (CLAUDE.md, "Heap peaks"); slice 35's folder runs in part 10. Reported, not
+recut here (shared infrastructure: a `chore/` branch by the recut rule if it repeats).
+
+### The timing (S35-timing; S35-03's "a few seconds at most")
+
+Taking a baseline of the demo's "Retail Co – DWH" in the page, from the click to the list showing it, five times:
+
+| Where | Each (ms) | Median |
+| --- | --- | --- |
+| CI's full run (GitHub runner, dev server) | 377, 259, 257, 274, 273 | 273 ms |
+| The laptop (dev server) | 1,070, 404, 1,219, 1,012, 509 | 1,012 ms |
+
+The workspace home's load (navigation start to load end, median of three reloads): in CI 217 ms with the demo's one
+baseline, 226 ms with six; on the laptop 1,047 and 511 ms (the first page of a dev server compiles). No content is read
+for the list. Online figures come with step 5's acceptance on `dev:pg`.
+
+### The prototype against the app (screenshots at 1440 × 900 in `test-results/s35-screens/`, not committed)
+
+The screenshots: `app-tab-owner`, `app-tab-reader`, `app-rename`, `app-delete`, `app-compare-filter`, each beside its
+`prototype-…` twin. The tab's layout, the box, the rows, the buttons' order and the dialogs' frames match. Every visible
+difference, with its reason:
+
+1. **The page around the tab:** the prototype draws the workspace home inside the canvas's frame (the left panel, the
+   canvas toolbar, the details panel); the app's workspace home is a page of its own without them (slice 0, unchanged).
+   So the tab is wider in the app (1,180 px against 740 px) and the intro fits one line.
+2. **"Create baseline" and Save** are in the app's primary colour (the logical blue, `primaryClass`, every primary button
+   of the app), the prototype's `.pri` in the mapping green.
+3. **"New document from it"** on each row and **"Make a document"** in Compare are slice 36's: not built.
+4. **The counts:** the app counts logical entities, as the Overview (Łukasz's answer 2): the demo shows 6 entities where
+   the prototype counts 13 (with the facts and dimensions).
+5. **The demo's comparison:** "Stage 1 sign-off" is built from today's demo minus S35-04's four items, so Compare shows 4
+   changes; the prototype's baseline predates its star and shows 57.
+6. **People (4)** against the prototype's (5): the prototype counts a pending invitee; the app counts members (slice 33,
+   unchanged).
+7. **The times** are the browser's (Łukasz's answer 1); before hydration the server's HTML shows UTC for a moment.
+8. **"Comparing…"** shows in the list while the server answers (the prototype compares in the page at once).
+9. **Requirements in the counts** differ by one from the prototype's demo (the app's demo has REQ-210, slice 15d).
+
+Nothing else differs: the intro's text, the box's two fields and their sizes, the row's grid (name, the line under it,
+the buttons below), the buttons' order (Compare…, Rename, Delete baseline), the danger colour, the dialogs' subtitles,
+titles, texts, field labels and lengths, the footers' order (Cancel, then the action), the Compare row of three
+controls, the line, the groups' headings and colours, the tables' columns, "Nothing matches the filter.".
+
+### What differs from the plan
+
+- **S35-03's undo and redo** are done on a rename (undone, then redone); an entity is deleted, and another is deleted and
+  undone. A redo of an entity delete replayed by the test's helper was refused as "changed afterwards": the helper applies
+  the domain's write sets directly and skips `runCommand`'s live-canvas step (`withLiveCanvases`, which the app's undo
+  runs too), so the helper's history differs from the app's. Not the app's behaviour; noted, not chased in this slice.
+- **The dialogs' paragraphs** got the prototype's 1em margins in a commit after the first push (`e58cc93`), so the full
+  run was started again on it.
