@@ -806,3 +806,94 @@ controls, the line, the groups' headings and colours, the tables' columns, "Noth
   the star).
 - **Checks on `ff95fe1`:** CI `check`, Schema `migrations` and `smoke` passed. Locally: lint, typecheck, `npm test`
   (2,520 passed, 13 skipped), `e2e/slice-35` with S23-01 (11 passed). No full run for these two (the closing's follows).
+
+## 11. Step 5: Łukasz's acceptance (24 November 2026)
+
+Łukasz's acceptance on `dev:pg` with the demo accounts found two bugs; both are fixed in `8f8cc0c` on draft PR #93.
+
+### Bug 1: renames showed as changes on every row that points to the renamed one
+
+**What Łukasz saw:** he renamed the entity Customer and approved customers.dob → Customer.birth_date (In review →
+Approved). Compare… with Now listed 8 mappings as changed that he never touched; the status change was one of them.
+
+**Cause:** `compareBaselines` (`src/domain/baseline/compare.ts`) compared reference fields by the names it shows, not by
+the rows they point to:
+- a mapping's `target_attribute` ("Entity.attribute") and `source_columns` ("table.column");
+- an entity's `concept` and `stereotype` (their names);
+- a source table's `system`;
+- a requirement's `parent` (its key);
+- the classifications of a column or a table (their names).
+
+Renaming an entity, an attribute, a source table or column, a concept, a stereotype, a classification, a system or a
+requirement's key therefore changed every row pointing to it.
+
+**Fix (S35-04's rule, "ids are shown by name"):** a short field may carry what it is compared by, its id or its ids as a
+sorted set (`Short`, `keyOf`, `setOf`), and is shown by name as before. A rename is one change, on the renamed row. A
+mapping changes only when its target attribute or its source columns are other rows (an input's order alone is no change);
+an entity only when its concept or stereotype is another one; a table or a column only when its set of classifications
+differs. A reference that does change still shows old → new by each side's own names. The item labels are unchanged
+(each side's current names).
+
+**Tests:**
+- Ten unit tests in `tests/baseline-compare.test.ts`, "references compared by id, shown by name (step 5)":
+  - a rename of an entity, an attribute, a source table or a source column gives exactly one change, on that row;
+  - a rename of a concept, a stereotype or a classification gives none (they are not compared as items);
+  - a mapping pointed at another attribute shows "target attribute: Customer.birth_date → Customer.email";
+  - a column's classifications changed show "Personal data → Business key, Personal data";
+  - Łukasz's case gives exactly "Entity Client: name: Customer → Client" and "Mapping customers.dob → Client.birth_date:
+    status: In review → Approved".
+- In `e2e/slice-35/S35-04`, "Customer renamed and one mapping approved, through the page": Łukasz's case driven through
+  the page (the entity panel's name, the mapping panel's Approved), then Compare… shows exactly those two rows.
+
+### Bug 2: the Compare dialog could not show the end of a long list
+
+**What Łukasz saw:** with a long list the scroll bar seemed to stop before the end, and the last row stayed hidden.
+
+**Cause:** the comparison's table was wider than the dialog. Real models have long technical names without spaces (a
+source system's tables and columns, in the Item column and in "What changed"); the table's columns cannot be narrower
+than the longest such word. Reproduced with the demo's baseline written with long column names: the table was 917 px wide
+in a 760 px body. The body (`overflow: auto`) then scrolls both ways:
+- a horizontal scroll bar sits along the bottom of the list, and the vertical one stops above it;
+- the right column ("What changed") is cut off;
+- where scroll bars are drawn over the content, the horizontal one covers the last row.
+
+The dialog's height, the body's `max-height`, its padding and the footer were not the cause: with the demo's short names
+the last row ends 14 px above the footer at 1440 × 900 and at 1280 × 720.
+
+**Fix:**
+- `WsModal` (the Compare, Rename and Delete dialogs) breaks a long word anywhere (`overflow-wrap: anywhere`), so nothing
+  is wider than the dialog.
+- The same in the list's rows (`minmax(0, 1fr)` for the text's column): a 400-character note ran past its row.
+
+The Rename and Delete dialogs were checked the same way. With a 120-character name without spaces, their title ran past
+the dialog before the fix; now it breaks, and their texts end above the footer.
+
+**Tests in `e2e/slice-35/S35-04`:**
+- "a long list scrolls to its last row" at 1440 × 900 and 1280 × 720, light and dark (four cases). The demo's baseline is
+  written without its attributes and with long column names, which gives 110 rows. The test checks:
+  - nothing is wider than the body;
+  - after scrolling to the end with the mouse wheel, the last row of the last group is fully inside the body's client
+    area, above the footer, and in the viewport.
+- "Rename and Delete with a long unbroken name fit the dialog at 1280 × 720", light and dark: no element's text runs past
+  its box (text fields aside), nothing is wider than the dialog, the text ends above the footer, and the list's row
+  doesn't overflow.
+
+Both kinds failed before the fix and pass after it.
+
+**Screenshots** (in `test-results/s35-step5/`, not committed):
+- `before-compare-long-names-1024x768.jpg`: the app's browser pane, with the horizontal scroll bar and the cut column;
+- `before-compare-long-*.png`: headless, where scroll bars are hidden, so only the cut column shows;
+- `compare-long-*` and `compare-end-*`: after the fix, at the top and at the end of the list;
+- `dialog-rename-baseline-*` and `dialog-delete-baseline-*`.
+
+**Seen, not fixed:** the toast "Created the baseline {name}." runs past its box with a 120-character unbroken name. The
+toast is the app's shared component (shared infrastructure, The slice cycle, 4).
+
+### Checks (commit `8f8cc0c`)
+
+- CI `check`, Schema `migrations` and `smoke`: passed.
+- Locally:
+  - lint and typecheck;
+  - `npm test`: 2,530 passed, 13 skipped;
+  - `e2e/slice-35`: 15 passed.
+- No full run (the closing's follows).
