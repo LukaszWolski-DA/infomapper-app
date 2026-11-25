@@ -190,4 +190,36 @@ or below 1,500 MB and has the shortest longest part.
 
 ### 5.3 The results
 
-_The full run on the eleven-part cut: filled in after it ran._
+- CI `check`, Schema `migrations` and `smoke` passed on `a57e0d3`. Locally: `tests/e2e-parts.test.ts` (7 passed),
+  typecheck, and lint on the changed files.
+- **Full run** [45566512650](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45566512650) on `a57e0d3`,
+  which contains `dev`'s head `3403287`: **897 passed, 16 skipped, 0 failed, 0 flaky**. Wall-clock 14 min 33 s
+  (07:13:57 to 07:28:30 UTC). Each part ran with its own fresh dev server, side by side.
+
+| Part | Folders | E2e step | Job | Heap peak | Expected peak |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1 | `fixes` to `slice-01b` | 501 s | 9 min 48 s | 1,318 MB | ~1,360 MB |
+| 2 | `slice-02a` to `slice-03a` | 516 s | 9 min 53 s | 1,312 MB | ~1,290 MB |
+| 3 | `slice-03b` to `slice-05a` | 609 s | 11 min 30 s | 1,374 MB | ~1,290 MB |
+| 4 | `slice-06a` to `slice-07b` | 637 s | 12 min 2 s | 1,370 MB | ~1,260 MB |
+| 5 | `slice-07c` to `slice-09` | 516 s | 10 min 15 s | 1,536 MB | ~1,330 MB |
+| 6 | `slice-10a` to `slice-12b` | 705 s | 13 min 16 s | 1,202 MB | ~1,490 MB |
+| 7 | `slice-13` to `slice-15b` | 392 s | 7 min 39 s | 1,573 MB | ~1,330 MB |
+| 8 | `slice-15c` to `slice-20` | 494 s | 9 min 39 s | 1,608 MB | ~1,480 MB |
+| 9 | `slice-21` to `slice-24` | 251 s | 5 min 22 s | 1,105 MB | ~1,390 MB |
+| 10 | `slice-25` to `slice-26` | 263 s | 5 min 47 s | 1,391 MB | ~1,270 MB |
+| 11 | `slice-27` to `slice-35` | 628 s | 12 min 2 s | 1,388 MB | ~1,300 MB |
+
+**Every part is under 1,700 MB.** The highest peak is 1,608 MB (part 8, during `slice-20`, which started at 1,340 MB).
+It was 1,941 MB and 1,864 MB in the last two runs on the old cut, and 1,751 MB on the ten-part cut. The wall-clock is
+about the same as before: 14 min 33 s, against 14 min 57 s (ten parts) and 15 min 4 s and 15 min 42 s (the old cut).
+
+Beside the ten-part run 45563847036:
+
+| | Ten parts (45563847036) | Eleven parts (45566512650) |
+| --- | --- | --- |
+| Highest heap peak | 1,751 MB (part 9) | 1,608 MB (part 8) |
+| Parts above 1,700 MB | 2 | 0 |
+| Longest e2e step | 737 s (part 4) | 705 s (part 6) |
+| Wall-clock | 14 min 57 s | 14 min 33 s |
+| Tests | 897 passed, 16 skipped | 897 passed, 16 skipped |
