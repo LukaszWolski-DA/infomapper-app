@@ -366,13 +366,16 @@ async function scenario(store: DataStore, ctxOf: (actorId: string) => CommandCon
     const live = await docOf(stored.id);
     await step("document: source to a baseline again", ok(updateDocument(ctxOf(LUKASZ), lukaszAccess, live, { workspaceId: RETAIL, documentId: live.id, expectedVersion: live.version, source: { kind: "baseline", baselineId } }, DOCUMENT_SECTION_KINDS, undefined, refs)));
     const again = await docOf(stored.id);
-    await step("document: a baseline source without its id", buildWriteSet(ctx, RETAIL, [update("document_definition", again, next(ctx, again, { baseline_id: null }))]));
+    const unpaired = ctxOf(LUKASZ);
+    await step("document: a baseline source without its id", buildWriteSet(unpaired, RETAIL, [update("document_definition", again, next(unpaired, again, { baseline_id: null }))]));
     answers["document: count with another's private document"] = (await baselineDocumentCounts(store, RETAIL))[baselineId];
-    await step("baseline: delete", ok(deleteBaseline(ctx, lukaszAccess, now, { baselineId, expectedVersion: now.version })));
+    // each write after the documents' on a later clock, so the change log's order is the writes' order on both adapters
+    const later = ctxOf(LUKASZ);
+    await step("baseline: delete", ok(deleteBaseline(later, lukaszAccess, now, { baselineId, expectedVersion: now.version })));
     const kept = await docOf(stored.id);
     answers["document: kept after its baseline's delete"] = { live: kept.deleted_at === null, baseline: kept.baseline_id === baselineId, count: (await baselineDocumentCounts(store, RETAIL))[baselineId] ?? null };
     answers["document: its baseline gone"] = (await documentModel(store, (await store.workspaces.get(RETAIL))!, kept))?.source.kind;
-    await step("baseline: name free again", ok(createBaseline(ctx, lukaszAccess, await baselineState(), taken, { workspaceId: RETAIL, name: "contract renamed" })));
+    await step("baseline: name free again", ok(createBaseline(ctxOf(LUKASZ), lukaszAccess, await baselineState(), taken, { workspaceId: RETAIL, name: "contract renamed" })));
     answers["baseline: no content read after its delete"] = (await store.baselines.content(RETAIL, baselineId)) === null;
   }
   return answers;
