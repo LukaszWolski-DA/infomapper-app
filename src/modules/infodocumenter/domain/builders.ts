@@ -163,7 +163,7 @@ export function buildDictionary(input: SectionBuildInput): DocNode[] {
         cards: attributes.map((a) => ({
           title: [mono(a.name)],
           props: CARD_PROPS.filter((c) => o.columns.includes(c))
-            .map((c) => (c === "nullable" ? (a.is_nullable && !a.is_primary_key ? [text(t("nullable").toLowerCase())] : EMPTY) : dictionaryCell(state, a, c, scope, t)))
+            .map((c) => (c === "nullable" ? (a.is_nullable && !a.is_primary_key ? [text(t("nullableCard"))] : EMPTY) : dictionaryCell(state, a, c, scope, t)))
             .filter((runs) => runs.length),
           ...(definitions && a.definition_text ? { text: definitionRuns(a) } : {}),
           lines: CARD_LINES.filter((c) => o.columns.includes(c))

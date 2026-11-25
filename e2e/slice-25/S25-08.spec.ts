@@ -44,7 +44,7 @@ test("S25-08: a German workspace prints its headings and labels in German; names
   await laidOut(page);
   const t = await texts(page);
   expect(t.toc).toBe("Inhalt");
-  expect(t.sections).toEqual(["Einleitung", "Modellübersicht", "Konventionen und Notation", "Diagramme", "Datenkatalog", "Anforderungen und Abdeckung", "Datenqualitätsregeln", "Klassifikationsverzeichnis"]);
+  expect(t.sections).toEqual(["Einleitung", "Modellübersicht", "Konventionen und Notation", "Diagramme", "Datenwörterbuch", "Anforderungen und Abdeckung", "Datenqualitätsregeln", "Klassifikationsverzeichnis"]);
   expect(t.cover).toEqual(["Kunde", "Workspace", "Modellstand", "Version", "Status", "Erstellt von"]);
   expect(t.heads).toEqual(expect.arrayContaining(["Attribut", "Typ", "Personenbezogene Daten"]));
   expect(t.entities).toContain("Customer");

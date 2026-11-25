@@ -69,7 +69,7 @@ describe("the sections' headings in three languages (S26-10)", () => {
   const ALL = ["overview", "ready", "conv", "sources", "classreg", "reqs", "trace", "dq", "cube.bus"];
   it.each([
     ["en", ["Model overview", "Model readiness", "Conventions and notation", "Source tables", "Classification register", "Requirements and coverage", "Traceability", "Data quality rules", "Bus matrix"]],
-    ["pl", ["Przegląd modelu", "Gotowość modelu", "Konwencje i notacja", "Tabele źródłowe", "Rejestr klasyfikacji", "Wymagania i pokrycie", "Śledzenie wymagań (traceability)", "Reguły jakości danych", "Macierz bus matrix"]],
+    ["pl", ["Przegląd modelu", "Gotowość modelu", "Konwencje i notacja", "Tabele źródłowe", "Rejestr klasyfikacji", "Wymagania i pokrycie", "Śledzenie wymagań (traceability)", "Reguły jakości danych", "Bus matrix"]],
     ["de", ["Modellübersicht", "Modellreife", "Konventionen und Notation", "Quelltabellen", "Klassifikationsverzeichnis", "Anforderungen und Abdeckung", "Rückverfolgbarkeit", "Datenqualitätsregeln", "Bus-Matrix"]],
   ] as const)("in %s, by the document's own language (Q8)", (language, expected) => {
     expect(doc(ALL.map((type) => ({ type })), { language }).sections.map((s) => s.heading)).toEqual(expected);
@@ -209,7 +209,7 @@ describe("Source tables and the classification register", () => {
     expect(lists(s.nodes).map((l) => words(l.items[0]!.runs))).toContain("Hub on cust_no");
     // the reading in the document's language (D3)
     const pl = one("sources", {}, { db: demo(dv2), language: "pl" });
-    expect(headings(pl.nodes, 4)[0]).toBe("Odczyt Data Vault");
+    expect(headings(pl.nodes, 4)[0]).toBe("Interpretacja Data Vault");
     expect(lists(pl.nodes).map((l) => words(l.items[0]!.runs))).toContain("Hub na cust_no");
     const de = one("sources", {}, { db: demo(dv2), language: "de" });
     expect(lists(de.nodes).map((l) => words(l.items[0]!.runs))).toContain("Hub auf cust_no");
@@ -326,6 +326,23 @@ describe("the dictionary's layouts and long definitions (D1)", () => {
     expect(email.props.map(words)).toEqual(["string(120)"]);
     expect(words(email.text)).toMatch(/^Where we write/);
     expect(email.lines.map((l) => l.label)).toEqual(["Mapped from"]);
+  });
+
+  it("prints a card's nullable word as the language writes it, never lower-cased (fix/document-words-pl-de)", () => {
+    const base = db();
+    const customerId = base.entity.find((e) => e.workspace_id === WS && e.name === "Customer")!.id;
+    const nullable = base.attribute.find((a) => a.entity_id === customerId && !a.deleted_at && a.is_nullable && !a.is_primary_key)!;
+    const required = base.attribute.find((a) => a.entity_id === customerId && !a.deleted_at && a.is_primary_key)!;
+    const card = (language: DocLanguage, name: string) => {
+      const nodes = flat(one("dict", { layout: "cards", columns: ["attribute", "nullable"], entity: [] }, { db: base, language, scope: { dimensional: false } }).nodes);
+      const at = nodes.findIndex((x) => x.kind === "heading" && x.level === 3 && x.text === "Customer");
+      const cards = nodes.slice(at).find((x): x is Extract<DocNode, { kind: "cards" }> => x.kind === "cards")!;
+      return cards.cards.find((c) => words(c.title) === name)!.props.map(words);
+    };
+    expect(card("en", nullable.name)).toEqual(["nullable"]);
+    expect(card("pl", nullable.name)).toEqual(["może być pusty"]);
+    expect(card("de", nullable.name)).toEqual(["NULL zulässig"]);
+    expect(card("de", required.name)).toEqual([]);
   });
 
   it("moves a definition over the chosen length to the section's end, with a numbered reference in its place", () => {
