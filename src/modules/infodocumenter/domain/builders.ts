@@ -4,6 +4,7 @@
 // each reads the document's model state (`src/domain/document/state.ts`: one snapshot and the app's indexes over it)
 // and nothing else, and draws what the prototype's `DOC` draws. The other sections are in `sections-*.ts`.
 
+import { buildChanges, changesHeading } from "./sections-changes";
 import { EMPTY, lines, longTextTable, marksStatus, mono, muted, relationshipsBlock, statusShown, strong, text, typeRuns, warn } from "@/domain/document/blocks";
 import type { DocColumn, DocNode, DocRun, DocRuns } from "@/domain/document/content";
 import type { DocumentSectionType, SectionBuildInput, SectionScope } from "@/domain/document/sections";
@@ -329,7 +330,7 @@ export function buildS2T({ state, scope, options, language }: SectionBuildInput)
 
 const titled = (key: LabelKey) => (language: DocLanguage) => label(language, key);
 
-type Registration = Pick<DocumentSectionType, "label" | "description" | "build">;
+type Registration = Pick<DocumentSectionType, "label" | "description" | "heading" | "build">;
 
 /** InfoDocumenter's section types: their kinds (`sections.ts`) with their headings, the prototype's "+ Add section" lines and builders. */
 const OWN: Record<string, Registration> = {
@@ -377,6 +378,13 @@ const OWN: Record<string, Registration> = {
     label: titled("t_diagrams"),
     description: "Figures of whole canvases or single frames, each with its own view, size and caption. Tick what goes into the document.",
     build: buildDiagramsSection,
+  },
+  // slice 36
+  changes: {
+    label: titled("t_changesType"),
+    description: "What was added, changed and removed since a baseline you choose.",
+    heading: changesHeading,
+    build: buildChanges,
   },
   figure: {
     label: titled("t_figs"),

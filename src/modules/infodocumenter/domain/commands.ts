@@ -6,8 +6,11 @@
 
 import { z } from "zod";
 import { buildWriteSet, fail, newRowColumns, nextVersion, type CommandContext, type CommandResult } from "@/domain/changes";
+import { olderFirst } from "@/domain/baseline/compare";
+import { BASELINE_GONE_MESSAGE } from "@/domain/baseline/names";
 import { current, nothingToChange, softDeleted } from "@/domain/commands/shared";
 import type { DocumentSectionKind } from "@/domain/document/sections";
+import type { BaselineRef } from "@/domain/document/state";
 import { sectionOptionsRefusal } from "@/domain/document/sections";
 import { domainError, notFound, type DomainError } from "@/domain/errors";
 import type { WorkspaceAccess } from "@/domain/permissions";
@@ -71,14 +74,41 @@ const of = { workspaceId: uuidSchema, documentId: uuidSchema };
 
 // ---- create ----
 
-const createInput = z.object({ workspaceId: uuidSchema, preset: z.enum(DOCUMENT_PRESETS) }).strict();
+const createInput = z
+  .object({
+    workspaceId: uuidSchema,
+    preset: z.enum(DOCUMENT_PRESETS),
+    /** Slice 36: "New document from it" (a baseline's row); without it the sign-off preset takes the newest. */
+    baselineId: uuidSchema.optional(),
+  })
+  .strict();
 export type CreateDocumentInput = z.input<typeof createInput>;
 
 const EMPTY_COVER: DocumentCover = { title: null, subtitle: null, version: null, status: null, preparedBy: null };
 
+/** Slice 36's refusals and names (step 1's Q7, F10; Łukasz's answer 6). */
+export const BASELINE_TEXTS = {
+  /** The sign-off preset while the workspace has no baseline (the prototype's). */
+  noBaseline: "Create a baseline first.",
+  /** A baseline deleted meanwhile, of another workspace, or none (slice 35's `BASELINE_GONE_MESSAGE`). */
+  gone: BASELINE_GONE_MESSAGE,
+  fromBaseline: (name: string) => `Documentation of “${name}”`,
+  changesSince: (older: string, newer: string | null) => (newer === null ? `Changes since “${older}”` : `Changes since “${older}” to “${newer}”`),
+} as const;
+
+/** A name cut to the longest a document has (F10), as Duplicate does. */
+const fitName = (name: string) => name.slice(0, SHORT_TEXT_MAX).trim();
+
+const baselineGone = () => fail(domainError("not_found", BASELINE_TEXTS.gone));
+
 /**
  * A new private document of the person's from a preset (D1, D13): named by the preset's label, the live model, the whole
  * model in scope, both levels, the preset's mappings, its sections, then the available modules' that end it.
+ *
+ * Slice 36: with a baseline (`baselineId`, "New document from it": "Documentation of “{name}”"), or the sign-off preset
+ * (the newest baseline), the document's source is that baseline and its draft mark is off (Łukasz's answer 2); the
+ * sign-off preset is refused while the workspace has no live baseline. `canvasIds` are then the baseline's (the caller
+ * reads them from its content).
  */
 export function createDocument(
   ctx: CommandContext,
@@ -87,6 +117,8 @@ export function createDocument(
   kinds: Kinds,
   /** Slice 27 (D9): the scope's canvases in order (`diagramCanvases`), for Diagrams' figures. */
   canvasIds: readonly Uuid[] = [],
+  /** Slice 36: the workspace's live baselines, newest first (`baselines.list`). */
+  baselines: readonly BaselineRef[] = [],
 ): CommandResult<{ document: DocumentDefinition }> {
   const refused = createRefusal(access);
   if (refused) return fail(refused);
@@ -94,22 +126,75 @@ export function createDocument(
   if (!parsed.ok) return fail(parsed.error);
   if (parsed.data.workspaceId !== access.workspace.id) return fail(notFound("workspace"));
   const preset = presetOf(parsed.data.preset);
+  const chosen = parsed.data.baselineId;
+  const baseline = chosen ? baselines.find((b) => b.id === chosen) : preset.fromBaseline ? baselines[0] : undefined;
+  if (chosen && !baseline) return baselineGone();
+  if (preset.fromBaseline && !baseline) return fail(domainError("invalid", BASELINE_TEXTS.noBaseline));
   const scope: DocumentScope = { projects: [], concepts: [], logical: true, dimensional: true, mappings: preset.mappings };
+  const language = access.workspace.doc_language;
   const row: DocumentDefinition = {
     ...newRowColumns(ctx),
     workspace_id: access.workspace.id,
-    name: preset.label,
+    name: chosen && baseline ? fitName(BASELINE_TEXTS.fromBaseline(baseline.name)) : preset.label,
     author_id: ctx.actorId,
     shared: false,
     audience: preset.audience,
     preset: preset.code,
-    source_kind: "live",
-    baseline_id: null,
+    source_kind: baseline ? "baseline" : "live",
+    baseline_id: baseline?.id ?? null,
     scope,
     cover: { ...EMPTY_COVER },
-    // a new document takes the workspace's documentation language (Q8) and its preset's draft mark
-    style: defaultStyle({ language: access.workspace.doc_language, watermark: preset.watermark }),
-    sections: presetSections(preset, kinds.values(), access.workspace, ctx.newId, canvasIds),
+    // a new document takes the workspace's documentation language (Q8) and its preset's draft mark; none from a baseline
+    style: defaultStyle({ language, watermark: baseline ? false : preset.watermark }),
+    sections: presetSections(preset, kinds.values(), access.workspace, ctx.newId, canvasIds, language),
+  };
+  return { ok: true, value: { document: row }, writeSet: buildWriteSet(ctx, access.workspace.id, [{ kind: "insert", table: "document_definition", row }]) };
+}
+
+const changesDocumentInput = z.object({ workspaceId: uuidSchema, olderId: uuidSchema, newerId: uuidSchema.nullable() }).strict();
+export type CreateChangesDocumentInput = z.input<typeof changesDocumentInput>;
+
+/**
+ * "Make a document" in the Compare dialog (B4.6, slice 36): a private document from the blank preset (its row's preset
+ * stays `blank`, F11) whose source is the newer state (a baseline, or the live model for Now) and whose one section is
+ * "Changes since" the older baseline, chosen, not "previous"; named "Changes since “{older}” to “{newer}”" (or
+ * "Changes since “{older}”" against Now), cut to the name's length (F10); the whole workspace in scope; no draft mark.
+ * The older state is the start whichever way round they come (B4.2).
+ */
+export function createChangesDocument(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  input: unknown,
+  kinds: Kinds,
+  /** The workspace's live baselines, newest first. */
+  baselines: readonly BaselineRef[],
+): CommandResult<{ document: DocumentDefinition }> {
+  const refused = createRefusal(access);
+  if (refused) return fail(refused);
+  const parsed = parseInput(changesDocumentInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  if (parsed.data.workspaceId !== access.workspace.id) return fail(notFound("workspace"));
+  const first = baselines.find((b) => b.id === parsed.data.olderId);
+  const second = parsed.data.newerId === null ? null : baselines.find((b) => b.id === parsed.data.newerId);
+  if (!first || second === undefined) return baselineGone();
+  const [older, newer] = olderFirst<BaselineRef>(first, second);
+  const preset = presetOf("blank");
+  const kind = kinds.get("changes");
+  if (!kind) return fail(domainError("invalid", SECTION_TEXTS.notInstalled));
+  const row: DocumentDefinition = {
+    ...newRowColumns(ctx),
+    workspace_id: access.workspace.id,
+    name: fitName(BASELINE_TEXTS.changesSince(older!.name, newer?.name ?? null)),
+    author_id: ctx.actorId,
+    shared: false,
+    audience: null,
+    preset: preset.code,
+    source_kind: newer ? "baseline" : "live",
+    baseline_id: newer?.id ?? null,
+    scope: { projects: [], concepts: [], logical: true, dimensional: true, mappings: preset.mappings },
+    cover: { ...EMPTY_COVER },
+    style: defaultStyle({ language: access.workspace.doc_language, watermark: false }),
+    sections: [newSection(ctx.newId(), kind.type, { ...kind.defaults(), against: older!.id }, !kind.samePage)],
   };
   return { ok: true, value: { document: row }, writeSet: buildWriteSet(ctx, access.workspace.id, [{ kind: "insert", table: "document_definition", row }]) };
 }
@@ -140,6 +225,8 @@ const updateInput = z
     scope: scopePatch.optional(),
     style: stylePatch.optional(),
     section: sectionPatch.optional(),
+    /** Slice 36 (B3.2): the document's model state, the live model or a live baseline of the workspace. */
+    source: z.discriminatedUnion("kind", [z.object({ kind: z.literal("live") }).strict(), z.object({ kind: z.literal("baseline"), baselineId: uuidSchema }).strict()]).optional(),
   })
   .strict();
 export type UpdateDocumentInput = z.input<typeof updateInput>;
@@ -159,6 +246,11 @@ export function updateDocument(
   kinds: Kinds,
   /** Slice 27: the workspace's canvases and their frames; a figure added in this save must show one of them. */
   canvases?: { readonly canvasIds: ReadonlySet<string>; readonly frameCanvas: ReadonlyMap<string, string> },
+  /**
+   * Slice 36: the workspace's live baselines; a source, or a changes section's "Compared with", chosen in this save must
+   * be one of them ("This baseline no longer exists." otherwise: deleted meanwhile, another workspace's, or none).
+   */
+  baselines: readonly BaselineRef[] = [],
 ): CommandResult<{ document: DocumentDefinition }> {
   const refused = editRefusal(access, doc);
   if (refused) return fail(refused);
@@ -175,6 +267,12 @@ export function updateDocument(
   if (p.cover) patch.cover = { ...before.cover, ...p.cover };
   if (p.scope) patch.scope = { ...before.scope, ...p.scope };
   if (p.style) patch.style = patchedStyle(before.style, p.style);
+  const live = (id: string) => baselines.some((b) => b.id === id);
+  if (p.source) {
+    if (p.source.kind === "baseline" && !live(p.source.baselineId)) return baselineGone();
+    patch.source_kind = p.source.kind;
+    patch.baseline_id = p.source.kind === "baseline" ? p.source.baselineId : null;
+  }
   if (p.section) {
     const at = before.sections.findIndex((s) => s.id === p.section!.id);
     if (at < 0) return fail(notFound("section"));
@@ -187,6 +285,8 @@ export function updateDocument(
       const refusal = sectionOptionsRefusal(kinds, { id: section.id, type: section.type, options: merged });
       if (refusal) return fail(refusal);
       options = kind!.options.parse(merged);
+      // slice 36: a "Compared with" chosen now must be a live baseline (one kept from before may be gone: S36-05)
+      if (typeof options.against === "string" && options.against !== section.options.against && !live(options.against)) return baselineGone();
       const added = figuresAdded(section.options, options);
       if (added.some((f) => !canvases?.canvasIds.has(f.canvasId) || (f.frameId !== null && canvases.frameCanvas.get(f.frameId) !== f.canvasId)))
         return fail(domainError("invalid", FIGURE_CANVAS_REFUSAL, { [`sections.${section.id}`]: "invalid" }));
@@ -345,6 +445,15 @@ export function duplicateDocument(ctx: CommandContext, access: WorkspaceAccess, 
   };
   return { ok: true, value: { document: row }, writeSet: buildWriteSet(ctx, access.workspace.id, [{ kind: "insert", table: "document_definition", row }]) };
 }
+
+// ---- slice 36: the documents made from a baseline ----
+
+/**
+ * How many live documents are made from a baseline, every author's, private ones included (Q8): the delete dialog
+ * shows the number only, never a name.
+ */
+export const documentsFromBaseline = (rows: readonly Pick<DocumentDefinition, "source_kind" | "baseline_id" | "deleted_at">[], baselineId: Uuid): number =>
+  rows.filter((d) => d.deleted_at === null && d.source_kind === "baseline" && d.baseline_id === baselineId).length;
 
 // ---- delete ----
 

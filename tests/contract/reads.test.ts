@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES, documentStateFor } from "@/compose/documents";
+import { baselineDocumentCounts, documentModel } from "@/compose/document-model";
 import { STORE_SCHEMA } from "@/compose/tables";
 import type { DevDb } from "@/data/local/schema";
 import { createLocalDataStore } from "@/data/local/store";
@@ -43,6 +44,33 @@ async function markdownFrom(store: DataStore): Promise<Record<string, string>> {
     const snapshot = await store.snapshot(d.workspace_id, DOCUMENT_TABLES);
     const tree = buildDocument({ definition: d, state: documentStateFor(snapshot!), types: DOCUMENT_SECTION_TYPES, date: "2026-11-21" });
     out[d.id] = documentMarkdown({ tree, name: d.name, generated: "2026-11-21T09:05+01:00" });
+  }
+  return out;
+}
+
+/**
+ * Slice 36 (S36-06): each live document read as if made from each live baseline of its workspace, with a changes
+ * section (the previous baseline) at its end: the model's source and comparisons, and its Markdown with a fixed time;
+ * and each workspace's documents' count per baseline. Nothing is written: both adapters must give the same.
+ */
+async function baselineDocumentsFrom(store: DataStore): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = {};
+  const documents = ((db as unknown as Record<string, DocumentDefinition[]>).document_definition ?? []).filter((d) => d.deleted_at === null);
+  for (const d of documents) {
+    const workspace = (await store.workspaces.get(d.workspace_id))!;
+    for (const b of await store.baselines.list(d.workspace_id)) {
+      const definition: DocumentDefinition = {
+        ...d,
+        source_kind: "baseline",
+        baseline_id: b.id,
+        sections: [...d.sections, { id: "01a0f9e9-2036-7b1a-8c35-5e1f0a7e3601", type: "changes", on: true, heading: null, newPage: true, options: { against: null } }],
+      };
+      const model = (await documentModel(store, workspace, definition))!;
+      const state = documentStateFor(model.snapshot, { source: model.source, changes: (a) => model.changes[a ?? ""] ?? { kind: "pending" } });
+      const tree = buildDocument({ definition, state, types: DOCUMENT_SECTION_TYPES, date: "2026-11-21", time: (iso) => iso.slice(0, 16) });
+      out[`${d.id} ${b.id}`] = { source: model.source, changes: model.changes, markdown: documentMarkdown({ tree, name: d.name, generated: "2026-11-21T09:05+01:00" }) };
+    }
+    out[`counts ${d.workspace_id}`] = await baselineDocumentCounts(store, d.workspace_id);
   }
   return out;
 }
@@ -103,6 +131,13 @@ describe("the reads on the local adapter, against the rows themselves", () => {
     expect(localReads["passwordResets.getByTokenHash (unknown)"]).toBeNull();
   });
 
+  it("builds documents from a baseline: its content, its comparison with the previous one, the counts (slice 36)", async () => {
+    const read = await baselineDocumentsFrom(localStore);
+    const built = Object.entries(read).filter(([k]) => !k.startsWith("counts"));
+    expect(built.length).toBeGreaterThan(0);
+    for (const [, v] of built) expect((v as { source: { kind: string } }).source.kind).toBe("baseline");
+  });
+
   it("names the lost original in model.load", () => {
     const lost = rowsOf("workspace").flatMap((w) => (localReads[`model.load ${w.id}`] as { lostOriginals: unknown[] }).lostOriginals);
     expect(lost.length).toBeGreaterThan(0);
@@ -153,6 +188,11 @@ describe.runIf(!!CONTRACT_DB)("the reads on Postgres: the same as the local adap
         else expect.soft(pg[table], `${name} ${table}`).toEqual(local[table]);
       }
     }
+  });
+
+  it("gives documents from a baseline the local adapter's model, comparisons and Markdown (slice 36)", async () => {
+    const local = await baselineDocumentsFrom(localStore);
+    expect(await baselineDocumentsFrom(store)).toEqual(local);
   });
 
   it("gives every document's Markdown the local adapter's text (slice 34, F23)", async () => {

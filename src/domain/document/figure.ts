@@ -111,6 +111,8 @@ export interface FigureInput {
   readonly notation: "ie" | "uml";
   /** The style's black and white (F5: the prototype's `PAL.mono`). */
   readonly mono: boolean;
+  /** Slice 36 (B3.3, F5): the snapshot is a baseline's, which holds no labels: a label canvas is not drawn. */
+  readonly fromBaseline?: boolean;
 }
 
 export type FigureDrawing =
@@ -118,6 +120,8 @@ export type FigureDrawing =
   | { readonly kind: "gone"; readonly what: "canvas" | "frame" }
   /** Nothing of it is in the document's scope ("Nothing from this canvas is in the document's scope."). */
   | { readonly kind: "empty" }
+  /** Slice 36 (F5): a label canvas in a document from a baseline, which holds no labels: not drawn. */
+  | { readonly kind: "label"; readonly canvas: string }
   | {
       readonly kind: "drawn";
       /** The SVG, its `viewBox` the box below (canvas pixels). */
@@ -191,6 +195,7 @@ export function figureDrawing(input: FigureInput, spec: FigureSpec): FigureDrawi
   const { snapshot, scope } = input;
   const canvas = snapshot.canvases.find((c) => c.id === spec.canvasId);
   if (!canvas) return { kind: "gone", what: "canvas" };
+  if (input.fromBaseline && canvas.live_label_id) return { kind: "label", canvas: canvas.name };
   const frameRows = snapshot.frames.filter((f) => f.canvas_id === canvas.id);
   if (spec.frameId && !frameRows.some((f) => f.id === spec.frameId)) return { kind: "gone", what: "frame" };
   const asOnCanvas = spec.view === "canvas";

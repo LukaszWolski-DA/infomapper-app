@@ -8,6 +8,7 @@ import { z } from "zod";
 import { LONG_TEXTS } from "@/domain/document/blocks";
 import { figureList } from "@/domain/document/figure-entry";
 import type { DocumentSectionKind } from "@/domain/document/sections";
+import { uuidSchema } from "@/domain/validation";
 
 /** The longest Text body (F18: as plain text elsewhere). */
 export const TEXT_BODY_MAX = 20000;
@@ -209,6 +210,13 @@ export const diagramsOptions = z
 export type DiagramsOptions = z.output<typeof diagramsOptions>;
 export const DIAGRAMS_DEFAULTS: DiagramsOptions = { figures: [], legend: true, notation: "doc", warnPt: 0 };
 
+// ---- slice 36: "Changes since …" ----
+
+/** "Compared with": a baseline by its id, or null for the previous baseline (B4.1). */
+export const changesOptions = z.object({ against: uuidSchema.nullable().default(null) }).strict();
+export type ChangesOptions = z.output<typeof changesOptions>;
+export const CHANGES_DEFAULTS: ChangesOptions = { against: null };
+
 const always = () => true;
 const copy = <T extends object>(value: T) => () => structuredClone(value) as unknown as Record<string, unknown>;
 const asRecord = (schema: z.ZodType) => schema as unknown as z.ZodType<Record<string, unknown>>;
@@ -232,4 +240,6 @@ export const INFODOC_SECTION_KINDS: readonly DocumentSectionKind[] = [
   own("conv", CONVENTIONS_DEFAULTS, conventionsOptions),
   own("trace", TRACE_DEFAULTS, traceOptions),
   own("dq", QUALITY_DEFAULTS, qualityOptions),
+  // slice 36: the changes since a baseline (the prototype's last own section)
+  own("changes", CHANGES_DEFAULTS, changesOptions),
 ];

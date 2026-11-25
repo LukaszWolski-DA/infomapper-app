@@ -105,6 +105,39 @@ export function baselineContentOf<T extends ModuleTable>(snapshot: WorkspaceSnap
   });
 }
 
+/** What a document from a baseline takes from the live workspace (slice 36, Q1): what a content does not hold. */
+export type LiveParts<T extends ModuleTable> = Pick<WorkspaceSnapshot<T>, "workspace" | "organization" | "people">;
+
+/**
+ * A baseline's content read back as a workspace snapshot (slice 36, Q1; the inverse of `baselineContentOf`), so a
+ * document's builders read a baseline exactly as they read the live model. The model, requirements, projects, canvases,
+ * their items and frames and the modules' rows are the content's; the workspace's row is today's (its name, client and
+ * documentation language) with the content's four settings over it (Data Vault mode, four-eyes, naming conventions and
+ * InfoCube then); the organization and the people are today's; labels, label links and members are empty (a content has
+ * none: a label canvas is not drawn from a baseline). `moduleTables`: the module tables the reader asks for, each the
+ * content's rows or none. Pure; nothing is copied.
+ */
+export function snapshotOfContent<T extends ModuleTable>(content: BaselineContent, live: LiveParts<T>, moduleTables: readonly T[]): WorkspaceSnapshot<T> {
+  const modules = Object.fromEntries(moduleTables.map((t) => [t, content.modules[t] ?? []])) as unknown as WorkspaceSnapshot<T>["modules"];
+  return {
+    workspace: { ...live.workspace, ...content.settings },
+    organization: live.organization,
+    model: content.model,
+    requirements: content.requirements,
+    requirementLinks: content.requirementLinks,
+    projects: content.projects,
+    projectCanvases: content.projectCanvases,
+    canvasItems: content.canvasItems,
+    canvases: content.canvases,
+    frames: content.frames,
+    labels: [],
+    labelLinks: [],
+    members: [],
+    people: live.people,
+    modules,
+  };
+}
+
 /** The list's summary (Łukasz's answer 2): logical entities, mappings (source to logical) and requirements, as the Overview. */
 export function baselineSummary(content: BaselineContent): Pick<Baseline, "entity_count" | "mapping_count" | "requirement_count"> {
   return {

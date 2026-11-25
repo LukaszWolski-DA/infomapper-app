@@ -956,9 +956,9 @@ on the server, so another's private document never reaches the browser.
 | `author_id` | uuid | no | FK `app_user`: the author (step 1's F15); a duplicate's author is the person who duplicated it |
 | `shared` | boolean | no | default false; shared with the workspace's members |
 | `audience` | text | yes | free text, for the author's own orientation |
-| `preset` | text | no | `dictionary`, `s2t`, `blank` (CHECK): the preset it was made from |
-| `source_kind` | text | no | `live` or `baseline`, default `live`; this slice accepts `live` only (the domain and the local adapter) |
-| `baseline_id` | uuid | yes | FK `baseline`, set exactly when `source_kind` is `baseline` (CHECK `document_definition_source_ck`); null in this slice; no key in the local adapter while `baseline` is not in the domain |
+| `preset` | text | no | `dictionary`, `s2t`, `signoff` (slice 36, migration `20261125120000_document_signoff.sql`), `blank` (CHECK): the preset it was made from; a document made from a comparison ("Make a document") is `blank` |
+| `source_kind` | text | no | `live` or `baseline`, default `live`; since slice 36 both (the domain and the local adapter) |
+| `baseline_id` | uuid | yes | FK `baseline`, set exactly when `source_kind` is `baseline` (CHECK `document_definition_source_ck`); since slice 36 a live baseline of the same workspace when it is chosen (the domain's rule; the key accepts a soft-deleted one, which the document keeps pointing to and then says so, B3.5); the key in the local adapter since slice 35 |
 | `scope` | jsonb | no | `{ projects, concepts, logical, dimensional, mappings }`: no project = the whole model, a project its canvases' entities; no concept = all; `mappings` `all`, `notdraft`, `approved`. Ids of deleted projects and concepts are kept and ignored |
 | `cover` | jsonb | no | the title page's `{ title, subtitle, version, status, preparedBy }`, each null when not set (the title is then the name, "prepared by" the author) |
 | `style` | jsonb | no | slice 26 (F9, D-81): `{ language, template, accent, colours, paper, orientation, notation, keepRows, cover, contents, numbers, banded, runningHeader, watermark, header: { left, right }, footer: { left, right } }`, since slice 27 also `listOfFigures` (false) and `smallestPt` (5 to 8, default 6; D-82); `language` null follows the workspace's documentation language (a recipe stored before slice 26 is read with the defaults and `language` null); a header or footer part null shows its example; SQL default `{}` |

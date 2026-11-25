@@ -390,7 +390,12 @@ export function documentMarkdown({ tree, name, generated }: MarkdownInput): stri
     ["workspace", row("workspace")],
     ["organization", tree.cover.organization],
     ["language", tree.language],
-    ["source", "live model"],
+    // slice 36 (S36-04): a baseline is named with the time it was taken, its offset from UTC the reader's
+    ...((tree.source.kind === "baseline"
+      ? [["source", "baseline"], ["baseline", tree.source.name], ["baseline_taken", localTimestamp(new Date(tree.source.created_at))]]
+      : tree.source.kind === "gone"
+        ? [["source", "baseline"]]
+        : [["source", "live model"]]) as [string, string][]),
     ["generated", generated],
     ["generator", "InfoMapper (InfoDocumenter)"],
     ...(tree.cover.subtitle ? [["subtitle", tree.cover.subtitle] as [string, string]] : []),
@@ -420,6 +425,8 @@ export function documentMarkdown({ tree, name, generated }: MarkdownInput): stri
     blocks.push(`## ${escapeText(tree.contents.heading)}`);
     blocks.push(tree.sections.map((s, i) => `- [${escapeText(s.heading)}](#${all[offset + sectionAt[i]!]})`).join("\n"));
   }
+  // slice 36 (B3.5): a document whose baseline is gone says so in place of its content
+  if (tree.missing) blocks.push(`> ${escapeText(tree.missing)}`);
   if (tree.skipped.length) blocks.push(tree.skipped.map((s) => `> ${escapeText(s.text)}`).join("\n>\n"));
   for (const b of bodies) blocks.push(...b);
   return `${blocks.filter((b) => b.trim()).join("\n\n")}\n`;

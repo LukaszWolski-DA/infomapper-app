@@ -4,16 +4,26 @@
 
 import type { DocumentSectionKind } from "@/domain/document/sections";
 import type { Uuid } from "@/domain/ids";
-import type { Workspace } from "@/domain/types";
+import type { DocLanguage, Workspace } from "@/domain/types";
 import type { FigureLook } from "@/domain/document/figure-entry";
+import { newFigure } from "@/domain/document/figure-entry";
 import { diagramFigures } from "./figures";
+import { label } from "./labels";
 import type { DocumentPreset, DocumentSection, MappingFilter } from "./types";
 
 /**
  * A preset's section: an own type with its options over the type's defaults, or where the modules' sections go.
  * Slice 27 (D9): Diagrams' `figures`, the look of the figures it is made with (one whole canvas each of the scope's).
  */
-export type PresetSection = { readonly type: string; readonly options?: Readonly<Record<string, unknown>>; readonly figures?: Partial<FigureLook> } | { readonly modules: true };
+export type PresetSection =
+  | {
+      readonly type: string;
+      readonly options?: Readonly<Record<string, unknown>>;
+      readonly figures?: Partial<FigureLook>;
+      /** Slice 36: the overview's figure, the first canvas of the scope's (the first project's first in tab order). */
+      readonly firstFigure?: true;
+    }
+  | { readonly modules: true };
 
 export interface Preset {
   readonly code: DocumentPreset;
@@ -24,8 +34,13 @@ export interface Preset {
   readonly mappings: MappingFilter;
   /** The draft mark (the ETL preset has none, the prototype's). */
   readonly watermark: boolean;
+  /** Slice 36: made from a baseline (the newest, or the one chosen); refused while the workspace has none. */
+  readonly fromBaseline?: true;
   readonly sections: readonly PresetSection[];
 }
+
+/** Slice 36: the sign-off's Text to fill in (the prototype's). */
+export const SIGNOFF_BODY = ["Scope of this stage: …", "Assumptions: …", "Open points: …"].join("\n\n");
 
 const INTRODUCTION =
   "This document describes the data the warehouse will hold, in business terms. Definitions come from the model; ask the data owner listed for each requirement about anything unclear.";
@@ -70,6 +85,32 @@ export const PRESETS: readonly Preset[] = [
       { type: "dq" },
     ],
   },
+  // slice 36 (B4.5, the prototype's `PRESETS.signoff`): every section's options the app's defaults but Text's and the
+  // overview's figure
+  {
+    code: "signoff",
+    label: "Sign-off package for the client",
+    description: "From a baseline: cover, introduction, overview, diagrams, dictionary, mappings, requirements and changes.",
+    audience: "Client",
+    mappings: "all",
+    watermark: false,
+    fromBaseline: true,
+    sections: [
+      { type: "text", options: { body: SIGNOFF_BODY } },
+      { type: "conv" },
+      { type: "overview", firstFigure: true },
+      { type: "ready" },
+      { type: "diagrams" },
+      { type: "dict" },
+      { type: "s2t" },
+      { type: "reqs" },
+      { type: "trace" },
+      { type: "dq" },
+      { type: "sources" },
+      { type: "classreg" },
+      { type: "changes" },
+    ],
+  },
   {
     code: "blank",
     label: "Blank document",
@@ -91,7 +132,15 @@ export const presetOf = (code: DocumentPreset): Preset => PRESETS.find((p) => p.
  * them; where the preset says, every registered kind that names the preset and is available in the workspace now, with
  * its defaults; all on.
  */
-export function presetSections(preset: Preset, kinds: Iterable<DocumentSectionKind>, workspace: Workspace, newId: () => Uuid, canvasIds: readonly Uuid[] = []): DocumentSection[] {
+export function presetSections(
+  preset: Preset,
+  kinds: Iterable<DocumentSectionKind>,
+  workspace: Workspace,
+  newId: () => Uuid,
+  canvasIds: readonly Uuid[] = [],
+  /** Slice 36: the document's language, for the overview figure's caption. */
+  language: DocLanguage = workspace.doc_language,
+): DocumentSection[] {
   const all = [...kinds];
   const byType = new Map(all.map((k) => [k.type, k]));
   return preset.sections.flatMap((s) => {
@@ -101,6 +150,8 @@ export function presetSections(preset: Preset, kinds: Iterable<DocumentSectionKi
     const options = { ...(kind?.defaults() ?? {}), ...structuredClone(s.options ?? {}) };
     // slice 27 (D9): Diagrams is made with one figure per canvas of the scope's, in the preset's look
     if (s.type === "diagrams") options.figures = diagramFigures(canvasIds, newId, s.figures);
+    // slice 36: the sign-off's overview shows the first canvas, captioned as the prototype's
+    if (s.firstFigure && canvasIds[0]) options.figures = [{ ...newFigure(newId(), canvasIds[0]), caption: label(language, "figLogical") }];
     return [newSection(id, s.type, options, !kind?.samePage)];
   });
 }

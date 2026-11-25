@@ -25,6 +25,10 @@ import { buildWriteSet, type CommandContext, type CommandResult, type Write, typ
 import { addAttribute } from "@/domain/commands/attribute";
 import { createBaseline, deleteBaseline, renameBaseline } from "@/domain/commands/baseline";
 import { baselineContentNow } from "@/compose/baselines";
+import { baselineDocumentCounts, baselineRefs, documentModel } from "@/compose/document-model";
+import { DOCUMENT_SECTION_KINDS } from "@/compose/documents";
+import { createDocument, updateDocument } from "@/modules/infodocumenter/domain/commands";
+import type { DocumentDefinition } from "@/modules/infodocumenter/domain/types";
 import { createConcept } from "@/domain/commands/concept";
 import { createEntity, deleteEntity, updateEntity } from "@/domain/commands/entity";
 import { importSources, importStateOf } from "@/domain/commands/import";
@@ -346,7 +350,28 @@ async function scenario(store: DataStore, ctxOf: (actorId: string) => CommandCon
     const now = (await store.baselines.get(RETAIL, baselineId))!;
     await step("baseline: same name twice", buildWriteSet(ctx, RETAIL, [insert("baseline", { ...now, id: ctx.newId(), created_at: ctx.now, version: 1, snapshot: taken })]));
     await step("baseline: content rewritten", buildWriteSet(ctx, RETAIL, [update("baseline", now, { ...next(ctx, now, { note: "x" }), snapshot: taken })]));
+    // slice 36 (S36-01, S36-03, S36-05): the sign-off preset's row from the newest baseline, Anna's private document from
+    // it, a source switched to the live model and back, a source the database's pairing refuses, the documents' count
+    // with another person's private document, and after the delete the documents kept and read as gone
+    const refs = await baselineRefs(store, RETAIL);
+    const signoff = ok(createDocument(ctxOf(LUKASZ), lukaszAccess, { workspaceId: RETAIL, preset: "signoff" }, DOCUMENT_SECTION_KINDS, [], refs));
+    await step("document: sign-off preset", signoff);
+    const fromIt = ok(createDocument(ctxOf(ANNA), anna, { workspaceId: RETAIL, preset: "signoff", baselineId }, DOCUMENT_SECTION_KINDS, [], refs));
+    await step("document: from a baseline, private", fromIt);
+    const docOf = async (id: string) => (await store.modules.list(RETAIL, "document_definition")).find((d) => d.id === id) as DocumentDefinition;
+    const stored = await docOf(signoff.value.document.id);
+    answers["document: sign-off row"] = { preset: stored.preset, source_kind: stored.source_kind, baseline: stored.baseline_id === baselineId, watermark: stored.style.watermark, sections: stored.sections.map((x) => x.type) };
+    const asLive = ok(updateDocument(ctxOf(LUKASZ), lukaszAccess, stored, { workspaceId: RETAIL, documentId: stored.id, expectedVersion: stored.version, source: { kind: "live" } }, DOCUMENT_SECTION_KINDS, undefined, refs));
+    await step("document: source to the live model", asLive);
+    const live = await docOf(stored.id);
+    await step("document: source to a baseline again", ok(updateDocument(ctxOf(LUKASZ), lukaszAccess, live, { workspaceId: RETAIL, documentId: live.id, expectedVersion: live.version, source: { kind: "baseline", baselineId } }, DOCUMENT_SECTION_KINDS, undefined, refs)));
+    const again = await docOf(stored.id);
+    await step("document: a baseline source without its id", buildWriteSet(ctx, RETAIL, [update("document_definition", again, next(ctx, again, { baseline_id: null }))]));
+    answers["document: count with another's private document"] = (await baselineDocumentCounts(store, RETAIL))[baselineId];
     await step("baseline: delete", ok(deleteBaseline(ctx, lukaszAccess, now, { baselineId, expectedVersion: now.version })));
+    const kept = await docOf(stored.id);
+    answers["document: kept after its baseline's delete"] = { live: kept.deleted_at === null, baseline: kept.baseline_id === baselineId, count: (await baselineDocumentCounts(store, RETAIL))[baselineId] ?? null };
+    answers["document: its baseline gone"] = (await documentModel(store, (await store.workspaces.get(RETAIL))!, kept))?.source.kind;
     await step("baseline: name free again", ok(createBaseline(ctx, lukaszAccess, await baselineState(), taken, { workspaceId: RETAIL, name: "contract renamed" })));
     answers["baseline: no content read after its delete"] = (await store.baselines.content(RETAIL, baselineId)) === null;
   }
@@ -408,6 +433,22 @@ const EXPECTED: Record<string, unknown> = {
   "baseline: rename, stale": { ok: false, code: "stale_version", message: "Someone changed this meanwhile." },
   "baseline: same name twice": { ok: false, code: "conflict", message: "This already exists" },
   "baseline: content rewritten": { ok: false, code: "invalid", message: "A baseline's content never changes." },
+  // slice 36
+  "document: sign-off preset": { ok: true },
+  "document: from a baseline, private": { ok: true },
+  "document: sign-off row": {
+    preset: "signoff",
+    source_kind: "baseline",
+    baseline: true,
+    watermark: false,
+    sections: ["text", "conv", "overview", "ready", "diagrams", "dict", "s2t", "reqs", "trace", "dq", "sources", "classreg", "changes"],
+  },
+  "document: source to the live model": { ok: true },
+  "document: source to a baseline again": { ok: true },
+  "document: a baseline source without its id": { ok: false, code: "invalid", message: "A data rule was broken" },
+  "document: count with another's private document": 2,
+  "document: kept after its baseline's delete": { live: true, baseline: true, count: null },
+  "document: its baseline gone": "gone",
   "baseline: delete": { ok: true },
   "baseline: name free again": { ok: true },
   "baseline: no content read after its delete": true,

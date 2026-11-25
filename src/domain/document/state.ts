@@ -7,6 +7,7 @@
 // derives them from the snapshot's module rows and passes them in, as every later caller of the requirement index does
 // (CLAUDE.md, slice 15d).
 
+import type { BaselineChange } from "../baseline/compare";
 import type { Uuid } from "../ids";
 import { NO_FIGURE_CONTRIBUTIONS, type FigureContributions } from "./figure";
 import type { CheckInput, ModuleChecks } from "../model/checks";
@@ -36,6 +37,35 @@ export interface DocumentContributions {
 /** No module: no dimensional level, no role, no checks, nothing on figures. */
 export const NO_CONTRIBUTIONS: DocumentContributions = { dimensionalOn: false, entityRole: () => null, moduleChecks: () => [], figures: NO_FIGURE_CONTRIBUTIONS };
 
+/** A baseline as a document names it (slice 36): its id, name and the time it was taken. */
+export interface BaselineRef {
+  readonly id: Uuid;
+  readonly name: string;
+  readonly created_at: string;
+}
+
+/**
+ * Where a document's model comes from (slice 36, D-88 as proposed): the live model, a baseline's content, or a baseline
+ * that no longer exists (B3.5: nothing is built, the document says so).
+ */
+export type DocumentSource = { readonly kind: "live" } | ({ readonly kind: "baseline" } & BaselineRef) | { readonly kind: "gone" };
+
+/**
+ * A "Changes since …" section's comparison (slice 36, Q3), made on the server: the older and the newer state (`newer`
+ * null: the live model), the changes in the document's scope; or why there is none: no older baseline (`none`), the
+ * chosen baseline deleted (`gone`), or the answer still on its way (`pending`).
+ */
+export type SectionChanges =
+  | { readonly kind: "list"; readonly older: BaselineRef; readonly newer: BaselineRef | null; readonly changes: readonly BaselineChange[] }
+  | { readonly kind: "none" }
+  | { readonly kind: "gone" }
+  | { readonly kind: "pending" };
+
+/** Slice 36: the comparisons a document's changes sections read, by their "Compared with" (null: the previous baseline). */
+export type ChangesLookup = (against: Uuid | null) => SectionChanges;
+
+const PENDING: ChangesLookup = () => ({ kind: "pending" });
+
 export interface DocumentState<T extends ModuleTable = ModuleTable> {
   readonly snapshot: WorkspaceSnapshot<T>;
   /** The live model looked up once (the requirement index's own lookup, built with the feeds). */
@@ -57,10 +87,20 @@ export interface DocumentState<T extends ModuleTable = ModuleTable> {
   readonly classifications: ClassificationIndex;
   /** Slice 26: the modules' contributions. */
   readonly modules: DocumentContributions;
+  /** Slice 36: where the snapshot comes from (the live model unless the caller says otherwise). */
+  readonly source: DocumentSource;
+  /** Slice 36: the changes sections' comparisons; without them every one is still on its way. */
+  readonly changes: ChangesLookup;
 }
 
 /** The state of one document's model, from a snapshot and the modules' feeds. Pure. */
-export function documentStateOf<T extends ModuleTable>(snapshot: WorkspaceSnapshot<T>, feeds: AttributeFeeds = {}, modules: DocumentContributions = NO_CONTRIBUTIONS): DocumentState<T> {
+export function documentStateOf<T extends ModuleTable>(
+  snapshot: WorkspaceSnapshot<T>,
+  feeds: AttributeFeeds = {},
+  modules: DocumentContributions = NO_CONTRIBUTIONS,
+  /** Slice 36: the source and the comparisons (`documentStateFor`'s caller passes them). */
+  extra: { readonly source?: DocumentSource; readonly changes?: ChangesLookup } = {},
+): DocumentState<T> {
   const model = snapshot.model;
   const requirements = buildRequirementIndex(snapshot.requirements, snapshot.requirementLinks, model, feeds);
   const lookup = requirements.lookup;
@@ -80,5 +120,7 @@ export function documentStateOf<T extends ModuleTable>(snapshot: WorkspaceSnapsh
     mapped: countsAsMapped(derivations, direct),
     classifications: classificationIndex(model.classifications, model.classificationLinks),
     modules,
+    source: extra.source ?? { kind: "live" },
+    changes: extra.changes ?? PENDING,
   };
 }

@@ -33,7 +33,7 @@ export function figureWordsOf(language: DocLanguage): { drawing: FigureWords; no
       more: (n) => t("figMore", { n }),
       relationships: (n) => (n === 1 ? t("figRel1") : t("figRelN", { n })),
     },
-    node: { figure: t("fig"), part: (i, n) => t("part", { i, n }), empty: t("figEmpty"), noCanvas: t("figNoCanvas"), noFrame: t("figNoFrame") },
+    node: { figure: t("fig"), part: (i, n) => t("part", { i, n }), empty: t("figEmpty"), noCanvas: t("figNoCanvas"), noFrame: t("figNoFrame"), labelCanvas: (c) => t("labelCanvas", { c }) },
   };
 }
 
@@ -53,6 +53,8 @@ export function figureInputOf(
     words,
     notation: input.notation,
     mono: input.page.mono,
+    // slice 36 (F5): a baseline's snapshot holds no labels, so its label canvases are not drawn
+    fromBaseline: state.source.kind === "baseline",
   };
 }
 
