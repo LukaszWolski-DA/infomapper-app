@@ -497,3 +497,23 @@ Technical points with my recommendation (no answer needed unless you disagree): 
 comparison on the server with the editor asking per saved change (Q3), the scope on either side (Q4), the extension
 point for the Baselines tab (F1), the document page's time filled in the browser (F7), Duplicate keeps the source (F9),
 the name cut to 200 (F10), full runs in steps 2, 3 and 6 (F15).
+
+## 8. Łukasz's answers (25 November 2026)
+
+1. **D-87's sentence** (Claude's call, technical): accepted. A document from a baseline gets its content in the editor as
+   the live model is today (built in the browser, through `snapshotOfContent` and `browserSnapshot`). D-87's note at the
+   closing: "A document from a baseline gets its content as the editor gets the live model (D-81); a comparison's
+   contents stay on the server."
+2. **The watermark:** a source switch changes only the watermark's text, never whether it is on; new documents from a
+   baseline (the sign-off preset, "New document from it", "Make a document") start with it off.
+3. **"Mappings included"** is not applied to the changes section.
+4. **The heading** always names the older state.
+5. **The note and the hint:** the prototype's places and texts (the note above the preview, the hint under the select).
+6. **"New document from it"** names the document "Documentation of “{name}”".
+7. **No demo document** from "Stage 1 sign-off".
+8. **No "baseline gone" mark** in the Documentation tab (into `ideas.md` at the closing).
+9. **The words:** the Polish words of Q5 are accepted as proposed, "kanwy etykiet" included; German stays for Łukasz's
+   review before the closing. InfoDocumenter's existing word is taken wherever `labels.ts` already names the same closed
+   value, with a test comparing the two.
+
+The technical recommendations (Q1 to Q4, F1 to F18, P1 to P9) stand as Claude's calls, to be quoted at the closing.
