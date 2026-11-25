@@ -864,3 +864,12 @@ and its three columns. Visible differences, each with its reason:
   both private listed newest first, the switch's label).
 - **Changed:** none. `e2e/slice-25/S25-02.spec.ts:75` reads the meta line with `toContainText("by Łukasz")`, which still
   holds; no spec reads the switch's label (they use its test id, `check-style-watermark`, S26-08). Both were run again.
+
+### The checks (commit `216e392`)
+
+- **CI** `check`: passed. Locally: lint, typecheck, the new unit tests; `S36-list`, S25-02 and S26-08 passed.
+- **Schema** `migrations` and `smoke`: passed.
+- **e2e**, the single-file check (one round, no full run: the closing's full run follows),
+  [45604036666](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45604036666) on `216e392`: `e2e/slice-36`
+  (S36-01 to S36-05 and `S36-list`; the screenshots spec left out) with S25-02, S25-03 and S26-08: **25 passed, 0 failed,
+  0 flaky, 0 skipped**.
