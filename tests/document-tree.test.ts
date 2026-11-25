@@ -378,7 +378,7 @@ describe("the labels in three languages (S25-08)", () => {
     expect(words(tables(part(plCube, 3, "Dim Product"))[0]!.rows[0]!.cells[0]!)).toBe("Migawka · Month-end");
 
     const de = inLanguage("de");
-    expect(de.sections.map((s) => s.heading)).toEqual(["Einleitung", "Datenkatalog", "Quelle-Ziel-Mapping", "Dimensionales Modell"]);
+    expect(de.sections.map((s) => s.heading)).toEqual(["Einleitung", "Datenwörterbuch", "Quelle-Ziel-Mapping", "Dimensionales Modell"]);
     expect(de.cover.rows[2]!.value).toBe("Aktuelles Modell vom 2026-11-12");
     const deCube = de.sections[3]!.nodes;
     expect(tables(part(deCube, 3, "Fact Sales"))[0]!.columns.map((c) => c.label)).toEqual(["Fakttyp", "Granularität"]);

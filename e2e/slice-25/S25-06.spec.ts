@@ -38,7 +38,7 @@ test("S25-06: InfoCube's words in the document's language (Polish)", async ({ pa
   await signInAs(page, "Łukasz");
   await openView(page);
   const text = await sectionText(page, "Model wymiarowy");
-  for (const part of ["Fakty", "Wymiary", "Typ faktu", "Ziarno", "Transakcyjny", "Miary", "Addytywność", "Addytywna", "Zasilany z", "Migawka · Month-end", "Wymiar typu junk", "Fakt transakcyjny, agregat faktu Fact Sales"]) {
+  for (const part of ["Fakty", "Wymiary", "Typ faktu", "Ziarnistość", "Transakcyjny", "Miary", "Addytywność", "Addytywna", "Zasilany z", "Migawka · Month-end", "Wymiar typu junk", "Fakt transakcyjny, agregat faktu Fact Sales"]) {
     expect(text, part).toContain(part);
   }
   // names and grains as the model has them

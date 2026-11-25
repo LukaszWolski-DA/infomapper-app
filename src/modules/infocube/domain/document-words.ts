@@ -108,7 +108,7 @@ const PL: CubeDocWords = {
   facts: "Fakty",
   dims: "Wymiary",
   ftype: "Typ faktu",
-  grain: "Ziarno",
+  grain: "Ziarnistość",
   dimension: "Wymiar",
   role: "Rola",
   key: "Klucz",
@@ -152,7 +152,7 @@ const PL: CubeDocWords = {
     snapshot: (period) => `migawka${period ? ` (${period})` : ""}`,
     outriggerOf: (names) => `outrigger wymiaru ${names}`,
   },
-  busTitle: "Macierz bus matrix",
+  busTitle: "Bus matrix",
   fact: "Fakt",
 };
 

@@ -22,7 +22,7 @@ test("S26-09: a document in German in a Polish workspace", async ({ page }) => {
 
   await page.goto(viewUrl(doc.id));
   await laidOut(page);
-  expect(await headings(page)).toEqual(["1Einleitung", "2Datenkatalog"]);
+  expect(await headings(page)).toEqual(["1Einleitung", "2Datenwörterbuch"]);
   await expect(page.locator('[data-testid="document-host"] .dtoc h2')).toHaveText("Inhalt");
   // names and definitions stay as the model has them
   await expect(page.getByTestId("document-host")).toContainText("A person or organisation that buys from us.");

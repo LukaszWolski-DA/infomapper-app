@@ -113,7 +113,7 @@ describe("the tree: numbering, Compact, the switches, the language, keep-rows, t
 
   it("follows the document's own language, else the workspace's (Q8)", () => {
     expect(doc(["dict"]).sections[0]!.heading).toBe("Data dictionary");
-    expect(doc(["dict"], { language: "de" }).sections[0]!.heading).toBe("Datenkatalog");
+    expect(doc(["dict"], { language: "de" }).sections[0]!.heading).toBe("Datenwörterbuch");
     const pl = demo((d) => {
       for (const w of d.workspace) if (w.id === WS) w.doc_language = "pl";
     });

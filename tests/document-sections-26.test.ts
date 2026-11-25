@@ -69,7 +69,7 @@ describe("the sections' headings in three languages (S26-10)", () => {
   const ALL = ["overview", "ready", "conv", "sources", "classreg", "reqs", "trace", "dq", "cube.bus"];
   it.each([
     ["en", ["Model overview", "Model readiness", "Conventions and notation", "Source tables", "Classification register", "Requirements and coverage", "Traceability", "Data quality rules", "Bus matrix"]],
-    ["pl", ["Przegląd modelu", "Gotowość modelu", "Konwencje i notacja", "Tabele źródłowe", "Rejestr klasyfikacji", "Wymagania i pokrycie", "Śledzenie wymagań (traceability)", "Reguły jakości danych", "Macierz bus matrix"]],
+    ["pl", ["Przegląd modelu", "Gotowość modelu", "Konwencje i notacja", "Tabele źródłowe", "Rejestr klasyfikacji", "Wymagania i pokrycie", "Śledzenie wymagań (traceability)", "Reguły jakości danych", "Bus matrix"]],
     ["de", ["Modellübersicht", "Modellreife", "Konventionen und Notation", "Quelltabellen", "Klassifikationsverzeichnis", "Anforderungen und Abdeckung", "Rückverfolgbarkeit", "Datenqualitätsregeln", "Bus-Matrix"]],
   ] as const)("in %s, by the document's own language (Q8)", (language, expected) => {
     expect(doc(ALL.map((type) => ({ type })), { language }).sections.map((s) => s.heading)).toEqual(expected);
@@ -209,7 +209,7 @@ describe("Source tables and the classification register", () => {
     expect(lists(s.nodes).map((l) => words(l.items[0]!.runs))).toContain("Hub on cust_no");
     // the reading in the document's language (D3)
     const pl = one("sources", {}, { db: demo(dv2), language: "pl" });
-    expect(headings(pl.nodes, 4)[0]).toBe("Odczyt Data Vault");
+    expect(headings(pl.nodes, 4)[0]).toBe("Interpretacja Data Vault");
     expect(lists(pl.nodes).map((l) => words(l.items[0]!.runs))).toContain("Hub na cust_no");
     const de = one("sources", {}, { db: demo(dv2), language: "de" });
     expect(lists(de.nodes).map((l) => words(l.items[0]!.runs))).toContain("Hub auf cust_no");
