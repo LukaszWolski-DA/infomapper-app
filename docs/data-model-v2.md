@@ -732,7 +732,8 @@ InfoDocumenter's `document_definition` is "out"), and the settings `dv2_mode`, `
 `infocube`. Left out: labels and their links, project pins, notes, change events, source changes and imports, people,
 members and access.
 
-**Where it is stored:** on Postgres in `snapshot`; read alone, by its id, only when compared; the baselines' reads name
+**Where it is stored:** on Postgres in `snapshot`; read alone, by its id, only when compared or, since slice 36 (D-88),
+when a document from it is opened, made, previewed, printed or exported (read back as a snapshot, `snapshotOfContent`); the baselines' reads name
 their columns without it (`ROW_COLUMNS`, `STORE_ONLY_COLUMNS`). In the local file each content is its own file
 `<data file>.baselines/<id>.json`, written before the data file; a content found inline in the data file (a hand-made or
 copied file) is moved into the folder on read; no format step (the table is optional in a format-18 file).
@@ -963,6 +964,10 @@ on the server, so another's private document never reaches the browser.
 | `cover` | jsonb | no | the title page's `{ title, subtitle, version, status, preparedBy }`, each null when not set (the title is then the name, "prepared by" the author) |
 | `style` | jsonb | no | slice 26 (F9, D-81): `{ language, template, accent, colours, paper, orientation, notation, keepRows, cover, contents, numbers, banded, runningHeader, watermark, header: { left, right }, footer: { left, right } }`, since slice 27 also `listOfFigures` (false) and `smallestPt` (5 to 8, default 6; D-82); `language` null follows the workspace's documentation language (a recipe stored before slice 26 is read with the defaults and `language` null); a header or footer part null shows its example; SQL default `{}` |
 | `sections` | jsonb | no | the ordered list `{ id, type, on, heading, newPage, options }` (at most 50; `heading` null is the type's default heading in the document's language; slice 25's Text kept its heading in its options, moved to the entry on read): InfoDocumenter's types `text`, `overview`, `diagrams`, `figure`, `dict`, `s2t`, `sources`, `classreg`, `reqs`, `ready`, `conv`, `trace`, `dq` and a module's by its registered name (`cube.dim`, `cube.bus`); a type whose module is off or unknown is kept and skipped when drawn; an option added later has a default. Slice 27 (D-82): `diagrams`, `figure`, `overview` and `cube.dim` hold `figures`, a list of at most 50 `{ id, on, canvasId, frameId, view, rows, lines: { rel, map, src, cube }, status, size, orientation, caption }` (the figure's canvas and frame by id, kept when deleted and drawn as gone); `diagrams` also `legend`, `notation` (`doc`, `ie`, `uml`), `warnPt` (0 = the style's); `overview` `figuresAt` (`end`, `start`); `dict` `conceptFigures`; `cube.dim` `star`, `starRows`, `starSize`, `starOrientation`, `starMax` |
+
+Since slice 36 (D-88) `sections` may hold `changes` (`{ against }`: a baseline's id, or null for the previous one; a
+deleted baseline's id is kept and the section says so). The Documentation tab lists documents by name, the same name
+newest first by `created_at`, then by id; no column was added.
 
 `scope`, `cover`, `style` and `sections` are one recipe, checked by the module's schemas on every save and by the CHECK
 `document_definition_recipe_ck` for their JSON kinds. A row stored in an older shape is read through the module's row

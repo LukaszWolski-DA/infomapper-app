@@ -109,8 +109,13 @@ unchanged. The file is for exchange in any Markdown tool; GitHub and Azure DevOp
 Slice 35 (D-87) builds baselines: the workspace home's "Baselines (n)" tab (after the modules' tabs, before People);
 owners, admins and modelers take a named baseline (an immutable content of the model from one read) and rename it,
 owners and admins delete it (soft), outside undo, logged; every member compares one with Now or another baseline on the
-server (seven kinds, the older state first, references compared by id and shown by name). Documents from a baseline are
-slice 36.
+server (seven kinds, the older state first, references compared by id and shown by name). Slice 36 (D-88) makes documents
+from a baseline: a document's "Model state" is the live model or a live baseline, switched at any time; a document from a
+baseline is built from its content alone (today's workspace name, organization and people; label canvases not drawn),
+its footer and draft mark name the baseline; the section "Changes since a baseline" (the previous baseline by default,
+the older state first, the document's scope on either side, compared on the server); the sign-off preset; "New document
+from it" and "Make a document" on the Baselines tab; Markdown's front matter names the baseline; a gone baseline's
+documents stay and say so; the Documentation list says "created {time}", the same name newest first.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -447,6 +452,25 @@ list up to date in each sub-slice):
   adapter keeps each content in `<data file>.baselines/<id>.json` (`baselineFolder`). The port is `baselines.list`,
   `listAll`, `get`, `content` (through the upgrade chain). **A comparison** compares a reference by its id (a list as a
   set) and shows it by name (`Short`'s third element, `keyOf`): **a later field that points to a row** does the same.
+- **Documents from a baseline** (slice 36, D-88):
+  - **The model from the source:** `snapshotOfContent` (`src/domain/baseline/content.ts`, the inverse of
+    `baselineContentOf`) reads a content back as a `WorkspaceSnapshot` (the live workspace's row under the content's
+    four settings, today's organization and people, no labels or members); `documentModel` (`src/compose/document-model.ts`:
+    the snapshot, `source`, the live baselines, the comparisons; an empty model and `gone` for a deleted baseline) feeds
+    the editor (`documentModelAction`) and the document page; `documentCanvases` the figures made and checked;
+    `baselineDocumentCounts` the delete dialog. `DocumentState.source` (`DocumentSource`) and `.changes` (`ChangesLookup`,
+    `SectionChanges`); `documentStateFor(snapshot, { source, changes })`. **A later reader of a document's model** goes
+    through `documentModel`, never `store.snapshot` directly.
+  - **The changes section** (`src/modules/infodocumenter/domain/sections-changes.ts`): `changesPlan` (which two states),
+    `changesInScope` (either side), `changesRequestKey` (what the editor re-asks on), the heading and the tables in
+    `COMPARE_WORDS` (Polish and German since slice 36). A section type may give a heading from what it shows
+    (`DocumentSectionType.heading`). A label canvas in a baseline's state is the figure kind `label`.
+  - **The Baselines tab's extension point** (`src/compose/baselines-ui.ts`, `BaselineExtensions`): a row's action, the
+    Compare dialog's action and the delete dialog's lines, plain data and server actions the tab draws; InfoMapper's tab
+    never names a module.
+  - **Times in the browser's zone:** `src/ui/local-time.ts` (pure: `minuteText`, `timeToken` for a tree built on the
+    server, `localTimes`), `src/ui/use-minute.ts` (the client hook) and `src/ui/local-minute.tsx` (a time with its
+    same-width placeholder). A hook goes in a client file: Next.js refuses one in a file a server page imports.
 - **A new module** adds its folder, its name to `modules` in `eslint.config.mjs`, its tables to the registry's three
   records (and their baseline flags, slice 35) and a migration, and its pieces to `src/compose/`; InfoMapper's code does not change.
 
@@ -589,7 +613,7 @@ local adapter no pool is made.
     `smoke`. The E2E workflow's jobs are named `e2e-plan`, `e2e-part`, `e2e-report` and `e2e-check`, so that none shares
     a name with a required check (a skipped job counts as passed). The full run stays a rule of this file, not a
     required check.
-  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its ten parts
+  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its eleven parts
     (`e2e/parts.ts`) side by side on GitHub's Linux runners, each with its own fresh dev server, no retries; one job
     merges their reports. Start it by hand (`gh workflow run e2e.yml --ref <branch>`, or "Run workflow" on the Actions
     page) or with the label `full-e2e` on the pull request (it tests the branch's head commit). A push starts none; a
@@ -787,7 +811,7 @@ npm run lint             # ESLint, including the layer rules (eslint-plugin-boun
 npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
 npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
-npm run e2e -- --part 2   # one of the full run's ten parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
+npm run e2e -- --part 2   # one of the full run's eleven parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
 npm run e2e -- --list    # each part's files, as CI runs them (--part <n>: one part); starts no server
 gh workflow run e2e.yml --ref <branch>                                          # the full run in GitHub Actions (or the label full-e2e on the pull request)
 gh workflow run e2e.yml --ref <branch> -f files="e2e/slice-06a/S6A-07.spec.ts" -f rounds=3   # a single-file check: 3 jobs side by side, each with a fresh server
@@ -871,6 +895,7 @@ SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts           
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
 npx tsx scripts/bench-baselines.ts                            # slice 35: a baseline's content, size, comparison and taking, on the demo and Performance test (reference figures, no bar)
 SCREENS=<folder> npm run e2e -- e2e/slice-35/S35-screens.spec.ts                         # slice 35: the Baselines tab (owner, reader), Rename, Delete, Compare with a filter, beside the prototype's
+SCREENS=<folder> npm run e2e -- e2e/slice-36/S36-screens.spec.ts                         # slice 36: the editor from a baseline, the presets, a long changes section, Compare's "Make a document", the delete dialog's line, a gone baseline
 npx tsx scripts/bench-documents.ts                            # slice 25: a whole document's content tree (snapshot, state, tree) on Performance test and the demo (reference figure, no bar)
 npx tsx scripts/bench-figures.ts                              # slice 27: the dictionary preset with Diagrams' figures, the figures' share of the tree, their SVGs' size (reference figure, no bar)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-27/S27-10-figures.spec.ts  # slice 27: the editor with figures: snapshot, state, tree, first layout, what Auto shows after a change (reference figures)
@@ -1202,6 +1227,14 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   `baselineFolder(E2E_DB)/<id>.json`; a spec may rewrite it to make a long comparison (S35-04). The test helpers' undo
   (`revertChangeGroup` with the store) skips `runCommand`'s live-canvas step: a redo the app's own controls do is S35-03's
   second case.
+
+  Slice 36's fixtures are slice 35's (`seed` "full" in most specs, "docs" for a workspace without a baseline). Its helpers
+  choose "Exact pages" once the page has hydrated (`exactPages`: a choice made before it is lost and the preview shows
+  the quick sheet), make test data through the domain (`takeBaseline`, `deleteBaselineAs`, `documentFromBaseline`), change
+  the e2e file (`changeDb`, `changeDocument`, `liveEntity` of the demo workspace), make a changes section entry
+  (`changesSection`), read Model state (`modelState`, `chosenText`, `optionTexts`) and a changes section's rows on the
+  laid-out pages (`changesRows`: "Kind | Item | What changed"). A row's last row of a long list may sit near the top of an
+  A4 page taller than the window: scroll to the row, not to the preview's end (S36-02).
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,

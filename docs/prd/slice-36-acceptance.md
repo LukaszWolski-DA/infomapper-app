@@ -873,3 +873,8 @@ and its three columns. Visible differences, each with its reason:
   [45604036666](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45604036666) on `216e392`: `e2e/slice-36`
   (S36-01 to S36-05 and `S36-list`; the screenshots spec left out) with S25-02, S25-03 and S26-08: **25 passed, 0 failed,
   0 flaky, 0 skipped**.
+
+### The three changes checked (Łukasz, 25 November 2026, 12:42, on `dev:pg`)
+
+Łukasz checked the three changes of `216e392`: "created …" in the Documentation list, documents of the same name newest
+first, and the switch "“Draft” mark". **Slice 36's acceptance is complete.**

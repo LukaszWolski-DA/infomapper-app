@@ -2119,3 +2119,13 @@ large workspace each request reads both contents (bench: `scripts/bench-baseline
 
 Taking, renaming and deleting a baseline are change events with who and when, but no page lists them yet (D-87;
 `docs/ideas.md`, "A history view of the change log").
+
+## Documents from a baseline (slice 36, D-88)
+
+### "Now" in a changes section can be newer than the rest of the preview
+
+In a live document the editor reads the model once when it opens (D-81). A changes section's comparison comes with that
+read, so at first "Now" is the same state as the rest of the document. After a saved change of the source, the scope or a
+"Compared with", the editor asks the server for the comparisons again; their "Now" is then the model at that moment, which
+may hold others' changes that the rest of the preview shows only after a reload (step 1's F8). The document page always
+reads both from one moment.

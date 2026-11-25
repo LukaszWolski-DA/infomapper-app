@@ -1050,8 +1050,7 @@ slice.
 
 ## Baselines: what comes later (slice 35, PRD section 9 and the closing)
 
-- **Documents from a baseline** (slice 36): a document's source a baseline, "Changes since …", the sign-off preset,
-  "Make a document" in Compare, Markdown from a baseline, the documents' count in the delete dialog.
+- ~~**Documents from a baseline**~~: done in slice 36 (D-88); what comes after it is the next section.
 - **Restore** a baseline into the workspace (or into a new workspace): not in AD-03 yet; a decision first.
 - **Comparing more:** the classification list and the stereotype list themselves (their names, codes, definitions), and
   InfoCube's own rows (a fact's grain and type, a dimension's history, the unknown member, dimensional mappings).
@@ -1064,6 +1063,16 @@ slice.
   one change, on the renamed row, and never on the rows pointing to it.
 - Freezing the labels and label links that drive live label canvases (the design's option a); a workspace transfer or
   copy with baselines (the transfer slice).
+
+## Documents from a baseline: what comes later (slice 36, PRD section 9 and the closing)
+
+- **A "baseline gone" mark in the Documentation list** beside a document's name (step 1's P9; Łukasz's answer 8: not in
+  slice 36; the meta line's "from baseline (missing)" is there).
+- **The Compare dialog's filters in a document** made with "Make a document" (the filter text and the kind carried into
+  its changes section).
+- **A filter option in the changes section** (a text or a kind, as the Compare dialog's).
+- **A version, "Generate version":** one document frozen as rendered (the prototype's button; D-81: versions later).
+- Freezing labels for label canvases, so a document from a baseline could draw them (the design's option a).
 
 ## The database program: what comes later (slice 29, the walking skeleton)
 
