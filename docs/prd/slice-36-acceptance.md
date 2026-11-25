@@ -664,3 +664,162 @@ No restart printed; every part under 2 GB (part 6 the highest, 1,853 MB).
 7. **One label more than Q5's table:** `t_changesType`, the type's name in "+ Add section" and its default heading
    ("Changes since a baseline"; Polish "Zmiany od baseline’u"; German "Änderungen seit einer Baseline", for Łukasz's
    review).
+
+## 10. Step 3: the pages (25 November 2026)
+
+PR 95 (draft), commit `33ef608` after section 9's `85a6014`. No connection to `infomapper-dev`, no `pg:migrate`.
+
+### What was built, by file
+
+**InfoDocumenter's editor and pages**
+- `app/editor.tsx`: the model read through `documentModelAction` once per document and source (F3: again on each switch
+  of "Model state"), the tree built only from the current source's model; the changes sections' comparisons asked for
+  again with `documentChangesAction` when `changesRequestKey` changes, which only a saved change does (an answer for an
+  older key is dropped); the Scope's projects and concepts and the register's classifications, Data Vault mode and
+  naming from the document's own snapshot once read (F4); "Model state" as the prototype's select (`ModelState`: the live
+  model, each live baseline newest first as "Baseline “{name}” ({time})" in the browser's time zone, the gone option
+  "Baseline no longer exists: choose another source"; a save of the document) with the prototype's hint under it; the
+  note above the preview for a baseline source; Print / PDF and Markdown disabled for a gone baseline with the
+  prototype's title (F17), and until the source's model has come; the changes section's options get the baselines,
+  the previous baseline and the browser's minute.
+- `app/preview.tsx`: `note`, the prototype's `.de-note` above the pages (left out of print).
+- `app/section-options.tsx`: the field kind `choice` (a select of ids, "" for null, a stored id no longer offered shown
+  as "Baseline no longer exists"); the changes section's spec ("Compared with": "Previous baseline: {name} ({time})" or
+  "Previous baseline (none yet)", then each baseline; the prototype's hint).
+- `app/pages.tsx`: the editor gets the document's source and the baselines (names and times only); "+ Add section" lists
+  "Changes since a baseline" again (step 2 held it back); the document page builds from `documentModel` (a gone
+  baseline's message, never the live model) with each baseline's time left as a token for the browser (F7), and Print
+  disabled with the reason for a gone baseline.
+- `app/paged-view.tsx`: the tokens written as the browser's minute in the copy and the CSS before Paged.js lays the pages
+  out (F7); `printOff`.
+- `ui/document-html.tsx`: a gone baseline's document is its one sheet with the line (the prototype's `missing` sheet).
+- `app/actions.ts`: `createDocumentFromBaselineAction` (the row's button: the sign-off preset from that baseline);
+  `documentSnapshotAction` removed (replaced by `documentModelAction`).
+- `app/tab.tsx`, `app/tab-actions.tsx`, `app/load.ts`: the sign-off preset in "New document", greyed out with "Create a
+  baseline first." (the line under it and its title) while the workspace has no live baseline; the meta line's source as
+  the prototype's ("live model", "from baseline “{name}”", "from baseline (missing)").
+- `domain/commands.ts`: the Baselines tab's words (`newFromIt`, `makeDocument`, `makeDocumentTitle`, `documentsLine`).
+
+**InfoMapper, through the composition root (F1)**
+- `src/compose/baselines-ui.ts` (new): `BaselineExtensions` (a row's action, the Compare dialog's action, the delete
+  dialog's lines by baseline) and `baselineExtensions(store, access)`: InfoDocumenter's buttons for whoever may make
+  documents (its own rights: on, not archived), the documents' line counted on the server.
+- `src/app/w/[workspaceId]/_components/baselines.tsx`: draws `extensions`: the row's button after "Compare…", "Make a
+  document" before "Close" (the two states as the dialog shows them; the command puts the older first), the delete
+  dialog's line under "It cannot be brought back here."; a module's answer opens its page.
+- `src/app/w/[workspaceId]/page.tsx`: reads the extensions for the Baselines tab only.
+- `src/compose/home.tsx`: the Documentation tab knows whether the workspace has a live baseline.
+- `src/ui/local-time.ts` (new, pure: `minuteText`, `timeToken`, `localTimes`, `localTimesIn`) and `src/ui/use-minute.ts`
+  (new, client: `useLocalTime`, `useMinute`). Slice 35's tab keeps its own copy of the same rule.
+
+**Tests**
+- `e2e/slice-36/` (new): `fixtures.ts`, `helpers.ts` (`exactPages` chooses "Exact pages" once the page has hydrated,
+  baselines and documents made through the domain, `changesRows`, `changeDb`), and:
+  - `S36-01` (2 tests): "New document from it" opens the editor; the name, source, audience and no draft mark; Model
+    state chosen with the hint and the note; the footer "Retail Co – DWH · Baseline “Stage 1 sign-off” of 2026-09-15
+    10:12"; REQ-105 absent; a rename in the live model afterwards changes nothing; the options newest first; switched to
+    the live model (REQ-105, the renamed entity, the live footer, no note), to another baseline and back; the draft mark
+    switched on reads "DRAFT · baseline Stage 1 sign-off". A reviewer sees Model state disabled on a shared one.
+  - `S36-02` (4): "+ Add section" with its name and description; "Compared with" first "Previous baseline: Stage 1 sign-off
+    (2026-09-15 10:12)" and its hint; S35-04's four changes asked for after the section's save, its groups and columns;
+    the same section in Markdown. **A rename of an entity with mappings is one change** ("Entity | Client | name:
+    Customer → Client", the attribute and mapping labels in the newer names, "Changed (3)"). **A long list** (every
+    logical attribute's definition and every source column's comment changed: about seventy rows) scrolled down in the
+    preview to its last row. A chosen baseline (Stage 2, then Stage 1), Polish words and heading, a concept's scope
+    leaving Customer's changes out, "Nothing to compare with yet." and "No changes.".
+  - `S36-03` (2): four presets in order; the sign-off greyed out with its line and title without a baseline; with two,
+    made from the newest (as Anna), its thirteen sections in order, the text, the overview's caption, the changes
+    section comparing with Stage 1; then changed like any document.
+  - `S36-04` (3): "Make a document" against Now (the dialog's filter not carried, the live source, one section, Markdown
+    `source: "live model"`); between two baselines opened from the newer row (the older first, the newer as source,
+    Markdown `source`, `baseline`, `baseline_taken`); a document from Stage 1: `baseline_taken: "2026-09-15T10:12+02:00"`.
+  - `S36-05` (2): the delete dialog's "2 documents are made from it…" counting Anna's private document without naming it;
+    after the delete the editor's message, Model state's gone option, Print / PDF and Markdown disabled with the title;
+    the document page's message and Print disabled; the live model chosen and it works. A chosen baseline gone: the
+    section's message, the rest printed; the previous one takes Stage 1; the option names the gone baseline.
+  - `S36-screens` (on demand, `SCREENS=<folder>`).
+
+### Earlier tests changed, with the reason
+
+| Test | Change | Why |
+| --- | --- | --- |
+| `e2e/slice-25/S25-03.spec.ts:35` | reads the chosen option of `select-model-state` instead of the text `text-model-state` | Model state is the prototype's select now (F2) |
+| `e2e/slice-26/S26-10-figures.spec.ts` (comment only) | names `documentModelAction` | the editor's snapshot comes from it (the spec takes the largest action answer, so its measuring is unchanged) |
+| `scripts/pg-snapshot-size.ts` (comment only) | the same | the same |
+
+No other earlier spec or test changed.
+
+### The checks and the full run (commit `33ef608`)
+
+- **CI** `check`: passed. Locally: lint, typecheck, 2,565 unit tests passed, 14 skipped; `e2e/slice-36` and S25-03 passed.
+- **Schema** `migrations` and `smoke`: passed.
+- **Full run** [45593559325](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45593559325) on `33ef608`:
+  **910 passed, 0 failed, 0 flaky, 16 skipped, 0 expected failures**; about 16 minutes (10:17 to 10:33 UTC).
+  `slice-36`: 13 tests (the 3 screenshot tests skipped), 112 s.
+
+| Part | Duration | Heap peak | Peak of threshold (80 %) |
+| --- | ---: | ---: | ---: |
+| 1 | 9 min 41 s | 1,288 MB | 20 % |
+| 2 | 11 min 7 s | 1,165 MB | 18 % |
+| 3 | 8 min 51 s | 1,578 MB | 25 % |
+| 4 | 7 min 27 s | 1,560 MB | 25 % |
+| 5 | 8 min 54 s | 1,403 MB | 22 % |
+| 6 | 10 min 46 s | 1,190 MB | 19 % |
+| 7 | 6 min 36 s | 1,592 MB | 25 % |
+| 8 | 9 min 19 s | 1,560 MB | 24 % |
+| 9 | 3 min 46 s | 1,344 MB | 21 % |
+| 10 | 4 min 34 s | 1,250 MB | 19 % |
+| 11 | 12 min 29 s | 1,363 MB | 21 % |
+
+No part reached 1,850 MB (the highest: part 7, 1,592 MB; part 6, 1,853 MB in step 2's run, is 1,190 MB here). No
+restart printed. Part 11 (`slice-27` to `slice-36`) is the longest by 1 min 22 s in this run; the recut rule reads the
+median of the last three full runs, which the closing checks.
+
+### The prototype against the app (screenshots at 1440 × 900 in `test-results/s36-screens/`, not committed)
+
+Taken: the editor with a baseline source and its footer, the preset picker with and without a baseline, a changes
+section with about seventy rows, the Compare dialog with "Make a document", the delete dialog with its documents' line,
+a document whose baseline is gone; and the prototype's Baselines tab, Compare dialog, delete dialog and editor from a
+baseline. The prototype's own preset dialog was not reached by the script (its button is drawn elsewhere); its picker
+was compared from its code (`pickPreset`, line 10388).
+
+The layout matches: Model state at the top of the Document panel with the hint under it, the note above the pages,
+"New document from it" after "Compare…", "Make a document" before "Close", the documents' line as the delete dialog's
+second paragraph, the greyed preset with its line in the warning colour, the changes section's groups with their counts
+and its three columns. Visible differences, each with its reason:
+
+1. **The draft mark of a document from a baseline** reads "DRAFT · baseline {name}"; the prototype writes "DRAFT · live
+   model" for every source. The PRD's text (P6).
+2. **A changes section in a document from a baseline** compares with the document's own state; the prototype compares
+   with the live model (`modelPart(S)`, line 10053). The PRD's rule (F12).
+3. **A chosen baseline that is gone**: the section says "The baseline this section compared with no longer exists." and
+   its option "Baseline no longer exists"; the prototype shows "Nothing to compare with yet." and its first option. The
+   PRD's text (F18).
+4. **The gone baseline's sheet** keeps the running header (Paged.js lays out a real page with the document's frame); the
+   prototype's preview sheet has none. The app's pages always have their frame.
+5. **No "Generate version"** in the editor's bar: versions come later (D-81).
+6. **The cover's logo and the concepts' colour swatches in Scope**, and the page count (30 against 22) are earlier slices'
+   differences, unchanged here.
+7. **The watermark switch's label** stays "“Draft” mark when from the live model" (the prototype's) though since Łukasz's
+   answer 2 the mark can be on for a baseline document too (then naming the baseline).
+8. **The Documentation tab's meta line** says "from baseline “{name}”", or "from baseline (missing)" when it is gone, as the
+   prototype's (`dr-meta`, line 10319). Step 1's P9 said the prototype had no gone mark: it has none beside the name, but
+   its meta line has "(missing)". For Łukasz (below).
+
+### What differs from the plan
+
+1. **Step 1's Q1 said the editor reads the model once per source:** so it does, and the Scope and register lists follow
+   it, but the page's server still reads the live projects and concepts for the editor's first paint (before the model
+   arrives); they are replaced as soon as it does.
+2. **`documentSnapshotAction` is gone** (step 2 kept it beside the new action); nothing else used it.
+3. **The browser's minute** is a small shared pair in `src/ui/` (`local-time.ts` pure, `use-minute.ts` the hook):
+   Next.js refuses a hook in a file a server page imports, which the first local run showed.
+4. **"Exact pages" in the specs** is chosen through `exactPages`, which waits until the choice is stored: a choice made
+   before hydration was lost and the preview showed the quick sheet (S36-02's first local run).
+
+### For Łukasz
+
+- **The meta line's "from baseline (missing)"** (difference 8): the prototype's own text, so the app has it; your answer 8
+  ("no mark beside its name") is kept. Say if "(missing)" should go too.
+- **The watermark switch's label** (difference 7): keep the prototype's, or change it to "“Draft” mark"; a wording change,
+  for the closing.
