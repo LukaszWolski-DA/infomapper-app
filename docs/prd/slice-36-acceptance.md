@@ -1,0 +1,499 @@
+# Slice 36 – acceptance: step 1 (the PRD checked against the code)
+
+Step 1 of `docs/prd/slice-36-documents-from-a-baseline.md`, 25 November 2026, on `slice/36-documents-from-a-baseline`
+from `origin/dev` at `b9db4e5` (the merge of PR 94, chore/e2e-parts-recut). No application code; no `pg:` script, no
+connection to `infomapper-dev`; neither `.data/dev-db.json` nor a KB backup was read. "Fact" is read in the code at
+`b9db4e5` (file and line); "assumption" is not verified yet and says how it will be. The figures in Q3 and Q9 come from
+a throwaway script in the session's scratchpad, outside the repository and not committed, on a fresh demo seed
+(`buildSeed` + `addSeedDemoData`) written to a temporary file and read through the local adapter.
+
+## 0. The files
+
+| File | Bytes | `cmp` with Downloads | SHA-256 | Expected (prompt) |
+| --- | --- | --- | --- | --- |
+| `docs/prd/slice-36-documents-from-a-baseline.md` | 28,272 | equal | `bfd4f4d8e9997e3f8c7ae0fc84e91093cdb4be9c6025cf79d2ee5b7728cca7c4` | equal |
+| `docs/prototype/infomapper-prototype-with-sources.html` (on the branch, unchanged) | 990,528 | – | `6d5b5b7f5f00c739f3c799961ec2b6198e3ec407601595fe63c47a400ecdc179` | equal (also the PRD's) |
+
+Downloads held one file of that name, no "… (1)" copy. The prototype's slice 36 hunks were listed in slice 35's step 1
+(`slice-35-acceptance.md`, section 0, hunks 1, 10, 15–22); section 4 below compares them with the app.
+
+## 1. The answers (Q1–Q10)
+
+### Q1. Building from a content
+
+**What the builders read (fact).** Every section's `build` reads `DocumentState` only (`src/domain/document/state.ts`),
+built by `documentStateFor(snapshot)` (`src/compose/documents.ts:49`) from a `WorkspaceSnapshot<ModuleTable>`
+(`src/domain/model/workspace-model.ts:160-182`). `buildDocument` (`src/modules/infodocumenter/domain/document.ts:94`)
+reads besides the state: `snapshot.workspace` (name, `client_name`, `doc_language`, and each type's
+`available(workspace)`, i.e. `infocube`), `snapshot.organization.name` and `snapshot.people` (the author's name).
+
+**A content is that snapshot without some fields (fact).** `BaselineContent` (`src/domain/baseline/content.ts:40-51`)
+keeps `WorkspaceSnapshot`'s field names: `model`, `requirements`, `requirementLinks`, `projects`, `projectCanvases`,
+`canvasItems`, `canvases`, `frames`, `modules`, plus `settings` (`dv2_mode`, `four_eyes`, `naming_conventions`,
+`infocube`). It lacks `workspace`, `organization`, `labels`, `labelLinks`, `members`, `people`. Its module tables are
+`BASELINE_MODULE_TABLES`, which equal `DOCUMENT_TABLES` today (both InfoCube's six; checked by the script), so a content
+has every module row a document reads. `store.baselines.content(ws, id)` already returns it in the current shape
+(upgrade chain plus the modules' row rules, `src/data/baselines.ts`, `shapedBaselineContent`).
+
+**The inverse (recommendation).** A pure `snapshotOfContent(content, live)` in `src/domain/baseline/` (beside
+`baselineContentOf`, so InfoMapper's domain owns both directions):
+
+| Field | From | Why |
+| --- | --- | --- |
+| `model`, `requirements`, `requirementLinks`, `projects`, `projectCanvases`, `canvasItems`, `canvases`, `frames`, `modules` | the content | the model as it was |
+| `workspace` | the live row with the content's four `settings` over it | name, client, documentation language and archive state are the workspace's now; Data Vault mode, naming conventions and InfoCube on/off are the model's then (Data Vault reading, Conventions, the dimensional level) |
+| `organization`, `people` | live (as today, through `browserSnapshot` for the browser) | outside a content; the title page's author and organization are today's |
+| `labels`, `labelLinks` | `[]` | labels are "out"; a label canvas is not drawn (Q2) |
+| `members` | `[]` | as `browserSnapshot` already does |
+
+The live part is one small read (workspace, organization, people), not a second `store.snapshot`: the action reads
+`store.workspaces.get`, the organization and `users.listForWorkspace`, then the content. *Assumption:* InfoCube's
+availability follows the content's `infocube` setting (a section `cube.dim` in a document from a baseline taken while
+InfoCube was off is skipped with its note). The licence stays live: InfoDocumenter itself must be on to open the
+document at all (`openRefusal`).
+
+**Where the document is built: in the browser, as every document in the editor is (recommendation).** The editor
+builds the tree in the browser from one snapshot read when it opens (D-81; `editor.tsx:199-254`,
+`documentSnapshotAction`, `actions.ts:161-168`), rebuilding it on every change and every keystroke's pause. A document
+from a baseline takes the same path: `documentSnapshotAction` answers `browserSnapshot(snapshotOfContent(content,
+live))` instead of `browserSnapshot(store.snapshot(...))` for a document whose source is a baseline. Nothing else in the
+editor, the preview, Print / PDF or Markdown changes. Why not on the server: the editor's rebuild per keystroke would
+become a round trip per change, and the document page would need a second renderer. Cost (Q9): the same bytes as the
+live snapshot (191 KB against 199 KB on the demo).
+
+**D-87's "the contents never go to the browser"** was written for Compare (the comparison runs on the server; the
+browser gets the changes). With this recommendation a document's own source content does reach the browser, as the live
+model does today, in the snapshot shape and through `browserSnapshot` (no e-mail, no roles). Every member may read every
+baseline (D-87), so nothing new is exposed, but the sentence changes: proposal for D-87's note, "A document from a
+baseline gets its content as the editor gets the live model (D-81); a comparison's contents stay on the server." (For
+Łukasz to decide, 1.)
+
+**The document page** (`/view`, `pages.tsx:126-153`) builds on the server today (`buildDocument` there). For a baseline
+it does the same with `snapshotOfContent`. Its one problem is the time, F7.
+
+### Q2. Figures
+
+**What a content holds (fact):** `canvases` (live, every column: name, look, names, `live_label_id`), `canvasItems`
+(live, places, filters, collapse), `frames`, `projects` and `projectCanvases` in tab order (`content.ts:55-80`). On the
+demo's "Stage 1 sign-off": 3 canvases, 25 items, 0 frames (slice 35's Q2 table).
+
+**How a figure draws (fact):** `figureDrawing` (`src/domain/document/figure.ts:189-232`) reads `snapshot.canvases`,
+`frames`, `canvasItems`, `model`, `labels`, `labelLinks` only. Fed with `snapshotOfContent`, every figure, Diagrams,
+the overview's figures, the dictionary's concept frames and InfoCube's star draw the baseline's canvases in their layout
+then. A figure whose canvas is not in the baseline shows D-82's existing line "(canvas no longer exists)"
+(`figure-node.ts:38-53`), as for a deleted canvas today.
+
+**A label canvas (F5):** the content keeps a live label canvas's row and its items (they are ordinary `canvas_item`
+rows), but no labels. `figureDrawing` then finds no label (`figure.ts:229`, `liveLabel` undefined) and draws the items
+as a plain canvas: **not** "not drawn", as B3.3 wants. A rule is needed (recommendation): a canvas with `live_label_id`
+in a document from a baseline is `{ kind: "label" }`, drawn as a warning line "{canvas}: label canvases are not drawn
+from a baseline." in the document's language (a new figure word, Q5). The state needs to know it is a baseline's:
+`DocumentState.source` (Q3).
+
+**Making figures from a baseline (F6):** a new Diagrams (the sign-off preset, "+ Add section") gets one figure per canvas
+of the scope from the **live** projects today (`scopeCanvases`, `actions.ts:63-69`, used by `createDocumentAction:71`
+and `addDocumentSectionAction:121`). For a document from a baseline it must read the baseline's projects and links
+(from the content), and leave label canvases out (otherwise the preset makes figures that only say "not drawn").
+
+**Saving a figure (F6):** `updateDocumentAction` refuses a figure added on a canvas or frame that is not live now
+(`actions.ts:84`, `FIGURE_CANVAS_REFUSAL`, `commands.ts:131`). For a document from a baseline the check must read the
+baseline's canvases and frames (from its content), or a figure of a canvas deleted since cannot be chosen, though the
+figure editor offers it (its list comes from the snapshot, `editor.tsx:267-276`).
+
+### Q3. The changes section
+
+**Recommendation: the comparison on the server, the section built in the browser from its result.** Reasons:
+- D-87: the comparison runs on the server; the older content never needs to reach the browser.
+- Size: a document showing one content and comparing with another would hold two contents in the browser; on Performance
+  test one content is 2.2 MB of JSON (slice 35's bench), two are near Vercel's 4.5 MB answer limit
+  (`scripts/pg-snapshot-size.ts`). The changes themselves are small (740 bytes on the demo).
+- The builders stay pure and synchronous: the section reads a ready list from the state.
+
+**How it fits the editor (recommendation):**
+- `DocumentState` gets an optional `source` (`{ kind: "live" } | { kind: "baseline", baseline: { id, name, created_at } }`)
+  and `baselines` (the live list, names and times only, newest first) and `changes: (sectionId) => ChangesResult`, a
+  lookup the caller fills (`ChangesResult`: `{ older, newer, changes } | { none: true } | { gone: true } | { pending:
+  true }`). Without them every builder reads as today (the same pattern as `AttributeFeeds`' optional last argument).
+- A read action `documentChangesAction({ workspaceId, documentId })` answers the result for every `changes` section of
+  the stored recipe: the older and newer state's contents read on the server (`store.baselines.content`, and for a live
+  document `baselineContentNow`), `compareBaselines`, then the scope on either side (Q4). `documentSnapshotAction`
+  answers the same results with the snapshot (one request when the editor opens; for a live document the "now" side
+  comes from the same `store.snapshot` read, so it equals what the other sections show).
+- The editor asks again only after a saved change that changes a result: the source, a changes section's "Compared
+  with", the scope, a changes section added. All are saves, never keystrokes (no debounce needed). While an answer is on
+  its way the section shows its last result; a new section shows "…" and Print / PDF and Markdown wait (`built`
+  includes the changes).
+- The document page builds the same results on the server in its own render.
+- Markdown reads the same tree, so the section is in it (slice 34's tables).
+
+**A small difference for a live document (F8):** after such a re-ask, the "now" side is the model at that request,
+while the other sections show the model as read when the editor opened (D-81: others' changes reach it after a reload).
+Recommendation: accept it and list it in `known-limitations.md`; the document page always reads both from one moment.
+
+**The previous baseline and ties (recommendation):** the list's own order, `newestBaselineFirst`
+(`src/domain/baseline/names.ts:35`: `created_at`, then `id`), is a total order; "previous" is the next one after the
+source in that order (for a live document, the first). Two baselines taken in the same millisecond are then still
+ordered, by id (UUID v7, so by creation in practice). The prototype's `x.created <= src.created` (line 10046) compares
+minutes and would take a baseline of the same minute that was taken later; the app's milliseconds and id avoid it.
+
+**Cost (fact, the demo, local adapter, median of 15 after one warm-up):** reading the content
+`store.baselines.content` 2.2 ms (the content file read and shaped each time); `baselineContentNow` 1.6 ms;
+`compareBaselines` ("Stage 1 sign-off" → Now, 4 changes: 2 added, 2 changed, 0 removed) 1.1 ms; the scope on both
+sides 0.06 ms and narrowing the changes 0.09 ms. One section costs about 5 ms on the server. Reference on Performance
+test (slice 35's bench): compare 14.0 ms (83 changes). Nothing here needs a bar.
+
+### Q4. Scope on either side
+
+**What exists (fact):** `sectionScopeOf(scope, snapshot)` (`src/modules/infodocumenter/domain/scope.ts:17-33`) is pure
+over a `WorkspaceSnapshot`: projects and concepts by id (deleted ones ignored), the projects' canvases' entities
+(`projectScope`), `entityIds`, `canvasIds`, `tableIds` (`sourceTablesInScope`), the levels and the mapping filter. On
+`snapshotOfContent` it resolves the baseline's own projects, canvases and concepts with no change.
+
+**The rule (recommendation, not complex):** resolve `sectionScopeOf` on each side's snapshot; a change counts when its
+item is in scope on either side, by its kind:
+
+| Kind | In scope when |
+| --- | --- |
+| Entity | its id is in `entityIds` on either side, and its level is in scope (`logical`, `dimensional`) |
+| Attribute | its entity is (the attribute's entity read on the side that has the attribute, both for a changed one) |
+| Mapping | its target attribute's entity is |
+| Relationship | either end's entity is (the dictionary's `relationshipsBlock` lists a relationship with either end in scope) |
+| Requirement | it touches the scope on either side by the Requirements section's own rule (`touchesScope`, `sections-requirements.ts:39`); with no project and no concept chosen, every requirement |
+| Source table | it is in `tableIds` on either side |
+| Source column | its table is |
+
+The document's "Mappings included" filter is not applied to the changes (B4.3 names projects, concepts and levels;
+a change of a draft mapping is a change; for Łukasz to decide, 3). Cost: 0.15 ms on the demo (Q3). With no project and no
+concept chosen nothing is narrowed (`sectionScopeOf` gives every entity and table), so "Make a document" (the whole
+workspace) shows the Compare dialog's list exactly. **The PRD's criterion stays** (no fallback to "the whole
+workspace" needed).
+
+### Q5. Words
+
+**What exists (fact):** `COMPARE_WORDS = { en: EN, pl: EN, de: EN }` (`src/domain/baseline/words.ts:95`); InfoDocumenter's
+`labels.ts` is complete in all three languages (`EN`, `PL`, `DE`, lines 8, 225, 432). The prototype has the section's and
+the source's words in three languages (lines 9335–9425: `bl`, `t_changes`, `noChanges`, `noBase`, `missing`, `kind`,
+`item`, `what`, `added`, `changed`, `removed`); where it has them they are used below.
+
+**New document labels (`labels.ts`), proposed:**
+
+| Key | English | Polish | German |
+| --- | --- | --- | --- |
+| `bl` (footer, cover's Model state) | Baseline “{n}” of {d} | Baseline „{n}” z dnia {d} | Baseline „{n}“ vom {d} |
+| `wmBl` (watermark) | DRAFT · baseline {n} | WERSJA ROBOCZA · baseline {n} | ENTWURF · Baseline {n} |
+| `t_changes` (heading) | Changes since {n} | Zmiany od {n} | Änderungen seit {n} |
+| `added`, `changed`, `removed` | Added, Changed, Removed | Dodane, Zmienione, Usunięte | Hinzugefügt, Geändert, Entfernt |
+| `kind`, `item`, `what` (columns) | Kind, Item, What changed | Rodzaj, Element, Co się zmieniło | Art, Element, Was sich geändert hat |
+| `noChanges` | No changes. | Brak zmian. | Keine Änderungen. |
+| `noBase` | Nothing to compare with yet. | Na razie nie ma z czym porównać. | Noch nichts zum Vergleichen. |
+| `blGoneSection` | The baseline this section compared with no longer exists. | Baseline, z którym ta sekcja porównywała, już nie istnieje. | Die Baseline, mit der dieser Abschnitt verglichen hat, gibt es nicht mehr. |
+| `missing` (the document) | This document points to a baseline that no longer exists. | Ten dokument wskazuje na baseline, którego już nie ma. | Dieses Dokument verweist auf eine Baseline, die es nicht mehr gibt. |
+| `labelCanvas` (figure line) | {c}: label canvases are not drawn from a baseline. | {c}: kanwy etykiet nie są rysowane z baseline’u. | {c}: Label-Arbeitsflächen werden aus einer Baseline nicht gezeichnet. |
+| section label, description (`+ Add section`, English only as every type's) | Changes since a baseline; What was added, changed and removed since a baseline you choose. | – | – |
+
+"Baseline" stays a loan word in Polish and German, as the prototype writes it.
+
+**`COMPARE_WORDS` in Polish and German, proposed** (the app's UI stays English; these are the document's):
+
+| Key | Polish | German |
+| --- | --- | --- |
+| kinds | Encja, Atrybut, Mapowanie, Relacja, Wymaganie, Tabela źródłowa, Kolumna źródłowa | Entität, Attribut, Mapping, Beziehung, Anforderung, Quelltabelle, Quellspalte |
+| groups | Dodane, Zmienione, Usunięte | Hinzugefügt, Geändert, Entfernt |
+| name, alias, stereotype, concept, definition | nazwa, alias, stereotyp, koncept, definicja | Name, Alias, Stereotyp, Konzept, Definition |
+| type, PK, FK, BK, personal data, nullable, calculated, rule | typ, PK, FK, BK, dane osobowe, dopuszcza puste, wyliczany, reguła | Typ, PK, FK, BK, personenbezogene Daten, nullable, berechnet, Regel |
+| status, kind, source columns, target attribute, note | status, rodzaj, kolumny źródłowe, atrybut docelowy, notatka | Status, Art, Quellspalten, Zielattribut, Notiz |
+| label, from min, from max, to min, to max | etykieta, od min, od max, do min, do max | Bezeichnung, von min, von max, bis min, bis max |
+| role at the left end, role at the right end, description | rola po lewej stronie, rola po prawej stronie, opis | Rolle am linken Ende, Rolle am rechten Ende, Beschreibung |
+| priority, severity, owner, external reference, parent, expression | priorytet, waga, właściciel, odwołanie zewnętrzne, nadrzędne, wyrażenie | Priorität, Schweregrad, Verantwortlich, externe Referenz, übergeordnet, Ausdruck |
+| system, database, schema, object type, file format, missing from source | system, baza danych, schemat, typ obiektu, format pliku, brak w źródle | System, Datenbank, Schema, Objekttyp, Dateiformat, fehlt in der Quelle |
+| classifications, comment, default, not needed | klasyfikacje, komentarz, wartość domyślna, niepotrzebna | Klassifikationen, Kommentar, Standardwert, nicht benötigt |
+| mapping status | Szkic, W przeglądzie, Zatwierdzone | Entwurf, In Prüfung, Freigegeben |
+| mapping kind | Bezpośrednie, Transformacja | Direkt, Transformation |
+| requirement kind | Potrzeba biznesowa, Wymaganie dotyczące danych, Reguła biznesowa, Reguła jakości danych, Niefunkcjonalne | Geschäftsbedarf, Datenanforderung, Geschäftsregel, Datenqualitätsregel, Nicht-funktional |
+| requirement status | Szkic, Uzgodnione, Wdrożone, Zweryfikowane | Entwurf, Vereinbart, Umgesetzt, Verifiziert |
+| priority | Musi, Powinno, Może, Nie będzie | Muss, Soll, Kann, Nicht |
+| severity | Ostrzeżenie, Blokada | Warnung, Blockierend |
+| object type | Tabela, Widok, Plik | Tabelle, Sicht, Datei |
+| yes, no, none | tak, nie, – | ja, nein, – |
+| "{field} (changed)", "{field}: {old} → {new}" | "{field} (zmieniono)", "{field}: {old} → {new}" | "{field} (geändert)", "{field}: {old} → {new}" |
+
+*Assumption:* where InfoDocumenter's `labels.ts` already names a closed value in Polish or German (a mapping's status in
+Source-to-target, a requirement's kind in Requirements), step 2 takes that word instead of the table's, so a document
+says one word for one thing; a test compares the two. Every key present in all three is a unit test (PRD).
+
+### Q6. The migration and the local adapter
+
+**Facts:** `document_definition_preset_ck check (preset in ('dictionary', 's2t', 'blank'))` and
+`document_definition_source_ck` (`(source_kind = 'live' and baseline_id is null) or (source_kind = 'baseline' and
+baseline_id is not null)`) in `20261111120000_infodocumenter.sql:38-40`; `baseline_id uuid references baseline (id)`
+(line 27): **the foreign key exists**, to the id only, with no `on delete` (a baseline is soft-deleted, so it holds).
+It does not tie the workspace: another workspace's baseline is refused by the domain only (Q7). The local adapter:
+`INFODOC_RULES` (`src/modules/infodocumenter/data/tables.ts:15-30`) has the key `baseline_id: "baseline"` (accepts a
+deleted target, as the SQL does) and a source check stricter than the SQL's (`ACCEPTED_SOURCE_KINDS` and
+`baseline_id === null`).
+
+**The migration (recommendation):** one file, `2026112…_document_signoff.sql` (time in step 2): drop and re-add
+`document_definition_preset_ck` with `'signoff'`. Nothing else: `source_ck` already allows a baseline. No new index
+(the documents' count, Q8, reads the workspace's documents, a few). RLS unchanged.
+
+**Local adapter (recommendation):** `DOCUMENT_PRESETS` gains `signoff` (the check reads it); `ACCEPTED_SOURCE_KINDS`
+goes, and the source check becomes the SQL's pairing rule. No format step: the file's rows are unchanged and a
+format-18 file (KB's archive) reads as before.
+
+**Schema workflow (fact):** `tests/schema/compare-schema.test.ts:146` checks `baseline_id`'s column; the schema check
+compares columns, not CHECK lists, so it passes unchanged; the migration runs in CI's container and in the contract
+suite. `npm run pg:migrate` on `infomapper-dev` is step 4 (Łukasz).
+
+### Q7. The source's writes
+
+**Recommendation:** the source is one more field of `updateDocument` (`commands.ts:154`), so it is a save like any other:
+the row's version (D-59), its change event, outside undo (`INFODOC_UNDO` "outside undo",
+`src/modules/infodocumenter/domain/tables.ts:15`), InfoDocumenter's edit rights (`editRefusal`, which refuses an
+archived workspace). Input `source: { kind: "live" } | { kind: "baseline", baselineId }` (Zod); the action reads the
+baseline with `store.baselines.get(workspaceId, id)` (live only, the workspace's only) and passes it; a missing one
+(deleted, another workspace's, never existed) is refused with slice 35's "This baseline no longer exists."
+(`BASELINE_GONE_MESSAGE`, `names.ts:14`), so another workspace's baseline is never told to exist. The same source
+again is "Nothing to change." (as every field). The style is not touched (watermark: for Łukasz to decide, 2).
+
+**Other writes that set a source (recommendation):**
+- `createDocument` with `signoff`: the newest live baseline (`store.baselines.list`, newest first), refused with
+  "Create a baseline first." when there is none (the domain and the dialog both).
+- "New document from it" and "Make a document": the create command takes an optional baseline (and for "Make a
+  document" the sections), read and checked by the action as above.
+- **`duplicateDocument` (F9):** copies `source_kind` and `baseline_id` (`commands.ts:339-340`). A document whose baseline
+  was deleted would be duplicated pointing to a deleted baseline: accepted by both adapters (the key accepts a deleted
+  row) and consistent with the original (the copy says the same). Recommendation: keep it so (a copy is a copy); the
+  refusal "at the time of the write" applies to writes that choose a baseline.
+
+### Q8. The documents' count
+
+**Recommendation:** a pure count in InfoDocumenter's domain (`documentsFromBaseline(rows, baselineId)`: live rows with
+`source_kind = "baseline"` and that `baseline_id`, every author's) read through `store.modules.list(ws,
+"document_definition")` on both adapters (already contract-tested as a read). **The Baselines tab is InfoMapper's**
+(`src/app/w/[workspaceId]/_components/baselines.tsx`) and InfoMapper never imports a module (AD-33, lint), so the count
+reaches it through the composition root (F1): the home page (`src/app` may import `src/compose`) asks
+`baselineDocumentCounts(store, workspaceId)` (`src/compose/baselines.ts`) with the tab's other data and hands the tab a
+number per baseline; only the number reaches the browser, never a name. While InfoDocumenter is off the count is 0 and
+the line is not shown (the documents stay). Cost: one read of the workspace's documents when the Baselines tab opens (no
+content).
+
+### Q9. Reading
+
+**Facts:** the Baselines tab reads `store.baselines.list` (rows without the content; AD-14's note, `ROW_COLUMNS` on
+Postgres, the folder on the local adapter); the Documentation tab reads `visibleDocuments` (`app/load.ts:31`: the
+documents and the people); neither reads a content. After this slice the Baselines tab adds one read of the documents
+(Q8), still no content; the Documentation tab adds nothing (the gone mark is dropped, section 3, P9).
+
+**When a content is read (recommendation):** the editor: once when it opens (`documentSnapshotAction`, the source's
+content) and once per changes result (Q3: older and newer); again only after a saved change of the source, a "Compared
+with", the scope or an added changes section; never per keystroke (typing changes no input of a result). The document
+page: on each load. "New document from it" and the sign-off preset: once at the create, for Diagrams' and the
+overview's figures (F6). Print / PDF and Markdown read nothing (they use the editor's tree).
+
+**Cost (fact, the demo, local adapter, median of 15):**
+
+| Step | Time |
+| --- | --- |
+| read the content (`store.baselines.content`) | 2.19 ms |
+| read the live snapshot (`store.snapshot`, `DOCUMENT_TABLES`), for comparison | 0.38 ms |
+| content → `WorkspaceSnapshot` shape | 0.01 ms |
+| `documentStateFor` (the builders' state) | 0.66 ms |
+| `buildDocument`, the sign-off preset's 12 sections (3 figures in Diagrams) from the content | 8.62 ms |
+| the same on the live model (state and tree) | 8.67 ms |
+| `documentMarkdown` of that tree | 7.21 ms |
+| bytes: the content / the browser's snapshot from it / the live snapshot | 188,954 / 191,397 / 198,786 |
+
+A document from a baseline costs what a live one costs, plus about 2 ms to read the content. The tree's 171 KB of JSON
+is the editor's own (never sent).
+
+### Q10. Risks and shared infrastructure
+
+- **"Ten parts"** (fact): `scripts/e2e.ts:2` and CLAUDE.md lines 592 and 790 still say ten; `e2e/parts.ts` and CLAUDE.md's
+  "The full run in eleven parts" say eleven. Fixed in this slice's closing (PRD).
+- **The e2e parts:** `e2e/slice-36/` joins part 11 (from `slice-27`, the recut rule); a handful of specs, well inside the
+  heap's margin of chore PR 94's runs. Its full-run time is checked against the recut rule at the closing.
+- **Shared infrastructure touched:** `src/domain/document/state.ts` (the optional `source`, `baselines`, `changes`),
+  `figure.ts` (the label canvas's kind), a new composition point for the Baselines tab (F1), and InfoDocumenter's local
+  adapter rules (`INFODOC_RULES`, read by the local adapter). By "Test runs"' exception the local adapter's rules count
+  as shared infrastructure: **a full run in step 2 too**, not only in step 3 (P10).
+- **The Markdown and PDF paths (D-86):** unchanged for a live document; a baseline changes the front matter, the frame's
+  texts and the cover's "Model state" row; `tests/document-markdown-html.test.ts` keeps the HTML unchanged for live
+  documents.
+- **Size online (assumption):** a baseline's content reaches the browser as the live snapshot does; for KB the live
+  snapshot's size is known to `scripts/pg-snapshot-size.ts` (not run in this step: it reads `infomapper-dev`). A content
+  is about the live snapshot's size, so the same margin under 4.5 MB holds; Łukasz may run the script at step 4.
+- **Nothing changes this plan's shape.**
+
+## 2. Where the PRD is wrong or costs more (with proposals)
+
+- **F1. The Baselines tab is InfoMapper's; its new buttons and the delete dialog's line are InfoDocumenter's.**
+  "New document from it", "Make a document" and the documents' count cannot be written into
+  `src/app/w/[workspaceId]/_components/baselines.tsx` calling InfoDocumenter (AD-33; `eslint.config.mjs`'s module
+  rule). *Proposal:* a small extension point, listed in CLAUDE.md's: `BASELINE_EXTENSIONS` in `src/compose/`
+  (plain data and server actions, as `ModuleView`): per baseline row an action button (label, test id, whether shown for
+  the person), one for the Compare dialog (given the older and newer side), and the delete dialog's count with its
+  sentence. The home page builds it; InfoMapper's tab draws what it is given.
+- **F2. "Model state" is a plain text today** (`editor.tsx:562-565`, `EDITOR_TEXTS.modelState`); it becomes the
+  prototype's select. The PRD does not say the list's source: the page reads `store.baselines.list` (no content).
+  S25-03 reads it with `toHaveText` (section 5).
+- **F3. Switching the source must read a new snapshot.** The editor reads its snapshot once per document id
+  (`editor.tsx:200-212`, "once per document"); after a source change the preview would keep the old model.
+  *Proposal:* the snapshot is keyed by the document's source too, read again once per switch (and the changes, Q3).
+- **F4. The editor's Scope lists are the live model's** (`pages.tsx:64,110-111`: `store.projects.list`,
+  `model.concepts`), and so are the register's classifications (`optionContext`). For a document from a baseline they
+  should be the baseline's (a project deleted since is in its scope). *Proposal:* the editor takes the projects,
+  concepts and classifications from its snapshot once read (for both kinds of source, so one path); ids are kept as
+  today (F7 of slice 25).
+- **F5. A label canvas would be drawn from a baseline** as a plain canvas (Q2). *Proposal:* the figure kind "label" with
+  its line; label canvases left out of the Diagrams a baseline document is made with.
+- **F6. Figures are made and checked against the live canvases** (Q2: `scopeCanvases`, `FIGURE_CANVAS_REFUSAL`).
+  *Proposal:* a document from a baseline makes and checks them against its content; the create and the figure save then
+  read the content (a few ms, Q9).
+- **F7. The time on the document page.** The PRD wants the baseline's time in the browser's time zone (as slice 35,
+  never the server's). The editor builds in the browser, so its footer, cover and Markdown are right. The document page
+  (`/view`) builds the tree on the server (`pages.tsx:126-131`), on Vercel in UTC. *Proposal:* the tree carries the
+  baseline's time as `{taken}` with its ISO instant; `PagedView` (a client component that already receives the frame's
+  CSS) and the cover's row fill it in the browser before Paged.js lays the pages out. Nothing else of the page changes.
+  Same for the "Compared with" text in the section's heading if it ever carries a time (it does not: only the name).
+- **F8. "Now" in a live document's changes section** may be newer than the rest of the editor's preview after a re-ask
+  (Q3). *Proposal:* a known limitation, as D-81's "others' changes reach it after a reload".
+- **F9. Duplicate keeps a gone baseline** (Q7). *Proposal:* keep it; the PRD's refusal applies to choosing one.
+- **F10. "Make a document"'s name can exceed the 200-character name limit:** two names of up to 120 each give up to 265
+  characters with the sentence (`SHORT_TEXT_MAX`, `commands.ts:26`). *Proposal:* cut to 200 and trim, as Duplicate does
+  (`commands.ts:330`).
+- **F11. "Make a document" made from `blank` with its Text replaced:** the row's `preset` stays `blank` (the CHECK allows
+  it); the command takes the one section instead of the preset's. *Proposal:* `createDocument`'s input gains an optional
+  `changesSince` (older baseline id) and `source`; with them the sections are only the changes section, the audience
+  null, the watermark the preset's (`blank`: on; *assumption:* off for a baseline source as the sign-off's, for Łukasz 2).
+- **F12. The prototype's changes section compares with the live model even in a document from a baseline**
+  (`now = modelPart(S)`, line 10053; `src` only orders the two). The PRD is right ("the document's source"): the app
+  follows the PRD, not this line.
+- **F13. A chosen baseline newer than the document's own state** (a baseline document compared with a later baseline):
+  the older state is the start (B4.2), so the comparison runs from the document's state to the chosen one, and the
+  heading "Changes since “{chosen}”" would name the newer one. *Proposal:* the heading always names the older state:
+  "Changes since “{older}”" (for Łukasz 4).
+- **F14. The documents' count in the delete dialog counts InfoDocumenter's rows from InfoMapper's page** (Q8, F1);
+  online the count is a read of the module table through the composed store, no new port.
+- **F15. Step 2 needs a full run** (Q10, P10).
+- **F16. The PRD's editor note "under Model state"** stands above the preview in the prototype (`de-note`, line 10485),
+  and the prototype has a hint under the select the PRD leaves out: "A baseline gives the same document every time; the
+  live model always shows today." (line 10509). *Proposal:* the prototype's places and both texts (for Łukasz 5).
+- **F17. Print / PDF and Markdown's disabled title:** the prototype's is "This document points to a baseline that no
+  longer exists. Choose another source under Model state." (`expOff`, line 9499); the PRD's "that reason". *Proposal:*
+  the prototype's (it says what to do).
+- **F18. A gone chosen baseline:** the prototype shows "Nothing to compare with yet." (`againstOf` finds none); the PRD
+  "The baseline this section compared with no longer exists.". *Proposal:* the PRD's (it says why).
+
+## 3. Smaller points (proposals)
+
+- **P1. "New document from it"'s name:** the PRD does not say; the prototype names it "Documentation of “{name}”"
+  (line 10360), the sign-off preset from "New document" by the preset's label. *Proposal:* the prototype's (for Łukasz 6).
+- **P2. The groups' headings:** the prototype writes "Added (2)" with the count (line 10055). *Proposal:* with the count.
+- **P3. "Compared with"'s hint:** the prototype's "Compares that baseline with the document's own model state; the older
+  one is always the starting point." (line 10050), and "Previous baseline (none yet)" when there is none. *Proposal:* both.
+- **P4. Prototype order of "Compared with"'s list:** every baseline, the source included (it then shows "No changes.").
+  *Proposal:* the same (no special case).
+- **P5. The cover's "Model state" row** says the same as the footer's `{state}` ("Baseline “{name}” of {date time}"),
+  as the prototype's `srcTxt` (line 10233).
+- **P6. The watermark text for a baseline** ("DRAFT · baseline {name}") is the PRD's; the prototype has only "DRAFT ·
+  live model" for every source (line 10258). The PRD's is better; its Polish and German in Q5.
+- **P7. The sign-off preset's options:** the prototype's `PRESETS.signoff` (line 9533) gives options only to Text and the
+  overview's figure ("Logical data model" as its caption); every other section takes the app's defaults. *Proposal:* the
+  overview's figure the first project's first canvas in tab order with the prototype's caption in the document's
+  language; Diagrams made from the baseline's canvases (F6).
+- **P8. The demo:** the prototype seeds a shared "Retail Co – stage 1 documentation" from the sign-off preset (line 9549).
+  *Proposal:* no demo document (the PRD's assumption): S36-06 asks for the demo's documents unchanged, and the specs make
+  their own (for Łukasz 7).
+- **P9. The Documentation tab's "baseline gone" mark:** not in the prototype. *Proposal:* drop it in this slice
+  (`docs/ideas.md`); the editor and the page say it (for Łukasz 8).
+- **P10. Test runs:** full runs in steps 2, 3 and 6 (step 2 by "Test runs"' exception, F15).
+- **P11. Generate version** is disabled for a gone baseline in the prototype; the app has no versions (D-81: later).
+- **P12. Deleting a baseline touches no document** (no cascade): InfoDocumenter's table is "outside undo", so it
+  registers no parent for `moduleCascade` (`src/domain/commands/module-cascade.ts`). *Assumption*, a unit test in step 2.
+
+## 4. The prototype against the app (what this slice touches)
+
+| Prototype | App today (fact) | In this slice |
+| --- | --- | --- |
+| Model state select `data-dsrc` with live, each baseline, the gone option (10508) | a plain text (`editor.tsx:562-565`) | the select (F2) |
+| hint under it (10509) | – | F16 |
+| note above the preview for a baseline (10485) | – | F16 |
+| preview's "missing" sheet (10231), Print / Markdown / Generate disabled (10447, 9499) | Print and Markdown enabled when built (`editor.tsx:418-421`) | the message and the disabled buttons (no Generate) |
+| footer and cover `bl` (10233) | "Live model on {d}" (`document.ts:101`) | `bl` (Q5), browser time (F7) |
+| watermark "DRAFT · live model" for every source | the same (`document.ts:161,180`) | "DRAFT · baseline {name}" (P6) |
+| changes section `reg(CORE, {type:"changes"…})` (10048–10055) | no such type | the section (Q3, Q4, F12, F13, F18, P2–P4) |
+| `PRESETS.signoff` (9532), disabled without a baseline (10388) | three presets (`presets.ts`) | the fourth (P7) |
+| "New document from it" on a baseline's row (10349, 6429) | Compare…, Rename, Delete (`baselines.tsx:126-143`) | via F1 (P1) |
+| "Make a document" in Compare (6362, 10391) | Close only | via F1 (F10, F11) |
+| delete dialog's documents' line (6342) | "It cannot be brought back here." (`baselines.tsx:364`) | via F1, counted on the server (Q8) |
+| seeded shared sign-off document (9549) | three demo documents (`data/demo.ts`) | not seeded (P8) |
+| Markdown | `source: "live model"` (`markdown.ts:393`) | the PRD's three keys (S36-04) |
+
+## 5. Earlier specs and tests, by step
+
+**Step 2 (domain and data):**
+- `src/modules/infodocumenter/domain/documents.test.ts:115`: loops over `PRESETS` expecting `source_kind: "live"`; the
+  sign-off needs a baseline (the loop's case for it changes).
+- `tests/infodocumenter-store.test.ts:95-96`: expects a baseline source refused by the check; it becomes accepted with
+  a live baseline, refused with none (the key) and refused in its pairing.
+- `tests/layer-rules.test.ts:80` imports `DOCUMENT_PRESETS` as a probe: unchanged.
+- `tests/baseline-compare.test.ts` reads `COMPARE_WORDS.en`: unchanged; new cases for `pl` and `de`.
+- `tests/document-markdown.test.ts`, `tests/document-markdown-html.test.ts`, `tests/document-figures*.test.ts`,
+  `tests/document-html.test.ts`: unchanged for live documents (the optional state fields absent); new cases beside them.
+- Contract suite (`tests/contract/reads.test.ts`, `writes.test.ts`): new cases (source to a baseline and refused, the
+  sign-off row, the count with another person's private document).
+- Full run (F15).
+
+**Step 3 (pages):**
+- `e2e/slice-25/S25-03.spec.ts:35`: `text-model-state` `toHaveText("Live model (changes as people work)")` becomes the
+  select's chosen option (the test id moves to the select; the assertion reads its value).
+- `e2e/slice-25/S25-02.spec.ts:37`, `S25-03.spec.ts:8`: the preset buttons by test id; the fourth button does not change
+  them. The dialog's text (`S25-03.spec.ts:11`, `toContainText`) is unchanged.
+- `e2e/slice-34/S34-02.spec.ts:24`: the front matter of a live document, unchanged.
+- `e2e/slice-35/S35-02.spec.ts:86,96,129`: counts of `button-baseline-compare` and the delete text by its own test id;
+  the new button and the documents' line get their own test ids, so unchanged (the demo has no document from a
+  baseline).
+- New `e2e/slice-36/` S36-01 to S36-05 with the demo accounts; S36-06's live part is the earlier specs.
+
+## 6. The plan for steps 2 to 6
+
+2. **Domain and data:** `snapshotOfContent`; `DocumentState.source`, `baselines`, `changes`; the label canvas's figure
+   kind; `COMPARE_WORDS` PL and DE and the new labels; the changes section (`changes` type: options, heading, builder,
+   scope on either side, three messages); the sign-off preset; the source in `updateDocument`, the create's baseline and
+   changes options, the refusals; the frame's and cover's texts, the watermark, Markdown's front matter; the documents'
+   count; the migration; `INFODOC_RULES`; the composition (`documentSnapshotAction` for a baseline, `documentChangesAction`,
+   `baselineDocumentCounts`, `BASELINE_EXTENSIONS`'s data); unit and contract tests. A draft PR into `dev`; a full run (F15).
+3. **Pages:** Model state with its hint and the note; the snapshot per source (F3) and the lists from it (F4);
+   "New document from it"; the preset picker's disabled sign-off; the changes section's options; "Make a document"; the
+   gone baseline's message and disabled buttons; the delete dialog's line; the document page's time (F7); the e2e specs
+   and screenshots beside the prototype; a full run.
+4. **Łukasz's migration:** `pg:backup`, KB's counts, `pg:migrate`, KB's counts again. Stop.
+5. **Łukasz's acceptance** on `dev:pg` with the demo accounts (a baseline taken by hand; long lists and renames to try).
+   Stop.
+6. **Close:** the docs (D-88, the notes, `data-model-v2.md`, `known-limitations.md` with F8, `ideas.md` with P9,
+   `inventory-prototype-vs-app.md`, README, CLAUDE.md with the extension point and the "ten parts" lines), one full run
+   on the final commit.
+
+## 7. For Łukasz to decide
+
+Business questions; each has a recommendation.
+
+1. **D-87's sentence "the contents never go to the browser":** a document from a baseline brings its own content to the
+   editor as the live model comes today (Q1). Recommendation: accept, with the note's text in Q1.
+2. **The watermark when the source is switched:** recommendation: the switch changes the text ("DRAFT · baseline
+   {name}"), never whether it is on; only new documents from a baseline (the sign-off preset, "New document from it",
+   "Make a document") start with it off.
+3. **The changes section and "Mappings included":** recommendation: not applied; every mapping change in scope is listed.
+4. **A chosen baseline newer than the document's state:** recommendation: the heading names the older state ("Changes
+   since “{older}”", F13).
+5. **The note and the hint (F16):** recommendation: the prototype's places and texts (the note above the preview, the
+   hint under the select).
+6. **"New document from it"'s name:** recommendation: the prototype's "Documentation of “{name}”" (P1).
+7. **A demo document from "Stage 1 sign-off":** recommendation: none (P8).
+8. **The Documentation tab's "baseline gone" mark:** recommendation: drop, into `ideas.md` (P9).
+9. **The Polish and German words in Q5:** for your review, any time before the closing.
+
+Technical points with my recommendation (no answer needed unless you disagree): build in the browser (Q1), the
+comparison on the server with the editor asking per saved change (Q3), the scope on either side (Q4), the extension
+point for the Baselines tab (F1), the document page's time filled in the browser (F7), Duplicate keeps the source (F9),
+the name cut to 200 (F10), full runs in steps 2, 3 and 6 (F15).
