@@ -68,7 +68,8 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
   ]);
   const language = doc.style.language ?? access.workspace.doc_language;
   // every registered type, in their order: InfoDocumenter's, then the modules' (the prototype's "+ Add section")
-  const types: EditorSectionType[] = [...DOCUMENT_SECTION_TYPES.values()].map((t) => ({
+  // slice 36, step 2: "Changes since a baseline" joins "+ Add section" with its options in step 3 (the pages unchanged until then)
+  const types: EditorSectionType[] = [...DOCUMENT_SECTION_TYPES.values()].filter((t) => t.type !== "changes").map((t) => ({
     type: t.type,
     name: t.label("en"),
     description: t.description ?? "",

@@ -66,7 +66,8 @@ export function DocumentationTab({
           Documents are generated from the model: their tables come from its objects, so a document is right at the moment it is opened. A{" "}
           <b>document</b> is the recipe; print it to make a PDF.
         </p>
-        {canCreate && <NewDocumentButton workspaceId={workspaceId} presets={PRESETS.map((p) => ({ code: p.code, label: p.label, description: p.description }))} />}
+        {/* slice 36, step 2: the sign-off preset joins the dialog with its disabled state in step 3 */}
+        {canCreate && <NewDocumentButton workspaceId={workspaceId} presets={PRESETS.filter((p) => !p.fromBaseline).map((p) => ({ code: p.code, label: p.label, description: p.description }))} />}
       </div>
       <H3>{TAB_TEXTS.shared}</H3>
       <div data-testid="list-shared-documents">
