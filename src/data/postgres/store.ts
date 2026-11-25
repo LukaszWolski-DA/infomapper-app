@@ -17,7 +17,9 @@ import {
   workspaceSnapshotOf,
   type StoredRows,
 } from "@/domain/model/workspace-model";
-import type { ModuleTable, WritableRows } from "@/domain/types";
+import { newestBaselineFirst } from "@/domain/baseline/names";
+import type { Baseline, ModuleTable, WritableRows } from "@/domain/types";
+import { shapedBaselineContent } from "../baselines";
 import { CORE_SCHEMA } from "../local/schema";
 import { newestImportFirst, oldestChangeFirst } from "../order";
 import type { DataStore } from "../ports";
@@ -113,6 +115,20 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
       listMembershipsOfUsers: async (userIds) => (userIds.length ? ((await read("organization_member", "user_id = any($1::uuid[])", [...userIds])) as never) : []),
       getAccess: async (organizationId) => one(await read("organization_access", "organization_id = $1", organizationId)),
       listLicences: async (organizationId) => (await read("organization_licence", "organization_id = $1 and deleted_at is null", organizationId)) as never,
+    },
+
+    // slice 35 (D-87): rows without their content (`STORE_ONLY_COLUMNS`); a content alone, one baseline at a time
+    baselines: {
+      list: async (workspaceId) => ((await ofWorkspace(pool, "baseline", workspaceId, true)) as never as Baseline[]).sort(newestBaselineFirst),
+      listAll: async (workspaceId) => (await ofWorkspace(pool, "baseline", workspaceId, false)) as never,
+      get: async (workspaceId, baselineId) => one(await read("baseline", "workspace_id = $1 and id = $2 and deleted_at is null", workspaceId, baselineId)),
+      content: async (workspaceId, baselineId) => {
+        const { rows } = await pool.query<{ snapshot: unknown; snapshot_schema: number }>(
+          "select snapshot, snapshot_schema from baseline where workspace_id = $1 and id = $2 and deleted_at is null",
+          [workspaceId, baselineId],
+        );
+        return rows[0] ? shapedBaselineContent(rows[0].snapshot, rows[0].snapshot_schema, schema) : null;
+      },
     },
 
     modules: {

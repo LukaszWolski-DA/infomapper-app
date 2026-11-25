@@ -57,6 +57,11 @@ export async function readDb(file: string): Promise<DevDb> {
     throw e;
   }
   const db = JSON.parse(text) as DevDb;
+  // slice 35 (F7): a file without baselines has none; no format step, so an older file is not written back for it
+  (db as Partial<DevDb>).baseline ??= [];
+  // slice 35: a content written into the data file itself (a test's file, a hand-made one) goes to its own file first;
+  // the rows never carry it, and the next write of the data file leaves it out
+  if (db.baseline.some((b) => (b as { snapshot?: unknown }).snapshot !== undefined)) db.baseline = (await writeBaselineContents(file, db)).baseline;
   const was = db.format as number;
   const now = new Date().toISOString();
   const { report, passwordsGiven, ownStereotypes } = upgradeDb(db, now, () => uuidv7());
@@ -292,6 +297,8 @@ function deepFreeze<T>(value: T): T {
 export async function writeDb(file: string, db: DevDb, options?: { ifUnchanged: Stamp | null }): Promise<boolean> {
   assertNotProduction();
   await mkdir(path.dirname(file), { recursive: true });
+  // slice 35: a new baseline's content into its own file first, the row without it into the data file
+  db = await writeBaselineContents(file, db);
   const temp = `${file}.${randomUUID()}.tmp`;
   // compact (slice 7a): after large imports the file is many MB, and indenting doubled its size and its writing time
   await writeFile(temp, JSON.stringify(db) + "\n", "utf8");
@@ -337,4 +344,55 @@ export async function removeDb(file: string): Promise<void> {
   assertNotProduction();
   cache.delete(file);
   await rm(file, { force: true });
+  await removeBaselineFolder(file);
+}
+
+// ---- Baselines' contents (slice 35, the design of 11 November 2026, step 1's Q4) ----
+//
+// Each baseline's content is a file of its own in a folder beside the data file (`.data/dev-db.baselines/<id>.json` for
+// `.data/dev-db.json`), written before its row; the data file holds the row without it, so a write of the data file never
+// rewrites a baseline's content and a list never reads one. A content file is never changed or removed (a baseline is
+// soft-deleted); a reset or a removal of the data file empties the folder.
+
+/** The folder of a data file's baselines' contents. */
+export const baselineFolder = (file: string): string => path.join(path.dirname(file), `${path.basename(file, ".json")}.baselines`);
+
+const baselineFile = (file: string, id: string): string => {
+  if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error(`Not a baseline id: ${id}`);
+  return path.join(baselineFolder(file), `${id}.json`);
+};
+
+/**
+ * The data with every baseline row that carries its content (a new one, the seed's) written to its file and stored
+ * without it. The same object when no row carries one.
+ */
+async function writeBaselineContents(file: string, db: DevDb): Promise<DevDb> {
+  const rows = (db.baseline ?? []) as (DevDb["baseline"][number] & { snapshot?: unknown })[];
+  if (!rows.some((r) => r.snapshot !== undefined)) return db;
+  await mkdir(baselineFolder(file), { recursive: true });
+  for (const r of rows) {
+    if (r.snapshot === undefined) continue;
+    const target = baselineFile(file, r.id);
+    const temp = `${target}.${randomUUID()}.tmp`;
+    await writeFile(temp, JSON.stringify(r.snapshot) + "\n", "utf8");
+    await withRetry(() => rename(temp, target));
+  }
+  return { ...db, baseline: rows.map((r) => (r.snapshot === undefined ? r : Object.fromEntries(Object.entries(r).filter(([k]) => k !== "snapshot")) as DevDb["baseline"][number])) };
+}
+
+/** A baseline's content as stored, or null when its file is missing. */
+export async function readBaselineContent(file: string, id: string): Promise<unknown> {
+  assertNotProduction();
+  try {
+    return JSON.parse(await withRetry(() => readFile(baselineFile(file, id), "utf8"))) as unknown;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw e;
+  }
+}
+
+/** Empties a data file's folder of baselines' contents (a reset, a removal). */
+export async function removeBaselineFolder(file: string): Promise<void> {
+  assertNotProduction();
+  await rm(baselineFolder(file), { recursive: true, force: true });
 }

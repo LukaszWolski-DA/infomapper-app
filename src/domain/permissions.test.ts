@@ -19,11 +19,14 @@ const expected: Record<WorkspaceRole, WorkspaceAction[]> = {
     "workspace.view", "workspace.edit_settings", "project.create", "project.edit", "project.delete", "canvas.create", "canvas.rename", "canvas.edit_projects",
     "canvas.edit_items", "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
     "requirement.edit", "requirement.set_status", "people.edit", "module.own_objects",
+    // slice 35: baselines
+    "baseline.create", "baseline.rename", "baseline.delete",
   ],
   modeler: [
     "workspace.view", "project.create", "project.edit", "project.delete", "canvas.create", "canvas.rename", "canvas.edit_projects", "canvas.edit_items",
     "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
     "requirement.edit", "requirement.set_status", "module.own_objects",
+    "baseline.create", "baseline.rename",
   ],
   // Slice 3a: reviewers work on notes as modelers do (Łukasz's step 0 answer 1); labels are for editors (answer 2).
   // Slice 4a: reviewers change a requirement's status only (AD-05).

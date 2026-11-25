@@ -15,8 +15,8 @@ const isObject = (v: unknown) => typeof v === "object" && v !== null && !Array.i
 export const INFODOC_RULES: Readonly<Record<InfoDocTable, TableRules>> = {
   document_definition: {
     key: ["id"],
-    // `baseline_id` has no key here: the baseline table is not in the domain yet (F6; the SQL has it)
-    foreignKeys: { ...model, author_id: "app_user" },
+    // slice 35: `baseline_id` points to a baseline (the SQL has had the key since slice 25)
+    foreignKeys: { ...model, author_id: "app_user", baseline_id: "baseline" },
     checks: [
       { name: "document_definition_name_ck", test: (r: AnyRow) => typeof r.name === "string" && r.name.length > 0 && r.name === r.name.trim() },
       { name: "document_definition_preset_ck", test: oneOf(DOCUMENT_PRESETS, "preset") },

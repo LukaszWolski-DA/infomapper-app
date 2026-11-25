@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { upgradeDb } from "../../src/data/local/file";
+import { baselineFolder, upgradeDb } from "../../src/data/local/file";
 import { DEV_DB_FORMAT, type DevDb } from "../../src/data/local/schema";
 import { uuidv7 } from "../../src/domain/ids";
 
@@ -48,14 +48,38 @@ export function upgradedFrom(text: string, now = new Date().toISOString()): Upgr
   return { db, formatBefore, made };
 }
 
-/** The backup given, read through a temporary copy (removed afterwards), upgraded in memory. */
+/**
+ * Every baseline row of a file with its content (slice 35): a pg backup holds it in the row; a local data file keeps it
+ * in the folder beside it (`baselineFolder`), read from there. A live or deleted baseline without one refuses the file:
+ * a copy never writes a baseline without its content.
+ */
+export function withBaselineContents(db: DevDb, file: string): DevDb {
+  const rows = (db.baseline ?? []) as (DevDb["baseline"][number] & { snapshot?: unknown })[];
+  if (!rows.length) return db;
+  const folder = baselineFolder(file);
+  const missing: string[] = [];
+  const full = rows.map((r) => {
+    if (r.snapshot !== undefined) return r;
+    const at = path.join(folder, `${r.id}.json`);
+    if (!fs.existsSync(at)) {
+      missing.push(r.id);
+      return r;
+    }
+    return { ...r, snapshot: JSON.parse(fs.readFileSync(at, "utf8")) as unknown };
+  });
+  if (missing.length) throw new Error(`${missing.length} baseline${missing.length === 1 ? "" : "s"} of the file ${missing.length === 1 ? "has" : "have"} no content beside it (${path.basename(folder)}): nothing was read.`);
+  return { ...db, baseline: full };
+}
+
+/** The backup given, read through a temporary copy (removed afterwards), upgraded in memory, with its baselines' contents. */
 export function readBackupCopy(given: string | undefined, root = process.cwd()): UpgradedFile {
   const file = backupPath(given, root);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "im-backup-copy-"));
   const copy = path.join(dir, "copy.json");
   try {
     fs.copyFileSync(file, copy);
-    return upgradedFrom(fs.readFileSync(copy, "utf8"));
+    const read = upgradedFrom(fs.readFileSync(copy, "utf8"));
+    return { ...read, db: withBaselineContents(read.db, file) };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

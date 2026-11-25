@@ -106,6 +106,11 @@ Slice 34 (D-86, InfoDocumenter's slice E; feature slices return, AD-31's note) g
 "Print / PDF": a dialog with the document as one Markdown file built at the click from the editor's tree, Copy and
 Download .md; figures as Mermaid `erDiagram` blocks in syntax Mermaid 9.4.3, 10.9.5 and 12.3.0 all parse; the PDF
 unchanged. The file is for exchange in any Markdown tool; GitHub and Azure DevOps are not targets.
+Slice 35 (D-87) builds baselines: the workspace home's "Baselines (n)" tab (after the modules' tabs, before People);
+owners, admins and modelers take a named baseline (an immutable content of the model from one read) and rename it,
+owners and admins delete it (soft), outside undo, logged; every member compares one with Now or another baseline on the
+server (seven kinds, the older state first, references compared by id and shown by name). Documents from a baseline are
+slice 36.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -217,6 +222,12 @@ list up to date in each sub-slice):
   rows has a default (`TableRules.defaults`, read by the store's `modules.list` and `loadForUndo` through `readRows`) and
   an undo image default (`ModuleUndoTable.defaults`), with no file format (AD-33). Read a module's table only through a store made with
   `getDataStore(STORE_SCHEMA)` (the default store knows InfoMapper's tables only and throws).
+  **Since slice 35 every table has a baseline flag** (`BASELINE_TABLES` in `src/domain/baseline/tables.ts` for
+  InfoMapper's, a module's own record, joined in `BASELINE_FLAGS`; `BASELINE_MODULE_TABLES` are the module tables a
+  content holds): "in" puts the table's live rows into a baseline's content, "out" leaves it out; the guard test fails a
+  table without one. **A later table** decides its flag; a later change of a stored shape of an "in" table adds a step
+  to the content's upgrade chain (`src/domain/baseline/upgrade.ts`, `SNAPSHOT_SCHEMA`) and a fixture test
+  (`tests/baseline-upgrade.test.ts`, `tests/baseline-shape.test.ts` compares the fixture's shape with the columns).
 - **Cascades:** `moduleCascade` (`src/domain/commands/module-cascade.ts`, run by `runCommand`): a module's rows that
   point to a deleted InfoMapper row go in the same change group; the parents are the ones the module registered for undo.
   Since slice 15c a table may also go whole with a row that points to it (`goesWhole` in its undo registration, Q-5):
@@ -425,8 +436,19 @@ list up to date in each sub-slice):
   `module.own_objects` (every role, never in an archived workspace); the module adds its own rules on top
   (InfoDocumenter's `rights.ts`). A module table outside undo registers as `"outside undo"` (`ModuleTableClass`): its
   writes keep their change events and are never an undo step.
+- **Baselines** (slice 35, D-87): the domain is `src/domain/baseline/` (`content.ts`: `baselineContentOf`, the content
+  projected from `store.snapshot`, `baselineSummary`, `snapshotWriteRefusal`; `upgrade.ts`; `compare.ts`:
+  `compareBaselines`, `filterChanges`, `olderFirst`; `words.ts`: `COMPARE_WORDS` per documentation language, shared with
+  slice 36; `names.ts`), the commands `src/domain/commands/baseline.ts` (outside undo), the composition
+  `src/compose/baselines.ts` (`baselineContentNow`, `compareWith`), the actions `src/app/_actions/baselines.ts`, the tab
+  `src/app/w/[workspaceId]/_components/baselines.tsx`. **The content never travels with the row:** the domain's
+  `Baseline` has no `snapshot`; the insert carries it, change images leave it out (`IMAGE_LEFT_OUT`), both adapters
+  refuse an update carrying it; Postgres reads name their columns (`ROW_COLUMNS`, `STORE_ONLY_COLUMNS`), the local
+  adapter keeps each content in `<data file>.baselines/<id>.json` (`baselineFolder`). The port is `baselines.list`,
+  `listAll`, `get`, `content` (through the upgrade chain). **A comparison** compares a reference by its id (a list as a
+  set) and shows it by name (`Short`'s third element, `keyOf`): **a later field that points to a row** does the same.
 - **A new module** adds its folder, its name to `modules` in `eslint.config.mjs`, its tables to the registry's three
-  records and a migration, and its pieces to `src/compose/`; InfoMapper's code does not change.
+  records (and their baseline flags, slice 35) and a migration, and its pieces to `src/compose/`; InfoMapper's code does not change.
 
 **Writes (AD-23).**
 - Every write goes through the server (server actions or route handlers) and then through a `domain` command.
@@ -634,11 +656,14 @@ local adapter no pool is made.
   the local KB in `.data/dev-db.json` is **an untouched archive since 21 November 2026** (slice 34, option a): Łukasz no
   longer works in it and nothing changes it (no reset, no format upgrade, no `seed:large`, no write through a dev
   server). The rules since the switch:
-  - **`pg:backup` before every `pg:migrate` and every merge into `dev`, and after a day of Łukasz's work in KB online**
-    (Łukasz, 20 November 2026, slice 33, amending AD-39's note); the prompt for each says so. **Not** before an acceptance
-    on `dev:pg` with the demo accounts (they do not see KB), and not again when KB has not changed since the last backup.
-    Before a migration that adds a table the backup runs from `dev`'s code, or from code whose `pg:backup` leaves out a
-    table the database does not have yet (since slice 33 it names it and reads the rest).
+  - **Supabase is on a paid plan** (Łukasz, 24 November 2026, AD-39's note): `infomapper-dev` is never paused and has
+    Supabase's own backups (retention: to be checked by Łukasz in Supabase's dashboard).
+  - **A manual `pg:backup` before every `pg:migrate`, and before a merge into `dev` only when KB changed since the last
+    backup;** Supabase's backups otherwise (AD-39's note of 24 November 2026, replacing slice 33's rule); the prompt for
+    each says so. **Not** before an acceptance on `dev:pg` with the demo accounts (they do not see KB). Before a
+    migration that adds a table the backup runs from `dev`'s code, or from code whose `pg:backup` leaves out a table the
+    database does not have yet (since slice 33 it names it and reads the rest). Since slice 35 a backup holds KB's
+    baselines with their contents inline.
   - **Slice acceptances on `dev:pg` use the demo accounts only** (they do not see KB).
   - **`pg:kb` from the local file is not run after the switch** (it would overwrite the master with an older copy; the
     script has no guard against it yet, `docs/ideas.md`); a restore is `pg:restore` from `.data/backups/pg/`.
@@ -844,6 +869,8 @@ SCREENS=<folder> npx playwright test e2e/slice-24/S24-screens.spec.ts           
 SCREENS=<folder> npx playwright test e2e/slice-23/S23-screens.spec.ts                     # slice 23: the Metadata conventions tab, the remove dialog, Settings' Model conventions, the new workspace's language; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts                     # slice 22: the unknown member's section (a value, a value that does not fit, off), Fact Sales' Dimensions; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
+npx tsx scripts/bench-baselines.ts                            # slice 35: a baseline's content, size, comparison and taking, on the demo and Performance test (reference figures, no bar)
+SCREENS=<folder> npm run e2e -- e2e/slice-35/S35-screens.spec.ts                         # slice 35: the Baselines tab (owner, reader), Rename, Delete, Compare with a filter, beside the prototype's
 npx tsx scripts/bench-documents.ts                            # slice 25: a whole document's content tree (snapshot, state, tree) on Performance test and the demo (reference figure, no bar)
 npx tsx scripts/bench-figures.ts                              # slice 27: the dictionary preset with Diagrams' figures, the figures' share of the tree, their SVGs' size (reference figure, no bar)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-27/S27-10-figures.spec.ts  # slice 27: the editor with figures: snapshot, state, tree, first layout, what Auto shows after a change (reference figures)
@@ -1165,6 +1192,16 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   in the test's Node process on the three versions (`mermaidBlocks`, `parsedOnEvery`). Windows' clipboard answers CRLF:
   compare a copied text with its line ends as LF. The size's unit in a spec is written in pieces (`${"K"}${"B"}`), as
   the own-model guard writes it.
+
+  Slice 35's fixtures are slice 25's in a 1,440 × 900 window (`seed` "docs", "plain" or "full"; S35-01, S35-02 and S35-04
+  use "full", with the demo's "Stage 1 sign-off", `DEMO_BASELINE`). Its helpers open the tab and its rows (`openBaselines`,
+  `rows`, `rowNamed`, `tabLabel`), take one in the box (`createInBox`), find the dialogs (`renameDialog`, `deleteDialog`,
+  `compareDialog`, `openCompare`, `compareRows`: "Kind | Item | What changed"), read the e2e file's baselines and their
+  change events (`storedBaselines`, `storedBaseline`, `baselineEvents`), run a command as a person through the composed
+  store (`asPersonHere`) and write a time as the browser shows it (`minute`). A baseline's content is the file
+  `baselineFolder(E2E_DB)/<id>.json`; a spec may rewrite it to make a long comparison (S35-04). The test helpers' undo
+  (`revertChangeGroup` with the store) skips `runCommand`'s live-canvas step: a redo the app's own controls do is S35-03's
+  second case.
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,

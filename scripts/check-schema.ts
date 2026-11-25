@@ -70,7 +70,7 @@ async function main(): Promise<number> {
     }
     console.log(
       `The schema matches the domain: ${domain.length} tables, ${domain.reduce((n, t) => n + t.columns.length, 0)} columns ` +
-        `(not in the domain yet: ${NOT_IN_DOMAIN_YET.join(", ")}); Row Level Security on every table.`,
+        `(not in the domain yet: ${NOT_IN_DOMAIN_YET.join(", ") || "none"}); Row Level Security on every table.`,
     );
     return 0;
   } finally {

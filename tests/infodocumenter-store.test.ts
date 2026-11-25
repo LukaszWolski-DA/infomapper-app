@@ -92,7 +92,8 @@ describe("documents in the local adapter", () => {
       const changed = { ...r.value.document, ...row };
       return store.apply({ ...r.writeSet, writes: [{ kind: "insert", table: "document_definition", row: changed }] });
     };
-    expect(await insert({ source_kind: "baseline", baseline_id: uuidv7() })).toMatchObject({ ok: false, error: { message: expect.stringContaining("document_definition_source_ck") } });
+    // slice 35: `baseline_id` has its key now; a source pointing to a baseline is refused by the check, and to none by the key
+    expect(await insert({ source_kind: "baseline", baseline_id: uuidv7() })).toMatchObject({ ok: false, error: { message: expect.stringMatching(/document_definition_source_ck|baseline_id/) } });
     expect(await insert({ sections: {} as never })).toMatchObject({ ok: false, error: { message: expect.stringContaining("document_definition_recipe_ck") } });
     // slice 26: the style is part of the recipe
     expect(await insert({ style: [] as never })).toMatchObject({ ok: false, error: { message: expect.stringContaining("document_definition_recipe_ck") } });

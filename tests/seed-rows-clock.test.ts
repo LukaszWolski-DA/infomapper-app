@@ -6,16 +6,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { seedRows } from "../scripts/lib/seed-rows";
 import { AT, contractClock } from "./contract/shared";
+import { DEMO_BASELINE } from "@/compose/seed";
 
 const ISO = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/;
 
-/** "table.field" of every time in the rows that is not `at`. */
+/**
+ * "table.field" of every time in the rows that is not `at`. Slice 35: the demo's baseline was taken at a fixed time in
+ * the past (`DEMO_BASELINE.at`), a constant, never the clock; its content's rows are at `at`.
+ */
 function otherTimes(at: string): string[] {
   const out = new Set<string>();
   const db = seedRows(new Date(at)) as unknown as Record<string, unknown>;
   for (const [table, rows] of Object.entries(db)) {
     if (!Array.isArray(rows)) continue;
-    for (const row of rows as Record<string, unknown>[]) for (const [field, value] of Object.entries(row)) if (typeof value === "string" && ISO.test(value) && value !== at) out.add(`${table}.${field}`);
+    for (const row of rows as Record<string, unknown>[]) for (const [field, value] of Object.entries(row)) if (typeof value === "string" && ISO.test(value) && value !== at && !(table === "baseline" && value === DEMO_BASELINE.at)) out.add(`${table}.${field}`);
   }
   return [...out].sort();
 }

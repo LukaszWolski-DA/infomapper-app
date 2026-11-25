@@ -17,6 +17,7 @@
 // 6. commit, or roll back with the first refusal.
 
 import type { Pool, PoolClient } from "pg";
+import { snapshotWriteRefusal } from "@/domain/baseline/content";
 import type { Write, WriteSet } from "@/domain/changes";
 import { accessChangedRefusal, type AccessNow, type CheckedAccess } from "@/domain/commands/access-check";
 import { countChecks, countRefusal, crossesWorkspaces, needsOrganizationLock, type CountCheck, type CountRows } from "@/domain/commands/count-rules";
@@ -104,6 +105,9 @@ const phaseOf = (w: Write): Phase => {
 export async function applyWriteSet(pool: Pool, schema: StoreSchema, writeSet: WriteSet, options: ApplyOptions = {}): Promise<ApplyResult> {
   const unknown = writeSet.writes.find((w) => !schema.rules[w.table]);
   if (unknown) return { ok: false, error: domainError("invalid", `The store does not know the table ${unknown.table}.`) };
+  // slice 35 (F2): a baseline's content is written by its insert only
+  const rewrite = snapshotWriteRefusal(writeSet.writes);
+  if (rewrite) return { ok: false, error: domainError("invalid", rewrite) };
   const client = await pool.connect();
   const started = performance.now();
   let lockWait = 0;

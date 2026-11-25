@@ -13,7 +13,9 @@
 //   npx tsx scripts/kb-counts.ts .data/backups/kb-count-copy.json
 //   Remove-Item .data\backups\kb-count-copy.json
 import fs from "node:fs";
+import { baselineContentOfRows } from "../src/compose/baselines";
 import { STORE_SCHEMA } from "../src/compose/tables";
+import { baselineSummary } from "../src/domain/baseline/content";
 import { upgradeDb } from "../src/data/local/file";
 import { DEV_DB_FORMAT, type DevDb } from "../src/data/local/schema";
 import { timeColumnOf } from "../src/data/postgres/tables";
@@ -85,6 +87,22 @@ function main() {
     console.log(`  ${table.padEnd(28)} ${pad(live, 7)} ${pad(mine.length - live, 7)} ${pad(table === "app_user" ? `(${t[table]!.length} people)` : other, 12)} ${pad(d, 7)}`);
   }
   console.log(`KB's rows as JSON: about ${kbBytes.toLocaleString("en-GB")} bytes.`);
+
+  // slice 35: what a baseline of each of KB's live workspaces would hold now, by number (counts and bytes only), and KB's baselines
+  (db as Partial<DevDb>).baseline ??= [];
+  console.log("\nA baseline taken now (the content's rows, its JSON bytes, its summary: logical entities, mappings, requirements):");
+  workspaces.filter((w) => !isDeleted(w)).forEach((w, i) => {
+    const started = performance.now();
+    const content = baselineContentOfRows(db, w.id as string);
+    const ms = performance.now() - started;
+    if (!content) return;
+    const text = JSON.stringify(content);
+    const rows = (text.match(/"id":/g) ?? []).length;
+    const s = baselineSummary(content);
+    console.log(`  workspace ${i + 1}: about ${rows.toLocaleString("en-GB")} rows, ${text.length.toLocaleString("en-GB")} bytes, made in ${ms.toFixed(0)} ms; ${s.entity_count} / ${s.mapping_count} / ${s.requirement_count}`);
+  });
+  const baselines = (t.baseline ?? []).filter((b) => ws.has(b.workspace_id as string));
+  console.log(`KB's baselines: ${baselines.filter((b) => !isDeleted(b)).length} live, ${baselines.filter(isDeleted).length} deleted.`);
 
   // fields KB's rows use that no row of the demo's seed uses (schema names only)
   const seedFields = new Map<string, Set<string>>();

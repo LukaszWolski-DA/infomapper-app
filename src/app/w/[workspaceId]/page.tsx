@@ -25,6 +25,7 @@ import { resetReachOf } from "@/app/_lib/people-links";
 import { invitationsReady, NOT_SET_UP } from "@/app/_lib/supabase-admin";
 import { inviteDate } from "@/ui/invite-date";
 import { SettingsForm } from "./_components/settings-form";
+import { BaselinesTab } from "./_components/baselines";
 import { Conventions } from "./_components/conventions";
 import { settingsBoxes } from "@/compose/settings";
 import { HOME_GONE, homeTabs } from "@/compose/home";
@@ -38,7 +39,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const shell = await loadShell({ workspaceId });
   const store = getDataStore();
   const workspace = (await store.workspaces.get(workspaceId))!;
-  const [members, users, projects, model, requirements, requirementLinks, history] = await Promise.all([
+  const [members, users, projects, model, requirements, requirementLinks, history, baselines] = await Promise.all([
     store.workspaces.listMembers(workspaceId),
     workspacePeople(store, workspaceId),
     store.projects.list(workspaceId),
@@ -46,6 +47,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     store.requirements.list(workspaceId),
     store.requirements.listLinks(workspaceId),
     store.undoHistory.state(workspaceId, shell.user.id),
+    // slice 35: the rows only (the tab's count and list), never a content
+    store.baselines.list(workspaceId),
   ]);
   const orgMemberships = await store.organizations.listMembershipsOfUsers(members.map((m) => m.user_id));
   const organizations = await Promise.all(
@@ -162,6 +165,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               [
                 ["overview", "Overview"],
                 ...moduleTabs.map((t) => [t.id, t.label] as const),
+                ["baselines", `Baselines (${baselines.length})`],
                 ["people", `People (${members.length})`],
                 ["conventions", "Metadata conventions"],
                 ["settings", "Settings"],
@@ -256,6 +260,26 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                 </>
               )}
             </>
+          )}
+
+          {tab === "baselines" && (
+            <BaselinesTab
+              workspaceId={workspace.id}
+              workspaceName={workspace.name}
+              rights={{ create: canHere("baseline.create"), rename: canHere("baseline.rename"), delete: canHere("baseline.delete") }}
+              baselines={baselines.map((b) => ({
+                id: b.id,
+                version: b.version,
+                name: b.name,
+                note: b.note,
+                created_at: b.created_at,
+                // the people the page may name: every author of a change event, so the baseline's taker too
+                by: users.find((u) => u.id === b.created_by)?.display_name ?? "?",
+                entity_count: b.entity_count,
+                mapping_count: b.mapping_count,
+                requirement_count: b.requirement_count,
+              }))}
+            />
           )}
 
           {tab === "people" && (

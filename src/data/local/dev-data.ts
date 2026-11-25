@@ -1,7 +1,7 @@
 // Seeding and resetting the local data file (npm run seed, npm run reset-dev-data, npm run seed:large).
 
 import { existsSync } from "node:fs";
-import { assertNotProduction, readDb, writeDb } from "./file";
+import { assertNotProduction, readDb, removeBaselineFolder, writeDb } from "./file";
 import { CORE_SCHEMA, type DevDb, type LocalSchema } from "./schema";
 import { buildSeed } from "./seed";
 import { addLargeWorkspace } from "./seed-large";
@@ -28,6 +28,8 @@ export async function seedDevData(file: string, extra?: SeedExtra): Promise<"cre
  */
 export async function resetDevData(file: string, extra?: SeedExtra): Promise<void> {
   assertNotProduction();
+  // slice 35: the old data's baselines go with it (the folder is written again with the new data's)
+  await removeBaselineFolder(file);
   await writeDb(file, seeded(extra));
 }
 

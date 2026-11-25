@@ -7,6 +7,10 @@ import { addChecksDemo } from "@/data/local/seed-checks";
 import { addSalesStar, addStarDerivations, addStarTypes } from "@/modules/infocube/data/sales-star";
 import { addDocumentsDemo } from "@/modules/infodocumenter/data/demo";
 import { DOCUMENT_SECTION_KINDS } from "./documents";
+import { baselineSummary, type BaselineContent, type BaselineInsert } from "@/domain/baseline/content";
+import { baselineNameKey } from "@/domain/baseline/names";
+import { SNAPSHOT_SCHEMA } from "@/domain/baseline/upgrade";
+import { baselineContentOfRows } from "./baselines";
 
 /** The Sales star in "Retail Co – DWH", with InfoMate's InfoCube licence and InfoCube on there. */
 export function addModuleDemoData(db: DevDb, at?: string): boolean {
@@ -74,9 +78,70 @@ export function addDocumentsDemoData(db: DevDb, at?: string): boolean {
   );
 }
 
-/** What the seed, the reset and `npm run demo` write: `addFullDemoData`, then `addDocumentsDemoData` (slice 25). */
+/** The demo's baseline (slice 35): its id, name and the time it was taken (10:12 in Warsaw on 15 September 2026). */
+export const DEMO_BASELINE = {
+  id: "01a0f9e9-2035-7b1a-8c35-5e1f0a7e3501",
+  name: "Stage 1 sign-off",
+  note: "Agreed with Retail Co on 15 September.",
+  at: "2026-09-15T08:12:00.000Z",
+} as const;
+
+/**
+ * Slice 35's demo (PRD "The demo", step 1's Q8 and F14): the baseline "Stage 1 sign-off" of "Retail Co – DWH", taken
+ * from today's demo model by the same rule as every baseline (`baselineContentOfRows`), minus what the prototype says
+ * came later: REQ-105 with its links and `Customer.segment_code` (it has no mapping); with the mapping `customers.cust_no →
+ * Customer.customer_number` still a draft and `customers.cust_no` still `varchar(10)`. Run last by the seed, the reset,
+ * `npm run demo` (`addSeedDemoData`, so `pg:seed` too) and slice 35's fixtures; never by an earlier fixture. No change
+ * event, as the seed's other rows. False when the workspace is not there or the baseline is already.
+ */
+export function addBaselinesDemoData(db: DevDb): boolean {
+  if (db.baseline.some((b) => b.id === DEMO_BASELINE.id)) return false;
+  const now = baselineContentOfRows(db, SEED_IDS.wsRetailDwh);
+  if (!now) return false;
+  const content = structuredClone(now) as { -readonly [K in keyof BaselineContent]: BaselineContent[K] };
+  const m = content.model;
+  const req = content.requirements.find((r) => r.key === "REQ-105");
+  if (req) {
+    content.requirements = content.requirements.filter((r) => r.id !== req.id);
+    content.requirementLinks = content.requirementLinks.filter((k) => k.requirement_id !== req.id);
+  }
+  const customer = m.entities.find((e) => e.name === "Customer" && e.model_level === "logical");
+  const segment = m.attributes.find((a) => a.entity_id === customer?.id && a.name === "segment_code");
+  if (segment) {
+    m.attributes = m.attributes.filter((a) => a.id !== segment.id);
+    content.requirementLinks = content.requirementLinks.filter((k) => k.attribute_id !== segment.id);
+  }
+  const customers = m.sourceTables.find((t) => t.name === "customers");
+  const custNo = m.sourceColumns.find((c) => c.source_table_id === customers?.id && c.name === "cust_no");
+  if (custNo) custNo.type_length = 10;
+  const number = m.attributes.find((a) => a.entity_id === customer?.id && a.name === "customer_number");
+  const fromCustNo = new Set(m.mappingInputs.filter((i) => i.source_column_id === custNo?.id).map((i) => i.mapping_id));
+  const mapping = m.mappings.find((x) => x.attribute_id === number?.id && fromCustNo.has(x.id));
+  if (mapping) Object.assign(mapping, { status: "draft", approved_by: null, approved_at: null });
+  const row: BaselineInsert = {
+    id: DEMO_BASELINE.id,
+    workspace_id: SEED_IDS.wsRetailDwh,
+    version: 1,
+    created_at: DEMO_BASELINE.at,
+    created_by: SEED_USERS.lukasz.id,
+    updated_at: DEMO_BASELINE.at,
+    updated_by: SEED_USERS.lukasz.id,
+    deleted_at: null,
+    name: DEMO_BASELINE.name,
+    name_key: baselineNameKey(DEMO_BASELINE.name),
+    note: DEMO_BASELINE.note,
+    snapshot_schema: SNAPSHOT_SCHEMA,
+    ...baselineSummary(content),
+    snapshot: content,
+  };
+  db.baseline.push(row);
+  return true;
+}
+
+/** What the seed, the reset and `npm run demo` write: `addFullDemoData`, `addDocumentsDemoData` (slice 25), then the baseline (slice 35). */
 export function addSeedDemoData(db: DevDb, at?: string): boolean {
   const added = addFullDemoData(db, at);
   addDocumentsDemoData(db, at);
+  addBaselinesDemoData(db);
   return added;
 }

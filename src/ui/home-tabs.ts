@@ -5,8 +5,11 @@
 
 import type { ReactNode } from "react";
 
-/** The home's own tabs, in order (slice 23: Metadata conventions between People and Settings). */
-export const CORE_HOME_TABS = ["overview", "people", "conventions", "settings"] as const;
+/**
+ * The home's own tabs, in order (slice 23: Metadata conventions between People and Settings; slice 35, B1.1: Baselines
+ * after the modules' tabs and before People).
+ */
+export const CORE_HOME_TABS = ["overview", "baselines", "people", "conventions", "settings"] as const;
 export type CoreHomeTab = (typeof CORE_HOME_TABS)[number];
 
 /** A module's tab on the workspace home: its id in `?tab=` and its test id (`tab-{id}`), its label, and its body. */

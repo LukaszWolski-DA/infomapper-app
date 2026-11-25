@@ -10,8 +10,10 @@ import type { Uuid } from "@/domain/ids";
 import type { HistoryChange, UndoState, UndoStep } from "@/domain/model/undo-history";
 import type { MappingLog } from "@/domain/model/mapping-rules";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
+import type { BaselineContent } from "@/domain/baseline/content";
 import type {
   AppUser,
+  Baseline,
   Canvas,
   CanvasItem,
   ChangeEvent,
@@ -212,6 +214,22 @@ export interface ChangeEventRepository {
  * `apply`'s `history`; these calls read it, and drop a step that can no longer be reverted. Steps whose change group is no
  * longer in the change log (fresh demo data) are left out.
  */
+/**
+ * Baselines (slice 35, D-87): their rows never carry the content (the list reads none); the content is read alone, one
+ * baseline at a time, in its current shape (the upgrade chain and the modules' row rules, `shapedBaselineContent` in
+ * `src/data/baselines.ts`), never written back.
+ */
+export interface BaselineRepository {
+  /** The workspace's live baselines, newest first (`newestBaselineFirst`). */
+  list(workspaceId: Uuid): Promise<Baseline[]>;
+  /** The workspace's baselines, deleted ones too (a command's state: the names it compares). */
+  listAll(workspaceId: Uuid): Promise<Baseline[]>;
+  /** A live baseline, or null. */
+  get(workspaceId: Uuid, baselineId: Uuid): Promise<Baseline | null>;
+  /** A live baseline's content in the current schema, or null. */
+  content(workspaceId: Uuid, baselineId: Uuid): Promise<BaselineContent | null>;
+}
+
 export interface UndoHistoryRepository {
   /** What the pages show: is there something to undo, to redo. Never reads a step's events. */
   state(workspaceId: Uuid, userId: Uuid): Promise<UndoState>;
@@ -254,6 +272,7 @@ export interface DataStore {
   changeEvents: ChangeEventRepository;
   undoHistory: UndoHistoryRepository;
   modules: ModuleRowRepository;
+  baselines: BaselineRepository;
   /**
    * One consistent read of a live workspace (slice 25, F1): its model, requirements, projects and cards, people and the
    * named module tables' live rows, all from one state of the data. Null when the workspace is not live. A table the

@@ -10,6 +10,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { STORE_SCHEMA, UNDO_TABLES } from "@/compose";
+import { BASELINE_FLAGS, BASELINE_MODULE_TABLES } from "@/compose/tables";
+import { contentTables } from "@/domain/baseline/content";
 import { seedDevData } from "@/data/local/dev-data";
 import { readDb } from "@/data/local/file";
 import { CORE_SCHEMA, localSchema, RULES, findViolation, type DevDb } from "@/data/local/schema";
@@ -53,6 +55,22 @@ describe("the table registry against the migrations (slice 15a)", () => {
     // slice 25 (R2-4a2): InfoDocumenter's documents are outside undo, the first module table there
     expect(UNDO_TABLES.outside.has("document_definition")).toBe(true);
     expect(STORE_SCHEMA.undoable).not.toContain("document_definition");
+  });
+});
+
+describe("the baselines' flags (slice 35, the design of 11 November 2026)", () => {
+  it("flag every table a migration creates, and no other", () => {
+    expect(Object.keys(BASELINE_FLAGS).sort()).toEqual(migratedTables().filter((t) => t !== "change_event"));
+  });
+
+  it("put into a baseline exactly the tables its content holds: InfoMapper's fields and the modules' tables flagged in", () => {
+    const flaggedIn = Object.entries(BASELINE_FLAGS).filter(([, f]) => f === "in").map(([t]) => t).sort();
+    expect([...contentTables(), ...BASELINE_MODULE_TABLES].sort()).toEqual(flaggedIn);
+    for (const out of ["label", "label_link", "project_pinned_label", "note", "source_change", "source_import", "workspace", "app_user", "document_definition", "baseline"]) {
+      expect(BASELINE_FLAGS[out], out).toBe("out");
+    }
+    // a baseline is outside undo, as every write of it
+    expect(UNDO_TABLES.outside.has("baseline")).toBe(true);
   });
 });
 

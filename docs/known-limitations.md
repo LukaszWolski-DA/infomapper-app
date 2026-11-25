@@ -2100,3 +2100,22 @@ account form, Set password) asked for the workspace's page twice at once. Since 
 Set password leave by a full page load (`afterSessionChange`), so none of this happens; the two forms that create an
 organization still use the router (`docs/ideas.md`). A test that clicks right after one of these forms waits for the page
 to hydrate (`landed`, `e2e/session-full-load.ts`): the top bar is now drawn before the page's code runs.
+
+## Baselines (slice 35, D-87)
+
+### A long name without spaces runs past the toast
+
+A baseline's name may have 120 characters. A name without spaces (or with a very long word) runs past the right edge of
+the toast "Created the baseline {name}." (and of the rename's and the delete's toasts). The dialogs and the list break
+such a name anywhere (step 5); the toast is the app's shared component (`src/ui/components/toast.tsx`), so it is left for a `fix/` branch
+(shared infrastructure, The slice cycle, 4).
+
+### A comparison is read again for each "Compared with"
+
+Compare… asks the server for the changes each time "Compared with" changes; nothing is kept between two openings. On a
+large workspace each request reads both contents (bench: `scripts/bench-baselines.ts`).
+
+### No page shows a baseline's history
+
+Taking, renaming and deleting a baseline are change events with who and when, but no page lists them yet (D-87;
+`docs/ideas.md`, "A history view of the change log").

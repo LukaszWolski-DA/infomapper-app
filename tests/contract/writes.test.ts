@@ -23,6 +23,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { STORE_SCHEMA, UNDO_TABLES } from "@/compose/tables";
 import { buildWriteSet, type CommandContext, type CommandResult, type Write, type WriteSet } from "@/domain/changes";
 import { addAttribute } from "@/domain/commands/attribute";
+import { createBaseline, deleteBaseline, renameBaseline } from "@/domain/commands/baseline";
+import { baselineContentNow } from "@/compose/baselines";
 import { createConcept } from "@/domain/commands/concept";
 import { createEntity, deleteEntity, updateEntity } from "@/domain/commands/entity";
 import { importSources, importStateOf } from "@/domain/commands/import";
@@ -124,6 +126,14 @@ async function scenario(store: DataStore, ctxOf: (actorId: string) => CommandCon
     answers[name] = answerOf(await store.apply(writeSet, options));
   };
   const anna = await accessOf(store, ANNA);
+
+  // slice 35 (S35-03, S35-05): a baseline taken before every write below; at the end its content is what was taken
+  const lukaszAccess = await accessOf(store, LUKASZ);
+  const taken = (await baselineContentNow(store, RETAIL))!;
+  const baselineState = async () => ({ baselines: await store.baselines.listAll(RETAIL) });
+  const take = ok(createBaseline(ctxOf(LUKASZ), lukaszAccess, await baselineState(), taken, { workspaceId: RETAIL, name: "Contract  Baseline", note: " Before the scenario. " }));
+  await step("baseline: create", take);
+  const baselineId = take.value.baseline.id;
 
   // a concept and an entity on a canvas, then an attribute and a rename (inserts, then a versioned update)
   const concept = ok(createConcept(ctxOf(ANNA), anna, { concepts: (await store.model.load(RETAIL)).concepts }, { name: "Finance" }));
@@ -322,13 +332,39 @@ async function scenario(store: DataStore, ctxOf: (actorId: string) => CommandCon
     };
     await step("use reset link", ok(redeemPasswordReset(ctxOf(ola.id), await redeemState(hex(6)), { tokenHash: hex(6), authUserId: null })));
   }
+
+  // slice 35: the baseline's rename (and a stale one), the unique name past the command's check, an update that carries a
+  // content (refused by both adapters), its delete and its name taken again; its content unchanged by everything above
+  {
+    const ctx = ctxOf(LUKASZ);
+    const b = (await store.baselines.get(RETAIL, baselineId))!;
+    answers["baseline: content unchanged by the writes"] = JSON.stringify(sortedKeys(await store.baselines.content(RETAIL, baselineId))) === JSON.stringify(sortedKeys(taken));
+    const renamed = ok(renameBaseline(ctx, lukaszAccess, await baselineState(), b, { baselineId, expectedVersion: b.version, name: "Contract renamed", note: null }));
+    await step("baseline: rename", renamed);
+    answers["baseline: content unchanged by its rename"] = JSON.stringify(sortedKeys(await store.baselines.content(RETAIL, baselineId))) === JSON.stringify(sortedKeys(taken));
+    await step("baseline: rename, stale", ok(renameBaseline(ctxOf(LUKASZ), lukaszAccess, { baselines: [] }, b, { baselineId, expectedVersion: b.version, name: "Contract stale", note: null })));
+    const now = (await store.baselines.get(RETAIL, baselineId))!;
+    await step("baseline: same name twice", buildWriteSet(ctx, RETAIL, [insert("baseline", { ...now, id: ctx.newId(), created_at: ctx.now, version: 1, snapshot: taken })]));
+    await step("baseline: content rewritten", buildWriteSet(ctx, RETAIL, [update("baseline", now, { ...next(ctx, now, { note: "x" }), snapshot: taken })]));
+    await step("baseline: delete", ok(deleteBaseline(ctx, lukaszAccess, now, { baselineId, expectedVersion: now.version })));
+    await step("baseline: name free again", ok(createBaseline(ctx, lukaszAccess, await baselineState(), taken, { workspaceId: RETAIL, name: "contract renamed" })));
+    answers["baseline: no content read after its delete"] = (await store.baselines.content(RETAIL, baselineId)) === null;
+  }
   return answers;
+}
+
+/** A value with every object's keys sorted (Postgres's jsonb keeps no key order). */
+function sortedKeys(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(sortedKeys);
+  if (v && typeof v === "object") return Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortedKeys((v as Record<string, unknown>)[k])]));
+  return v;
 }
 
 /** A link's token hash as the server hands it on. */
 const hex = (n: number) => n.toString(16).padStart(64, "d");
 
 const EXPECTED: Record<string, unknown> = {
+  "baseline: create": { ok: true },
   "create concept": { ok: true },
   "create entity": { ok: true },
   "add attribute": { ok: true },
@@ -365,6 +401,16 @@ const EXPECTED: Record<string, unknown> = {
   "reset link": { ok: true },
   "reset link again": { ok: true },
   "use reset link": { ok: true },
+  // slice 35
+  "baseline: content unchanged by the writes": true,
+  "baseline: rename": { ok: true },
+  "baseline: content unchanged by its rename": true,
+  "baseline: rename, stale": { ok: false, code: "stale_version", message: "Someone changed this meanwhile." },
+  "baseline: same name twice": { ok: false, code: "conflict", message: "This already exists" },
+  "baseline: content rewritten": { ok: false, code: "invalid", message: "A baseline's content never changes." },
+  "baseline: delete": { ok: true },
+  "baseline: name free again": { ok: true },
+  "baseline: no content read after its delete": true,
 };
 
 describe("the writes on the local adapter (S30-10)", () => {

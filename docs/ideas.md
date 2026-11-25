@@ -1027,7 +1027,9 @@ on release (D-54); and the editor has no narrow screens' overlay (it stacks up t
 - S20-01 line 67: a fixed waitForTimeout(500) after the grain is cleared; wait for what the page shows instead (A race in a test)
 - Next.js upgrade: check whether a newer Next.js (its bundled React) stops the development server from keeping every rendered request (pendingOperations); a separate upgrade decision.
 
-## Baselines: the design agreed for their slice (11 November 2026)
+## Baselines: the design agreed for their slice (11 November 2026), done in slice 35
+
+**Done in slice 35** (D-87, 24 November 2026), with step 1's changes: the content is a projection of the existing one-read snapshot (`store.snapshot`); the list's summary is three counts; KB's backup is `pg:backup` with the contents inline (KB's master is online); InfoDocumenter's documents are out of the content. The design as agreed:
 
 Baselines: the design agreed for their slice (11 November 2026). A baseline's snapshot holds the live rows (for link
 tables, both ends live) of the core, sources, classifications and their links, stereotypes, mappings, requirements and
@@ -1045,6 +1047,23 @@ logged; content immutable; soft delete; read only in an archived workspace. Live
 not drawn from a baseline; later, freezing the labels and label links that drive them (option a). A document from a
 baseline after that slice; a workspace transfer with baselines holding InfoCube rows is a question for the transfer
 slice.
+
+## Baselines: what comes later (slice 35, PRD section 9 and the closing)
+
+- **Documents from a baseline** (slice 36): a document's source a baseline, "Changes since …", the sign-off preset,
+  "Make a document" in Compare, Markdown from a baseline, the documents' count in the delete dialog.
+- **Restore** a baseline into the workspace (or into a new workspace): not in AD-03 yet; a decision first.
+- **Comparing more:** the classification list and the stereotype list themselves (their names, codes, definitions), and
+  InfoCube's own rows (a fact's grain and type, a dimension's history, the unknown member, dimensional mappings).
+- **"Who changed it and when" between two baselines:** each change of a comparison with the people and times of the change
+  events between the two states (the change log is there; a baseline has its taking time).
+- **A history view of the change log:** a page that lists change events (the baselines' create, rename and delete among
+  them); S35-02's "recorded with who and when" is shown by tests only (slice 35, answer 7).
+- **Impact analysis, "what points to this renamed row":** before or after a rename, the rows that name it (mappings,
+  requirement links, documents). Distinct from comparing states: since slice 35's step 5 a comparison shows a rename as
+  one change, on the renamed row, and never on the rows pointing to it.
+- Freezing the labels and label links that drive live label canvases (the design's option a); a workspace transfer or
+  copy with baselines (the transfer slice).
 
 ## The database program: what comes later (slice 29, the walking skeleton)
 
@@ -1161,7 +1180,8 @@ decide.
   at an unchanged zoom (on S6B-04's pan from 45 % to about 10 to 30 % and back in 250 ms); the prototype's `centerOn` pans
   straight at a constant zoom (a CSS transition). For Łukasz to decide: a `fix/` branch with `interpolate: "linear"` on
   the seven animated view changes (`ModelCanvas.tsx`, `GroupActions.ts`, `useFrames.ts`), a visible change of the
-  canvas and shared infrastructure (its own full run).
+  canvas and shared infrastructure (its own full run). **Decided (b), leave it** (Łukasz, 24 November 2026, AD-24's note): it does not
+  bother him; the straight pan may come back later as its own `fix/` branch.
 - **The PDF's Source-to-target writes "Not mapped" into "Target type"** (found in Łukasz's acceptance of step 3): an
   unmapped attribute's row puts the word in the first short column after the target, so the PDF does not show the
   target's type there; the prototype spans the word over the source's columns. The Markdown keeps the type since slice 34

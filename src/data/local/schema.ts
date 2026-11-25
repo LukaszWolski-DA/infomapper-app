@@ -6,6 +6,7 @@
 import type {
   AppUser,
   Attribute,
+  Baseline,
   AttributeInput,
   Canvas,
   CanvasItem,
@@ -147,6 +148,11 @@ export interface DevDb {
   label_link: LabelLink[];
   project_pinned_label: ProjectPinnedLabel[];
   note: Note[];
+  /**
+   * Slice 35 (D-87): the baselines' rows without their content, which `writeDb` keeps in a file of its own per baseline
+   * (`baselineFolder`). A file written before slice 35 has none: read as empty, with no format step (step 1's F7).
+   */
+  baseline: Baseline[];
   change_event: ChangeEvent[];
 }
 
@@ -203,6 +209,7 @@ export const emptyDb = (): DevDb => ({
   label_link: [],
   project_pinned_label: [],
   note: [],
+  baseline: [],
   change_event: [],
 });
 
@@ -591,6 +598,20 @@ export const RULES: Record<DevTable, TableRules> = {
       { name: "note_one_pin_ck", test: (r) => !isSet(r.pin_canvas_item_id) || !isSet(r.pin_frame_id) },
       { name: "note_pinned_not_in_frame_ck", test: (r) => (!isSet(r.pin_canvas_item_id) && !isSet(r.pin_frame_id)) || !isSet(r.frame_id) },
       { name: "note_width_ck", test: (r) => Number.isInteger(r.width) && (r.width as number) >= 160 && (r.width as number) <= 520 },
+    ],
+  },
+  // slice 35 (D-87): baselines, mirroring supabase/migrations/20261124120000_baselines.sql (the content is not in the row)
+  baseline: {
+    key: ["id"],
+    foreignKeys: model,
+    unique: [{ columns: ["workspace_id", "name_key"], live: true }],
+    checks: [
+      { name: "baseline_name_ck", test: (r) => typeof r.name === "string" && r.name === r.name.trim() && r.name.length >= 1 && r.name.length <= 120 },
+      { name: "baseline_note_ck", test: (r) => r.note === null || (typeof r.note === "string" && r.note === r.note.trim() && r.note.length >= 1 && r.note.length <= 1000) },
+      {
+        name: "baseline_counts_ck",
+        test: (r) => [r.entity_count, r.mapping_count, r.requirement_count, r.snapshot_schema].every((n) => Number.isInteger(n) && (n as number) >= 0) && (r.snapshot_schema as number) >= 1,
+      },
     ],
   },
   change_event: {
