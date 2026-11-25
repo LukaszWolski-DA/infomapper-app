@@ -7,6 +7,8 @@ import { STORE_SCHEMA } from "@/compose";
 import { getDataStore, type DataStore } from "@/data";
 
 export { DOCUMENT_SECTION_KINDS, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES, dimensionalLevelOn, documentStateFor } from "@/compose/documents";
+// slice 36: a document's model from its source, its comparisons and the canvases of its figures
+export { baselineDocumentCounts, baselineRefs, documentCanvases, documentChanges, documentModel, type DocumentModel } from "@/compose/document-model";
 
 /** The store that knows the modules' tables. */
 export const composedStore = (): DataStore => getDataStore(STORE_SCHEMA);

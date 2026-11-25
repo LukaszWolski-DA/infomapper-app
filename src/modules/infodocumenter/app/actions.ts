@@ -6,7 +6,7 @@
 // (`rights.ts`): a guest makes and prints private documents, an archived workspace's are read only.
 
 import { revalidatePath } from "next/cache";
-import { DOCUMENT_SECTION_KINDS, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES } from "@/app/_lib/documents";
+import { baselineRefs, DOCUMENT_SECTION_KINDS, DOCUMENT_SECTION_TYPES, documentCanvases, documentChanges, documentModel, type DocumentModel } from "@/app/_lib/documents";
 import { loadAccess, modelRead } from "@/app/_lib/model-command";
 import { documentHref } from "@/app/_lib/paths";
 import { runCommand, type ActionResult, type Saved } from "@/app/_lib/run-command";
@@ -17,11 +17,13 @@ import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type { ModuleTable } from "@/domain/types";
-import { diagramCanvases } from "../domain/figures";
+import type { SectionChanges } from "@/domain/document/state";
 import { openRefusal } from "../domain/rights";
 import { browserSnapshot } from "./snapshot";
 import {
   addDocumentSection,
+  createChangesDocument,
+  type CreateChangesDocumentInput,
   moveDocumentSection,
   removeDocumentSection,
   type AddDocumentSectionInput,
@@ -59,18 +61,41 @@ async function documentCommand<T>(
   return result;
 }
 
-/** Slice 27 (D9): the canvases of the chosen projects (every project's, then the rest, when none), in order, for Diagrams' figures. */
-async function scopeCanvases(store: DataStore, workspaceId: Uuid, chosen: readonly Uuid[]): Promise<Uuid[]> {
-  const projects = await store.projects.list(workspaceId);
-  const links = (await Promise.all(projects.map((p) => store.canvases.listLinksOfProject(workspaceId, p.id)))).flat();
-  // with no project chosen, the canvases in no project too (step 4)
-  return diagramCanvases(projects, links, chosen, chosen.length ? [] : await store.canvases.list(workspaceId));
+/**
+ * Slice 27 (D9): the canvases of the chosen projects (every project's, then the rest, when none), in order, for Diagrams'
+ * figures; slice 36 (F6): the source's, a baseline's from its content.
+ */
+async function scopeCanvases(store: DataStore, workspaceId: Uuid, chosen: readonly Uuid[], baselineId: Uuid | null = null): Promise<Uuid[]> {
+  return (await documentCanvases(store, workspaceId, { baselineId }, chosen)).order;
 }
 
-/** New document (D13): a private document from the preset; the page then opens its form. */
+/** A document's baseline, while its source is one. */
+const baselineOf = (doc: Pick<DocumentDefinition, "source_kind" | "baseline_id"> | null): Uuid | null => (doc?.source_kind === "baseline" ? doc.baseline_id : null);
+
+/**
+ * New document (D13): a private document from the preset; the page then opens its form. Slice 36: the sign-off preset and
+ * "New document from it" (`baselineId`) are made from a baseline, their figures from its canvases.
+ */
 export async function createDocumentAction(input: CreateDocumentInput): Promise<ActionResult<{ documentId: Uuid; href: string }>> {
   return documentCommand(input, async (access, _doc, store, ctx) => {
-    const r = createDocument(ctx, access, input, DOCUMENT_SECTION_KINDS, await scopeCanvases(store, access.workspace.id, []));
+    const baselines = await baselineRefs(store, access.workspace.id);
+    const given = typeof input?.baselineId === "string" ? input.baselineId : null;
+    const from = given ?? (input?.preset === "signoff" ? (baselines[0]?.id ?? null) : null);
+    const canvases = await scopeCanvases(store, access.workspace.id, [], from && baselines.some((b) => b.id === from) ? from : null);
+    const r = createDocument(ctx, access, input, DOCUMENT_SECTION_KINDS, canvases, baselines);
+    return r.ok ? { ...r, value: { documentId: r.value.document.id, href: documentHref(access.workspace.id, r.value.document.id) } } : r;
+  });
+}
+
+/** Slice 36 (S36-01): a baseline's row's "New document from it": the sign-off preset from that baseline. */
+export async function createDocumentFromBaselineAction(input: { workspaceId: string; baselineId: string }): Promise<ActionResult<{ documentId: Uuid; href: string }>> {
+  return createDocumentAction({ workspaceId: input?.workspaceId, baselineId: input?.baselineId, preset: "signoff" });
+}
+
+/** Slice 36 (B4.6): the Compare dialog's "Make a document"; the page then opens the editor. */
+export async function createChangesDocumentAction(input: CreateChangesDocumentInput): Promise<ActionResult<{ documentId: Uuid; href: string }>> {
+  return documentCommand(input, async (access, _doc, store, ctx) => {
+    const r = createChangesDocument(ctx, access, input, DOCUMENT_SECTION_KINDS, await baselineRefs(store, access.workspace.id));
     return r.ok ? { ...r, value: { documentId: r.value.document.id, href: documentHref(access.workspace.id, r.value.document.id) } } : r;
   });
 }
@@ -78,12 +103,17 @@ export async function createDocumentAction(input: CreateDocumentInput): Promise<
 /** One field of the form (the name, the audience, a title page field, a scope part, a section's switch or options). */
 export async function updateDocumentAction(input: UpdateDocumentInput): Promise<ActionResult<Saved>> {
   return documentCommand(input, async (access, doc, store, ctx) => {
-    // slice 27: a figure added must show a canvas (or a frame of it) of this workspace; read only for a figures' save
-    const options = (input as { section?: { options?: unknown } } | null)?.section?.options;
+    // slice 27: a figure added must show a canvas (or a frame of it) of the document's source (slice 36, F6: a
+    // baseline's own canvases); read only for a figures' save
+    const given = input as { section?: { options?: unknown }; source?: unknown } | null;
+    const options = given?.section?.options;
     const figures = typeof options === "object" && options !== null && "figures" in options;
-    const [canvasRows, frameRows] = figures ? await Promise.all([store.canvases.list(access.workspace.id), store.frames.list(access.workspace.id)]) : [[], []];
-    const canvases = { canvasIds: new Set<string>(canvasRows.map((c) => c.id)), frameCanvas: new Map<string, string>(frameRows.map((f) => [f.id, f.canvas_id])) };
-    const r = updateDocument(ctx, access, doc, input, DOCUMENT_SECTION_KINDS, canvases);
+    const none = { canvasIds: new Set<string>(), frameCanvas: new Map<string, string>() };
+    const canvases = figures ? await documentCanvases(store, access.workspace.id, { baselineId: baselineOf(doc) }, []) : none;
+    // slice 36: a source or a "Compared with" chosen must be a live baseline of the workspace
+    const chooses = given?.source !== undefined || (typeof options === "object" && options !== null && "against" in options);
+    const baselines = chooses ? await baselineRefs(store, access.workspace.id) : [];
+    const r = updateDocument(ctx, access, doc, input, DOCUMENT_SECTION_KINDS, canvases, baselines);
     return r.ok ? { ...r, value: { version: r.value.document.version } } : r;
   });
 }
@@ -122,7 +152,7 @@ export async function addDocumentSectionAction(input: AddDocumentSectionInput): 
   return documentCommand(input, async (access, doc, store, ctx) => {
     // slice 27 (D9): a new Diagrams gets one figure per canvas of the document's scope
     const diagrams = (input as { type?: unknown } | null)?.type === "diagrams";
-    const canvasIds = diagrams && doc ? await scopeCanvases(store, access.workspace.id, doc.scope.projects) : [];
+    const canvasIds = diagrams && doc ? await scopeCanvases(store, access.workspace.id, doc.scope.projects, baselineOf(doc)) : [];
     const r = addDocumentSection(ctx, access, doc, input, DOCUMENT_SECTION_TYPES, canvasIds);
     return r.ok ? { ...r, value: { version: r.value.document.version, sectionId: r.value.sectionId } } : r;
   });
@@ -144,26 +174,42 @@ export async function moveDocumentSectionAction(input: MoveDocumentSectionInput)
   });
 }
 
+// ---- slice 36: a document's model from its source ----
+
+/** What the editor reads once when it opens (and again after its source changes): the model as the browser may hold it. */
+export type DocumentModelAnswer = Omit<DocumentModel, "snapshot"> & { snapshot: WorkspaceSnapshot<ModuleTable> };
+
 /**
- * The editor's model, read once when it opens (D7): one snapshot of the workspace (F1) with the document's tables, as
- * the browser may hold it (`browserSnapshot`: no e-mail address, no member rows). Only for a document the person may
- * open; a read, no write.
+ * The editor's model from the document's source (Q1): the live model, or a baseline's content read back as a snapshot,
+ * as the browser may hold it (`browserSnapshot`), with the workspace's live baselines and the changes sections'
+ * comparisons made here (Q3). Only for a document the person may open; a read, no write.
  */
-export async function documentSnapshotAction(input: { workspaceId: string; documentId: string }): Promise<ActionResult<WorkspaceSnapshot<ModuleTable>>> {
-  // slice 29 (Q9): with INFOMAPPER_TIMING=1 one log line of numbers (no id, name or value): the reads and the bytes
+export async function documentModelAction(input: { workspaceId: string; documentId: string }): Promise<ActionResult<DocumentModelAnswer>> {
   return withTiming(
-    () => snapshotFor(input),
+    () =>
+      modelRead(input?.workspaceId, async (access, _model, store) => {
+        const doc = await documentOf(store, access, input?.documentId);
+        if (!doc || openRefusal(access, doc)) throw new Error("not_found");
+        const model = await documentModel(store, access.workspace, doc);
+        if (!model) throw new Error("not_found");
+        return { ...model, snapshot: browserSnapshot(model.snapshot) };
+      }).catch(() => ({ ok: false as const, code: "not_found" as const, message: "This document is no longer available to you." })),
     (summary, result) =>
-      console.log(`timing ${JSON.stringify({ route: "document-snapshot", ok: result.ok, ...summary, bytes: result.ok ? Buffer.byteLength(JSON.stringify(result.value)) : 0 })}`),
+      console.log(`timing ${JSON.stringify({ route: "document-model", ok: result.ok, ...summary, bytes: result.ok ? Buffer.byteLength(JSON.stringify(result.value)) : 0 })}`),
   );
 }
 
-function snapshotFor(input: { workspaceId: string; documentId: string }): Promise<ActionResult<WorkspaceSnapshot<ModuleTable>>> {
+/**
+ * The comparisons alone (Q3): asked again by the editor after a saved change of what they depend on
+ * (`changesRequestKey`: the source, the scope, a "Compared with", a changes section added or switched), never per
+ * keystroke. Read from the stored recipe.
+ */
+export async function documentChangesAction(input: { workspaceId: string; documentId: string }): Promise<ActionResult<Record<string, SectionChanges>>> {
   return modelRead(input?.workspaceId, async (access, _model, store) => {
     const doc = await documentOf(store, access, input?.documentId);
-    if (openRefusal(access, doc)) throw new Error("not_found");
-    const snapshot = await store.snapshot(access.workspace.id, DOCUMENT_TABLES);
-    if (!snapshot) throw new Error("not_found");
-    return browserSnapshot(snapshot);
+    if (!doc || openRefusal(access, doc)) throw new Error("not_found");
+    const changes = await documentChanges(store, access.workspace, doc);
+    if (!changes) throw new Error("not_found");
+    return changes;
   }).catch(() => ({ ok: false as const, code: "not_found" as const, message: "This document is no longer available to you." }));
 }

@@ -32,7 +32,8 @@ test("S25-03: each preset makes a private document with its sections, and opens 
     ["classreg", true],
   ]);
   await expect(page.getByTestId("editor-section")).toHaveCount(8);
-  await expect(page.getByTestId("text-model-state")).toHaveText("Live model (changes as people work)");
+  // slice 36 (F2): Model state is a select of the live model and the baselines; a new document is from the live model
+  await expect.poll(() => page.getByTestId("select-model-state").evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.textContent)).toBe("Live model (changes as people work)");
 
   const s2t = await fromPreset(page, "s2t");
   // InfoCube is off in this seed: no Dimensional model (D1)

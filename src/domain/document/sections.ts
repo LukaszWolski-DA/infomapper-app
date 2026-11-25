@@ -139,6 +139,11 @@ export interface DocumentSectionType<T extends ModuleTable = ModuleTable> extend
   readonly module: string | null;
   /** Its default heading in each documentation language. */
   readonly label: (language: DocLanguage) => string;
+  /**
+   * Slice 36: a heading from what the section shows, in place of `label` when the entry has none of its own ("Changes
+   * since “Stage 1”").
+   */
+  readonly heading?: (input: Pick<SectionBuildInput<T>, "state" | "options" | "language">) => string;
   /** Its line in the editor's "+ Add section" list and under its options' title (slice 26), in the app's language. */
   readonly description?: string;
   /** Slice 26: a line in place of options, for a type with none to set (the Bus matrix's). */

@@ -7,9 +7,15 @@ import type { ReactNode } from "react";
 import { documentHref } from "@/app/_lib/paths";
 import type { DocLanguage } from "@/domain/types";
 import { DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
+import { LocalMinute } from "@/ui/local-minute";
+import { createdText, metaLine as metaLineOf, type MetaLineRow } from "../domain/document-list";
 import { PRESETS } from "../domain/presets";
 import type { DocumentListRow } from "./load";
 import { NewDocumentButton, RowActions } from "./tab-actions";
+import { BASELINE_TEXTS } from "../domain/commands";
+
+/** Slice 36: why the sign-off preset cannot be chosen (the prototype's). */
+const NO_BASELINE = BASELINE_TEXTS.noBaseline;
 
 export const TAB_TEXTS = {
   label: (n: number) => `Documentation (${n})`,
@@ -22,9 +28,8 @@ export const TAB_TEXTS = {
 
 const languageName = (l: DocLanguage) => DOC_LANGUAGE_OPTIONS.find(([code]) => code === l)?.[1] ?? l;
 
-/** "{audience} · live model · {n} sections · {language} · A4 · by {author}" ("by …" for shared ones only). */
-export const metaLine = (d: Pick<DocumentListRow, "audience" | "sections" | "shared" | "author">, language: DocLanguage): string =>
-  [d.audience, "live model", `${d.sections} section${d.sections === 1 ? "" : "s"}`, languageName(language), "A4", d.shared ? `by ${d.author}` : null].filter(Boolean).join(" · ");
+/** The meta line in the documents' language's name (`domain/document-list.ts`); "created …" is drawn after it. */
+export const metaLine = (d: MetaLineRow, language: DocLanguage): string => metaLineOf(d, languageName(language));
 
 export function DocumentationTab({
   workspaceId,
@@ -32,12 +37,15 @@ export function DocumentationTab({
   documents,
   canCreate,
   canShare,
+  hasBaseline = false,
 }: {
   workspaceId: string;
   language: DocLanguage;
   documents: DocumentListRow[];
   canCreate: boolean;
   canShare: boolean;
+  /** Slice 36: whether the workspace has a live baseline (the sign-off preset is greyed out otherwise). */
+  hasBaseline?: boolean;
 }) {
   const shared = documents.filter((d) => d.shared);
   const mine = documents.filter((d) => !d.shared);
@@ -53,7 +61,9 @@ export function DocumentationTab({
           {d.name}
         </Link>
         <div className="text-[11.5px] text-im-ink-3" data-testid="text-document-meta">
-          {metaLine(d, language)}
+          {metaLine(d, language)} · {createdText("")}
+          {/* B5.1 (a): the time it was made, in the browser's time zone */}
+          <LocalMinute iso={d.created_at} testId="text-document-created" />
         </div>
       </div>
       <RowActions workspaceId={workspaceId} document={{ id: d.id, name: d.name, version: d.version }} rights={d.rights} />
@@ -66,7 +76,12 @@ export function DocumentationTab({
           Documents are generated from the model: their tables come from its objects, so a document is right at the moment it is opened. A{" "}
           <b>document</b> is the recipe; print it to make a PDF.
         </p>
-        {canCreate && <NewDocumentButton workspaceId={workspaceId} presets={PRESETS.map((p) => ({ code: p.code, label: p.label, description: p.description }))} />}
+        {canCreate && (
+          <NewDocumentButton
+            workspaceId={workspaceId}
+            presets={PRESETS.map((p) => ({ code: p.code, label: p.label, description: p.description, off: p.fromBaseline && !hasBaseline ? NO_BASELINE : null }))}
+          />
+        )}
       </div>
       <H3>{TAB_TEXTS.shared}</H3>
       <div data-testid="list-shared-documents">

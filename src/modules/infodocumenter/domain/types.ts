@@ -5,15 +5,13 @@
 import type { Uuid } from "@/domain/ids";
 import type { DocLanguage, StandardColumns } from "@/domain/types";
 
-/** The presets a document is made from (PRD section 3, D1). */
-export const DOCUMENT_PRESETS = ["dictionary", "s2t", "blank"] as const;
+/** The presets a document is made from (PRD section 3, D1); slice 36: the sign-off package, from a baseline. */
+export const DOCUMENT_PRESETS = ["dictionary", "s2t", "signoff", "blank"] as const;
 export type DocumentPreset = (typeof DOCUMENT_PRESETS)[number];
 
-/** Where a document's content comes from: the live model now, a baseline from its own slice (R2-1a, F6). */
+/** Where a document's content comes from: the live model, or a baseline (slice 36, D-88 as proposed). */
 export const SOURCE_KINDS = ["live", "baseline"] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];
-/** The source kinds this slice accepts. */
-export const ACCEPTED_SOURCE_KINDS: readonly SourceKind[] = ["live"];
 
 /** Which mappings a document shows: all (drafts marked), all but drafts, approved only. */
 export const MAPPING_FILTERS = ["all", "notdraft", "approved"] as const;
@@ -103,7 +101,7 @@ export interface DocumentDefinition extends StandardColumns {
   audience: string | null;
   preset: DocumentPreset;
   source_kind: SourceKind;
-  /** Null while baselines do not exist (F6). */
+  /** Slice 36: the baseline, exactly when `source_kind` is `baseline` (it may be deleted since: B3.5). */
   baseline_id: Uuid | null;
   scope: DocumentScope;
   cover: DocumentCover;

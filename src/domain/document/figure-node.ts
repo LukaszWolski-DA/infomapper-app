@@ -20,6 +20,8 @@ export interface FigureNodeWords {
   readonly empty: string;
   readonly noCanvas: string;
   readonly noFrame: string;
+  /** Slice 36 (F5): "{canvas}: label canvases are not drawn from a baseline." */
+  readonly labelCanvas: (canvas: string) => string;
 }
 
 export interface FigureNodeInput {
@@ -51,6 +53,7 @@ export function figureName(snapshot: FigureInput["snapshot"], spec: Pick<FigureS
 export function figureNodes(input: FigureInput, page: FigurePage, words: FigureNodeWords, f: FigureNodeInput): { nodes: DocNode[]; layout: FigureLayout | null } {
   const drawing = figureDrawing(input, f.spec);
   if (drawing.kind === "gone") return { nodes: [{ kind: "paragraph", runs: [warn(figureName(input.snapshot, f.spec, words))] }], layout: null };
+  if (drawing.kind === "label") return { nodes: [{ kind: "paragraph", runs: [warn(words.labelCanvas(drawing.canvas))] }], layout: null };
   if (drawing.kind === "empty") return { nodes: [{ kind: "paragraph", runs: [muted(words.empty)] }], layout: null };
   const layout = figureLayout(drawing.box, drawing.rects, page, f.size, f.orientation, page.smallestPt);
   const n = layout.parts.length;

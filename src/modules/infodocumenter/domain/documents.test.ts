@@ -108,11 +108,15 @@ describe("the rights (PRD item 10, F14 b)", () => {
 
 describe("creating from a preset (D1, D13)", () => {
   it("makes a private document of the person's, of every role, from each preset", () => {
+    // slice 36: the sign-off preset is made from the newest baseline, the others from the live model
+    const BASELINE_ID = "01a0f9e9-2035-7b1a-8c35-5e1f0a7e3599";
+    const baselines = [{ id: BASELINE_ID, name: "Stage 2", created_at: "2026-11-20T10:00:00.000Z" }];
     for (const role of WORKSPACE_ROLES) {
       for (const p of PRESETS) {
-        const r = createDocument(makeCtx(ME), as(role), { workspaceId: ids.ws, preset: p.code }, KINDS);
+        const r = createDocument(makeCtx(ME), as(role), { workspaceId: ids.ws, preset: p.code }, KINDS, [], baselines);
         const d = ok(r).document;
-        expect(d).toMatchObject({ name: p.label, author_id: ME, shared: false, audience: p.audience, preset: p.code, source_kind: "live", baseline_id: null });
+        const source = p.fromBaseline ? { source_kind: "baseline", baseline_id: BASELINE_ID } : { source_kind: "live", baseline_id: null };
+        expect(d).toMatchObject({ name: p.label, author_id: ME, shared: false, audience: p.audience, preset: p.code, ...source });
         expect(d.scope).toEqual({ projects: [], concepts: [], logical: true, dimensional: true, mappings: p.mappings });
         expect(d.cover).toEqual({ title: null, subtitle: null, version: null, status: null, preparedBy: null });
         // slice 26: the module's place holds nothing while InfoCube is off

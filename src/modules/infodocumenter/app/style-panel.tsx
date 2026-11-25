@@ -68,7 +68,8 @@ export const STYLE_TEXTS = {
     ["numbers", "Numbered sections and subsections"],
     ["banded", "Banded table rows"],
     ["runningHeader", "Running header"],
-    ["watermark", "“Draft” mark when from the live model"],
+    // slice 36 (Łukasz, 25 November 2026): the mark works for both sources
+    ["watermark", "“Draft” mark"],
   ] as const,
   headerFooter: "Header and footer",
   fields: [

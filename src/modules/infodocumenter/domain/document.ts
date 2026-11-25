@@ -7,7 +7,7 @@
 
 import type { DocNode } from "@/domain/document/content";
 import type { DocumentSectionType } from "@/domain/document/sections";
-import type { DocumentState } from "@/domain/document/state";
+import type { DocumentSource, DocumentState } from "@/domain/document/state";
 import type { Uuid } from "@/domain/ids";
 import type { DocLanguage, ModuleTable } from "@/domain/types";
 import { documentFigures } from "./figures";
@@ -77,6 +77,13 @@ export interface DocumentTree {
   readonly sections: readonly DocumentTreeSection[];
   /** One line per section that is on and skipped: its module off, or a type no module knows. */
   readonly skipped: readonly { readonly id: Uuid; readonly type: string; readonly text: string }[];
+  /** Slice 36: where the document's model came from (Markdown's front matter names a baseline). */
+  readonly source: DocumentSource;
+  /**
+   * Slice 36 (B3.5): "This document points to a baseline that no longer exists." in place of its content, when its
+   * baseline was deleted (no sections, contents or figures are built); otherwise null.
+   */
+  readonly missing: string | null;
 }
 
 export interface BuildDocumentInput {
@@ -85,11 +92,24 @@ export interface BuildDocumentInput {
   readonly types: ReadonlyMap<string, DocumentSectionType<ModuleTable>>;
   /** The day the live model is read, `yyyy-mm-dd` ("Live model on {d}"). */
   readonly date: string;
+  /**
+   * Slice 36: a baseline's time as the reader sees it ("yyyy-mm-dd hh:mm"); by default in this runtime's time zone, which
+   * is the browser's in the editor (step 1's F7: the document page passes its own).
+   */
+  readonly time?: (iso: string) => string;
+}
+
+const two = (n: number) => String(n).padStart(2, "0");
+/** "yyyy-mm-dd hh:mm" in this runtime's time zone (slice 35's list, the browser's). */
+export function localMinute(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
 }
 
 const orDash = (value: string | null | undefined) => (value?.trim() ? value.trim() : "–");
 
-export function buildDocument({ definition, state, types, date }: BuildDocumentInput): DocumentTree {
+export function buildDocument({ definition, state, types, date, time = localMinute }: BuildDocumentInput): DocumentTree {
   const { snapshot } = state;
   const language = definition.style.language ?? snapshot.workspace.doc_language;
   const t = (key: LabelKey, values?: Readonly<Record<string, string | number>>) => label(language, key, values);
@@ -98,7 +118,10 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
   const title = cover.title?.trim() || definition.name;
   const organization = snapshot.organization?.name ?? "";
   const author = snapshot.people.find((p) => p.id === definition.author_id)?.display_name ?? "";
-  const modelState = t("live", { d: date });
+  // slice 36: the model state's words (D-88 as proposed): a baseline's name and time, or the live model's day
+  const source = state.source;
+  const modelState = source.kind === "baseline" ? t("bl", { n: source.name, d: time(source.created_at) }) : source.kind === "gone" ? "–" : t("live", { d: date });
+  const gone = source.kind === "gone";
 
   const st = definition.style;
   const page = { paper: st.paper, orientation: st.orientation, smallestPt: st.smallestPt, mono: st.colours === "mono" };
@@ -107,7 +130,8 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
   const sections: DocumentTreeSection[] = [];
   const skipped: { id: Uuid; type: string; text: string }[] = [];
   for (const s of definition.sections) {
-    if (!s.on) continue;
+    // slice 36 (B3.5): nothing is built from a baseline that no longer exists, never the live model in its place
+    if (!s.on || gone) continue;
     const type = types.get(s.type);
     if (!type) {
       skipped.push({ id: s.id, type: s.type, text: t("skippedUnknown", { type: s.type }) });
@@ -117,7 +141,7 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
       skipped.push({ id: s.id, type: s.type, text: t("skippedOff", { module: type.module ?? "", section: type.label(language) }) });
       continue;
     }
-    const heading = s.heading?.trim() || type.label(language);
+    const heading = s.heading?.trim() || type.heading?.({ state, options: s.options, language }) || type.label(language);
     // the Compact template runs sections on (the prototype's)
     const newPage = s.newPage && definition.style.template !== "compact";
     const nodes = type.build({ state, scope, options: s.options, language, notation: definition.style.notation, keepRows: definition.style.keepRows, page, figures });
@@ -158,10 +182,12 @@ export function buildDocument({ definition, state, types, date }: BuildDocumentI
       state: modelState,
       date,
       author: cover.preparedBy?.trim() || author,
-    }, `${t("page")} {page} ${t("of")} {pages}`, t("wm")),
+    }, `${t("page")} {page} ${t("of")} {pages}`, source.kind === "baseline" ? t("wmBl", { n: source.name }) : t("wm")),
     style: definition.style,
     sections,
     skipped,
+    source,
+    missing: gone ? t("missing") : null,
   };
 }
 

@@ -9,6 +9,7 @@ import type { WorkspaceAccess } from "@/domain/permissions";
 import type { AppUser } from "@/domain/types";
 import { canSee, documentRights, openRefusal } from "../domain/rights";
 import type { DocumentDefinition } from "../domain/types";
+import { documentOrder } from "../domain/document-list";
 
 /** The `?gone=` the workspace home answers with its toast (`HOME_GONE` in `src/compose/home.tsx`, step 4b). */
 export const GONE_DOCUMENT = "document";
@@ -23,17 +24,25 @@ export interface DocumentListRow {
   author: string;
   rights: ReturnType<typeof documentRights>;
   version: number;
+  /** Slice 36: the baseline it is made from, by name; null for the live model; "" when that baseline is gone. */
+  baseline: string | null;
+  /** Slice 36 (B5.1 a): when it was made, for "created {time}" and the order of documents of the same name. */
+  created_at: string;
 }
 
-const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, "en", { sensitivity: "base" });
 
-/** The documents the person sees, by name: shared ones and their own private ones. */
+/** The documents the person sees, by name (the same name newest first, B5.1 a): shared ones and their own private ones. */
 export async function visibleDocuments(store: DataStore, access: WorkspaceAccess): Promise<DocumentListRow[]> {
   if (!access.member || !access.workspace.infodoc) return [];
-  const [rows, people] = await Promise.all([store.modules.list(access.workspace.id, "document_definition"), store.users.listForWorkspace(access.workspace.id)]);
+  const [rows, people, baselines] = await Promise.all([
+    store.modules.list(access.workspace.id, "document_definition"),
+    store.users.listForWorkspace(access.workspace.id),
+    // slice 36: the meta line names a document's baseline (the rows only, never a content)
+    store.baselines.list(access.workspace.id),
+  ]);
   return rows
     .filter((d) => canSee(access, d))
-    .sort(byName)
+    .sort(documentOrder)
     .map((d) => ({
       id: d.id,
       name: d.name,
@@ -43,6 +52,8 @@ export async function visibleDocuments(store: DataStore, access: WorkspaceAccess
       author: nameOf(people, d.author_id),
       rights: documentRights(access, d),
       version: d.version,
+      baseline: d.source_kind === "baseline" ? (baselines.find((b) => b.id === d.baseline_id)?.name ?? "") : null,
+      created_at: d.created_at,
     }));
 }
 

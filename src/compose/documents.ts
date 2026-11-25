@@ -8,7 +8,7 @@
 
 import { sectionKinds, type DocumentSectionKind, type DocumentSectionType } from "@/domain/document/sections";
 import { NO_FIGURE_CONTRIBUTIONS } from "@/domain/document/figure";
-import { documentStateOf, type DocumentContributions, type DocumentState } from "@/domain/document/state";
+import { documentStateOf, type ChangesLookup, type DocumentContributions, type DocumentSource, type DocumentState } from "@/domain/document/state";
 import type { CheckInput } from "@/domain/model/checks";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type { ModuleTable, Workspace } from "@/domain/types";
@@ -46,7 +46,11 @@ export const DOCUMENT_TABLES: readonly ModuleTable[] = [...new Set<ModuleTable>(
  * since slice 26 their contributions (Q6, F12): InfoCube's role words for the dictionary and its model checks for
  * readiness, while it is on. Pure.
  */
-export function documentStateFor(snapshot: WorkspaceSnapshot<ModuleTable>): DocumentState<ModuleTable> {
+export function documentStateFor(
+  snapshot: WorkspaceSnapshot<ModuleTable>,
+  /** Slice 36: where the snapshot comes from and the changes sections' comparisons. */
+  extra: { readonly source?: DocumentSource; readonly changes?: ChangesLookup } = {},
+): DocumentState<ModuleTable> {
   const cube = snapshot as WorkspaceSnapshot<CubeSectionTable>;
   const on = dimensionalLevelOn(snapshot.workspace);
   const modules: DocumentContributions = {
@@ -56,5 +60,5 @@ export function documentStateFor(snapshot: WorkspaceSnapshot<ModuleTable>): Docu
     // slice 27: InfoCube's roles, feeds and lines on figures, while it is on
     figures: on ? cubeFigureContributions(cube) : NO_FIGURE_CONTRIBUTIONS,
   };
-  return documentStateOf(snapshot, cubeDocumentFeeds(snapshot as WorkspaceSnapshot<(typeof CUBE_FEED_TABLES)[number]>), modules);
+  return documentStateOf(snapshot, cubeDocumentFeeds(snapshot as WorkspaceSnapshot<(typeof CUBE_FEED_TABLES)[number]>), modules, extra);
 }

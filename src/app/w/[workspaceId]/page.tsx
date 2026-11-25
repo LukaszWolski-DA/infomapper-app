@@ -29,8 +29,9 @@ import { BaselinesTab } from "./_components/baselines";
 import { Conventions } from "./_components/conventions";
 import { settingsBoxes } from "@/compose/settings";
 import { HOME_GONE, homeTabs } from "@/compose/home";
+import { baselineExtensions } from "@/compose/baselines-ui";
 import { chosenHomeTab } from "@/ui/home-tabs";
-import { moduleFeeds } from "@/compose";
+import { moduleFeeds, STORE_SCHEMA } from "@/compose";
 import { workspacePeople } from "@/app/_lib/people";
 
 export default async function WorkspaceHomePage({ params, searchParams }: PageProps<"/w/[workspaceId]">) {
@@ -265,6 +266,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
           {tab === "baselines" && (
             <BaselinesTab
               workspaceId={workspace.id}
+              // slice 36 (F1): the modules' buttons and the delete dialog's documents' line, read only for this tab
+              extensions={await baselineExtensions(getDataStore(STORE_SCHEMA), access)}
               workspaceName={workspace.name}
               rights={{ create: canHere("baseline.create"), rename: canHere("baseline.rename"), delete: canHere("baseline.delete") }}
               baselines={baselines.map((b) => ({

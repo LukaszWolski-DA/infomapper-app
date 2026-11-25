@@ -17,7 +17,7 @@ import { createDocumentAction, deleteDocumentAction, duplicateDocumentAction } f
 
 export const NEW_DOCUMENT_TEXT = "Start from a preset; everything can be changed afterwards. A new document is private until you share it.";
 
-export function NewDocumentButton({ workspaceId, presets }: { workspaceId: string; presets: { code: DocumentPreset; label: string; description: string }[] }) {
+export function NewDocumentButton({ workspaceId, presets }: { workspaceId: string; presets: { code: DocumentPreset; label: string; description: string; off?: string | null }[] }) {
   const [open, setOpen] = useState(false);
   const { run, pending } = useAction();
   const router = useRouter();
@@ -40,13 +40,20 @@ export function NewDocumentButton({ workspaceId, presets }: { workspaceId: strin
                 <button
                   key={p.code}
                   type="button"
-                  disabled={pending}
+                  disabled={pending || !!p.off}
+                  title={p.off ?? undefined}
                   data-testid={`button-preset-${p.code}`}
                   onClick={() => void create(p.code)}
-                  className="rounded-lg border border-im-line bg-im-surface px-3 py-2 text-left hover:border-im-logical disabled:opacity-50"
+                  className="rounded-lg border border-im-line bg-im-surface px-3 py-2 text-left hover:border-im-logical disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-im-line"
                 >
                   <b className="block font-semibold">{p.label}</b>
-                  <span className="text-[12px] text-im-ink-2">{p.description}</span>
+                  <span className="block text-[12px] text-im-ink-2">{p.description}</span>
+                  {/* slice 36: the prototype's line under a preset that cannot be chosen yet */}
+                  {p.off && (
+                    <span className="block text-[12px] text-im-warn" data-testid="text-preset-off">
+                      {p.off}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

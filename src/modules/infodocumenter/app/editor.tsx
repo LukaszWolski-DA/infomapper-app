@@ -9,7 +9,11 @@
 // text fields with their draft and their mark (D-66), choices with `useChoice`; the sections' add, remove and move are
 // saves of the row too. Outside undo (D-80).
 //
-// The preview (D7): the page reads the workspace's snapshot once when it opens (`documentSnapshotAction`) and builds the
+// Slice 36: the model comes from the document's source (`documentModelAction`: the live model, or a baseline's content),
+// read again on each switch of "Model state" (F3); the changes sections' comparisons come with it and are asked for again
+// after a saved change of what they depend on (`changesRequestKey`), never per keystroke.
+//
+// The preview (D7): the page reads the workspace's snapshot once when it opens (`documentModelAction`, slice 36) and builds the
 // content tree here, from the stored recipe with the text fields' drafts applied (`useDraft`'s `onType`), about 500 ms
 // after the last keystroke; any other change at once, when its save's page arrives. No cache: each change rebuilds the
 // tree (P6). The selection is the section's id or "doc".
@@ -23,6 +27,11 @@ import { DOCUMENT_SECTION_TYPES, documentStateFor } from "@/app/_lib/document-se
 import { Fold, Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type { DocLanguage, ModuleTable } from "@/domain/types";
+import type { BaselineRef, SectionChanges } from "@/domain/document/state";
+import { classificationIndex, isBuiltin, isDataVault } from "@/domain/model/classifications";
+import { useMinute } from "@/ui/use-minute";
+import { registerKey } from "../domain/sections-sources";
+import { changesPlan, changesRequestKey } from "../domain/sections-changes";
 import { useToast } from "@/ui/components/toast";
 import { DOCUMENT_TEXTS, NAME_REQUIRED, type UpdateDocumentInput } from "../domain/commands";
 import { buildDocument, type DocumentTree } from "../domain/document";
@@ -31,7 +40,9 @@ import type { FigureEntry } from "../domain/sections";
 import type { DocumentDefinition, MappingFilter } from "../domain/types";
 import {
   addDocumentSectionAction,
-  documentSnapshotAction,
+  documentChangesAction,
+  documentModelAction,
+  type DocumentModelAnswer,
   duplicateDocumentAction,
   moveDocumentSectionAction,
   removeDocumentSectionAction,
@@ -83,6 +94,12 @@ export const EDITOR_TEXTS = {
   backTitle: "Back to the Documentation tab",
   print: "Print / PDF",
   documentLine: "Model state, scope, style, cover",
+  // slice 36 (the prototype's Model state, its hint, the note above the preview, `expOff`)
+  baselineOption: (name: string, time: string) => `Baseline “${name}” (${time})`,
+  goneOption: "Baseline no longer exists: choose another source",
+  modelStateHint: "A baseline gives the same document every time; the live model always shows today.",
+  baselineNote: "Tables and diagrams come from the baseline as it was taken. Label canvases are not drawn from a baseline.",
+  goneTitle: "This document points to a baseline that no longer exists. Choose another source under Model state.",
   sections: "Sections",
   addSection: "+ Add section",
   rowTitle: "Double-click to edit",
@@ -113,7 +130,9 @@ const FOLD_KEY = "doc:";
 
 export interface EditorProps {
   workspaceId: string;
-  document: Pick<DocumentDefinition, "id" | "version" | "name" | "audience" | "shared" | "scope" | "cover" | "style" | "sections" | "author_id">;
+  document: Pick<DocumentDefinition, "id" | "version" | "name" | "audience" | "shared" | "scope" | "cover" | "style" | "sections" | "author_id" | "source_kind" | "baseline_id">;
+  /** Slice 36: the workspace's live baselines, newest first, as the page read them (the model's list once it is read). */
+  baselines: BaselineRef[];
   types: EditorSectionType[];
   rights: { edit: boolean; share: boolean; unshare: boolean; delete: boolean; duplicate: boolean };
   archived: boolean;
@@ -158,7 +177,8 @@ const readMode = (): PreviewMode => {
 export const TYPING_PAUSE_MS = 500;
 
 export function DocumentEditor(props: EditorProps) {
-  const { workspaceId, document: doc, types, rights, archived, author, authorMember, projects, concepts, date, testHooks, dimensional, optionContext, workspaceLanguage, userId, panels, server } = props;
+  const { workspaceId, document: doc, types, rights, archived, author, authorMember, date, testHooks, dimensional, workspaceLanguage, userId, panels, server } = props;
+  const minute = useMinute();
   const bodyRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLElement>(null);
   const docPanels = useDocPanels(userId, panels);
@@ -195,30 +215,71 @@ export function DocumentEditor(props: EditorProps) {
     return typeof hook === "number" ? hook : LAYOUT_THRESHOLD_MS;
   }, [testHooks]);
 
-  // ---- the model, read once (D7) ----
-  const [snapshot, setSnapshot] = useState<WorkspaceSnapshot<ModuleTable> | null>(null);
+  // ---- the model, read once per source (D7; slice 36, F3) ----
+  const sourceKey = `${doc.source_kind}:${doc.baseline_id ?? ""}`;
+  const [model, setModel] = useState<{ key: string; asked: string; value: DocumentModelAnswer } | null>(null);
   useEffect(() => {
     let gone = false;
-    void documentSnapshotAction({ workspaceId, documentId: doc.id }).then((r) => {
+    const asked = changesRequestKey(doc);
+    void documentModelAction({ workspaceId, documentId: doc.id }).then((r) => {
       if (gone) return;
-      if (r.ok) setSnapshot(r.value);
+      if (r.ok) setModel({ key: sourceKey, asked, value: r.value });
       else toast(r.message, "refusal");
     });
     return () => {
       gone = true;
     };
-    // once per document: later model changes come with a new page (reload)
+    // once per document and source: later model changes come with a new page (reload)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId, doc.id]);
-  // the document state (the app's indexes over the snapshot), once per snapshot; timed for the reference figures (D7)
-  const [state, setDocState] = useState<{ state: ReturnType<typeof documentStateFor>; ms: number } | null>(null);
+  }, [workspaceId, doc.id, sourceKey]);
+  const current = model?.key === sourceKey ? model.value : null;
+  const snapshot: WorkspaceSnapshot<ModuleTable> | null = current?.snapshot ?? null;
+  const baselines = current?.baselines ?? props.baselines;
+  const source = current?.source ?? null;
+
+  // the comparisons: asked for again when what they depend on changed in a saved change (slice 36, Q3), the latest wins
+  const requestKey = changesRequestKey(doc);
+  const [changes, setChanges] = useState<{ of: DocumentModelAnswer; key: string; value: Readonly<Record<string, SectionChanges>> } | null>(null);
   useEffect(() => {
-    if (!snapshot) return;
+    // the model's own comparisons answer the key it was read with; another key is asked for once, a later one wins
+    if (!model || model.key !== sourceKey || requestKey === model.asked) return;
+    let stale = false;
+    void documentChangesAction({ workspaceId, documentId: doc.id }).then((r) => {
+      if (!stale && r.ok) setChanges({ of: model.value, key: requestKey, value: r.value });
+    });
+    return () => {
+      stale = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one request per key of what the comparisons depend on
+  }, [requestKey, model, sourceKey]);
+  const comparisons = changes && changes.of === current && changes.key === requestKey ? changes.value : (current?.changes ?? {});
+
+  // the document state (the app's indexes over the snapshot), once per snapshot and its comparisons; timed (D7)
+  const [state, setDocState] = useState<{ state: ReturnType<typeof documentStateFor>; ms: number; key: string } | null>(null);
+  useEffect(() => {
+    if (!snapshot || !source) return;
     const started = performance.now();
-    const s = documentStateFor(snapshot);
+    const s = documentStateFor(snapshot, { source, changes: (a) => comparisons[a ?? ""] ?? { kind: "pending" } });
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the state is built once the snapshot came, timed
-    setDocState({ state: s, ms: performance.now() - started });
-  }, [snapshot]);
+    setDocState({ state: s, ms: performance.now() - started, key: sourceKey });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the comparisons are read through their object
+  }, [snapshot, source, comparisons]);
+  const gone = source ? source.kind === "gone" : doc.source_kind === "baseline" && !baselines.some((b) => b.id === doc.baseline_id);
+  // slice 36 (F4): the Scope's and the register's lists from the document's own model once it is read
+  const projects = snapshot ? snapshot.projects.map((p) => ({ id: p.id, name: p.name })) : props.projects;
+  const concepts = snapshot ? snapshot.model.concepts.map((c) => ({ id: c.id, name: c.name })) : props.concepts;
+  const optionContext: OptionContext = useMemo(() => {
+    if (!snapshot) return props.optionContext;
+    const ws = snapshot.workspace;
+    const classifications = classificationIndex(snapshot.model.classifications, snapshot.model.classificationLinks)
+      .list.filter((c) => !isDataVault(c) || ws.dv2_mode)
+      .map((c) => ({ key: registerKey(c), name: c.name, scope: c.scope, own: !isBuiltin(c) }));
+    return { dataVault: ws.dv2_mode, hasNaming: !!ws.naming_conventions?.trim(), classifications };
+  }, [snapshot, props.optionContext]);
+  // slice 36: the changes sections' "Compared with" (the previous baseline of the document's own state)
+  const sourceRef = source?.kind === "baseline" ? source : null;
+  const previousPlan = changesPlan(sourceRef, null, baselines);
+  const previous = previousPlan.kind === "compare" ? previousPlan.older : null;
 
   // ---- the drafts and the recipe the preview draws ----
   const drafts = useRef(new Map<string, TextDraft>());
@@ -244,20 +305,20 @@ export function DocumentEditor(props: EditorProps) {
   };
 
   // the tree: rebuilt on each change of what is drawn (no cache, P6); its build time for the reference figures
-  const [built, setBuilt] = useState<{ tree: DocumentTree; ms: number; n: number } | null>(null);
+  const [built, setBuilt] = useState<{ tree: DocumentTree; ms: number; n: number; key: string } | null>(null);
   useEffect(() => {
     if (!state) return;
     const started = performance.now();
     const tree = buildDocument({ definition: drawn, state: state.state, types: DOCUMENT_SECTION_TYPES, date });
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the tree is built from the recipe drawn, timed (reference figure)
-    setBuilt((before) => ({ tree, ms: performance.now() - started, n: (before?.n ?? 0) + 1 }));
+    setBuilt((before) => ({ tree, ms: performance.now() - started, n: (before?.n ?? 0) + 1, key: state.key }));
   }, [state, drawn, date]);
 
   // slice 34 (D1): the Markdown at the click, from the editor's tree as the preview builds it (the snapshot read when the
   // editor opened, the recipe with the text fields' drafts, so a keystroke still in its typing pause is in it too)
   const [markdown, setMarkdown] = useState<MarkdownShown | null>(null);
   const openMarkdown = () => {
-    if (!state) return;
+    if (!state || gone) return;
     const recipe = withDrafts(docNow.current, drafts.current);
     const tree = buildDocument({ definition: recipe, state: state.state, types: DOCUMENT_SECTION_TYPES, date });
     setMarkdown({ text: documentMarkdown({ tree, name: recipe.name, generated: localTimestamp(new Date()) }), file: markdownFileName(recipe.name) });
@@ -370,6 +431,7 @@ export function DocumentEditor(props: EditorProps) {
     />
   );
 
+  const ready = !!built && built.key === sourceKey;
   const notice = archived ? EDITOR_TEXTS.archived : ro ? (doc.shared ? EDITOR_TEXTS.sharedReadOnly : EDITOR_TEXTS.privateReadOnly) : null;
   const tabHref = `/w/${workspaceId}?tab=docs`;
   return (
@@ -415,10 +477,18 @@ export function DocumentEditor(props: EditorProps) {
             </option>
           ))}
         </select>
-        <button type="button" className={smallButton} data-testid="button-print" disabled={!built} onClick={() => preview.current?.print()}>
+        {/* slice 36 (B3.5, F17): nothing is printed or exported from a baseline that is gone, nor before the source's model came */}
+        <button
+          type="button"
+          className={smallButton}
+          data-testid="button-print"
+          disabled={!ready || gone}
+          title={gone ? EDITOR_TEXTS.goneTitle : undefined}
+          onClick={() => preview.current?.print()}
+        >
           {EDITOR_TEXTS.print}
         </button>
-        <button type="button" className={smallButton} data-testid="button-markdown" disabled={!built} onClick={openMarkdown}>
+        <button type="button" className={smallButton} data-testid="button-markdown" disabled={!ready || gone} title={gone ? EDITOR_TEXTS.goneTitle : undefined} onClick={openMarkdown}>
           {MARKDOWN_TEXTS.button}
         </button>
         <MarkdownDialog shown={markdown} onClose={() => setMarkdown(null)} />
@@ -521,6 +591,7 @@ export function DocumentEditor(props: EditorProps) {
           onSelect={(sec) => choose(sec, false)}
           onOpen={open}
           skipped={skipped}
+          note={doc.source_kind === "baseline" && !gone ? EDITOR_TEXTS.baselineNote : null}
           onStatus={setStatus}
         />
         {/* the tree's builds and the last one's time (reference figures, D7; S26-03 counts the refreshes) */}
@@ -545,7 +616,7 @@ export function DocumentEditor(props: EditorProps) {
               version={doc.version}
               typed={typed}
               hints={state && sectionScope ? sectionHints(state.state, sectionScope, selectedSection.type, selectedSection.options) : {}}
-              context={{ ...optionContext, smallestPt: doc.style.smallestPt }}
+              context={{ ...optionContext, smallestPt: doc.style.smallestPt, baselines, previous, minute }}
               figures={{
                 sources: figureSources,
                 summaries: figureSummaries,
@@ -560,9 +631,15 @@ export function DocumentEditor(props: EditorProps) {
             // panel's sections (remembered per title, D-35); Header and footer and Cover start shut; Sharing last
             <div data-testid="panel-document">
               <H>Model state</H>
-              <div data-testid="text-model-state" className="text-im-ink-2">
-                {EDITOR_TEXTS.modelState}
-              </div>
+              <ModelState
+                version={doc.version}
+                stored={doc.source_kind === "baseline" && doc.baseline_id ? doc.baseline_id : "live"}
+                gone={gone}
+                baselines={baselines}
+                minute={minute}
+                disabled={ro}
+                save={(v) => save({ source: v === "live" ? { kind: "live" } : { kind: "baseline", baselineId: v } })}
+              />
 
               <Fold title="Scope" storeKey={FOLD_KEY} testId="fold-document-scope">
                 <Field label="Projects" hint="None ticked: the whole model. Otherwise what the projects' canvases show.">
@@ -635,6 +712,60 @@ export function DocumentEditor(props: EditorProps) {
 }
 
 type Answer = ReturnType<ReturnType<typeof useAction>["saveRow"]>;
+
+/**
+ * "Model state" (slice 36, the prototype's `data-dsrc`): the live model or a live baseline, newest first, the time in the
+ * browser's time zone; a baseline that is gone shows "Baseline no longer exists: choose another source" until another is
+ * chosen. A choice is a save of the document (B3.2); the hint under it says what each gives.
+ */
+function ModelState({
+  version,
+  stored,
+  gone,
+  baselines,
+  minute,
+  disabled,
+  save,
+}: {
+  version: number;
+  stored: string;
+  gone: boolean;
+  baselines: readonly BaselineRef[];
+  minute: (iso: string) => string;
+  disabled: boolean;
+  save: (v: string) => Answer;
+}) {
+  const choice = useChoice(stored, save, version);
+  const value = gone && choice.value === stored ? "" : choice.value;
+  return (
+    <Field hint={EDITOR_TEXTS.modelStateHint}>
+      {(f) => (
+        <select
+          id={f.id}
+          aria-label="Model state"
+          aria-describedby={f.hintId}
+          data-testid="select-model-state"
+          value={value}
+          disabled={disabled}
+          onChange={(e) => choice.choose(e.currentTarget.value)}
+          className="h-8 w-full rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
+        >
+          {gone && (
+            <option value="" disabled data-testid="option-source-gone">
+              {EDITOR_TEXTS.goneOption}
+            </option>
+          )}
+          <option value="live">{EDITOR_TEXTS.modelState}</option>
+          {baselines.map((b) => (
+            <option key={b.id} value={b.id}>
+              {EDITOR_TEXTS.baselineOption(b.name, minute(b.created_at))}
+            </option>
+          ))}
+        </select>
+      )}
+    </Field>
+  );
+}
 
 /** A section's row on the left: its switch, its name (a module's chip, "off"), up, down, remove. */
 function SectionRow({
