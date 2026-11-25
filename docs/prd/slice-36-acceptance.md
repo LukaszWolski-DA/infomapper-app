@@ -517,3 +517,150 @@ the name cut to 200 (F10), full runs in steps 2, 3 and 6 (F15).
    value, with a test comparing the two.
 
 The technical recommendations (Q1 to Q4, F1 to F18, P1 to P9) stand as Claude's calls, to be quoted at the closing.
+
+## 9. Step 2: the domain and the data (25 November 2026)
+
+PR 95 (draft, `slice/36-documents-from-a-baseline` into `dev`), commits `3f1d7e0`, `15fc306` and `3da88a6` after
+section 8's `2c8f016`: 32 files, 1,571 lines in, 63 out. No connection to `infomapper-dev`, no `pg:migrate` (step 4 is
+Łukasz's). No page shows anything new yet (below, "What differs from the plan", 1).
+
+### What was built, by file
+
+**InfoMapper's domain**
+- `src/domain/baseline/content.ts`: `snapshotOfContent(content, live, moduleTables)` (Q1): the content's model,
+  requirements, projects, canvases, items, frames and module rows; the live workspace's row with the content's four
+  settings over it; today's organization and people; no labels, label links or members. `LiveParts`.
+- `src/domain/baseline/words.ts`: `COMPARE_WORDS.pl` and `.de` (Q5; answer 9), every key of English's.
+- `src/domain/document/state.ts`: `DocumentState.source` (`DocumentSource`: live, a baseline as `BaselineRef`, or gone)
+  and `changes` (`ChangesLookup` by "Compared with", `SectionChanges`: a list with its older and newer state, `none`,
+  `gone`, `pending`); `documentStateOf`'s optional `extra` (without it: live, every comparison pending).
+- `src/domain/document/sections.ts`: `DocumentSectionType.heading`, a heading from what the section shows (used by
+  the changes section), in place of `label` when the entry has none of its own.
+- `src/domain/document/figure.ts`, `figure-node.ts`: `FigureInput.fromBaseline`, the drawing kind `label` and its line
+  (`FigureNodeWords.labelCanvas`, F5).
+
+**InfoDocumenter**
+- `domain/types.ts`: `DOCUMENT_PRESETS` with `signoff` (after `s2t`, before `blank`); `ACCEPTED_SOURCE_KINDS` removed.
+- `domain/presets.ts`: the sign-off preset (`fromBaseline`, audience "Client", every mapping, no draft mark, the
+  thirteen sections, `SIGNOFF_BODY`); `PresetSection.firstFigure` (the overview's figure, the first canvas, captioned
+  "Logical data model" in the document's language); `presetSections`' `language`.
+- `domain/sections.ts`: the kind `changes` (`changesOptions`: `against`, a baseline id or null), after `dq`.
+- `domain/sections-changes.ts` (new): `changesPlan` (which states: the previous baseline in the list's order, a chosen
+  one, the older first, `none`, `gone`), `changesInScope` (Q4's table, either side), `changesRequestKey` (the re-ask
+  key: source, projects, concepts, levels, the "Compared with"s; not the name or "Mappings included"),
+  `changesHeading` (names the older state, answer 4), `buildChanges` and `changesTables` (groups with their counts,
+  P2; Kind, Item, What changed in the document's words; the three messages and "…" while pending).
+- `domain/builders.ts`: the type `changes` registered ("Changes since a baseline", its description, heading, builder).
+- `domain/commands.ts`: `createDocument` takes the live baselines (the sign-off preset from the newest, "Create a
+  baseline first." without one; `baselineId` for "New document from it", named "Documentation of “{name}”", answer 6;
+  a baseline gone meanwhile refused; no draft mark from a baseline, answer 2); `createChangesDocument` ("Make a
+  document": `blank` on the row, the newer state as source, one section against the older, the name cut to 200, F10,
+  F11); `updateDocument`'s `source` and its last argument, the live baselines (a source or a "Compared with" chosen must
+  be one of them, "This baseline no longer exists." otherwise; one kept from before may be gone); `BASELINE_TEXTS`;
+  `documentsFromBaseline` (Q8).
+- `domain/document.ts`: the cover's and the footer's model state "Baseline “{n}” of {d}" with `time` (by default
+  `localMinute`, this runtime's time zone, the browser's in the editor; F7's document page passes its own in step 3),
+  the draft mark "DRAFT · baseline {n}", a section's `heading` from its type, and for a gone baseline no sections,
+  contents or figures with `DocumentTree.missing`; `DocumentTree.source`.
+- `domain/markdown.ts`: the front matter's `source: "baseline"`, `baseline` and `baseline_taken` (the reader's offset
+  from UTC, `localTimestamp`); a gone baseline's line in place of the content.
+- `domain/labels.ts`: `bl`, `wmBl`, `t_changes`, `t_changesType`, `item`, `what`, `noChanges`, `noBase`, `blGone`,
+  `missing`, `labelCanvas`, `figLogical` in English, Polish and German (`kind` was there).
+- `domain/figures.ts`: the label canvas's words; `fromBaseline` from the state's source.
+- `data/tables.ts`: the source check as the SQL's pairing (a baseline's id exactly with a baseline source).
+- `app/actions.ts`: `documentModelAction` (the editor's model from the source, as the browser may hold it, with the
+  live baselines and the comparisons), `documentChangesAction` (the comparisons alone, the re-ask),
+  `createChangesDocumentAction`; `createDocumentAction` with the baselines and a baseline's canvases; the figure save's
+  check and a new Diagrams against the source's canvases (F6); the baselines read only when a save chooses one.
+  `documentSnapshotAction` stays until step 3 switches the editor.
+- `app/tab.tsx`, `app/pages.tsx`: the sign-off preset and the changes type held back from the pages until step 3.
+
+**The composition and the data**
+- `src/compose/document-model.ts` (new): `documentModel` (a live document: one `store.snapshot` and its "now" content
+  from the same read; a baseline's: its content with the live parts; a gone one: an empty model and `gone`), the
+  comparisons (each content read once, `compareBaselines`, `changesInScope` with `sectionScopeOf` on each side),
+  `documentChanges`, `documentCanvases` (a baseline's canvases, label canvases left out of its figures),
+  `baselineDocumentCounts`, `baselineRefs`. Re-exported for the module's app part by `src/app/_lib/documents.ts`.
+- `src/compose/documents.ts`: `documentStateFor`'s optional source and comparisons.
+- `supabase/migrations/20261125120000_document_signoff.sql`: `document_definition_preset_ck` with `signoff`.
+- `docs/data-model-v2.md`: `document_definition`'s `preset`, `source_kind` and `baseline_id`.
+
+**Tests (new)**
+- `src/modules/infodocumenter/domain/baselines.test.ts` (24): the source's switches and refusals (gone, another
+  workspace's, nothing to change, archived, a reader, a "Compared with" chosen or kept); the sign-off preset (sections,
+  options, the overview's figure, no draft mark) and its refusal; "New document from it"; "Make a document" (either
+  order, the name cut to 200); the count; `changesPlan` (previous, ties by the list's order, chosen, newer chosen,
+  gone); the re-ask key; the scope on either side (removed from a scoped project, attributes, mappings, relationships,
+  columns, levels, the module off); the heading and body in Polish; the three messages; the footer, the cover, the draft
+  mark in English and German, the gone baseline's tree, the Markdown front matter.
+- `tests/document-baseline.test.ts` (10), on a fresh demo seed through the local adapter: the content alone (no
+  `Customer.segment_code`, no REQ-105, today's workspace name and people, no labels); a gone baseline; a live document
+  against "Stage 1 sign-off" (S35-04's four changes and the heading); none older, a chosen one gone, the source chosen
+  itself; a project's scope a subset, no level in scope; the sign-off preset from the baseline's canvases, built and
+  written as Markdown; a label canvas not drawn from a baseline but drawn live; the words' keys in three languages and
+  InfoDocumenter's words for the closed values.
+- Contract suite: `tests/contract/writes.test.ts` (the sign-off row from the newest baseline, Anna's private document
+  from it, the source to the live model and back, the SQL's pairing refused by both adapters, the count with another's
+  private document = 2, after the baseline's delete the documents kept and read as gone); `tests/contract/reads.test.ts`
+  (every demo document read as made from each live baseline with a changes section: the source, the comparisons and
+  the Markdown equal on both adapters, and the counts).
+
+### Earlier tests changed, with the reason
+
+| Test | Change | Why |
+| --- | --- | --- |
+| `src/modules/infodocumenter/domain/documents.test.ts`, "makes a private document … from each preset" | passes a baseline list; expects the sign-off preset's source to be that baseline | the fourth preset is made from a baseline (S36-03) |
+| `src/modules/infodocumenter/domain/editor.test.ts`, "drops the page tokens …" | its hand-made state has `source: { kind: "live" }` | `DocumentState.source` is a required field now |
+| `tests/infodocumenter-store.test.ts`, "joins InfoDocumenter's sections and InfoCube's two" | `changes` after `dq` in the kinds' list | the new section type |
+| `tests/contract/writes.test.ts`, the baseline's delete and "name free again" | each on a later clock of its own | the new document steps before them took later clocks; on the same earlier clock the two adapters listed the change events in different orders (Schema's first run on `15fc306` failed on it; the app is not involved) |
+
+`tests/infodocumenter-store.test.ts:95-96` (a baseline source with an unknown id) still passes: the key refuses it.
+No e2e spec changed.
+
+### The checks and the full run (commit `3da88a6`)
+
+- **CI** `check` (lint, typecheck, unit tests): passed. Locally: 212 files, 2,565 tests passed, 14 skipped.
+- **Schema** `migrations` (the schema check, the migration and the contract suite on Postgres) and `smoke`: passed.
+  On `15fc306` `migrations` failed once (the clock above), fixed by `3da88a6`.
+- **Full run** [45578183343](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45578183343) on `3da88a6`
+  (F15: shared infrastructure, the local adapter's rules and `DocumentState`): **897 passed, 0 failed, 0 flaky,
+  16 skipped, 0 expected failures**; about 16 minutes from start to report (08:39 to 08:55 UTC). The run on `15fc306`
+  was cancelled by this one.
+
+| Part | Duration | Heap peak | Peak of threshold (80 %) |
+| --- | ---: | ---: | ---: |
+| 1 | 9 min 23 s | 1,289 MB | 20 % |
+| 2 | 8 min 5 s | 1,439 MB | 22 % |
+| 3 | 12 min 37 s | 1,209 MB | 19 % |
+| 4 | 7 min 54 s | 1,528 MB | 24 % |
+| 5 | 6 min 23 s | 1,544 MB | 24 % |
+| 6 | 7 min 57 s | 1,853 MB | 29 % |
+| 7 | 6 min 36 s | 1,595 MB | 25 % |
+| 8 | 11 min 48 s | 1,191 MB | 19 % |
+| 9 | 3 min 57 s | 1,129 MB | 18 % |
+| 10 | 4 min 42 s | 1,357 MB | 21 % |
+| 11 | 10 min 26 s | 1,248 MB | 19 % |
+
+No restart printed; every part under 2 GB (part 6 the highest, 1,853 MB).
+
+### What differs from the plan
+
+1. **The pages stay as they were.** `PRESETS` and the section types are lists the pages read, so the sign-off preset and
+   "Changes since a baseline" would have shown in "New document" and "+ Add section" without their disabled state and
+   options; `tab.tsx` and `pages.tsx` hold them back until step 3 (two lines, each with a comment).
+2. **New actions beside the old one.** The editor still reads `documentSnapshotAction`; `documentModelAction` (the model
+   from the source, the baselines and the comparisons) and `documentChangesAction` are ready for step 3 to switch to.
+3. **"Make a document" is its own command** (`createChangesDocument`) instead of an option of `createDocument` (F11):
+   its input is the two states, not a preset.
+4. **The documents' count does not depend on InfoDocumenter being on** (step 1's Q8 said 0 while it is off): the documents
+   stay and say their baseline is gone either way, so the delete dialog says so too.
+5. **`DocumentSectionType.heading`** is new in the shared section contract (the changes section's "Changes since
+   “{older}”"); a type without it is unchanged.
+6. **Words taken from InfoDocumenter's labels** (answer 9) differ from Q5's proposed table where `labels.ts` already had
+   them. Polish: a direct mapping "Kopia bezpośrednia" (not "Bezpośrednie"), severity "Blokuje ładowanie" (not "Blokada"),
+   priority Won't "Nie teraz" (not "Nie będzie"). German: "Direkte Übernahme", "Geschäftlicher Bedarf", "Abgestimmt",
+   "Sollte", "Könnte", "Nicht jetzt", "Warnen", "Ladung blockieren" (Q5 had "Direkt", "Geschäftsbedarf", "Vereinbart",
+   "Soll", "Kann", "Nicht", "Warnung", "Blockierend"). `tests/document-baseline.test.ts` compares the two.
+7. **One label more than Q5's table:** `t_changesType`, the type's name in "+ Add section" and its default heading
+   ("Changes since a baseline"; Polish "Zmiany od baseline’u"; German "Änderungen seit einer Baseline", for Łukasz's
+   review).
