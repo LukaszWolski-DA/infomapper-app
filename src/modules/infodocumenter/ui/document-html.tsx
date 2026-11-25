@@ -447,6 +447,17 @@ export function Nodes({ nodes }: { nodes: readonly DocNode[] }) {
  * watermark at the top and the footer fields' text after the last sheet, page numbers as "–" (D8).
  */
 export function DocumentHtml({ tree, id, quick }: { tree: DocumentTree; id?: string; quick?: boolean }) {
+  // slice 36 (B3.5): a document whose baseline is gone shows the line alone, as the prototype's sheet (never the live model)
+  if (tree.missing)
+    return (
+      <div id={id} className={quick ? "dpages dquick" : "dpages"} lang={tree.language} data-testid={quick ? "document-quick" : "document-source"}>
+        <section className="dsheet" data-sec="doc">
+          <p className="dwarn" data-testid="document-missing">
+            {tree.missing}
+          </p>
+        </section>
+      </div>
+    );
   // slice 26, step 4: the style's title page and contents switches; the skipped sections' notes stay without contents
   const notes = tree.skipped.map((s) => (
     <p key={s.id} className="dnote" data-testid="document-skipped">

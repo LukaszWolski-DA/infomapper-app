@@ -1,5 +1,5 @@
 // npx tsx scripts/pg-snapshot-size.ts (slice 29, step 4, Q9): the editor's snapshot as the action answers it
-// (`documentSnapshotAction`: `store.snapshot(workspace, DOCUMENT_TABLES)`, then `browserSnapshot`), read through the
+// (`documentModelAction` since slice 36, for a live document: `store.snapshot(workspace, DOCUMENT_TABLES)`, then `browserSnapshot`), read through the
 // Postgres adapter from the laptop, for each workspace: its JSON's bytes uncompressed, gzip and brotli, against Vercel's
 // 4.5 MB body limit, and the read's time from here (environment 2, so the network to Frankfurt is in it). Counts and
 // sizes only; no value is printed.

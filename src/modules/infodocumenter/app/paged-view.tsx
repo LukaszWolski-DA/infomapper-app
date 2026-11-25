@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { PAGES_SCREEN_CSS } from "../ui/document-css";
 import { FigureImages, imagesReady, removeHolders } from "../ui/figure-images";
 import { loadFigureFonts } from "./figure-fonts";
+import { localTimes, localTimesIn } from "@/ui/local-time";
 
 export const LAYING_OUT = "Laying out pages…";
 export const pagesText = (n: number) => `${n} page${n === 1 ? "" : "s"}`;
@@ -23,7 +24,7 @@ interface PagedPreviewer {
   chunker: { destroy(): void };
 }
 
-export function PagedView({ sourceId, css, print }: { sourceId: string; css: string; print: boolean }) {
+export function PagedView({ sourceId, css, print, printOff = null }: { sourceId: string; css: string; print: boolean; printOff?: string | null }) {
   const host = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<State>({ kind: "laying" });
 
@@ -42,10 +43,12 @@ export function PagedView({ sourceId, css, print }: { sourceId: string; css: str
       if (gone) return;
       images.setFonts(fonts);
       const content = source.cloneNode(true) as Element;
+      // slice 36 (F7): a baseline's time in the browser's time zone, on the cover and in the footer
+      localTimesIn(content);
       images.attach(content);
       removeHolders(content);
       previewer = new Previewer();
-      await previewer.preview(content, [{ "infodocumenter.css": css }], target);
+      await previewer.preview(content, [{ "infodocumenter.css": localTimes(css) }], target);
       if (gone) return;
       // the pages are ready once their figures are decoded (print draws them)
       await imagesReady(target);
@@ -82,7 +85,8 @@ export function PagedView({ sourceId, css, print }: { sourceId: string; css: str
         <button
           type="button"
           data-testid="button-print"
-          disabled={!ready}
+          disabled={!ready || !!printOff}
+          title={printOff ?? undefined}
           onClick={() => window.print()}
           className="h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover disabled:opacity-50"
         >

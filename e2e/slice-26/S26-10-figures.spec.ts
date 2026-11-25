@@ -2,7 +2,7 @@
 // measurement build in headless Chromium. On demand only (skipped unless MEASURE=1):
 //   npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-26/S26-10-figures.spec.ts
 // Per document, LOADS loads of the editor after one warm-up:
-// - the snapshot's answer (`documentSnapshotAction`): its bytes as received and decoded, and every e-mail address-like
+// - the snapshot's answer (`documentModelAction` since slice 36): its bytes as received and decoded, and every e-mail address-like
 //   text in it (D7: none);
 // - the document state's build (`data-state-ms`), the tree's (`data-ms`) and the first layout (`data-layout-ms`).
 // The results go to test-results/s26-measure/ (git-ignored); the acceptance doc quotes them.

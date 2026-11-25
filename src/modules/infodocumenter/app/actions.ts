@@ -6,7 +6,7 @@
 // (`rights.ts`): a guest makes and prints private documents, an archived workspace's are read only.
 
 import { revalidatePath } from "next/cache";
-import { baselineRefs, DOCUMENT_SECTION_KINDS, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES, documentCanvases, documentChanges, documentModel, type DocumentModel } from "@/app/_lib/documents";
+import { baselineRefs, DOCUMENT_SECTION_KINDS, DOCUMENT_SECTION_TYPES, documentCanvases, documentChanges, documentModel, type DocumentModel } from "@/app/_lib/documents";
 import { loadAccess, modelRead } from "@/app/_lib/model-command";
 import { documentHref } from "@/app/_lib/paths";
 import { runCommand, type ActionResult, type Saved } from "@/app/_lib/run-command";
@@ -85,6 +85,11 @@ export async function createDocumentAction(input: CreateDocumentInput): Promise<
     const r = createDocument(ctx, access, input, DOCUMENT_SECTION_KINDS, canvases, baselines);
     return r.ok ? { ...r, value: { documentId: r.value.document.id, href: documentHref(access.workspace.id, r.value.document.id) } } : r;
   });
+}
+
+/** Slice 36 (S36-01): a baseline's row's "New document from it": the sign-off preset from that baseline. */
+export async function createDocumentFromBaselineAction(input: { workspaceId: string; baselineId: string }): Promise<ActionResult<{ documentId: Uuid; href: string }>> {
+  return createDocumentAction({ workspaceId: input?.workspaceId, baselineId: input?.baselineId, preset: "signoff" });
 }
 
 /** Slice 36 (B4.6): the Compare dialog's "Make a document"; the page then opens the editor. */
@@ -167,30 +172,6 @@ export async function moveDocumentSectionAction(input: MoveDocumentSectionInput)
     const r = moveDocumentSection(ctx, access, doc, input);
     return r.ok ? { ...r, value: { version: r.value.document.version } } : r;
   });
-}
-
-/**
- * The editor's model, read once when it opens (D7): one snapshot of the workspace (F1) with the document's tables, as
- * the browser may hold it (`browserSnapshot`: no e-mail address, no member rows). Only for a document the person may
- * open; a read, no write.
- */
-export async function documentSnapshotAction(input: { workspaceId: string; documentId: string }): Promise<ActionResult<WorkspaceSnapshot<ModuleTable>>> {
-  // slice 29 (Q9): with INFOMAPPER_TIMING=1 one log line of numbers (no id, name or value): the reads and the bytes
-  return withTiming(
-    () => snapshotFor(input),
-    (summary, result) =>
-      console.log(`timing ${JSON.stringify({ route: "document-snapshot", ok: result.ok, ...summary, bytes: result.ok ? Buffer.byteLength(JSON.stringify(result.value)) : 0 })}`),
-  );
-}
-
-function snapshotFor(input: { workspaceId: string; documentId: string }): Promise<ActionResult<WorkspaceSnapshot<ModuleTable>>> {
-  return modelRead(input?.workspaceId, async (access, _model, store) => {
-    const doc = await documentOf(store, access, input?.documentId);
-    if (openRefusal(access, doc)) throw new Error("not_found");
-    const snapshot = await store.snapshot(access.workspace.id, DOCUMENT_TABLES);
-    if (!snapshot) throw new Error("not_found");
-    return browserSnapshot(snapshot);
-  }).catch(() => ({ ok: false as const, code: "not_found" as const, message: "This document is no longer available to you." }));
 }
 
 // ---- slice 36: a document's model from its source ----

@@ -4,14 +4,15 @@
 // they can no longer open, or never could, returns to the Documentation tab with "This document is no longer available
 // to you." (step 4b), never a 404 and never "forbidden" (F15). The document page makes one snapshot of the workspace
 // (F1), builds the content tree on the server and renders it as React; only that HTML reaches the browser, never the
-// model or another document. The editor (slice 26, D7) reads its snapshot once from the browser (`documentSnapshotAction`)
+// model or another document. The editor (slice 26, D7) reads its snapshot once from the browser (`documentModelAction` since slice 36)
 // and builds the tree there: the model a member sees on the canvas pages anyway, never another document.
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/app/_components/app-shell";
 import { plexSerif } from "@/app/fonts/plex-serif";
-import { composedStore, dimensionalLevelOn, DOCUMENT_SECTION_TYPES, DOCUMENT_TABLES, documentStateFor } from "@/app/_lib/documents";
+import { baselineRefs, composedStore, dimensionalLevelOn, DOCUMENT_SECTION_TYPES, documentModel, documentStateFor } from "@/app/_lib/documents";
+import { timeToken } from "@/ui/local-time";
 import { classificationIndex, isBuiltin, isDataVault } from "@/domain/model/classifications";
 import { registerKey } from "../domain/sections-sources";
 import { loadAccess } from "@/app/_lib/model-command";
@@ -53,6 +54,9 @@ const backLink = (workspaceId: string) => (
   </Link>
 );
 
+/** Slice 36 (F17): why a document whose baseline is gone is not printed (the editor's words). */
+const GONE_PRINT_TITLE = "This document points to a baseline that no longer exists. Choose another source under Model state.";
+
 /** The day the live model is read, in the server's time zone: "Live model on {d}". */
 const today = () => new Date().toLocaleDateString("sv-SE");
 
@@ -60,16 +64,17 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
   const workspaceId = shell.workspace.id;
   const { access, doc } = await documentOrBack(workspaceId, documentId, shell.user.id);
   const store = composedStore();
-  const [projects, model, people, authorMember] = await Promise.all([
+  const [projects, model, people, authorMember, baselines] = await Promise.all([
     store.projects.list(workspaceId),
     store.model.load(workspaceId),
     store.users.listForWorkspace(workspaceId),
     store.workspaces.getMember(workspaceId, doc.author_id),
+    // slice 36: "Model state"'s and "Compared with"'s baselines (names and times only, no content)
+    baselineRefs(store, workspaceId),
   ]);
   const language = doc.style.language ?? access.workspace.doc_language;
   // every registered type, in their order: InfoDocumenter's, then the modules' (the prototype's "+ Add section")
-  // slice 36, step 2: "Changes since a baseline" joins "+ Add section" with its options in step 3 (the pages unchanged until then)
-  const types: EditorSectionType[] = [...DOCUMENT_SECTION_TYPES.values()].filter((t) => t.type !== "changes").map((t) => ({
+  const types: EditorSectionType[] = [...DOCUMENT_SECTION_TYPES.values()].map((t) => ({
     type: t.type,
     name: t.label("en"),
     description: t.description ?? "",
@@ -102,7 +107,10 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
             style: doc.style,
             sections: doc.sections,
             author_id: doc.author_id,
+            source_kind: doc.source_kind,
+            baseline_id: doc.baseline_id,
           }}
+          baselines={baselines}
           types={types}
           rights={documentRights(access, doc)}
           archived={access.workspace.archived_at !== null}
@@ -127,9 +135,12 @@ export async function DocumentEditorPage({ shell, documentId }: { shell: ShellDa
 export async function DocumentViewPage({ shell, documentId, print }: { shell: ShellData; documentId: string; print: boolean }) {
   const workspaceId = shell.workspace.id;
   const { access, doc } = await documentOrBack(workspaceId, documentId, shell.user.id);
-  const snapshot = await composedStore().snapshot(workspaceId, DOCUMENT_TABLES);
-  if (!snapshot) redirect(`${tabHref(workspaceId)}&gone=${GONE_DOCUMENT}`);
-  const tree = buildDocument({ definition: doc, state: documentStateFor(snapshot), types: DOCUMENT_SECTION_TYPES, date: today() });
+  // slice 36: the model from the document's source (a baseline's content, never the live model in place of a gone one),
+  // a baseline's time left for the browser to write in its own time zone (F7)
+  const model = await documentModel(composedStore(), access.workspace, doc);
+  if (!model) redirect(`${tabHref(workspaceId)}&gone=${GONE_DOCUMENT}`);
+  const state = documentStateFor(model.snapshot, { source: model.source, changes: (a) => model.changes[a ?? ""] ?? { kind: "pending" } });
+  const tree = buildDocument({ definition: doc, state, types: DOCUMENT_SECTION_TYPES, date: today(), time: timeToken });
   const sourceId = `document-source-${doc.id}`;
   return (
     <AppShell shell={shell} trail={trail(workspaceId, doc, true)}>
@@ -147,7 +158,7 @@ export async function DocumentViewPage({ shell, documentId, print }: { shell: Sh
           <div hidden id={sourceId}>
             <DocumentHtml tree={tree} />
           </div>
-          <PagedView sourceId={sourceId} css={documentCss(tree.frame, tree.style)} print={print} />
+          <PagedView sourceId={sourceId} css={documentCss(tree.frame, tree.style)} print={print && !tree.missing} printOff={tree.missing ? GONE_PRINT_TITLE : null} />
         </div>
       </div>
     </AppShell>

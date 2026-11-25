@@ -23,6 +23,8 @@ export interface DocumentListRow {
   author: string;
   rights: ReturnType<typeof documentRights>;
   version: number;
+  /** Slice 36: the baseline it is made from, by name; null for the live model; "" when that baseline is gone. */
+  baseline: string | null;
 }
 
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, "en", { sensitivity: "base" });
@@ -30,7 +32,12 @@ const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompar
 /** The documents the person sees, by name: shared ones and their own private ones. */
 export async function visibleDocuments(store: DataStore, access: WorkspaceAccess): Promise<DocumentListRow[]> {
   if (!access.member || !access.workspace.infodoc) return [];
-  const [rows, people] = await Promise.all([store.modules.list(access.workspace.id, "document_definition"), store.users.listForWorkspace(access.workspace.id)]);
+  const [rows, people, baselines] = await Promise.all([
+    store.modules.list(access.workspace.id, "document_definition"),
+    store.users.listForWorkspace(access.workspace.id),
+    // slice 36: the meta line names a document's baseline (the rows only, never a content)
+    store.baselines.list(access.workspace.id),
+  ]);
   return rows
     .filter((d) => canSee(access, d))
     .sort(byName)
@@ -43,6 +50,7 @@ export async function visibleDocuments(store: DataStore, access: WorkspaceAccess
       author: nameOf(people, d.author_id),
       rights: documentRights(access, d),
       version: d.version,
+      baseline: d.source_kind === "baseline" ? (baselines.find((b) => b.id === d.baseline_id)?.name ?? "") : null,
     }));
 }
 

@@ -10,6 +10,10 @@ import { DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
 import { PRESETS } from "../domain/presets";
 import type { DocumentListRow } from "./load";
 import { NewDocumentButton, RowActions } from "./tab-actions";
+import { BASELINE_TEXTS } from "../domain/commands";
+
+/** Slice 36: why the sign-off preset cannot be chosen (the prototype's). */
+const NO_BASELINE = BASELINE_TEXTS.noBaseline;
 
 export const TAB_TEXTS = {
   label: (n: number) => `Documentation (${n})`,
@@ -22,9 +26,12 @@ export const TAB_TEXTS = {
 
 const languageName = (l: DocLanguage) => DOC_LANGUAGE_OPTIONS.find(([code]) => code === l)?.[1] ?? l;
 
-/** "{audience} · live model · {n} sections · {language} · A4 · by {author}" ("by …" for shared ones only). */
-export const metaLine = (d: Pick<DocumentListRow, "audience" | "sections" | "shared" | "author">, language: DocLanguage): string =>
-  [d.audience, "live model", `${d.sections} section${d.sections === 1 ? "" : "s"}`, languageName(language), "A4", d.shared ? `by ${d.author}` : null].filter(Boolean).join(" · ");
+/** Slice 36: the source in the meta line, the prototype's: "live model", "from baseline “{name}”" or "from baseline (missing)". */
+export const sourceText = (baseline: string | null | undefined): string => (baseline == null ? "live model" : baseline ? `from baseline “${baseline}”` : "from baseline (missing)");
+
+/** "{audience} · {source} · {n} sections · {language} · A4 · by {author}" ("by …" for shared ones only). */
+export const metaLine = (d: Pick<DocumentListRow, "audience" | "sections" | "shared" | "author"> & { baseline?: string | null }, language: DocLanguage): string =>
+  [d.audience, sourceText(d.baseline), `${d.sections} section${d.sections === 1 ? "" : "s"}`, languageName(language), "A4", d.shared ? `by ${d.author}` : null].filter(Boolean).join(" · ");
 
 export function DocumentationTab({
   workspaceId,
@@ -32,12 +39,15 @@ export function DocumentationTab({
   documents,
   canCreate,
   canShare,
+  hasBaseline = false,
 }: {
   workspaceId: string;
   language: DocLanguage;
   documents: DocumentListRow[];
   canCreate: boolean;
   canShare: boolean;
+  /** Slice 36: whether the workspace has a live baseline (the sign-off preset is greyed out otherwise). */
+  hasBaseline?: boolean;
 }) {
   const shared = documents.filter((d) => d.shared);
   const mine = documents.filter((d) => !d.shared);
@@ -66,8 +76,12 @@ export function DocumentationTab({
           Documents are generated from the model: their tables come from its objects, so a document is right at the moment it is opened. A{" "}
           <b>document</b> is the recipe; print it to make a PDF.
         </p>
-        {/* slice 36, step 2: the sign-off preset joins the dialog with its disabled state in step 3 */}
-        {canCreate && <NewDocumentButton workspaceId={workspaceId} presets={PRESETS.filter((p) => !p.fromBaseline).map((p) => ({ code: p.code, label: p.label, description: p.description }))} />}
+        {canCreate && (
+          <NewDocumentButton
+            workspaceId={workspaceId}
+            presets={PRESETS.map((p) => ({ code: p.code, label: p.label, description: p.description, off: p.fromBaseline && !hasBaseline ? NO_BASELINE : null }))}
+          />
+        )}
       </div>
       <H3>{TAB_TEXTS.shared}</H3>
       <div data-testid="list-shared-documents">

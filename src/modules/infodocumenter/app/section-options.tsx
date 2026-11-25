@@ -34,6 +34,12 @@ export interface OptionContext {
   hasNaming: boolean;
   /** The workspace's classifications as the register keys them, in list order (Data Vault ones only in its mode). */
   classifications: readonly { key: string; name: string; scope: "column" | "table"; own: boolean }[];
+  /** Slice 36: the workspace's live baselines, newest first, for a changes section's "Compared with". */
+  baselines?: readonly { id: string; name: string; created_at: string }[];
+  /** Slice 36: the previous baseline of the document's own state ("Previous baseline: {name} ({time})"), or none. */
+  previous?: { name: string; created_at: string } | null;
+  /** Slice 36: a baseline's time in the browser's time zone ("" until it is known). */
+  minute?: (iso: string) => string;
 }
 
 type Pairs = readonly (readonly [string, string])[];
@@ -42,6 +48,8 @@ type FieldSpec =
   | { kind: "checks"; key: string; label?: string; items: Pairs; hint?: string }
   | { kind: "seg"; key: string; label: string; items: Pairs; hints?: Readonly<Record<string, string>> }
   | { kind: "select"; key: string; label: string; items: readonly (readonly [number, string])[]; hint?: string }
+  /** Slice 36: a select of ids, "" for null (a changes section's "Compared with"); a stored id not offered shows `gone`. */
+  | { kind: "choice"; key: string; label: string; items: Pairs; gone: string; hint?: string }
   | { kind: "text"; key: string; label: string; placeholder: string; hint: string }
   | { kind: "hint"; text: string }
   /** Slice 28 (finding 7): a group label above the options after it. */
@@ -120,7 +128,31 @@ export const OPTION_TEXTS = {
   own: "own",
 } as const;
 
+/** Slice 36: the changes section's words in the editor (the prototype's). */
+export const CHANGES_OPTION_TEXTS = {
+  label: "Compared with",
+  previous: (name: string, time: string) => `Previous baseline: ${name} (${time})`,
+  noPrevious: "Previous baseline (none yet)",
+  gone: "Baseline no longer exists",
+  hint: "Compares that baseline with the document's own model state; the older one is always the starting point.",
+} as const;
+
 const SPECS: Record<string, Spec> = {
+  // slice 36 (B4.1): empty means the previous baseline, named; or any live baseline, newest first
+  changes: (_o, cx) => {
+    const minute = cx.minute ?? (() => "");
+    const previous = cx.previous ? CHANGES_OPTION_TEXTS.previous(cx.previous.name, minute(cx.previous.created_at)) : CHANGES_OPTION_TEXTS.noPrevious;
+    return [
+      {
+        kind: "choice",
+        key: "against",
+        label: CHANGES_OPTION_TEXTS.label,
+        items: [["", previous], ...(cx.baselines ?? []).map((b) => [b.id, `${b.name} (${minute(b.created_at)})`] as const)],
+        gone: CHANGES_OPTION_TEXTS.gone,
+        hint: CHANGES_OPTION_TEXTS.hint,
+      },
+    ];
+  },
   overview: () => [
     { kind: "figures", key: "figures", label: "Figures (e.g. the logical data model)" },
     {
@@ -383,6 +415,37 @@ export function SectionOptions(props: {
                     </select>
                   )}
                 </Choice>
+                )}
+              </Field>
+            );
+          case "choice":
+            return (
+              <Field key={`${id}-${i}`} label={f.label} hint={f.hint}>
+                {(ids) => (
+                  <Choice version={version} stored={typeof o[f.key] === "string" ? (o[f.key] as string) : ""} save={(v) => save({ [f.key]: v || null })}>
+                    {(value, pick) => (
+                      <select
+                        id={ids.id}
+                        aria-describedby={ids.hintId}
+                        data-testid={`select-${type}-${f.key}`}
+                        value={value}
+                        disabled={readOnly}
+                        onChange={(e) => pick(e.currentTarget.value)}
+                        className="h-8 w-full rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
+                      >
+                        {value && !f.items.some(([v]) => v === value) && (
+                          <option value={value} disabled>
+                            {f.gone}
+                          </option>
+                        )}
+                        {f.items.map(([v, l]) => (
+                          <option key={v} value={v}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </Choice>
                 )}
               </Field>
             );

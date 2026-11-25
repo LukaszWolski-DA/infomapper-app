@@ -21,7 +21,7 @@ const DOCUMENTATION: HomeTabSource = {
   id: "docs",
   shown: (access) => access.workspace.infodoc && access.member !== null,
   async tab(store, access) {
-    const documents = await visibleDocuments(store, access);
+    const [documents, baselines] = await Promise.all([visibleDocuments(store, access), store.baselines.list(access.workspace.id)]);
     return {
       id: "docs",
       label: TAB_TEXTS.label(documents.length),
@@ -30,6 +30,8 @@ const DOCUMENTATION: HomeTabSource = {
           workspaceId={access.workspace.id}
           language={access.workspace.doc_language}
           documents={documents}
+          // slice 36: the sign-off preset is greyed out while the workspace has no live baseline
+          hasBaseline={baselines.length > 0}
           // slice 29 (Q5): nothing is offered on a server that takes no writes
           canCreate={createRefusal(access) === null}
           canShare={checkPermission(access, "model.edit") === null && checkPermission(access, "module.own_objects") === null}

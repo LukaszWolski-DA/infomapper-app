@@ -4,7 +4,8 @@
 // `askDeleteBaseline`, `compareBaseline`): the intro, the "New baseline" box (owners, admins, modelers), the list newest
 // first with its times in the browser's time zone (Łukasz's answer 1) and the stored counts, and the three dialogs. The
 // comparison runs on the server; the filter and the kind narrow it here. Baselines are outside undo: no Undo in a toast.
-// Slice 36's parts (a document from a baseline, "Make a document", the documents' line on delete) are not here.
+// Slice 36 (F1): the modules' parts come as `extensions` from the composition root (`src/compose/baselines-ui.ts`):
+// InfoDocumenter's "New document from it" in each row, "Make a document" in Compare, the delete dialog's documents' line.
 
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ import { useToast } from "@/ui/components/toast";
 import { CHANGE_KINDS, filterChanges, ITEM_KINDS, type ItemKind } from "@/domain/baseline/compare";
 import { BASELINE_NAME_MAX, BASELINE_NOTE_MAX, BASELINE_GONE_MESSAGE, NAME_REQUIRED_MESSAGE } from "@/domain/baseline/names";
 import { COMPARE_WORDS, whatChanged } from "@/domain/baseline/words";
+import { NO_BASELINE_EXTENSIONS, type BaselineExtensions } from "@/compose/baselines-ui";
 
 const W = COMPARE_WORDS.en;
 
@@ -92,13 +94,18 @@ export function BaselinesTab({
   workspaceName,
   baselines,
   rights,
+  extensions = NO_BASELINE_EXTENSIONS,
 }: {
   workspaceId: string;
   workspaceName: string;
   baselines: BaselineItem[];
   rights: { create: boolean; rename: boolean; delete: boolean };
+  /** Slice 36: what the modules add (none without them). */
+  extensions?: BaselineExtensions;
 }) {
   const minute = useMinute();
+  const opener = useOpener();
+  const row = extensions.rowAction;
   const [renaming, setRenaming] = useState<BaselineItem | null>(null);
   const [deleting, setDeleting] = useState<BaselineItem | null>(null);
   const [comparing, setComparing] = useState<BaselineItem | null>(null);
@@ -131,6 +138,17 @@ export function BaselinesTab({
                 <button type="button" className={smallBtn} data-testid="button-baseline-compare" onClick={() => setComparing(b)}>
                   Compare…
                 </button>
+                {row && (
+                  <button
+                    type="button"
+                    className={smallBtn}
+                    data-testid={row.testId}
+                    disabled={opener.pending}
+                    onClick={() => void opener.open(() => row.run({ workspaceId, baselineId: b.id }))}
+                  >
+                    {row.label}
+                  </button>
+                )}
                 {rights.rename && (
                   <button type="button" className={smallBtn} data-testid="button-baseline-rename" onClick={() => setRenaming(b)}>
                     Rename
@@ -151,10 +169,24 @@ export function BaselinesTab({
         </p>
       )}
       {renaming && <RenameDialog workspaceId={workspaceId} workspaceName={workspaceName} baseline={renaming} taken={minute(renaming.created_at)} onClose={() => setRenaming(null)} />}
-      {deleting && <DeleteDialog workspaceId={workspaceId} workspaceName={workspaceName} baseline={deleting} onClose={() => setDeleting(null)} />}
-      {comparing && <CompareDialog workspaceId={workspaceId} workspaceName={workspaceName} baseline={comparing} baselines={baselines} onClose={() => setComparing(null)} />}
+      {deleting && <DeleteDialog workspaceId={workspaceId} workspaceName={workspaceName} baseline={deleting} documentsLine={extensions.deleteLines[deleting.id] ?? null} onClose={() => setDeleting(null)} />}
+      {comparing && (
+        <CompareDialog workspaceId={workspaceId} workspaceName={workspaceName} baseline={comparing} baselines={baselines} action={extensions.compareAction} onClose={() => setComparing(null)} />
+      )}
     </div>
   );
+}
+
+/** Slice 36: a module's action that makes something and opens it (its answer's page), its refusal as a toast. */
+function useOpener() {
+  const { run, pending } = useAction();
+  const router = useRouter();
+  const open = async (action: () => ReturnType<NonNullable<BaselineExtensions["rowAction"]>["run"]>) => {
+    const r = await run(action as never);
+    if (r.ok) router.push((r.value as { href: string }).href);
+    return r.ok;
+  };
+  return { open, pending };
 }
 
 function NewBaselineBox({ workspaceId }: { workspaceId: string }) {
@@ -337,7 +369,20 @@ function RenameDialog({ workspaceId, workspaceName, baseline: b, taken, onClose 
   );
 }
 
-function DeleteDialog({ workspaceId, workspaceName, baseline: b, onClose }: { workspaceId: string; workspaceName: string; baseline: BaselineItem; onClose: () => void }) {
+function DeleteDialog({
+  workspaceId,
+  workspaceName,
+  baseline: b,
+  documentsLine,
+  onClose,
+}: {
+  workspaceId: string;
+  workspaceName: string;
+  baseline: BaselineItem;
+  /** Slice 36: how many documents are made from it, counted on the server (a number only), or null. */
+  documentsLine: string | null;
+  onClose: () => void;
+}) {
   const { saveRow, pending } = useAction();
   const remove = async () => {
     const r = await saveRow(b, (v) => deleteBaselineAction({ workspaceId, baselineId: b.id, expectedVersion: v }), BASELINE_TEXTS.deleted(b.name), { deletes: true });
@@ -363,13 +408,34 @@ function DeleteDialog({ workspaceId, workspaceName, baseline: b, onClose }: { wo
       <p className="my-[1em]" data-testid="text-delete-baseline">
         It cannot be brought back here.
       </p>
+      {documentsLine && (
+        <p className="my-[1em]" data-testid="text-delete-baseline-documents">
+          {documentsLine}
+        </p>
+      )}
     </WsModal>
   );
 }
 
 const GROUP_CLASS = { added: "text-im-map", changed: "text-im-logical", removed: "text-im-warn" } as const;
 
-function CompareDialog({ workspaceId, workspaceName, baseline: b, baselines, onClose }: { workspaceId: string; workspaceName: string; baseline: BaselineItem; baselines: BaselineItem[]; onClose: () => void }) {
+function CompareDialog({
+  workspaceId,
+  workspaceName,
+  baseline: b,
+  baselines,
+  action,
+  onClose,
+}: {
+  workspaceId: string;
+  workspaceName: string;
+  baseline: BaselineItem;
+  baselines: BaselineItem[];
+  /** Slice 36: a module's "Make a document" (B4.6), or null. */
+  action: BaselineExtensions["compareAction"];
+  onClose: () => void;
+}) {
+  const opener = useOpener();
   const minute = useMinute();
   const router = useRouter();
   const toast = useToast();
@@ -410,9 +476,23 @@ function CompareDialog({ workspaceId, workspaceName, baseline: b, baselines, onC
       testId="dialog-compare-baseline"
       onClose={onClose}
       footer={
-        <button type="button" className={btn} onClick={onClose} data-testid="button-close-compare">
-          Close
-        </button>
+        <>
+          {action && (
+            <button
+              type="button"
+              className={btn}
+              title={action.title}
+              data-testid={action.testId}
+              disabled={opener.pending}
+              onClick={() => void opener.open(() => action.run({ workspaceId, olderId: b.id, newerId: other === "now" ? null : other }))}
+            >
+              {action.label}
+            </button>
+          )}
+          <button type="button" className={btn} onClick={onClose} data-testid="button-close-compare">
+            Close
+          </button>
+        </>
       }
     >
       <div className="mb-2.5 flex flex-wrap items-end gap-2.5">

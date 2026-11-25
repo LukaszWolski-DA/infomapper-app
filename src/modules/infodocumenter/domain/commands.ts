@@ -94,6 +94,14 @@ export const BASELINE_TEXTS = {
   gone: BASELINE_GONE_MESSAGE,
   fromBaseline: (name: string) => `Documentation of “${name}”`,
   changesSince: (older: string, newer: string | null) => (newer === null ? `Changes since “${older}”` : `Changes since “${older}” to “${newer}”`),
+  // the Baselines tab's (the prototype's `blBtn`, `bl-mkdoc` and `askDeleteBaseline`)
+  newFromIt: "New document from it",
+  makeDocument: "Make a document",
+  makeDocumentTitle: "A document from the newer state with one section: Changes since the older one",
+  documentsLine: (n: number) =>
+    n === 1
+      ? "One document is made from it. It stays and says that the baseline no longer exists; its author can choose another source."
+      : `${n.toLocaleString("en-GB")} documents are made from it. They stay and say that the baseline no longer exists; their authors can choose another source.`,
 } as const;
 
 /** A name cut to the longest a document has (F10), as Duplicate does. */

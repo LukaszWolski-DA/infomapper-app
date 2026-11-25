@@ -122,13 +122,15 @@ interface Props {
   onOpen: (sec: string) => void;
   /** The notes on sections skipped while their module is off (`PREVIEW_TEXTS.skipped`). */
   skipped: readonly string[];
+  /** Slice 36: the note above the pages for a document from a baseline (the prototype's `.de-note`), or null. */
+  note?: string | null;
   /** The busy text and the page count, for the top bar. */
   onStatus: (text: string) => void;
 }
 
 type Shown = "none" | "pages" | "quick";
 
-export const DocumentPreview = forwardRef<PreviewHandle, Props>(function DocumentPreview({ tree, mode, zoom, threshold, selected, onSelect, onOpen, skipped, onStatus }, ref) {
+export const DocumentPreview = forwardRef<PreviewHandle, Props>(function DocumentPreview({ tree, mode, zoom, threshold, selected, onSelect, onOpen, skipped, note, onStatus }, ref) {
   const scroller = useRef<HTMLDivElement>(null);
   const pagesBox = useRef<HTMLDivElement>(null);
   const offscreen = useRef<HTMLDivElement>(null);
@@ -389,6 +391,11 @@ export const DocumentPreview = forwardRef<PreviewHandle, Props>(function Documen
           {text}
         </div>
       ))}
+      {note && (
+        <div className="de-note mb-3 rounded-lg bg-im-logical-soft px-3.5 py-2 text-[12.5px]" data-testid="note-baseline">
+          {note}
+        </div>
+      )}
       {/* the source Paged.js lays out: React's DOM, so every model text stays a text node */}
       <div hidden ref={source}>
         {tree && <DocumentHtml tree={tree} />}
@@ -407,7 +414,7 @@ const PREVIEW_CSS = `
 [data-testid="document-pages"] [data-sec]{cursor:pointer}
 [data-testid="document-pages"] .dsec:hover{outline:1px solid #C9D1DA;outline-offset:2mm}
 [data-testid="document-pages"] .dsec.dselsec{outline:1.5px solid #3346C4;outline-offset:2mm}
-@media print{.im-doc-quick,[data-testid="note-stale"],[data-testid="note-skipped"]{display:none!important}}
+@media print{.im-doc-quick,[data-testid="note-stale"],[data-testid="note-skipped"],[data-testid="note-baseline"]{display:none!important}}
 `;
 
 const smallButton = "h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover disabled:opacity-50";
