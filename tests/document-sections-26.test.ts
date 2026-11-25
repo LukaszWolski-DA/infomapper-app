@@ -328,6 +328,23 @@ describe("the dictionary's layouts and long definitions (D1)", () => {
     expect(email.lines.map((l) => l.label)).toEqual(["Mapped from"]);
   });
 
+  it("prints a card's nullable word as the language writes it, never lower-cased (fix/document-words-pl-de)", () => {
+    const base = db();
+    const customerId = base.entity.find((e) => e.workspace_id === WS && e.name === "Customer")!.id;
+    const nullable = base.attribute.find((a) => a.entity_id === customerId && !a.deleted_at && a.is_nullable && !a.is_primary_key)!;
+    const required = base.attribute.find((a) => a.entity_id === customerId && !a.deleted_at && a.is_primary_key)!;
+    const card = (language: DocLanguage, name: string) => {
+      const nodes = flat(one("dict", { layout: "cards", columns: ["attribute", "nullable"], entity: [] }, { db: base, language, scope: { dimensional: false } }).nodes);
+      const at = nodes.findIndex((x) => x.kind === "heading" && x.level === 3 && x.text === "Customer");
+      const cards = nodes.slice(at).find((x): x is Extract<DocNode, { kind: "cards" }> => x.kind === "cards")!;
+      return cards.cards.find((c) => words(c.title) === name)!.props.map(words);
+    };
+    expect(card("en", nullable.name)).toEqual(["nullable"]);
+    expect(card("pl", nullable.name)).toEqual(["może być pusty"]);
+    expect(card("de", nullable.name)).toEqual(["NULL zulässig"]);
+    expect(card("de", required.name)).toEqual([]);
+  });
+
   it("moves a definition over the chosen length to the section's end, with a numbered reference in its place", () => {
     const { nodes, block } = customer({ longDefinitions: 300 });
     const email = tables(block)[0]!.rows.find((r) => words(r.cells[0]) === "email")!;
