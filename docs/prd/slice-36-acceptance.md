@@ -878,3 +878,38 @@ and its three columns. Visible differences, each with its reason:
 
 Łukasz checked the three changes of `216e392`: "created …" in the Documentation list, documents of the same name newest
 first, and the switch "“Draft” mark". **Slice 36's acceptance is complete.**
+
+## 12. Step 6: the closing (25 November 2026)
+
+- **The docs:** `decisions.md` (D-88 and its note; notes on D-80, D-81, D-86 and D-87; AD-39's retention unchanged, "to be
+  checked by Łukasz in Supabase's dashboard"), `data-model-v2.md` (`document_definition`'s `changes` section and the
+  list's order; the baseline's content read for documents), `ideas.md` (documents from a baseline done; what comes
+  later: a "baseline gone" mark in the Documentation list, the Compare dialog's filters in a document, a filter in the
+  changes section, a version "Generate version", freezing labels), `known-limitations.md` (F8),
+  `inventory-prototype-vs-app.md`, README and CLAUDE.md. The lines that still said "ten parts" now say eleven
+  (`scripts/e2e.ts`'s header, CLAUDE.md's "Test runs" bullet and its `--part 2` line, and README's two lines).
+- **The checks** on `9cac281` (the docs' commit; this section's commit after it changes Markdown only): CI `check`,
+  Schema `migrations` and `smoke` passed.
+- **The full run** [45608507924](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45608507924) on
+  `9cac281`: **911 passed, 0 failed, 0 flaky, 16 skipped, 0 expected failures**; about 16 minutes (11:52 to 12:08 UTC).
+
+| Part | Duration | Heap peak | Peak of threshold (80 %) |
+| --- | ---: | ---: | ---: |
+| 1 | 12 min 11 s | 1,391 MB | 22 % |
+| 2 | 11 min 1 s | 1,171 MB | 18 % |
+| 3 | 9 min 9 s | 1,437 MB | 23 % |
+| 4 | 10 min 33 s | 1,189 MB | 18 % |
+| 5 | 9 min 28 s | 1,312 MB | 20 % |
+| 6 | 7 min 47 s | 1,857 MB | 29 % |
+| 7 | 6 min 32 s | 1,453 MB | 23 % |
+| 8 | 12 min 26 s | 1,177 MB | 18 % |
+| 9 | 3 min 51 s | 1,454 MB | 23 % |
+| 10 | 5 min 52 s | 1,039 MB | 16 % |
+| 11 | 10 min 19 s | 1,494 MB | 23 % |
+
+**Part 6 is above 1,850 MB** (1,857 MB, 29 % of its restart threshold, no restart): its folders are `slice-10a` (44 tests,
+173 s), `slice-10b`, `slice-10c`, `slice-11`, `slice-12a` and `slice-12b`, none of which slice 36 changed. Its peak was
+1,853 MB in step 2's run and 1,190 MB in step 3's: the heap peaks include garbage not yet collected (CLAUDE.md, "Heap
+peaks"), far below the 2 GB at which a part is added or the cuts move. Part 11 (`slice-27` to `slice-36`, 10 min 19 s) is
+not the longest in this run (part 8, 12 min 26 s), so the recut rule asks for nothing.
+- **PR 95** is marked ready for review; not merged.
