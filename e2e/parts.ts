@@ -1,4 +1,4 @@
-// The full e2e run in ten parts (chore e2e reliability, P2 B; four since slice 14b; seven since chore CI e2e; eight
+// The full e2e run in eleven parts (chore e2e reliability, P2 B; four since slice 14b; seven since chore CI e2e; eight
 // since chore e2e eight parts, cut in folder order by the median folder times of five full runs in GitHub Actions on
 // slices 17 to 20; recut by chore recut e2e parts on the median folder times of the three full runs on slice 26 and
 // PR 59, with slice-07b and slice-07c, the heaviest folders on the server's heap, in one part of their own folders and
@@ -6,13 +6,13 @@
 // 43903061704, 43964990106 and 44038848793, each part's heap growth under about 1.5 GB; ten since chore e2e recut, cut by the median folder times and retained
 // heap growth of the three full runs 44915828042, 44909278968 and 44897852644, each part's retained heap under about
 // 1.2 GB, `docs/prd/chore-e2e-recut.md`; recut by chore e2e parts recut on the folder times, retained heap growth and
-// peaks above the retained heap of the three full runs 45425975437, 45440728536 and 45487488095, each part's expected
-// peak under about 1.5 GB, `docs/prd/chore-e2e-parts-recut.md`): each part runs with its own fresh dev server, so the server's heap, which grows about 6 MB per
+// peaks above the retained heap of the full runs 45425975437, 45440728536, 45487488095 and 45563847036, eleven since
+// then, each part's expected peak at most about 1.5 GB, `docs/prd/chore-e2e-parts-recut.md`): each part runs with its own fresh dev server, so the server's heap, which grows about 6 MB per
 // test, never comes near Next.js's restart threshold, and in GitHub Actions the parts run side by side
 // (`.github/workflows/e2e.yml` reads this list). A part is a run of folders in Playwright's order (alphabetical), from
 // its first folder up to the next part's first; a folder added later falls into the part before it, a new slice into
 // the last one. Recut in folder order when the last part is the longest by more than about a minute on the median of
-// the last three full runs (CLAUDE.md, "The full run in ten parts").
+// the last three full runs (CLAUDE.md, "The full run in eleven parts").
 
 import { readdirSync } from "node:fs";
 import path from "node:path";
@@ -23,8 +23,8 @@ import path from "node:path";
  */
 export const POSTGRES_ONLY_FOLDERS: readonly string[] = ["slice-29"];
 
-/** The first folder of parts 2 to 10. */
-export const PART_STARTS = ["slice-01b", "slice-03a", "slice-04p", "slice-07c", "slice-10a", "slice-12b", "slice-15c", "slice-22", "slice-27"] as const;
+/** The first folder of parts 2 to 11. */
+export const PART_STARTS = ["slice-02a", "slice-03b", "slice-06a", "slice-07c", "slice-10a", "slice-13", "slice-15c", "slice-21", "slice-25", "slice-27"] as const;
 export const PART_COUNT = PART_STARTS.length + 1;
 
 /** The folders under `e2e/` that part `part` (1-based) runs. */

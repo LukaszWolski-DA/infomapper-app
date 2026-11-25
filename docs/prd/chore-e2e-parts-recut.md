@@ -115,4 +115,79 @@ peaked above 1,700 MB**, about 300 to 400 MB above the model's expected peaks:
   folder, where growth can only be estimated. So `slice-26` started at 1,570 MB and peaked at 1,751 MB.
 - **Part 8:** `slice-20` grew 387 MB (the model had 67 MB), and `slice-21` started at 1,454 MB and peaked at 1,721 MB.
 
-**Not yet decided:** whether to cut further. An eleventh part would split parts 8 and 9.
+**Łukasz's decision** (25 November 2026): an eleventh part, on this PR before the merge.
+
+## 5. The eleven-part cut
+
+### 5.1 The model again, with the fourth run
+
+The figures now come from four full runs: the three above and 45563847036. For a folder that had been the last of its
+part in all three earlier runs, the earlier figure was only an estimate, so its growth is now the one measured in
+45563847036:
+
+| Folder | Growth (earlier estimate → measured in 45563847036) |
+| --- | --- |
+| `slice-01b` | 136 → 423 MB |
+| `slice-04b1` | 100 → 45 MB |
+| `slice-07a` | 132 → 214 MB |
+| `slice-08` | 425 → 379 MB |
+| `slice-18` | 75 → 276 MB |
+| `slice-25` | 104 → **527 MB** |
+
+Two further rules:
+
+- **Floors:** `slice-11` (−274 MB) and `slice-15a` (−500 MB) were measured as garbage collected during the folder, so
+  they take the floor of 4 MB a test.
+- **`slice-20`:** it was measured in all four runs (279, −4, 67 and 387 MB), but takes 45563847036's 387 MB, as Łukasz
+  asked. The other folders keep the median of the runs in which they were measured.
+
+With these figures, the model gives the ten-part cut part 8 1,893 MB expected (measured 1,721 MB) and part 9 1,780 MB
+(measured 1,751 MB). The model is now on the pessimistic side, which is where it should be. Part 7 is the exception:
+modelled 1,552 MB, measured 1,630 MB.
+
+### 5.2 The cut
+
+| | `PART_STARTS` |
+| --- | --- |
+| Ten parts (section 3) | `slice-01b`, `slice-03a`, `slice-04p`, `slice-07c`, `slice-10a`, `slice-12b`, `slice-15c`, `slice-22`, `slice-27` |
+| **Eleven parts** | `slice-02a`, `slice-03b`, `slice-06a`, `slice-07c`, `slice-10a`, `slice-13`, `slice-15c`, `slice-21`, `slice-25`, `slice-27` |
+
+The cut came from an exhaustive search over the in-order cuts into eleven parts. It keeps every part's expected peak at
+or below 1,500 MB and has the shortest longest part.
+
+| Part | Folders | Tests | Expected time | Retained | Expected peak | Worst peak |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | `fixes` to `slice-01b` | 89 | 604 s | ~1,380 MB | ~1,360 MB | ~1,540 MB |
+| 2 | `slice-02a` to `slice-03a` | 73 | 578 s | ~1,050 MB | ~1,290 MB | ~1,390 MB |
+| 3 | `slice-03b` to `slice-05a` | 89 | 614 s | ~1,160 MB | ~1,290 MB | ~1,580 MB |
+| 4 | `slice-06a` to `slice-07b` | 95 | 500 s | ~1,270 MB | ~1,260 MB | ~1,340 MB |
+| 5 | `slice-07c` to `slice-09` | 77 | 478 s | ~1,120 MB | ~1,330 MB | ~1,420 MB |
+| 6 | `slice-10a` to `slice-12b` | 110 | 614 s | ~1,390 MB | ~1,490 MB | ~1,500 MB |
+| 7 | `slice-13` to `slice-15b` | 88 | 443 s | ~1,280 MB | ~1,330 MB | ~1,510 MB |
+| 8 | `slice-15c` to `slice-20` | 98 | 608 s | ~1,600 MB | ~1,480 MB | ~1,750 MB |
+| 9 | `slice-21` to `slice-24` | 52 | 245 s | ~1,190 MB | ~1,390 MB | ~1,510 MB |
+| 10 | `slice-25` to `slice-26` | 54 | 254 s | ~1,250 MB | ~1,270 MB | ~1,360 MB |
+| 11 | `slice-27` to `slice-35` | 88 | 474 s | ~1,020 MB | ~1,300 MB | ~1,540 MB |
+
+- **Parts 8 and 9 of the ten-part cut are split.**
+  - `slice-21`, which peaked last at 1,721 MB, now starts part 9 on a fresh server.
+  - `slice-25` (527 MB kept, spikes up to about 700 MB) starts part 10, followed only by `slice-26`.
+- **No eleven-part cut keeps the worst peak under 1,700 MB as well.** In part 8, `slice-20`'s spike of 538 MB (seen
+  once, in 45563847036) on top of `slice-15c` to `slice-19` gives about 1,750 MB.
+- **Time:** the longest part is 614 s, against 658 s for the ten-part cut by the same model.
+  - Parts 9 and 10 are short (about 250 s). Any cut that keeps `slice-25` and `slice-21` off a heavy retained heap leaves
+    them so.
+  - The run's wall-clock is decided by the slowest runner, as before.
+- **The cost:** one more job's setup and server start, about 2 minutes of runner time per full run (free on the public
+  repository's standard runners), and one more server start in the local fallback. There are eleven part jobs side by
+  side, plus CI and Schema on a push, within GitHub's 20 concurrent jobs.
+- **The workflow needs no change.** `e2e-plan` reads `PART_COUNT` from `e2e/parts.ts` (`seq 1 $count`). `scripts/e2e.ts`
+  loops to `PART_COUNT`. `scripts/e2e-summary.ts` sorts `part-<n>` as numbers. The limit of 10 in `e2e.yml` is for a
+  single-file check's `rounds` only. Checked: `PART_COUNT` read the way the workflow reads it gives 11, and
+  `npm run e2e -- --list` lists eleven parts.
+- **Left as written:** `scripts/e2e.ts`' header comment and two lines of CLAUDE.md ("Test runs": "its ten parts", and the
+  commands list's `--part 2`) still say "ten parts". This change was limited to the line that names the cut.
+
+### 5.3 The results
+
+_The full run on the eleven-part cut: filled in after it ran._
