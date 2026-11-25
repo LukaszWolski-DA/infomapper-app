@@ -89,4 +89,30 @@ three runs. A run's wall-clock is decided by its slowest runner. The peaks inclu
 
 ## 4. The results
 
-_The full run on this branch: filled in after it ran._
+- CI `check`, Schema `migrations` and `smoke` passed on `54e5e70` (PR 94). Locally: `tests/e2e-parts.test.ts` (7
+  passed), typecheck, and lint on the changed files.
+- **Full run** [45563847036](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45563847036) on `54e5e70`,
+  which contains `dev`'s head `3403287`: **897 passed, 16 skipped, 0 failed, 0 flaky**. Wall-clock 14 min 57 s
+  (06:52:35 to 07:07:32 UTC), against 15 min 4 s and 15 min 42 s in the last two runs.
+
+| Part | Folders | E2e step | Job | Heap peak | Expected peak |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1 | `fixes` to `slice-01a` | 558 s | 11 min 16 s | 1,115 MB | ~1,310 MB |
+| 2 | `slice-01b` to `slice-02c` | 518 s | 9 min 55 s | 1,564 MB | ~1,350 MB |
+| 3 | `slice-03a` to `slice-04b2` | 482 s | 9 min 32 s | 1,560 MB | ~1,240 MB |
+| 4 | `slice-04p` to `slice-07b` | 737 s | 13 min 40 s | 1,364 MB | ~1,410 MB |
+| 5 | `slice-07c` to `slice-09` | 551 s | 10 min 41 s | 1,378 MB | ~1,410 MB |
+| 6 | `slice-10a` to `slice-12a` | 502 s | 9 min 48 s | 1,501 MB | ~1,330 MB |
+| 7 | `slice-12b` to `slice-15b` | 419 s | 8 min 1 s | 1,630 MB | ~1,480 MB |
+| 8 | `slice-15c` to `slice-21` | 620 s | 11 min 43 s | **1,721 MB** | ~1,440 MB |
+| 9 | `slice-22` to `slice-26` | 401 s | 7 min 44 s | **1,751 MB** | ~1,350 MB |
+| 10 | `slice-27` to `slice-35` | 418 s | 7 min 56 s | 1,180 MB | ~1,250 MB |
+
+**Every part is under 1,850 MB**, and the highest peak fell from 1,941 and 1,864 MB to 1,751 MB. **Parts 8 and 9 still
+peaked above 1,700 MB**, about 300 to 400 MB above the model's expected peaks:
+
+- **Part 9:** `slice-25` grew 527 MB in this run. The model had 104 MB for it, because it had always been a part's last
+  folder, where growth can only be estimated. So `slice-26` started at 1,570 MB and peaked at 1,751 MB.
+- **Part 8:** `slice-20` grew 387 MB (the model had 67 MB), and `slice-21` started at 1,454 MB and peaked at 1,721 MB.
+
+**Not yet decided:** whether to cut further. An eleventh part would split parts 8 and 9.
