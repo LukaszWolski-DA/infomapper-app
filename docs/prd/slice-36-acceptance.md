@@ -823,3 +823,44 @@ and its three columns. Visible differences, each with its reason:
   ("no mark beside its name") is kept. Say if "(missing)" should go too.
 - **The watermark switch's label** (difference 7): keep the prototype's, or change it to "“Draft” mark"; a wording change,
   for the closing.
+
+## 11. Step 5: Łukasz's acceptance (25 November 2026)
+
+### The acceptance, criterion by criterion (Łukasz, on `dev:pg` with the demo accounts)
+
+- **S36-01 to S36-05: accepted.** Łukasz made a document from the demo's baseline "Test" (the draft mark "DRAFT ·
+  baseline Test", the footer "Baseline “Test” of …"), checked the sign-off preset, the changes section (the default, a
+  chosen baseline, the scope, the Polish words, a long list), "Make a document", Markdown's front matter, and deleting
+  "Test" with a document made from it.
+- **S36-06 (step 4, Łukasz on `infomapper-dev`):** `pg:backup` `kb-20261125-1140.json`, 4,871 rows; `pg:migrate` applied
+  `20261125120000_document_signoff.sql` (25 migrations before it); `pg:backup` `kb-20261125-1143.json`, 4,871 rows, every
+  count the same.
+
+### Three changes from the acceptance (Łukasz's decisions, 25 November 2026)
+
+1. **B5.1 (a), Łukasz's suggestion:** the Documentation tab's meta line ends with "created {yyyy-mm-dd hh:mm}" from the
+   document's `created_at`, in the browser's time zone (nothing in its place, at the same width, until the browser's time
+   is known, as slice 35's baseline list does), for shared and private documents alike; documents of the same name are
+   listed newest first (by `created_at`, then id). No migration.
+2. **The watermark switch's label** in the Style panel becomes "“Draft” mark" (it works for both sources now).
+3. **"from baseline (missing)"** in the meta line stays as it is.
+
+### What was built, by file
+
+- `src/modules/infodocumenter/domain/document-list.ts` (new, pure): `sourceText` and `metaLine` (moved from `app/tab.tsx`),
+  `createdText`, `documentOrder` (by name in any letter case, the same name newest first by `created_at`, then by id).
+- `src/modules/infodocumenter/app/load.ts`: the rows carry `created_at` and are sorted by `documentOrder`.
+- `src/modules/infodocumenter/app/tab.tsx`: the meta line, then " · created " and the time (`LocalMinute`, test id
+  `text-document-created`).
+- `src/ui/local-minute.tsx` (new, client): a time in the browser's time zone, an invisible placeholder of the same width
+  until it is known (slice 35's rule, the baseline list's own copy unchanged).
+- `src/modules/infodocumenter/app/style-panel.tsx`: the switch's label "“Draft” mark".
+
+### Tests added and changed
+
+- **Added:** `src/modules/infodocumenter/domain/document-list.test.ts` (3: the meta line with each source, "created …", the
+  order with the same name in another letter case and the same time); `e2e/slice-36/S36-list.spec.ts` (two documents of
+  the same name made a minute apart with fixed times: a shared one's and a private one's "created" time in Warsaw time,
+  both private listed newest first, the switch's label).
+- **Changed:** none. `e2e/slice-25/S25-02.spec.ts:75` reads the meta line with `toContainText("by Łukasz")`, which still
+  holds; no spec reads the switch's label (they use its test id, `check-style-watermark`, S26-08). Both were run again.

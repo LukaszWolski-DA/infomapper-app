@@ -7,6 +7,8 @@ import type { ReactNode } from "react";
 import { documentHref } from "@/app/_lib/paths";
 import type { DocLanguage } from "@/domain/types";
 import { DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
+import { LocalMinute } from "@/ui/local-minute";
+import { createdText, metaLine as metaLineOf, type MetaLineRow } from "../domain/document-list";
 import { PRESETS } from "../domain/presets";
 import type { DocumentListRow } from "./load";
 import { NewDocumentButton, RowActions } from "./tab-actions";
@@ -26,12 +28,8 @@ export const TAB_TEXTS = {
 
 const languageName = (l: DocLanguage) => DOC_LANGUAGE_OPTIONS.find(([code]) => code === l)?.[1] ?? l;
 
-/** Slice 36: the source in the meta line, the prototype's: "live model", "from baseline “{name}”" or "from baseline (missing)". */
-export const sourceText = (baseline: string | null | undefined): string => (baseline == null ? "live model" : baseline ? `from baseline “${baseline}”` : "from baseline (missing)");
-
-/** "{audience} · {source} · {n} sections · {language} · A4 · by {author}" ("by …" for shared ones only). */
-export const metaLine = (d: Pick<DocumentListRow, "audience" | "sections" | "shared" | "author"> & { baseline?: string | null }, language: DocLanguage): string =>
-  [d.audience, sourceText(d.baseline), `${d.sections} section${d.sections === 1 ? "" : "s"}`, languageName(language), "A4", d.shared ? `by ${d.author}` : null].filter(Boolean).join(" · ");
+/** The meta line in the documents' language's name (`domain/document-list.ts`); "created …" is drawn after it. */
+export const metaLine = (d: MetaLineRow, language: DocLanguage): string => metaLineOf(d, languageName(language));
 
 export function DocumentationTab({
   workspaceId,
@@ -63,7 +61,9 @@ export function DocumentationTab({
           {d.name}
         </Link>
         <div className="text-[11.5px] text-im-ink-3" data-testid="text-document-meta">
-          {metaLine(d, language)}
+          {metaLine(d, language)} · {createdText("")}
+          {/* B5.1 (a): the time it was made, in the browser's time zone */}
+          <LocalMinute iso={d.created_at} testId="text-document-created" />
         </div>
       </div>
       <RowActions workspaceId={workspaceId} document={{ id: d.id, name: d.name, version: d.version }} rights={d.rights} />
