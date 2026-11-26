@@ -54,6 +54,9 @@ import { attributeLabel, businessKeyHint, columnLabel, columnOptions, inputColum
 import { usePanels } from "./panels-context";
 import { RequirementsSection } from "./requirements-section";
 import { ChecksBox } from "./checks-box";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { linkChipVariants } from "@/ui/components/chip";
+import { Select } from "@/ui/components/select";
 
 export const STATUS_LABEL = { draft: "Draft", review: "In review", approved: "Approved" } as const;
 
@@ -157,7 +160,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         Attribute of{" "}
         <button
           type="button"
-          className="rounded-md bg-im-logical-soft px-1.5 py-px text-im-logical"
+          className={linkChipVariants()}
           onClick={() => p.goEntity(a.entity_id)}
           data-testid="link-attribute-entity"
         >
@@ -179,16 +182,16 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
           </span>
           {p.editable && (
             <>
-              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move to the top (Ctrl Shift ↑)" aria-label="Move to the top" disabled={position === 1} onClick={() => void move(a.id, "top")}>
+              <button type="button" className={iconButtonVariants()} title="Move to the top (Ctrl Shift ↑)" aria-label="Move to the top" disabled={position === 1} onClick={() => void move(a.id, "top")}>
                 ⤒
               </button>
-              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move up (Ctrl ↑)" aria-label="Move up" disabled={position === 1} onClick={() => void move(a.id, "up")}>
+              <button type="button" className={iconButtonVariants()} title="Move up (Ctrl ↑)" aria-label="Move up" disabled={position === 1} onClick={() => void move(a.id, "up")}>
                 ↑
               </button>
-              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move down (Ctrl ↓)" aria-label="Move down" disabled={position === siblings.length} onClick={() => void move(a.id, "down")}>
+              <button type="button" className={iconButtonVariants()} title="Move down (Ctrl ↓)" aria-label="Move down" disabled={position === siblings.length} onClick={() => void move(a.id, "down")}>
                 ↓
               </button>
-              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move to the bottom (Ctrl Shift ↓)" aria-label="Move to the bottom" disabled={position === siblings.length} onClick={() => void move(a.id, "bottom")}>
+              <button type="button" className={iconButtonVariants()} title="Move to the bottom (Ctrl Shift ↓)" aria-label="Move to the bottom" disabled={position === siblings.length} onClick={() => void move(a.id, "bottom")}>
                 ⤓
               </button>
             </>
@@ -221,12 +224,12 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       <Field label="Data type" htmlFor="f-at">
         {/* the parameters sit next to the type, and wrap under it when the panel is narrow */}
         <div className="flex flex-wrap gap-2" data-testid="field-attribute-type">
-          <select
+          <Select
             key={fieldKey(a.id, "type")}
             id="f-at"
             value={dataType.value}
             disabled={!followEditable}
-            className={`${inputClass} min-w-[120px] flex-1 basis-[120px]`}
+            className="min-w-[120px] flex-1 basis-[120px]"
             data-testid="select-attribute-type"
             onChange={(e) => dataType.choose(e.target.value as LogicalType)}
           >
@@ -235,7 +238,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
                 {t}
               </option>
             ))}
-          </select>
+          </Select>
           {a.data_type === "string" && (
             <ParamField key={fieldKey(a.id, "length")} version={a.version} label="Length" value={a.type_length} disabled={!followEditable} onSave={(n) => saveType({ length: n })} testId="input-type-length" />
           )}

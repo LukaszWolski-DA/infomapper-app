@@ -15,24 +15,9 @@ const EXCEPTIONS: Readonly<Record<string, string>> = {
   "src/app/w/[workspaceId]/p/[projectId]/_components/canvas-tabs.tsx": "the canvas tabs with their menus and the rename field are slice 38's layout (F8)",
 };
 
-/** Slice 37, step 2: every file that styled a control on its own after `fields.tsx`' constants became the shared look. */
+/** Slice 37, step 2: every file that styled a control on its own after `fields.tsx`' constants became the shared look.
+ * Step 3a converted the inspector's panels and InfoCube's sections (15 files). */
 const TO_CONVERT: readonly string[] = [
-  // step 3a: the inspector's panels (InfoCube's sections with them, A6)
-  "src/app/_panels/attribute-panel.tsx",
-  "src/app/_panels/calculation-section.tsx",
-  "src/app/_panels/classifications.tsx",
-  "src/app/_panels/delete-concept-dialog.tsx",
-  "src/app/_panels/entity-panel.tsx",
-  "src/app/_panels/fields.tsx",
-  "src/app/_panels/frame-panel.tsx",
-  "src/app/_panels/mapping-panel.tsx",
-  "src/app/_panels/note-panel.tsx",
-  "src/app/_panels/requirement-panel.tsx",
-  "src/app/_panels/requirements-section.tsx",
-  "src/app/_panels/source-changes.tsx",
-  "src/app/_panels/system-panel.tsx",
-  "src/modules/infocube/app/mapping-panel.tsx",
-  "src/modules/infocube/app/sections.tsx",
   // step 3b: the left panel, the toolbox and menus, the import wizard
   "src/app/_panels/import/import-wizard.tsx",
   "src/app/_panels/import/review-step.tsx",
@@ -135,6 +120,12 @@ describe("the guard's probes (S37-05)", () => {
     const code = `const small = "h-[26px] rounded-md px-2";
 export const P = ({ on }: { on: boolean }) => <button className={\`\${on ? small : "x"} w-full\`}>a</button>;`;
     expect(probe(code)).toEqual(["an arbitrary height (h-[26px])"]);
+  });
+  it("reads cn's arguments: merging is not the shared look", () => {
+    const code = `import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
+export const P = () => <><button className={cn(buttonVariants(), "rounded-[7px]")}>a</button><button className={cn(buttonVariants(), "w-full")}>b</button></>;`;
+    expect(probe(code)).toEqual(["an arbitrary radius (rounded-[7px])"]);
   });
   it("accepts the shared look, layout classes, a row's target height, check boxes and an unknown prop", () => {
     const code = `import { buttonVariants } from "@/ui/components/button";

@@ -181,6 +181,8 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 .im-canvas .overview-h { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 4px 0 10px; font-size: 11.5px; color: var(--im-ink-2); border-bottom: 1px solid var(--im-card-line) }
 .im-canvas .overview.closed .overview-h { border-bottom: 0 }
 .im-canvas .overview-z { margin-left: auto; color: var(--im-ink-3); font-variant-numeric: tabular-nums }
+/* slice 37 (S37-03): the toggle reaches 24 px; its margin keeps it where it was (22 × 20 before) */
+.im-canvas .overview .ib { height: 24px; min-width: 24px; padding: 0 5px; margin: 0 -1px }
 .im-canvas .overview .ib svg { transition: transform .15s }
 .im-canvas .overview.closed .ib svg { transform: rotate(180deg) }
 .im-canvas .overview-box { position: relative }

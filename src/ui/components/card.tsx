@@ -2,7 +2,7 @@
 // on `panel` without an edge. Not the canvas's cards, which the canvas draws (DS2.3).
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/ui/lib/utils"
 
 export const cardVariants = cva("rounded-lg", {
   variants: {

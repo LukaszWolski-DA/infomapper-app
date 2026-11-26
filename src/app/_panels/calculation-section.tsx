@@ -21,6 +21,8 @@ import type { Attribute } from "@/domain/types";
 import { openPick } from "@/ui/pick-popover";
 import { Actions, Field, fieldKey, Fold, Hint, List, Note, smallButtonClass, TextArea } from "./fields";
 import { usePanel } from "./inspector";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { cn } from "@/ui/lib/utils";
 
 const RULE_ID = "f-calc";
 
@@ -149,7 +151,7 @@ export function CalculationSection({ attribute: a }: { attribute: Attribute }) {
               {p.editable && (
                 <button
                   type="button"
-                  className="grid size-6 flex-none place-items-center rounded-md text-im-ink-3 hover:bg-im-hover"
+                  className={cn(iconButtonVariants({ size: "xs" }), "flex-none text-im-ink-3")}
                   title="Stop reading this attribute"
                   aria-label={`Stop reading ${name(f)}`}
                   onClick={() => void remove(f)}

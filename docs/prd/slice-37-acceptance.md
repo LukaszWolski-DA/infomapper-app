@@ -672,8 +672,54 @@ documents and three documents of every section type: Markdown, HTML, CSS).
 - `Seg` keeps its look until step 3: `Segmented` exists, but `fields.tsx`' `Seg` is not re-pointed yet, because of
   S28-07's no-wrap check in the editor.
 
+**Łukasz's answer (26 November 2026):** both calls accepted; they are quoted again at the closing.
+
 **Checks:**
 - `npm run lint`, `npm run typecheck` and `npm test` pass (216 files, 2,606 tests).
 - The slice-32 specs pass as single files (12 tests).
 - A first `npm test` run while the before run and a second dev server loaded the laptop timed out in 8 tests. All of
   them pass on their own and in the next full run.
+
+## Step 3a: the inspector's panels (26 November 2026)
+
+**CI on step 2's last commit (`a77324b`):** `check`, `migrations` and `smoke` passed (the smoke job ran
+`S32-smoke-theme` with the new body colours).
+
+**What changed:**
+- **`fields.tsx` draws `src/ui`'s components:** `Field` is the shared field (its label 12/16 500 in `ink-2`, F10); `Seg`
+  is `Segmented` (its props unchanged; the track 28 px, the buttons 24 px, 12.5 px 500); `Flag` the filter chip;
+  `TextField` and `TextArea` the shared input and text area (a text area is now at least 76 px, before 60);
+  `GroupedSelect` the shared `Select`; `LongList`'s filter the 28 px input; the inline conflict line's buttons (a canvas
+  tab, slice 14b) the button's new `xs` size (24 px, only inside a 28 px row).
+- **The panels:** every native `<select>` is `Select` (attribute, entity, frame, note, requirement, the delete-concept
+  dialog, source changes, InfoCube's sections and mapping panel); the ×, ↑ and ↓ buttons are the icon button's look (24 px
+  in a row, 28 px for the attribute's position, which lose their edge); the classification toggles are filter chips in
+  the physical tone (28 px, before 26); the small primary and danger buttons of source changes and "Re-import" are the
+  button's `sm`; the frame's colour swatches 24 px (before 22).
+- **What the "before" report found here:**
+  - a list row's meta (`fname` → `Customer.preferred_contact_…`) is cut with an ellipsis at 60 % of the row, its full
+    text in its title (`Li`, every list row);
+  - the attribute's entity, a table's system and an aggregate's base are a link chip (`linkChipVariants`): 24 px, the
+    line's height kept by a negative margin;
+  - the overview's toggle is 24 × 24 (before 22 × 20), its margin keeping its place;
+  - a fold's header is at least 28 px (`DISCLOSURE_HEADER`, before 20).
+- **Two pieces kept as list items, not controls:** InfoCube's trace target keeps its edge as an inset ring and a cube
+  hint its warning edge as an inset shadow, so the guard does not read them as an edge; neither is a button's look.
+- **A step 2 defect, fixed:** the armed delete (`ConfirmDelete`) grew by replacing `h-8` in the danger class, which
+  step 2 had renamed; the armed text could no longer wrap. It now merges its own height and wrapping.
+- **`cn` knows the design system's scales** (`src/ui/lib/utils.ts`, every `src/ui` component): tailwind-merge read
+  `text-body` as a text colour and dropped `text-im-ink` beside it, so `Select`, `Input` and `Button` lost their text
+  colour (a native select's text would have stayed black in dark mode). It is told the type scale and the control sizes.
+- **The guard** reads `cn(…)`'s arguments: only a `…Variants` call from `src/ui` is the shared look. 15 files left the
+  list: 171 offences in 51 files to convert and the one exception (215 in 66 after step 2).
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test` (216 files, 2,612 tests).
+- The specs of the controls changed (32 specs, slice 14b and slice 32: 88 tests), as one local run: 82 passed, 6 failed
+  by time (timeouts and a page that did not load in 15 s while `npm test` ran beside it). The six again alone: 5 passed
+  (S28-07 among them, with `Seg`'s new look); S4A-11 timed out again and passed alone (48 s of its 60).
+- **The check script on the step's screens** (`.data/ui-check/step3a-20261126-1756/`, 77 views): no text out of its
+  control, no overlap and no small target failing WCAG at 1280 px or wider. What is left at 390 px is the top bar and the
+  navigation row (slice 38's, A7), the working context's spill, and two pairs where a control on the canvas lies under a
+  panel field that is now 32 px tall (the details panel lies over the canvas at that width). "Words run together" is the
+  left panel's tabs and the top bar's switchers (steps 3b and 4).

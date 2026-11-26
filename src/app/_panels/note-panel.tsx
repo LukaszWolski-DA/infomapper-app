@@ -12,8 +12,9 @@ import { noteDate } from "@/canvas/note-data";
 import { useNoteDraft } from "@/canvas/note-drafts";
 import type { Uuid } from "@/domain/ids";
 import { NOTE_COLORS } from "@/domain/types";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextArea } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, Kind, Li, List, Section, Seg, smallButtonClass, TextArea } from "./fields";
 import { usePanel } from "./inspector";
+import { Select } from "@/ui/components/select";
 
 const COLOR_LABEL = { yellow: "Yellow", blue: "Blue", green: "Green", pink: "Pink", grey: "Grey" } as const;
 
@@ -118,10 +119,9 @@ export function NotePanel({ noteId }: { noteId: Uuid }) {
           </p>
           {can && (
             <Field label="Pin to" htmlFor="f-np">
-              <select
+              <Select
                 id="f-np"
                 value=""
-                className={inputClass}
                 data-testid="select-note-pin"
                 onChange={(e) => {
                   const t = view.targets.find((x) => `${x.kind}:${x.id}` === e.target.value);
@@ -134,7 +134,7 @@ export function NotePanel({ noteId }: { noteId: Uuid }) {
                     {t.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
           )}
         </>

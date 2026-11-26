@@ -13,7 +13,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { useAction } from "@/app/_components/use-action";
 import { useModules } from "@/app/_components/modules";
-import { Field, fieldKey, Flag, Fold, Hint, inputClass, Li, Note, Seg, smallButtonClass, TextField, useChoice } from "@/app/_panels/fields";
+import { Field, fieldKey, Flag, Fold, Hint, Li, Note, Seg, smallButtonClass, TextField, useChoice } from "@/app/_panels/fields";
 import { usePanel } from "@/app/_panels/inspector";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
@@ -25,6 +25,8 @@ import type { CubeAttribute, CubeEntity, CubeKey, CubeMeasure, DimKind, FactType
 import { UNKNOWN_TEXTS, unknownDefault, unknownFit, unknownValueOf } from "../domain/unknown-member";
 import { DIM_KIND_NAMES, FACT_TYPE_NAMES, type CubePageRows } from "../domain/view";
 import { addKeyAction, linkKeyAction, setMeasureAction, setUnknownValueAction, updateCubeEntityAction, updateMeasureAction } from "./actions";
+import { Select } from "@/ui/components/select";
+import { linkChipVariants } from "@/ui/components/chip";
 
 export const ADDITIVITY_LABEL = { additive: "Additive", semi: "Semi-additive", non: "Non-additive" } as const;
 export const ADDITIVITY_MARK = { additive: "Σ", semi: "Σ~", non: "∅Σ" } as const;
@@ -191,9 +193,8 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
           </p>
         </div>
         <Field label="Aggregate of" htmlFor="f-base">
-          <select
+          <Select
             id="f-base"
-            className={inputClass}
             value={baseChoice.value}
             disabled={!p.editable}
             onChange={(e) => baseChoice.choose(e.target.value)}
@@ -206,11 +207,11 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
                 {cube.nameOf(id)}
               </option>
             ))}
-          </select>
+          </Select>
           {base && (
             <p className={sentenceClass} data-testid="text-cube-base">
               It summarises{" "}
-              <button type="button" className="rounded-[10px] border border-im-line px-1.5 py-px text-im-ink hover:bg-im-hover" onClick={() => p.goEntity(base)} data-testid="link-cube-base">
+              <button type="button" className={linkChipVariants({ tone: "neutral" })} onClick={() => p.goEntity(base)} data-testid="link-cube-base">
                 {cube.nameOf(base)}
               </button>{" "}
               at a coarser grain: its dimensions should be {cube.nameOf(base)}&apos;s or fewer.
@@ -301,7 +302,7 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
                 <button
                   type="button"
                   key={`${i}:${h.text}`}
-                  className="rounded-md border-l-2 border-im-warn bg-im-warn-soft px-2 py-1 text-left text-[12px] text-im-ink hover:bg-im-hover"
+                  className="rounded-md bg-im-warn-soft px-2 py-1 text-left text-small text-im-ink shadow-[inset_2px_0_0_var(--im-warn)] hover:bg-im-hover"
                   onClick={() => go(h)}
                   data-testid="item-cube-hint"
                 >
@@ -644,12 +645,11 @@ function KeySection({ r, fact, dimension, cube }: { r: Relationship; fact: Uuid;
     <Fold title="InfoCube" testId="section-cube-key">
       <div className="rounded-lg border border-im-line px-3 pb-3 pt-0.5">
         <Field label={`Key in ${cube.nameOf(fact)}`} htmlFor="f-rkey">
-          <select
+          <Select
             key={fieldKey(r.id, "key")}
             id="f-rkey"
             value={choice.value}
             disabled={!p.editable}
-            className={inputClass}
             data-testid="select-cube-key"
             onChange={(e) => choice.choose(e.target.value)}
           >
@@ -659,7 +659,7 @@ function KeySection({ r, fact, dimension, cube }: { r: Relationship; fact: Uuid;
                 {a.name}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
         {!key && p.editable && (
           <div className="mt-2">

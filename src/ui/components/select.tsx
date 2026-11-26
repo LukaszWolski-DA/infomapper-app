@@ -5,7 +5,7 @@
 // `src/ui` a native `<select>` is refused by the guard (tests/control-style-guard.test.ts): use this one.
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/ui/lib/utils"
 import { FIELD_LOOK } from "./input"
 
 export const selectVariants = cva(`${FIELD_LOOK} cursor-pointer pl-2 pr-1`, {

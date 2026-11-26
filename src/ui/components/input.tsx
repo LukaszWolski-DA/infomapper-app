@@ -5,7 +5,7 @@
 // draws the same field.
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/ui/lib/utils"
 
 /** The look every field shares: inputs, text areas and drop-downs (select.tsx). */
 export const FIELD_LOOK =

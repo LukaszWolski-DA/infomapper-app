@@ -3,7 +3,7 @@
 // `title`, when given, is passed through word for word (A4: the e2e specs read titles; shortcuts come later).
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/ui/lib/utils"
 
 export const iconButtonVariants = cva(
   "inline-grid shrink-0 place-items-center rounded-md border border-transparent bg-transparent text-im-ink-2 transition-colors outline-none enabled:hover:bg-im-hover enabled:hover:text-im-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-im-logical disabled:cursor-default disabled:opacity-30 aria-pressed:bg-im-logical-soft aria-pressed:text-im-logical [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",

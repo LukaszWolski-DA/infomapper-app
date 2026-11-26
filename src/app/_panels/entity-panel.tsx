@@ -18,7 +18,7 @@ import { stereotypeIndex } from "@/domain/model/stereotypes";
 import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextField, useChoice } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, Hint, Li, LongList, smallButtonClass, TextField, useChoice } from "./fields";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
@@ -29,6 +29,7 @@ import { feedingSources, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
 import { RequirementsSection } from "./requirements-section";
 import { ChecksBox } from "./checks-box";
+import { Select } from "@/ui/components/select";
 
 
 /** `cardId` is null when the entity has no card on this canvas (a go-to link's fallback, slice 4a): its panel only. */
@@ -112,12 +113,11 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
           </Field>
         ) : (
         <Field label="Stereotype" htmlFor="f-es">
-          <select
+          <Select
             key={fieldKey(e.id, "stereotype")}
             id="f-es"
             value={stereotype.value}
             disabled={!p.editable}
-            className={inputClass}
             data-testid="select-entity-stereotype"
             onChange={(x) => stereotype.choose(x.target.value)}
           >
@@ -126,7 +126,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
                 {s.name}
               </option>
             ))}
-          </select>
+          </Select>
           {stereotypeDefinition && (
             <div className="mt-1 text-[11.5px] leading-[1.35] text-im-ink-3" data-testid="text-entity-stereotype-definition">
               {stereotypeDefinition}
@@ -135,12 +135,11 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         </Field>
         )}
         <Field label="Concept" htmlFor="f-ec">
-          <select
+          <Select
             key={fieldKey(e.id, "concept")}
             id="f-ec"
             value={concept.value}
             disabled={!p.editable}
-            className={inputClass}
             data-testid="select-entity-concept"
             onChange={(x) => concept.choose(x.target.value)}
           >
@@ -149,7 +148,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
                 {c.name}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
       </div>
       <RichTextField

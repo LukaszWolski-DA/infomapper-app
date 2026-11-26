@@ -13,10 +13,11 @@ import { CanvasUiCtx, type FramePatch } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { FREE_FRAME_COLORS } from "@/domain/model/frames";
 import type { FrameKind } from "@/domain/types";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextField, useChoice } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, Kind, Li, List, Section, Seg, smallButtonClass, TextField, useChoice } from "./fields";
 import { usePanel } from "./inspector";
 import { usePanels } from "./panels-context";
 import { NotesHere } from "./notes-here";
+import { Select } from "@/ui/components/select";
 
 const KINDS = [
   ["free", "Free area"],
@@ -114,10 +115,9 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       </Field>
       {f.kind === "concept" && (
         <Field label="Concept" htmlFor="f-fr">
-          <select
+          <Select
             key={fieldKey(f.id, "concept")}
             id="f-fr"
-            className={inputClass}
             value={concept.value}
             disabled={!p.editable}
             data-testid="select-frame-concept"
@@ -130,15 +130,14 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
                   {c.name}
                 </option>
               ))}
-          </select>
+          </Select>
         </Field>
       )}
       {f.kind === "source_system" && (
         <Field label="Source system" htmlFor="f-fr">
-          <select
+          <Select
             key={fieldKey(f.id, "system")}
             id="f-fr"
-            className={inputClass}
             value={system.value}
             disabled={!p.editable}
             data-testid="select-frame-system"
@@ -149,7 +148,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
                 {s.name}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
       )}
       {f.kind === "free" && (
@@ -163,7 +162,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
                 aria-label={`Colour ${c}`}
                 disabled={!p.editable}
                 onClick={() => c !== f.color && update({ color: c })}
-                className="size-[22px] rounded-md shadow-[0_0_0_1px_var(--im-line)] aria-pressed:shadow-[0_0_0_2px_var(--im-surface),0_0_0_3.5px_var(--im-ink)]"
+                className="size-target rounded-md shadow-[0_0_0_1px_var(--im-line)] aria-pressed:shadow-[0_0_0_2px_var(--im-surface),0_0_0_3.5px_var(--im-ink)]"
                 style={{ background: c }}
               />
             ))}

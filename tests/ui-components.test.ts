@@ -3,7 +3,9 @@
 import { describe, expect, it } from "vitest";
 import { buttonVariants, BUTTON_LAYOUT } from "@/ui/components/button";
 import { cardVariants } from "@/ui/components/card";
-import { chipVariants, filterChipVariants } from "@/ui/components/chip";
+import { chipVariants, filterChipVariants, linkChipVariants } from "@/ui/components/chip";
+import { DISCLOSURE_HEADER } from "@/ui/components/disclosure";
+import { cn } from "@/ui/lib/utils";
 import { FIELD_LABEL, FIELD_HINT } from "@/ui/components/field";
 import { iconButtonVariants } from "@/ui/components/icon-button";
 import { FIELD_LOOK, inputVariants, textareaVariants } from "@/ui/components/input";
@@ -37,6 +39,7 @@ describe("Button", () => {
     ["md", "h-control-md"],
     ["sm", "h-control-sm"],
     ["bar", "h-control-bar"],
+    ["xs", "h-target"],
   ] as const)("size %s", (size, height) => has(buttonVariants({ size }), height));
   it("is the look alone: no display or alignment, which the component adds", () => {
     lacks(buttonVariants(), /^(inline-)?flex$/, /^justify-/, /^items-/);
@@ -87,11 +90,32 @@ describe("Segmented, Tabs, Chip, Card", () => {
     has(chipVariants({ tone: "pii" }), "bg-im-warn-soft", "text-im-warn");
     has(chipVariants({ tone: "ok" }), "bg-im-map-soft", "text-im-map");
     has(filterChipVariants({ on: true }), "h-control-sm", "rounded-full", "border-im-logical");
+    has(filterChipVariants({ on: true, tone: "physical" }), "border-im-physical", "bg-im-physical-soft", "text-im-physical");
+    lacks(filterChipVariants({ on: false, tone: "physical" }), /physical/);
   });
+  it("the link chip in a sentence: 24 px for its target, its line kept by the negative margin", () => {
+    has(linkChipVariants(), "min-h-target", "-my-[3px]", "bg-im-logical-soft");
+    has(linkChipVariants({ tone: "physical" }), "bg-im-physical-soft");
+  });
+  it("a fold's header is at least 28 px", () => has(DISCLOSURE_HEADER, "min-h-control-sm", "w-full"));
   it("Card: a hairline, radius 12, no shadow; quiet on panel", () => {
     has(cardVariants(), "rounded-lg", "border-im-line", "bg-im-surface");
     lacks(cardVariants(), /^shadow/);
     has(cardVariants({ tone: "quiet" }), "bg-im-panel");
+  });
+});
+
+describe("cn knows the design system's scales", () => {
+  it("a size of the type scale does not drop a text colour, and the control sizes merge", () => {
+    expect(cn("text-im-ink text-body", "text-small")).toBe("text-im-ink text-small");
+    expect(cn("h-control-md", "h-auto")).toBe("h-auto");
+    expect(cn("size-target", "size-control-sm")).toBe("size-control-sm");
+  });
+  it("a component merged with no class of its own keeps every class", () => {
+    const v = buttonVariants({ variant: "secondary", size: "sm" });
+    expect(cn(v)).toBe(v);
+    const sel = selectVariants();
+    expect(cn(sel)).toBe(sel);
   });
 });
 

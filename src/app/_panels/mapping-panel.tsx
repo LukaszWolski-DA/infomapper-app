@@ -28,12 +28,15 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot, useDraft, DraftLine } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, GroupedSelect, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot, useDraft, DraftLine } from "./fields";
 import { usePanel } from "./inspector";
 import { RequirementsSection } from "./requirements-section";
 import { ItemLabels } from "./item-labels";
 import { usePanels } from "./panels-context";
 import { columnLabel, columnOptions, inputsLabel, typeCheckOf } from "./model-index";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { textareaVariants } from "@/ui/components/input";
+import { cn } from "@/ui/lib/utils";
 
 const KINDS = [
   ["direct", "Direct copy"],
@@ -45,7 +48,7 @@ const STATUSES = [
   ["approved", STATUS_LABEL.approved],
 ] as const;
 
-const iconButton = "grid size-6 flex-none place-items-center rounded text-im-ink-3 hover:bg-im-hover hover:text-im-ink disabled:opacity-30";
+const iconButton = cn(iconButtonVariants({ size: "xs" }), "flex-none text-im-ink-3");
 
 export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   const p = usePanel();
@@ -334,7 +337,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
           readOnly={!p.editable}
           placeholder={`e.g. CAST(${first?.name ?? "column"} AS date), a lookup, or plain words`}
           data-testid="input-mapping-rule"
-          className={`${inputClass} min-h-[60px] resize-y font-mono text-xs`}
+          className={cn(textareaVariants(), "font-mono text-xs")}
           onBlur={(e) => {
             // a transformation chosen and its rule left empty: nothing to save, and the hint goes
             if (wantsRule && !pending && !e.currentTarget.value.trim()) setWantsRule(false);
@@ -437,7 +440,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
               defaultValue={m.rule_expression ?? ""}
               placeholder="e.g. COALESCE(crm_email, web_email)"
               data-testid="input-merge-rule"
-              className={`${inputClass} min-h-[60px] resize-y font-mono text-xs`}
+              className={cn(textareaVariants(), "font-mono text-xs")}
             />
           </Field>
           <Note warn>The merged mapping is a transformation and goes to review; it needs a rule.</Note>

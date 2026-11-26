@@ -22,6 +22,7 @@ import { NOTE_REMOVED, NOTE_SAVED } from "@/domain/commands/source";
 import { DialogFooter } from "@/ui/components/dialog";
 import { buttonClass, dangerClass, Field, fieldKey, Fold, Hint, LongList, Li, TextArea } from "./fields";
 import { usePanel } from "./inspector";
+import { filterChipVariants } from "@/ui/components/chip";
 
 type Target = { kind: "source_table" | "source_column"; id: Uuid };
 const GROUPS = ["General", "Data Vault 2.0", "This workspace"] as const;
@@ -55,7 +56,7 @@ export function ClassificationsSection({ target }: { target: Target }) {
                     disabled={!p.editable}
                     onClick={() => toggle(c)}
                     data-testid="toggle-classification"
-                    className="h-[26px] rounded-[13px] border border-im-line bg-im-surface px-2.5 text-xs text-im-ink-2 hover:border-im-ink-3 disabled:cursor-not-allowed aria-pressed:border-im-physical aria-pressed:bg-im-physical-soft aria-pressed:text-im-physical"
+                    className={filterChipVariants({ on: mine.has(c.id), tone: "physical" })}
                   >
                     {c.name}
                   </button>

@@ -5,7 +5,7 @@
 // group's test id), named by `labelledBy` and described by `describedBy`; `columns={2}` lays the choices out in two
 // columns. The look is the design system's (appendix B's `.im-seg`): the track on `hover`, 28 px with 24 px buttons,
 // the chosen one white with a light shadow.
-import { cn } from "cn"
+import { cn } from "@/ui/lib/utils"
 
 export const SEGMENTED_TRACK = "rounded-md bg-im-hover p-0.5 gap-0.5"
 export const SEGMENTED_BUTTON =

@@ -6,8 +6,9 @@
 // - an edge (`border`, `border-2`, `border-b`, …: a width);
 // - an arbitrary radius (`rounded-[…]`) or an arbitrary height in px (`h-[…px]`, `min-h-[…px]`, `size-[…px]`);
 // - a radius together with a height or size (`rounded-md h-8`, `size-6 rounded`): a button drawn by hand.
-// A constant made by a `src/ui` component's variants (`buttonVariants(…)`) holds no class of its own: it is the shared
-// look. `min-h-target` (24 px, S37-03) is allowed: it is how a row reaches its target size without becoming a button.
+// A constant made by a `src/ui` component's variants (`buttonVariants(…)`) or exported by `src/ui` holds no class of its
+// own: it is the shared look; `cn(…)` is read through its arguments. `min-h-target` (24 px, S37-03) is allowed: it is
+// how a row reaches its target size without becoming a button.
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -101,11 +102,12 @@ function tokensOf(src: Source, e: ts.Expression | undefined, seen = new Set<stri
     if (ts.isJsxExpression(x)) return walk(x.expression, s);
     if (ts.isArrayLiteralExpression(x)) return x.elements.forEach((el) => walk(el, s));
     if (ts.isCallExpression(x)) {
-      // a src/ui component's variants hold the shared look: nothing of its own
+      // a src/ui component's variants (`buttonVariants(…)`) hold the shared look: nothing of its own. Any other call, `cn`
+      // from src/ui included, is read through its arguments.
       const callee = ts.isIdentifier(x.expression) ? x.expression.text : null;
       const imported = callee ? s.imports.get(callee) : undefined;
       const target = imported ? resolve(s.file, imported.from) : null;
-      if (target && isUi(target)) return;
+      if (target && isUi(target) && /Variants$/.test(imported!.name)) return;
       if (ts.isPropertyAccessExpression(x.expression) && x.expression.name.text === "join" && ts.isArrayLiteralExpression(x.expression.expression)) return walk(x.expression.expression, s);
       return x.arguments.forEach((a) => walk(a, s));
     }

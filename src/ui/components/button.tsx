@@ -1,12 +1,12 @@
 // Slice 37 (S37-02, D-89 as proposed): the button. One shape in four roles and three heights, on the design system's
 // tokens (appendix B's `.im-btn`): `primary` (the accent), `secondary` (the default: an edge on white), `quiet` (no edge,
 // no fill) and `danger` (the warning colour); `md` 32 px on pages, in forms and dialogs, `sm` 28 px in panels and
-// toolbars, `bar` 30 px in the top bar. `buttonVariants` is the look alone (no display or alignment), so a `<Link>` or a
-// row can take it, and so `fields.tsx`' class constants re-export it without changing how their buttons lay out their
-// content. The fifth role, the icon button, is `IconButton` (icon-button.tsx).
+// toolbars, `bar` 30 px in the top bar (`xs`, 24 px, only inside a 28 px row). `buttonVariants` is the look alone (no
+// display or alignment), so a `<Link>` or a row can take it, and so `fields.tsx`' class constants re-export it without
+// changing how their buttons lay out their content. The fifth role, the icon button, is `IconButton` (icon-button.tsx).
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/ui/lib/utils"
 import { Slot } from "radix-ui"
 
 export const buttonVariants = cva(
@@ -23,6 +23,8 @@ export const buttonVariants = cva(
         md: "h-control-md px-3.5 text-body",
         sm: "h-control-sm px-2.5 text-small",
         bar: "h-control-bar px-2.5 text-body",
+        // 24 px, only inside a 28 px row that has no room for more (the conflict line in a canvas tab, slice 14b)
+        xs: "h-target px-2 text-small",
       },
     },
     defaultVariants: { variant: "secondary", size: "md" },

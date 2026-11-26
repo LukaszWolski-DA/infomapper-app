@@ -24,6 +24,8 @@ import { Fold, Hint, List, smallButtonClass } from "./fields";
 import { usePanel } from "./inspector";
 import { usePanels } from "./panels-context";
 import { KindIcon } from "./requirement-ui";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { cn } from "@/ui/lib/utils";
 
 /** The name field a requirement panel focuses after “+ New requirement…” (`usePanels().nameFocus`). */
 export const requirementNameFocus = (requirementId: string) => `req:${requirementId}`;
@@ -108,7 +110,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
       {p.editable && (
         <button
           type="button"
-          className="grid size-6 flex-none place-items-center rounded text-im-req hover:bg-im-surface"
+          className={cn(iconButtonVariants({ size: "xs" }), "flex-none text-im-req enabled:hover:bg-im-surface enabled:hover:text-im-req")}
           aria-label={`Place ${r.key}'s card`}
           title={ui.requirementCard(r.id) ? "Its card is on this canvas: show it" : "Place its card next to this element (or drag the row onto the canvas)"}
           onClick={() => placeCard(r)}
@@ -123,7 +125,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
       {!viaText && p.editable && (
         <button
           type="button"
-          className="mr-1 grid size-6 flex-none place-items-center rounded text-im-ink-3 hover:bg-im-surface hover:text-im-warn"
+          className={cn(iconButtonVariants({ size: "xs" }), "mr-1 flex-none text-im-ink-3 enabled:hover:bg-im-surface enabled:hover:text-im-warn")}
           aria-label={`Unlink ${r.key}`}
           title="Unlink"
           onClick={() => unlink(r)}

@@ -32,6 +32,7 @@ import { attributeLabel, attributeOptions, fedEntities, mappingsOfColumn, tableP
 import { RequirementsSection } from "./requirements-section";
 import { day } from "./import/wizard-model";
 import { ChangesList, SourceDeleteForm } from "./source-changes";
+import { linkChipVariants } from "@/ui/components/chip";
 
 /**
  * “Missing from source since 2026-10-23” (slice 7a; the review's date format); a retired one “Retired: historical since
@@ -105,7 +106,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
         <span data-testid="source-table-kind">
           {KIND_OF[t.object_type](t)} of{" "}
           {system ? (
-            <button type="button" className="rounded-md bg-im-physical-soft px-1.5 py-px text-im-physical" onClick={() => p.goSystem(system.id)} data-testid="button-table-system">
+            <button type="button" className={linkChipVariants({ tone: "physical" })} onClick={() => p.goSystem(system.id)} data-testid="button-table-system">
               {system.name}
             </button>
           ) : (
