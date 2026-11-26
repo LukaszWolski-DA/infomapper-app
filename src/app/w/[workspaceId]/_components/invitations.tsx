@@ -13,11 +13,15 @@ import type { InvitationRole } from "@/domain/types";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui/components/dialog";
 import { useToast } from "@/ui/components/toast";
 import { btnClass } from "./lifecycle";
+import { cn } from "@/ui/lib/utils";
+import { inputVariants } from "@/ui/components/input";
+import { buttonVariants } from "@/ui/components/button";
+import { Select } from "@/ui/components/select";
 
-const inputClass = "h-[28px] rounded-md border border-im-line bg-im-surface px-2 text-[13px]";
-const boxClass = "mt-4 rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]";
-const primaryClass =
-  "inline-flex h-[26px] items-center rounded-md bg-im-logical px-[9px] text-xs font-medium text-white hover:opacity-90 disabled:cursor-default disabled:opacity-50";
+// slice 37 (step 5): the 28 px field, its padding and text kept (S33-05)
+const inputClass = cn(inputVariants({ size: "sm" }), "w-auto px-2 text-[13px]");
+const boxClass = "mt-4 rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]";
+const primaryClass = cn(buttonVariants({ variant: "primary", size: "sm" }), "inline-flex items-center px-[9px] text-xs");
 
 const ROLES: InvitationRole[] = ["admin", "modeler", "reviewer", "reader"];
 
@@ -120,7 +124,7 @@ export function InvitePersonBox({ workspaceId, ready, notReadyText }: { workspac
             aria-label="E-mail"
             placeholder="name@company.com"
             autoComplete="off"
-            className={inputClass + " w-full"}
+            className={cn(inputClass, "w-full")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -130,13 +134,13 @@ export function InvitePersonBox({ workspaceId, ready, notReadyText }: { workspac
             </span>
           )}
         </label>
-        <select data-testid="select-invite-role" disabled={!ready} aria-label="Role" className={inputClass} value={role} onChange={(e) => setRole(e.target.value as InvitationRole)}>
+        <Select size="sm" data-testid="select-invite-role" disabled={!ready} aria-label="Role" className={inputClass} value={role} onChange={(e) => setRole(e.target.value as InvitationRole)}>
           {ROLES.map((r) => (
             <option key={r} value={r}>
               {ROLE_LABEL[r]}
             </option>
           ))}
-        </select>
+        </Select>
         <button type="submit" data-testid="button-create-invitation" className={primaryClass} disabled={pending || !ready} title={ready ? undefined : notReadyText}>
           Create invitation link
         </button>

@@ -32,7 +32,7 @@ export function Breadcrumbs({ shell, trail, children }: { shell: ShellData; trai
       data-testid="nav-breadcrumbs"
       // contained (slice 6a, S6A-09): a chip coming or going lays out this row only, not the page with the canvas's
       // cards; a static property on the row's own element (AD-24 rule 4), its height fixed anyway
-      className="flex h-8 min-w-0 flex-none items-center gap-1.5 overflow-hidden border-b border-im-line bg-im-canvas px-2 text-xs [contain:strict]"
+      className="flex h-8 min-w-0 flex-none items-center gap-1.5 overflow-hidden border-b border-im-line bg-im-surface px-2 text-xs [contain:strict]"
     >
       <HistoryNav />
       <ol className="flex min-w-0 items-center gap-0.5 overflow-hidden whitespace-nowrap text-im-ink-3">
@@ -52,7 +52,7 @@ export function Breadcrumbs({ shell, trail, children }: { shell: ShellData; trai
                   data-testid="breadcrumb"
                   aria-current={current ? "page" : undefined}
                   className={
-                    "block min-h-target max-w-[220px] truncate rounded px-[5px] py-1 leading-4 hover:bg-im-surface hover:text-im-ink " +
+                    "block min-h-target max-w-[220px] truncate rounded px-[5px] py-1 leading-4 hover:bg-im-hover hover:text-im-ink " +
                     (current ? "font-medium text-im-ink" : "text-im-ink-2")
                   }
                 >

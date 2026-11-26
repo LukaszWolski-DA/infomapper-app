@@ -17,6 +17,11 @@ import { CHANGE_KINDS, filterChanges, ITEM_KINDS, type ItemKind } from "@/domain
 import { BASELINE_NAME_MAX, BASELINE_NOTE_MAX, BASELINE_GONE_MESSAGE, NAME_REQUIRED_MESSAGE } from "@/domain/baseline/names";
 import { COMPARE_WORDS, whatChanged } from "@/domain/baseline/words";
 import { NO_BASELINE_EXTENSIONS, type BaselineExtensions } from "@/compose/baselines-ui";
+import { cn } from "@/ui/lib/utils";
+import { FIELD_LABEL } from "@/ui/components/field";
+import { Select } from "@/ui/components/select";
+import { inputVariants, textareaVariants } from "@/ui/components/input";
+import { buttonVariants } from "@/ui/components/button";
 
 const W = COMPARE_WORDS.en;
 
@@ -79,15 +84,16 @@ function Minute({ iso }: { iso: string }) {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
 
-const smallBtn = "h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover disabled:opacity-50";
-const btn = "h-8 rounded-md border border-im-line bg-im-surface px-3 text-im-ink hover:bg-im-hover disabled:opacity-50";
+// slice 37 (step 5): the shared buttons and fields, each keeping its padding
+const smallBtn = cn(buttonVariants({ size: "sm" }), "px-[9px] text-xs");
+const btn = cn(buttonVariants(), "px-3");
 // the app's primary buttons (`primaryClass`, `src/app/_panels/fields.tsx`) use the logical colour, the prototype's `.pri` the
 // mapping colour: the app's own, as every primary button of the app
-const priBtn = "h-8 rounded-md border border-im-logical bg-im-logical px-3 font-medium text-im-surface disabled:opacity-50";
-const smallPriBtn = "h-[26px] rounded-md border border-im-logical bg-im-logical px-[9px] text-xs font-medium text-im-surface disabled:opacity-50";
-const textInput = "h-8 rounded-md border border-im-line bg-im-surface px-2 text-im-ink outline-none focus:border-im-logical";
-const fieldInput = "min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 text-im-ink outline-none focus:border-im-logical";
-const label = "mb-1 block text-[11.5px] text-im-ink-3";
+const priBtn = cn(buttonVariants({ variant: "primary" }), "px-3");
+const smallPriBtn = cn(buttonVariants({ variant: "primary", size: "sm" }), "px-[9px] text-xs");
+const textInput = cn(inputVariants(), "w-auto px-2");
+const fieldInput = cn(inputVariants(), "px-2");
+const label = FIELD_LABEL;
 
 export function BaselinesTab({
   workspaceId,
@@ -122,7 +128,7 @@ export function BaselinesTab({
               key={b.id}
               data-testid="baseline-row"
               data-id={b.id}
-              className="mb-2.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 [overflow-wrap:anywhere] gap-y-1.5 rounded-[10px] bg-im-surface px-3.5 py-3 shadow-[0_0_0_1px_var(--im-line)]"
+              className="mb-2.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 [overflow-wrap:anywhere] gap-y-1.5 rounded-lg bg-im-surface px-3.5 py-3 shadow-[0_0_0_1px_var(--im-line)]"
             >
               <div>
                 <div className="font-semibold" data-testid="baseline-name">
@@ -155,7 +161,7 @@ export function BaselinesTab({
                   </button>
                 )}
                 {rights.delete && (
-                  <button type="button" className={`${smallBtn} text-im-warn`} data-testid="button-baseline-delete" onClick={() => setDeleting(b)}>
+                  <button type="button" className={cn(smallBtn, "text-im-warn")} data-testid="button-baseline-delete" onClick={() => setDeleting(b)}>
                     Delete baseline
                   </button>
                 )}
@@ -208,7 +214,7 @@ function NewBaselineBox({ workspaceId }: { workspaceId: string }) {
     } else nameRef.current?.focus();
   };
   return (
-    <div className="mb-[18px] mt-3 rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-new-baseline">
+    <div className="mb-[18px] mt-3 rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-new-baseline">
       <h4 className="m-0 mb-1 text-[13.5px] font-semibold">New baseline</h4>
       <form
         className="flex flex-wrap items-center gap-2"
@@ -223,7 +229,7 @@ function NewBaselineBox({ workspaceId }: { workspaceId: string }) {
           aria-label="Name"
           maxLength={BASELINE_NAME_MAX}
           placeholder="Name, e.g. Stage 2 sign-off"
-          className={`${textInput} min-w-[220px] flex-1`}
+          className={cn(textInput, "min-w-[220px] flex-1")}
           value={name}
           onChange={(e) => setName(e.target.value)}
           data-testid="input-baseline-name"
@@ -233,7 +239,7 @@ function NewBaselineBox({ workspaceId }: { workspaceId: string }) {
           aria-label="Note (optional)"
           maxLength={BASELINE_NOTE_MAX}
           placeholder="Note (optional)"
-          className={`${textInput} min-w-[220px] flex-[2]`}
+          className={cn(textInput, "min-w-[220px] flex-[2]")}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           data-testid="input-baseline-note"
@@ -358,7 +364,7 @@ function RenameDialog({ workspaceId, workspaceName, baseline: b, taken, onClose 
             id="blr-note"
             rows={3}
             maxLength={BASELINE_NOTE_MAX}
-            className={`${fieldInput} min-h-[60px] resize-y`}
+            className={textareaVariants()}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             data-testid="input-rename-baseline-note"
@@ -399,7 +405,7 @@ function DeleteDialog({
           <button type="button" className={btn} onClick={onClose} data-testid="button-cancel-delete-baseline">
             Cancel
           </button>
-          <button type="button" className={`${btn} text-im-warn`} disabled={pending} onClick={() => void remove()} data-testid="button-confirm-delete-baseline">
+          <button type="button" className={cn(btn, "text-im-warn")} disabled={pending} onClick={() => void remove()} data-testid="button-confirm-delete-baseline">
             Delete baseline
           </button>
         </>
@@ -500,14 +506,14 @@ function CompareDialog({
           <label htmlFor="cmp-with" className={label}>
             Compared with
           </label>
-          <select id="cmp-with" className={fieldInput} value={other} onChange={(e) => setOther(e.target.value)} data-testid="select-compare-with">
+          <Select id="cmp-with" value={other} onChange={(e) => setOther(e.target.value)} data-testid="select-compare-with">
             <option value="now">Now (the live model)</option>
             {others.map((x) => (
               <option key={x.id} value={x.id}>
                 {x.name} ({minute(x.created_at)})
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div className="min-w-0 flex-[1_1_200px]">
           <label htmlFor="cmp-q" className={label}>
@@ -519,14 +525,14 @@ function CompareDialog({
           <label htmlFor="cmp-kind" className={label}>
             Kind
           </label>
-          <select id="cmp-kind" className={fieldInput} value={kind} onChange={(e) => setKind(e.target.value as ItemKind | "")} data-testid="select-compare-kind">
+          <Select id="cmp-kind" value={kind} onChange={(e) => setKind(e.target.value as ItemKind | "")} data-testid="select-compare-kind">
             <option value="">All kinds</option>
             {ITEM_KINDS.map((k) => (
               <option key={k} value={k}>
                 {W.kinds[k]}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
       <div data-testid="compare-list" aria-busy={!shown}>

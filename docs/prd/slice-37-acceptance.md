@@ -849,3 +849,46 @@ before any rerun, then it is run again alone and both are reported.
   S0-07, S0-08, S1A-03, S1A-06, S2A-10, S3B-01, S4B1-06, S5A-01, S5A-02, S5A-03, S6A-01 to S6A-08, S6A-10, S6A-11,
   S6B-09, S7B-14, S8-08, S11-02, S12A-01, S14B-07, S20-05, S20-06, S32-01, S32-02.
 - No full run in this step (Łukasz's instruction).
+
+**Łukasz's answer (26 November 2026):** step 4 accepted, the tools' 7 px gap from 1,201 to 1,300 px included. **For the
+closing:** a deviation from "no control moves" (F15): the top bar's tools move by up to 11 px at those widths only, so the
+working context keeps a 24 px target there.
+
+## Step 5: the homes, settings, people, baselines and dialogs (26 November 2026)
+
+**What changed:**
+- **White pages** (Q9): the workspace and project homes on `im-surface` (before `im-canvas`); the navigation row too
+  (the PRD's "white pages"; its links and Back and Forward now hover in `im-hover`, before white); the canvas tabs' strip
+  white (before `im-panel`; the selected tab keeps the canvas's colour so it joins the canvas). The homes keep their
+  layout and side panels (slice 38).
+- **The workspace home's tabs** are the shared tabs as links (`tabsListVariants`, `tabVariants`): natural width, 20 px
+  apart, the accent underline; `role="tab"`, `aria-selected` and the `tab-*` test ids kept; the labels as before
+  ("Baselines (1)", "People (4)"). At 390 px the row scrolls sideways with a fade at its end, and the page does not
+  (A7, below).
+- **The rule for widths:** every converted control keeps its horizontal padding and its text size, so it keeps its width
+  (People's columns, S33-05); the height, edge, radius and focus come from the shared look. Small buttons 28 px (before
+  26), fields 28 or 32 px (before 28, 30 or 32), text areas the shared one (at least 76 px, before 60).
+- **The files:** People and Invitations (the role selects `Select` `sm` at 13 px, the fields, the buttons through
+  `lifecycle.tsx`' `btnClass`, the primary "Create invitation link"); Baselines (its buttons, fields, the Compare
+  dialog's selects, the labels `Field`'s); Settings (the fields, the language `Select`, the concepts' colour swatches
+  24 px, before 22); the stereotypes' "move to" `Select`; the lifecycle's buttons; the new project and new canvas tiles
+  (`ADD_TILE` in `card.tsx`); a canvas tile's ⋯ the 28 px icon button; the project heading's name and description
+  (`QUIET_TEXT` in `input.tsx`: text until hovered, the field's edge and ring when focused); the project's labels' "Open
+  live canvas" the button's `sm`; the checks' "Show all" the button's `xs` and the stat "! n model checks" 24 px; the
+  new-organization dialog's fields, select and buttons. The homes' boxes and tiles are radius 12 (before 10).
+- **The check script:** it records each tab row's widths and whether it fades (`tabRows`), and two screens more
+  (`dialog-new-organization`, `dialog-compare-baseline`).
+- **The guard:** 12 files left the list: 17 files to convert and the one exception.
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test` (216 files, 2,618 tests).
+- **The check script**, before (`.data/ui-check/before5-20261126-2224/`, the committed code) and after
+  (`.data/ui-check/step5-20261126-2220/`): the workspace home and its six tabs, the project home, the two dialogs and an
+  entity's canvas (the tab strip), 1280 to 1920 px light and dark and 390 px. Nothing small, crowded, out of its control
+  or past the edge on these screens, before or after. **A7 at 390 px:** the workspace home's tab row is 609 px of tabs in
+  358 px, scrolls sideways and fades at its end; no page is wider than the screen. What is left is the canvas's top bar
+  at 390 px (step 4's, slice 38's layout).
+- **The specs of the screens touched** (31 specs, 73 tests, one local run with nothing beside it): 73 passed,
+  **S33-05 among them**. The specs: S0-02, S0-04 to S0-07, S3B-05, S6B-01, S8-07 to S8-10, S8-12, S10A-04, S12A-07,
+  S12A-11, S12B-01, S20-02, S21-05, S23-01, S23-05, S24-05, S24-06, S33-01 to S33-05, S35-01 to S35-04.
+- No full run in this step (Łukasz's instruction).

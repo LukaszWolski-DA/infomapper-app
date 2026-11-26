@@ -11,6 +11,8 @@ import { setLabelPinnedAction } from "@/app/_actions/label";
 import { useOpenLiveCanvas } from "@/app/_components/live-canvas";
 import { useAction } from "@/app/_components/use-action";
 import { TagIcon } from "@/app/_panels/labels-field";
+import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
 
 export interface ProjectLabelRow {
   id: string;
@@ -62,7 +64,7 @@ export function ProjectLabels({ workspaceId, projectId, labels, editable }: { wo
             <button
               type="button"
               disabled={openLive.pending}
-              className="h-[26px] whitespace-nowrap rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover"
+              className={cn(buttonVariants({ size: "sm" }), "px-[9px] text-xs")}
               onClick={() => void openLive.open(l.id)}
               data-testid="button-project-label-live"
             >

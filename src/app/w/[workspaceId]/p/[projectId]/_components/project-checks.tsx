@@ -11,8 +11,10 @@ import { projectChecksAction } from "@/app/_actions/checks";
 import type { HomeCheckGroup, HomeChecks, HomeCheckLine } from "@/app/_lib/project-checks";
 import { CHECK_TEXTS } from "@/domain/model/checks";
 import { useToast } from "@/ui/components/toast";
+import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
 
-const lineClass = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-im-hover";
+const lineClass = "flex min-h-target w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-im-hover";
 const groupClass = "mb-2 rounded-lg border border-im-line bg-im-surface px-2.5 py-2";
 const LIMIT = 20;
 
@@ -56,7 +58,7 @@ function Group({ group, workspaceId, projectId }: { group: HomeCheckGroup; works
         ))}
       </div>
       {group.count > LIMIT && (
-        <button type="button" className="mt-1 rounded-md border border-im-line px-2 py-0.5 text-xs hover:bg-im-hover" onClick={() => void toggle()} data-testid="button-checks-all">
+        <button type="button" className={cn(buttonVariants({ size: "xs" }), "mt-1 text-xs")} onClick={() => void toggle()} data-testid="button-checks-all">
           {shown ? CHECK_TEXTS.showFirst : CHECK_TEXTS.showAll(group.count)}
         </button>
       )}
@@ -99,7 +101,7 @@ export function ChecksStat({ count, high }: { count: number; high: boolean }) {
       data-high={high || undefined}
       title={CHECK_TEXTS.statTitle}
       onClick={() => document.getElementById("model-checks")?.scrollIntoView({ block: "start", behavior: "smooth" })}
-      className={`inline-flex items-center gap-1 rounded-[14px] bg-im-surface px-[11px] py-[3px] text-xs shadow-[0_0_0_1px_var(--im-line)] hover:bg-im-hover hover:underline ${high ? "text-im-warn" : "text-im-ink-2"}`}
+      className={`inline-flex min-h-target items-center gap-1 rounded-full bg-im-surface px-[11px] py-[3px] text-xs shadow-[0_0_0_1px_var(--im-line)] hover:bg-im-hover hover:underline ${high ? "text-im-warn" : "text-im-ink-2"}`}
     >
       <span className={`w-2.5 -skew-x-12 text-center font-bold italic ${high ? "text-im-warn" : "text-im-ink-3"}`} aria-hidden>
         !

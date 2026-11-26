@@ -13,9 +13,13 @@ import type { WorkspaceRole } from "@/domain/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
 import { useToast } from "@/ui/components/toast";
 import { btnClass } from "./lifecycle";
+import { cn } from "@/ui/lib/utils";
+import { inputVariants } from "@/ui/components/input";
+import { Select } from "@/ui/components/select";
 
-const inputClass = "h-[28px] rounded-md border border-im-line bg-im-surface px-2 text-[13px]";
-const boxClass = "mt-4 rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]";
+// slice 37 (step 5): the 28 px field, its padding and text kept (S33-05)
+const inputClass = cn(inputVariants({ size: "sm" }), "w-auto px-2 text-[13px]");
+const boxClass = "mt-4 rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]";
 const dangerClass = btnClass + " text-im-warn";
 
 const ADDABLE: WorkspaceRole[] = ["admin", "modeler", "reviewer", "reader"];
@@ -33,7 +37,8 @@ export function RoleSelect({ workspaceId, userId, name, role, ownerOffered }: { 
   const { run, pending } = useAction();
   const roles: WorkspaceRole[] = ownerOffered ? ["owner", ...ADDABLE] : ADDABLE;
   return (
-    <select
+    <Select
+      size="sm"
       data-testid="select-person-role"
       aria-label={`Role of ${name}`}
       className={inputClass}
@@ -46,7 +51,7 @@ export function RoleSelect({ workspaceId, userId, name, role, ownerOffered }: { 
           {ROLE_LABEL[r]}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 
@@ -175,7 +180,7 @@ export function OrganizationAccessBox({ workspaceId, link, version }: { workspac
               aria-label="New password"
               placeholder="New password"
               autoComplete="new-password"
-              className={inputClass + " w-full"}
+              className={cn(inputClass, "w-full")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -188,7 +193,7 @@ export function OrganizationAccessBox({ workspaceId, link, version }: { workspac
               aria-label="New password again"
               placeholder="New password again"
               autoComplete="new-password"
-              className={inputClass + " w-full"}
+              className={cn(inputClass, "w-full")}
               value={passwordAgain}
               onChange={(e) => setPasswordAgain(e.target.value)}
             />

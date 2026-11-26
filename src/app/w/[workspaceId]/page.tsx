@@ -33,6 +33,7 @@ import { baselineExtensions } from "@/compose/baselines-ui";
 import { chosenHomeTab } from "@/ui/home-tabs";
 import { moduleFeeds, STORE_SCHEMA } from "@/compose";
 import { workspacePeople } from "@/app/_lib/people";
+import { tabsListVariants, tabVariants } from "@/ui/components/tabs";
 
 export default async function WorkspaceHomePage({ params, searchParams }: PageProps<"/w/[workspaceId]">) {
   const { workspaceId } = await params;
@@ -131,7 +132,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
       {query.gone === "project" && <GoneNotice message="That project no longer exists." />}
       {/* slice 25 (step 4b): a module's page the person can no longer open sent them back here */}
       {typeof query.gone === "string" && HOME_GONE[query.gone] && <GoneNotice message={HOME_GONE[query.gone]!} />}
-      <div data-testid="page-workspace-home" className="min-h-full bg-im-canvas px-[clamp(16px,4vw,48px)] pb-12 pt-6">
+      <div data-testid="page-workspace-home" className="min-h-full bg-im-surface px-[clamp(16px,4vw,48px)] pb-12 pt-6">
         <div className="mx-auto max-w-[1180px]">
           <div className="mb-1 text-xs text-im-ink-3">{shell.organization.name} · workspace</div>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -161,7 +162,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
             </Banner>
           ) : null}
 
-          <div role="tablist" className="mb-1 mt-4 flex gap-0.5 border-b border-im-line">
+          <div role="tablist" className={`${tabsListVariants()} mb-1 mt-4`}>
             {(
               [
                 ["overview", "Overview"],
@@ -180,10 +181,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                 aria-selected={tab === key}
                 data-testid={`tab-${key}`}
                 href={workspaceHref(workspace.id, key === "overview" ? undefined : key)}
-                className={
-                  "-mb-px border-b-2 px-3.5 py-2 font-medium " +
-                  (tab === key ? "border-im-logical text-im-ink" : "border-transparent text-im-ink-2 hover:text-im-ink")
-                }
+                // slice 37 (step 5): the shared tabs, at their natural width (F8)
+                className={tabVariants()}
               >
                 {label}
               </Link>
@@ -230,7 +229,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                       key={p.id}
                       href={projectHref(workspace.id, p.id)}
                       data-testid="tile-project"
-                      className="overflow-hidden rounded-[10px] bg-im-surface text-left shadow-[0_0_0_1px_var(--im-line),0_6px_16px_-12px_var(--im-shadow)] hover:shadow-[0_0_0_2px_var(--im-logical),0_10px_24px_-14px_var(--im-shadow)]"
+                      className="overflow-hidden rounded-lg bg-im-surface text-left shadow-[0_0_0_1px_var(--im-line),0_6px_16px_-12px_var(--im-shadow)] hover:shadow-[0_0_0_2px_var(--im-logical),0_10px_24px_-14px_var(--im-shadow)]"
                     >
                       <span className="block h-[140px] border-b border-im-line bg-im-canvas">
                         {firstCanvas.has(p.id) && <CanvasThumbnail href={thumbnails.get(firstCanvas.get(p.id)!) ?? null} />}

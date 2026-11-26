@@ -24,6 +24,9 @@ import { useAction } from "@/app/_components/use-action";
 import { DraftLine, useChoice, useDraft } from "@/app/_panels/fields";
 import { NAME_REQUIRED } from "@/domain/validation";
 import { useToast } from "@/ui/components/toast";
+import { cn } from "@/ui/lib/utils";
+import { inputVariants, textareaVariants } from "@/ui/components/input";
+import { Select } from "@/ui/components/select";
 
 export interface SettingsValues {
   workspaceId: string;
@@ -49,8 +52,8 @@ const SAVED_MESSAGE = (patch: Patch, dataVaultUses: number): string => {
   return "Settings saved.";
 };
 
-const fieldClass =
-  "min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 disabled:opacity-60 disabled:cursor-default";
+// slice 37 (step 5): the shared field
+const fieldClass = cn(inputVariants(), "px-2");
 
 /**
  * `dataVaultUses`: the workspace's uses of Data Vault classifications (answer F16), for the mode-off message. `modules`:
@@ -96,7 +99,7 @@ export function SettingsForm({
   const dis = !editable;
   return (
     <div className="mt-3.5 grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-5" data-testid="form-workspace-settings">
-      <div className="rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]">
+      <div className="rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]">
         <h4 className="m-0 mb-1 text-[13.5px] font-semibold">General</h4>
         <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2">Shown on the workspace and in generated documents.</p>
         <Field label="Name">
@@ -138,7 +141,7 @@ export function SettingsForm({
             ref={descriptionBind}
             rows={3}
             data-testid="input-workspace-description"
-            className={fieldClass + " min-h-[60px] resize-y"}
+            className={textareaVariants()}
             defaultValue={descriptionInitial}
             disabled={dis && descriptionMark?.kind !== "copy"}
             readOnly={dis}
@@ -148,9 +151,8 @@ export function SettingsForm({
           <DraftLine mark={descriptionMark} onUse={descriptionTake} onKeep={descriptionKeep} />
         </Field>
         <Field label="Documentation language">
-          <select
+          <Select
             data-testid="select-workspace-language"
-            className={fieldClass}
             value={language.value}
             disabled={dis}
             onChange={(e) => language.choose(e.currentTarget.value as DocLanguage)}
@@ -160,11 +162,11 @@ export function SettingsForm({
                 {label}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
       </div>
 
-      <div className="rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]">
+      <div className="rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]">
         <h4 className="m-0 mb-1 text-[13.5px] font-semibold">Methodology</h4>
         <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2" data-testid="text-methodology">
           {DATA_VAULT_MODE_TEXT}
@@ -184,7 +186,7 @@ export function SettingsForm({
         </label>
       </div>
 
-      <div className="rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-model-conventions">
+      <div className="rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-model-conventions">
         <h4 className="m-0 mb-1 text-[13.5px] font-semibold">Model conventions</h4>
         <p className="m-0 text-[12.5px] text-im-ink-2">
           {MODEL_CONVENTIONS_TEXT}{" "}
@@ -212,7 +214,7 @@ export function SettingsForm({
  */
 export function ConceptColours({ workspaceId, concepts, editable }: { workspaceId: string; concepts: readonly ConceptColorRow[]; editable: boolean }) {
   return (
-    <section className="mt-3.5 rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-concept-colours">
+    <section className="mt-3.5 rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-concept-colours">
       <h3 className="m-0 mb-1 text-[15px] font-semibold">Concept colours</h3>
       <p className="m-0 mb-2.5 max-w-[90ch] text-[12.5px] text-im-ink-3">{CONCEPT_COLOURS_TEXT}</p>
       {concepts.length ? (
@@ -254,7 +256,7 @@ function ConceptColourLine({ workspaceId, concept, editable }: { workspaceId: st
             data-colour={c}
             disabled={!editable}
             onClick={() => colour.choose(c)}
-            className="size-[22px] rounded-[5px] shadow-[inset_0_0_0_1px_rgba(0,0,0,.15)] disabled:cursor-default disabled:opacity-60 aria-pressed:shadow-[0_0_0_2px_var(--im-surface),0_0_0_4px_var(--im-logical)]"
+            className="size-target rounded-md shadow-[inset_0_0_0_1px_rgba(0,0,0,.15)] disabled:cursor-default disabled:opacity-60 aria-pressed:shadow-[0_0_0_2px_var(--im-surface),0_0_0_4px_var(--im-logical)]"
             style={{ background: c }}
           />
         ))}

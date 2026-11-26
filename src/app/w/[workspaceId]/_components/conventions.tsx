@@ -61,7 +61,7 @@ export interface ConventionsProps {
 }
 
 const trimmed = (t: string) => t.trim();
-const boxClass = "mt-3.5 rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]";
+const boxClass = "mt-3.5 rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]";
 const hintClass = "m-0 mb-1.5 max-w-[90ch] text-[12.5px] text-im-ink-3";
 
 export function Conventions(p: ConventionsProps) {

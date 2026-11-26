@@ -20,9 +20,11 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/components/dropdown-menu";
 import { CanvasMenu, DotsIcon, itemClass, menuClass, useNewCanvas } from "./canvas-menu";
+import { cn } from "@/ui/lib/utils";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { ADD_TILE } from "@/ui/components/card";
 
-const addTileClass =
-  "grid min-h-[200px] place-items-center rounded-[10px] bg-transparent font-medium text-im-ink-2 shadow-[inset_0_0_0_1.5px_var(--im-line)] hover:text-im-logical hover:shadow-[inset_0_0_0_1.5px_var(--im-logical)] data-[state=open]:text-im-logical";
+const addTileClass = ADD_TILE;
 
 export function CanvasTiles({
   view,
@@ -47,7 +49,7 @@ export function CanvasTiles({
           <div
             key={canvas.id}
             data-testid="tile-canvas"
-            className="group relative overflow-hidden rounded-[10px] bg-im-surface shadow-[0_0_0_1px_var(--im-line),0_6px_16px_-12px_var(--im-shadow)] hover:shadow-[0_0_0_2px_var(--im-logical),0_10px_24px_-14px_var(--im-shadow)]"
+            className="group relative overflow-hidden rounded-lg bg-im-surface shadow-[0_0_0_1px_var(--im-line),0_6px_16px_-12px_var(--im-shadow)] hover:shadow-[0_0_0_2px_var(--im-logical),0_10px_24px_-14px_var(--im-shadow)]"
           >
             <Link href={href} className="block text-left">
               <span className="block h-[140px] border-b border-im-line bg-im-canvas">{thumbnails[canvas.id]}</span>
@@ -80,7 +82,7 @@ export function CanvasTiles({
                       title="Canvas options"
                       aria-label={`Options for ${canvas.name}`}
                       data-testid="button-canvas-menu"
-                      className="grid size-7 place-items-center rounded-md bg-im-surface text-im-ink-2 opacity-0 shadow-[0_0_0_1px_var(--im-line)] hover:text-im-ink focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+                      className={cn(iconButtonVariants(), "bg-im-surface opacity-0 shadow-[0_0_0_1px_var(--im-line)] focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100")}
                     >
                       <DotsIcon />
                     </button>

@@ -32,6 +32,7 @@ import {
 } from "@/domain/model/stereotypes";
 import type { Stereotype } from "@/domain/types";
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/ui/components/dialog";
+import { Select } from "@/ui/components/select";
 
 export const STEREOTYPES_HINT =
   "What an entity is in the model. Names and definitions are the workspace's; codes never change, so entities, imports and exports keep them while names change. The five built-in ones stay (Object is a new entity's stereotype and every fact's and dimension's); own ones can be added and removed. Facts and dimensions show their InfoCube role instead.";
@@ -54,7 +55,7 @@ export interface StereotypesBoxProps {
 }
 
 const trimmed = (t: string) => t.trim();
-const boxClass = "mt-3.5 rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]";
+const boxClass = "mt-3.5 rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]";
 const hintClass = "m-0 mb-1.5 max-w-[90ch] text-[12.5px] text-im-ink-3";
 
 export function StereotypesBox(p: StereotypesBoxProps) {
@@ -295,13 +296,13 @@ function RemoveDialog({ s, n, others, pending, onCancel, onRemove }: { s: Stereo
           <label htmlFor="st-move-to" className="text-im-ink-2">
             Stereotype
           </label>
-          <select id="st-move-to" value={to} onChange={(e) => setTo(e.target.value)} className={inputClass} data-testid="select-stereotype-move-to">
+          <Select id="st-move-to" value={to} onChange={(e) => setTo(e.target.value)} data-testid="select-stereotype-move-to">
             {others.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <p className="mt-2 text-[12px] text-im-ink-3">{STEREOTYPE_MOVE_NOTE}</p>
         <DialogFooter className="mt-4">

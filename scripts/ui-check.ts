@@ -141,6 +141,26 @@ function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[
   return [
     { id: "workspace-home", path: w, ready: '[data-testid="page-workspace-home"]' },
     ...wsTabs.map((tab) => ({ id: `workspace-${tab}`, path: `${w}?tab=${tab}`, ready: '[data-testid="page-workspace-home"]' })),
+    // slice 37, step 5: the homes' dialogs
+    {
+      id: "dialog-new-organization",
+      path: w,
+      ready: '[data-testid="page-workspace-home"]',
+      then: async (page: Page) => {
+        await page.getByTestId("switcher-organization").click();
+        await page.getByTestId("menu-item-new-organization").click();
+        await page.getByRole("dialog").waitFor();
+      },
+    },
+    {
+      id: "dialog-compare-baseline",
+      path: `${w}?tab=baselines`,
+      ready: '[data-testid="page-workspace-home"]',
+      then: async (page: Page) => {
+        await page.getByTestId("button-baseline-compare").first().click();
+        await page.getByRole("dialog").waitFor();
+      },
+    },
     { id: "project-home", path: `${w}/p/${ids.project}`, ready: '[data-testid="page-project-home"]' },
     { id: "canvas", path: canvas, ready: NODE },
     ...leftTabs.map((tab) => ({
@@ -311,6 +331,8 @@ interface Collected {
   cut: { testId: string | null; tag: string; text: string; box: TextBox }[];
   scrollWidth: number;
   innerWidth: number;
+  /** Each tab row (A7): how wide its tabs are, how wide it is, and whether it fades at its end. */
+  tabRows: { testId: string | null; scrollWidth: number; clientWidth: number; fades: boolean }[];
 }
 
 /** Runs in the page as plain JavaScript (a string, so no build helper is serialised into it). */
@@ -389,7 +411,11 @@ const COLLECT = String.raw`(() => {
     cut.push({ testId: e.getAttribute("data-testid") || e.closest("[data-testid]")?.getAttribute("data-testid") || null, tag: e.tagName.toLowerCase(), text: e.innerText.replace(/\s+/g, " ").slice(0, 80),
       box: { overflowX: s.overflowX, textOverflow: s.textOverflow, scrollWidth: e.scrollWidth, clientWidth: e.clientWidth } });
   }
-  return { controls, cut, scrollWidth: document.documentElement.scrollWidth, innerWidth };
+  const tabRows = [...document.querySelectorAll('[role="tablist"]')].filter((e) => shown(e)).map((e) => {
+    const s = getComputedStyle(e);
+    return { testId: e.getAttribute("data-testid"), scrollWidth: e.scrollWidth, clientWidth: e.clientWidth, fades: (s.maskImage || s.webkitMaskImage || "none") !== "none" };
+  });
+  return { controls, cut, scrollWidth: document.documentElement.scrollWidth, innerWidth, tabRows };
 })()`;
 
 // ---------- the server ----------
@@ -443,6 +469,7 @@ interface Result {
   small: ReturnType<typeof smallTargets>;
   cut: Collected["cut"];
   pageWider: number;
+  tabRows?: Collected["tabRows"];
   error?: string;
 }
 
@@ -487,6 +514,7 @@ async function check(page: Page, base: string, screen: Screen, view: View, dir: 
       small: smallTargets(got.controls),
       cut: got.cut.filter((c) => isCutWithoutEllipsis(c.box)),
       pageWider: Math.max(0, got.scrollWidth - got.innerWidth),
+      tabRows: got.tabRows,
     };
   } catch (e) {
     return { screen: screen.id, view, file: "", controls: [], overlaps: [], spills: [], crowded: [], past: [], small: [], cut: [], pageWider: 0, error: e instanceof Error ? e.message.split("\n")[0] : String(e) };
@@ -529,6 +557,7 @@ function report(results: readonly Result[], label: string, started: Date): strin
     for (const s of r.small) lines.push(`- ${Math.round(s.control.rect.w)} × ${Math.round(s.control.rect.h)} px${s.spaced ? " (spaced)" : ""}: ${describe(s.control)}`);
     for (const c of r.cut) lines.push(`- cut: ${c.testId ? `[${c.testId}] ` : ""}${c.tag} "${c.text.slice(0, 60)}" (${c.box.scrollWidth} in ${c.box.clientWidth} px)`);
     if (r.pageWider) lines.push(`- the page is ${r.pageWider} px wider than the screen`);
+    for (const t of r.tabRows ?? []) if (t.scrollWidth > t.clientWidth + 1) lines.push(`- a tab row${t.testId ? ` [${t.testId}]` : ""} scrolls: ${t.scrollWidth} px in ${t.clientWidth}${t.fades ? ", with a fade at its end" : ", without a fade"}`);
     lines.push("");
   }
   return lines.join("\n");

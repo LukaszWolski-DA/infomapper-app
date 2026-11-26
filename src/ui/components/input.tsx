@@ -28,6 +28,10 @@ export const textareaVariants = cva(`${FIELD_LOOK} min-h-[76px] resize-y px-2.5 
 export const QUIET_FIELD =
   "h-control-sm rounded-md bg-transparent text-im-ink-2 outline-none hover:bg-im-hover focus:bg-im-surface focus:text-im-ink focus:shadow-[0_0_0_1px_var(--im-line-control),0_0_0_4px_var(--im-logical-soft)]"
 
+/** A heading's field (the project's name and description): text until hovered; focused, the field's edge and ring. */
+export const QUIET_TEXT =
+  "w-full rounded-md bg-transparent py-0.5 outline-none hover:bg-im-hover focus:bg-im-surface focus:shadow-[0_0_0_1px_var(--im-line-control),0_0_0_4px_var(--im-logical-soft)]"
+
 type InputProps = Omit<React.ComponentProps<"input">, "size"> & VariantProps<typeof inputVariants>
 
 function Input({ className, size, type = "text", ...props }: InputProps) {

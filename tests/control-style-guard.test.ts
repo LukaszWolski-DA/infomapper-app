@@ -17,21 +17,9 @@ const EXCEPTIONS: Readonly<Record<string, string>> = {
 
 /** Slice 37, step 2: every file that styled a control on its own after `fields.tsx`' constants became the shared look.
  * Step 3a converted the inspector's panels and InfoCube's sections (15 files); step 3b the left panel, the toolbox and
- * the import wizard (6); step 4 the top bar, the navigation row and the canvas's switches (16). */
+ * the import wizard (6); step 4 the top bar, the navigation row and the canvas's switches (16);
+ * step 5 the homes, settings, people, baselines and dialogs (12). */
 const TO_CONVERT: readonly string[] = [
-  // step 5: the homes, settings, people, baselines, dialogs
-  "src/app/_components/new-organization-dialog.tsx",
-  "src/app/w/[workspaceId]/_components/baselines.tsx",
-  "src/app/w/[workspaceId]/_components/invitations.tsx",
-  "src/app/w/[workspaceId]/_components/lifecycle.tsx",
-  "src/app/w/[workspaceId]/_components/new-project-tile.tsx",
-  "src/app/w/[workspaceId]/_components/people.tsx",
-  "src/app/w/[workspaceId]/_components/settings-form.tsx",
-  "src/app/w/[workspaceId]/_components/stereotypes-box.tsx",
-  "src/app/w/[workspaceId]/p/[projectId]/_components/project-checks.tsx",
-  "src/app/w/[workspaceId]/p/[projectId]/_components/project-heading.tsx",
-  "src/app/w/[workspaceId]/p/[projectId]/_components/project-labels.tsx",
-  "src/app/w/[workspaceId]/p/[projectId]/_components/project-tiles.tsx",
   // step 6: InfoDocumenter
   "src/modules/infodocumenter/app/editor.tsx",
   "src/modules/infodocumenter/app/figure-editor.tsx",

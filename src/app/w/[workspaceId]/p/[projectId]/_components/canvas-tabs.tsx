@@ -62,7 +62,7 @@ export function CanvasTabs({
       role="tablist"
       aria-label="Canvases"
       data-testid="tabs-canvases"
-      className="flex h-[38px] flex-none items-end gap-0.5 overflow-x-auto overflow-y-hidden bg-im-panel px-2 [background:linear-gradient(var(--im-line),var(--im-line))_bottom/100%_1px_no-repeat,var(--im-panel)] [scrollbar-width:none]"
+      className="flex h-[38px] flex-none items-end gap-0.5 overflow-x-auto overflow-y-hidden bg-im-surface px-2 [background:linear-gradient(var(--im-line),var(--im-line))_bottom/100%_1px_no-repeat,var(--im-surface)] [scrollbar-width:none]"
     >
       <Link
         role="tab"
