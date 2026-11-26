@@ -42,6 +42,14 @@ Each item is explained further down. The first option is my recommendation.
 | A7 | **390 px.** S37-03 asks for "no page scrolling sideways at 390 px", but the top bar on a phone is slice 38's (DS2.4). (F20) | **(a)** The page does not scroll sideways (the tab rows scroll with a fade, and `overflow-x: clip` on the page as the prototype has it). The top bar's cut account button is reported and named as slice 38's. (b) Leave 390 px out of the criterion. |
 | A8 | **The check script's data.** "Give him long names" (the PRD's lesson). (Q6) | **(a)** The script resets a data file of its own from the demo and adds a few long names (an entity, an attribute, a document section, a project, a canvas) through the domain. (b) The demo alone. |
 
+**Łukasz's answers (26 November 2026):**
+- **A1 to A8:** all option (a), the recommendations above.
+- **A8, in detail:** the check script's data is a file of its own, `.data/ui-check-db.json`, made from the demo data
+  (`addSeedDemoData`) with the long names added. It never reads or writes `.data/dev-db.json` or `.data/demo-db.json`,
+  and it is git-ignored (`.data/`).
+- **F9:** native check boxes with `accent-color`; S37-01's "check box edges" is read as at least 3:1.
+- **F10:** the label above a field is 12/16 500 in `ink-2`, named in the before/after report.
+
 ### 2. Q1: the inventory of controls
 
 **By area** (elements in TSX; a list item drawn by `.map` counts once):
