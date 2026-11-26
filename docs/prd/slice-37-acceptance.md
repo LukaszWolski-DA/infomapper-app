@@ -723,3 +723,13 @@ documents and three documents of every section type: Markdown, HTML, CSS).
   navigation row (slice 38's, A7), the working context's spill, and two pairs where a control on the canvas lies under a
   panel field that is now 32 px tall (the details panel lies over the canvas at that width). "Words run together" is the
   left panel's tabs and the top bar's switchers (steps 3b and 4).
+- **The full run (A5)** on `fdc5aa8`, [run 45864284006](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45864284006):
+  15 min 54 s wall-clock; 910 passed, 1 failed, 16 skipped (the measuring and screenshot specs), no expected failures.
+  - Parts (time, server heap peak): 1 12.3 min 1,193 MB; 2 9.1 min 1,396 MB; 3 12.9 min 1,328 MB; 4 7.5 min 1,558 MB;
+    5 9.1 min 1,479 MB; 6 7.9 min 1,690 MB; 7 10.0 min 1,007 MB; 8 8.8 min 1,637 MB; 9 4.2 min 1,347 MB;
+    10 5.9 min 1,221 MB; 11 12.7 min 1,331 MB.
+  - The failure: `S36-list` (part 11) read the documents' times with `allTextContents()` right after a reload, before
+    hydration had replaced their placeholders (`text-document-created-pending`, `LocalMinute`): an empty list. The
+    single-file check, [run 45866858712](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45866858712),
+    passed 3 of 3. A race in the test, not in this slice: its fix (a retrying `toHaveText` on the two times) belongs to a
+    `fix/` branch from `dev`.
