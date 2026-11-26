@@ -62,6 +62,12 @@ import { StylePanel } from "./style-panel";
 import { MARKDOWN_TEXTS, MarkdownDialog, type MarkdownShown } from "./markdown-dialog";
 import { documentMarkdown, localTimestamp, markdownFileName } from "../domain/markdown";
 import { DocumentPreview, LAYOUT_THRESHOLD_MS, PREVIEW_TEXTS, type PreviewHandle, type PreviewMode, type PreviewZoom } from "./preview";
+import { cn } from "@/ui/lib/utils";
+import { Select } from "@/ui/components/select";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { chipVariants } from "@/ui/components/chip";
+import { Check as UiCheck, CHECK_LABEL } from "@/ui/components/check";
+import { buttonVariants } from "@/ui/components/button";
 
 /** A registered section type as the editor lists it (the server computes it for the workspace). */
 export interface EditorSectionType {
@@ -456,7 +462,8 @@ export function DocumentEditor(props: EditorProps) {
         <span data-testid="text-pages" className="text-[12px] text-im-ink-3" role="status">
           {status}
         </span>
-        <select
+        <Select
+          size="sm"
           aria-label="Preview pages"
           title={PREVIEW_TEXTS.modeTitle}
           data-testid="select-preview-mode"
@@ -469,14 +476,14 @@ export function DocumentEditor(props: EditorProps) {
               {label}
             </option>
           ))}
-        </select>
-        <select aria-label="Preview zoom" data-testid="select-preview-zoom" value={zoom} onChange={(e) => setZoom(e.currentTarget.value as PreviewZoom)} className={selectClass}>
+        </Select>
+        <Select size="sm" aria-label="Preview zoom" data-testid="select-preview-zoom" value={zoom} onChange={(e) => setZoom(e.currentTarget.value as PreviewZoom)} className={selectClass}>
           {PREVIEW_TEXTS.zooms.map(([v, label]) => (
             <option key={v} value={v}>
               {label}
             </option>
           ))}
-        </select>
+        </Select>
         {/* slice 36 (B3.5, F17): nothing is printed or exported from a baseline that is gone, nor before the source's model came */}
         <button
           type="button"
@@ -567,7 +574,7 @@ export function DocumentEditor(props: EditorProps) {
                       data-type={t.type}
                       disabled={!t.available || pending}
                       onClick={() => void addSection(t.type)}
-                      className="rounded-md border border-im-line bg-im-surface px-2.5 py-1.5 text-left hover:bg-im-hover disabled:cursor-not-allowed disabled:opacity-60"
+                      className={cn(buttonVariants(), "block h-auto w-full whitespace-normal px-2.5 py-1.5 text-left font-normal disabled:cursor-not-allowed")}
                     >
                       <b className="text-[12.5px]">{sectionName(t.type, t.name)}</b>
                       {t.module && <Chip>{t.module}</Chip>}
@@ -740,7 +747,7 @@ function ModelState({
   return (
     <Field hint={EDITOR_TEXTS.modelStateHint}>
       {(f) => (
-        <select
+        <Select
           id={f.id}
           aria-label="Model state"
           aria-describedby={f.hintId}
@@ -748,7 +755,7 @@ function ModelState({
           value={value}
           disabled={disabled}
           onChange={(e) => choice.choose(e.currentTarget.value)}
-          className="h-8 w-full rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
+          className="px-2"
         >
           {gone && (
             <option value="" disabled data-testid="option-source-gone">
@@ -761,7 +768,7 @@ function ModelState({
               {EDITOR_TEXTS.baselineOption(b.name, minute(b.created_at))}
             </option>
           ))}
-        </select>
+        </Select>
       )}
     </Field>
   );
@@ -801,7 +808,7 @@ function SectionRow({
   const choice = useChoice(s.on, onSwitch, version);
   return (
     <div
-      className={`de-sec ${rowClass} group flex items-center gap-1.5 ${!choice.value || off ? "off" : ""}`}
+      className={`de-sec ${rowClass} group relative flex items-center gap-1.5 ${!choice.value || off ? "off" : ""}`}
       aria-current={selected || undefined}
       data-testid="editor-section"
       data-section={s.type}
@@ -833,16 +840,19 @@ function SectionRow({
         </span>
       )}
       {!readOnly && (
-        <span className="de-btns flex gap-0.5">
-          <IconButton label="Move up" testId="button-section-up" disabled={first} onClick={() => onMove("up")}>
+        // slice 37 (step 6): over the row's end, so the name takes the whole row while they are hidden; hidden by opacity
+        // only, so they stay in the page and clickable (a touch screen, the specs); shown on hover, on the selected row
+        // and while one of them has the focus
+        <span className="de-btns absolute right-1 top-1/2 flex -translate-y-1/2 gap-0.5 rounded-md">
+          <RowButton label="Move up" testId="button-section-up" disabled={first} onClick={() => onMove("up")}>
             ↑
-          </IconButton>
-          <IconButton label="Move down" testId="button-section-down" disabled={last} onClick={() => onMove("down")}>
+          </RowButton>
+          <RowButton label="Move down" testId="button-section-down" disabled={last} onClick={() => onMove("down")}>
             ↓
-          </IconButton>
-          <IconButton label="Remove" testId="button-section-remove" onClick={onRemove}>
+          </RowButton>
+          <RowButton label="Remove" testId="button-section-remove" onClick={onRemove}>
             ✕
-          </IconButton>
+          </RowButton>
         </span>
       )}
     </div>
@@ -1033,12 +1043,7 @@ function Choice<T>({ stored, save, version, children }: { stored: T; save: (v: T
 
 function Check({ label, stored, onSave, version, disabled, testId }: { label: string; stored: boolean; onSave: (v: boolean) => Answer; version: number; disabled?: boolean; testId: string }) {
   const choice = useChoice(stored, onSave, version);
-  return (
-    <label className="flex items-center gap-2">
-      <input type="checkbox" data-testid={testId} checked={choice.value} disabled={disabled} onChange={(e) => choice.choose(e.currentTarget.checked)} />
-      {label}
-    </label>
-  );
+  return <UiCheck label={label} data-testid={testId} checked={choice.value} disabled={disabled} onChange={(e) => choice.choose(e.currentTarget.checked)} />;
 }
 
 function IdChecks({
@@ -1067,7 +1072,7 @@ function IdChecks({
   return (
     <div className="flex flex-col" role="group" aria-labelledby={labelledBy} data-testid={testId}>
       {items.map((i) => (
-        <label key={i.id} className="flex min-h-target items-center gap-2">
+        <label key={i.id} className={CHECK_LABEL}>
           <input
             type="checkbox"
             data-testid={`${testId}-item`}
@@ -1086,7 +1091,8 @@ function IdChecks({
   );
 }
 
-function IconButton({ label, testId, disabled, onClick, children }: { label: string; testId: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
+/** A section's ↑, ↓ and ✕: the 28 px icon button (slice 37, step 6). */
+function RowButton({ label, testId, disabled, onClick, children }: { label: string; testId: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
@@ -1099,33 +1105,36 @@ function IconButton({ label, testId, disabled, onClick, children }: { label: str
         onClick();
       }}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="grid h-[22px] w-[22px] place-items-center rounded text-[12px] text-im-ink-2 hover:bg-im-hover disabled:opacity-30"
+      className={cn(iconButtonVariants(), "text-[12px]")}
     >
       {children}
     </button>
   );
 }
 
-const Chip = ({ children }: { children: ReactNode }) => <span className="ml-1 rounded bg-im-hover px-1.5 text-[11px] font-normal text-im-ink-2">{children}</span>;
+const Chip = ({ children }: { children: ReactNode }) => <span className={cn(chipVariants(), "ml-1 font-normal")}>{children}</span>;
 const H = ({ children }: { children: ReactNode }) => <h3 className="mb-0 mt-5 text-[13px] font-semibold text-im-ink">{children}</h3>;
 
 function Badge({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
-    <span data-testid={testId} className="inline-flex h-[22px] items-center rounded-[11px] bg-im-hover px-[9px] text-[11.5px] font-medium text-im-ink-2">
+    <span data-testid={testId} className={chipVariants()}>
       {children}
     </span>
   );
 }
 
-const smallButton = "h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover disabled:opacity-50";
-const smallLink = "inline-flex h-[26px] items-center rounded-md px-[9px] text-[12.5px] text-im-ink-2 hover:bg-im-hover hover:text-im-ink";
-const selectClass = "h-[26px] rounded-md border border-im-line bg-im-surface px-1.5 text-xs text-im-ink";
+// slice 37 (step 6): the bar's controls 28 px (the button's and the select's `sm`), each keeping its padding and text
+const smallButton = cn(buttonVariants({ size: "sm" }), "px-[9px] text-xs");
+const smallLink = cn(buttonVariants({ variant: "quiet", size: "sm" }), "inline-flex items-center px-[9px] text-[12.5px]");
+const selectClass = "w-auto px-1.5 text-xs";
 const rowClass = "cursor-pointer rounded-md px-2 py-1.5 hover:bg-im-hover aria-[current]:bg-im-logical-soft";
 
 /** The prototype's row and panel details: faint buttons until hover or selection, an off section struck through, the flash. */
 const EDITOR_CSS = `
-.de-sec .de-btns{opacity:.15}
-.de-sec:hover .de-btns,.de-sec[aria-current] .de-btns{opacity:1}
+.de-sec .de-btns{opacity:0;transition:opacity .1s;background:var(--im-surface)}
+.de-sec:hover .de-btns,.de-sec[aria-current] .de-btns,.de-sec:focus-within .de-btns{opacity:1}
+.de-sec:hover .de-btns{background:var(--im-hover)}
+.de-sec[aria-current] .de-btns{background:var(--im-logical-soft)}
 .de-sec.off .de-name{text-decoration:line-through;color:var(--im-ink-3)}
 .de-flash{animation:de-flash .9s ease-out}
 @keyframes de-flash{0%{box-shadow:0 0 0 3px var(--im-logical)}100%{box-shadow:0 0 0 0 transparent}}

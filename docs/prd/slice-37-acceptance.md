@@ -892,3 +892,45 @@ working context keeps a 24 px target there.
   **S33-05 among them**. The specs: S0-02, S0-04 to S0-07, S3B-05, S6B-01, S8-07 to S8-10, S8-12, S10A-04, S12A-07,
   S12A-11, S12B-01, S20-02, S21-05, S23-01, S23-05, S24-05, S24-06, S33-01 to S33-05, S35-01 to S35-04.
 - No full run in this step (Łukasz's instruction).
+
+**Łukasz's answer (26 November 2026):** step 5 accepted. Steps 6 and 7 go together in one step.
+
+## Steps 6 and 7: InfoDocumenter and InfoCube (26 November 2026)
+
+**What changed:**
+- **The editor's bar:** Print / PDF, Markdown and the read-only banner's Duplicate are the button's `sm` (28 px, before 26),
+  their padding kept; the preview's two selects `Select` `sm` (28 px, before 26, with the focus ring they lacked); the
+  details panel's toggle the tool button at 28 px; the sharing and read-only marks `src/ui`'s chip. The bar's layout and
+  every control's place stay (slice 38).
+- **The section list:** move up, move down and remove are 28 px icon buttons (before 22). They lie over the row's end
+  (absolutely placed, on the row's own colour), so the section's name uses the row's whole width while they are hidden;
+  they are hidden by opacity only (0, before 0.15) and shown on hover, on the selected row and while one of them has the
+  focus (`focus-within`); one that cannot act is at 30 %. They stay in the page and take clicks at all times (no
+  `pointer-events: none`, no `display: none`), so a touch screen and the specs reach them. A module's mark is `src/ui`'s
+  chip. "+ Add section"'s list of types: the shared button, its rows as before.
+- **The panels:** InfoDocumenter's `Field` is `src/ui`'s (the label 12/16 500 `ink-2`, before 11.5 `ink-3`; the editor's
+  `de-wrap` kept); its `Check` is `src/ui`'s new `Check` (`check.tsx`: a native check box in a 24 px label); every select
+  of the options, the style and the figure editor is `Select` (32 px, the figure editor's 28 px); the Model state select
+  too; the accent colours' swatches 24 px (before 26: 28 is refused by the guard as a radius with a height, and 24 is the
+  target); the figure editor's ↑ ↓ ✕ the 24 px icon button in its row; its "Add" the button's `sm`.
+- **The Markdown dialog** (Copy, Download), the document page's Print and the preview's "Update pages": the button's
+  `sm`, their padding kept. **The Documentation tab's new-document cards:** `src/ui`'s card as a button.
+- **InfoCube:** the bus matrix's Close the shared button; the Create dimension dialog's attribute rows 24 px; the InfoCube
+  and InfoDocumenter settings boxes' check box in a 24 px label (`CHECK_LABEL`).
+- **The check script:** two screens more (`editor-markdown`, `editor-add-section`).
+- **The guard:** 10 files left the list (InfoDocumenter's 9, the bus matrix): 7 files to convert (step 8's) and the one
+  exception.
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test` (216 files, 2,619 tests).
+- **The generated documents:** `npx tsx scripts/document-texts.ts step6`, then `diff -r` against `documents-before`
+  (step 2a's, before any change of the slice): no difference in the 18 files (the six documents' Markdown, HTML and CSS).
+- **The check script**, before (`.data/ui-check/before6-20261126-2315/`, the committed code) and after
+  (`.data/ui-check/step6-20261126-2311/`): the editor (Document, a section, the Markdown dialog, the add-section list),
+  the Documentation and Settings tabs and the bus matrix, 1280 to 1920 px light and dark and 390 px: nothing small,
+  crowded, out of its control or past the edge, before or after; no page wider than the screen. The section's ↑ ↓ ✕ were
+  22 px (passing by spacing), now 28 px.
+- **The specs of the screens touched** (31 specs, 69 tests, one local run with nothing beside it): 69 passed, **S26-01,
+  S36-03 and S28-07 among them**. The specs: S15-11, S15-16, S25-01, S26-01 to S26-09, S27-03, S27-04, S28-01 to S28-07,
+  S34-01, S34-02, S36-01 to S36-05, fixes/late-selection-create-dimension.
+- No full run in this step (Łukasz's instruction).

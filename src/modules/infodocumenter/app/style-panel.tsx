@@ -16,6 +16,7 @@ import type { DocumentStyle } from "../domain/types";
 import { ACCENT_COLOURS } from "../ui/document-css";
 import { Field } from "./field";
 import { Check } from "./section-options";
+import { Select } from "@/ui/components/select";
 
 type Answer = ReturnType<ReturnType<typeof useAction>["saveRow"]>;
 
@@ -116,13 +117,13 @@ export function StylePanel({
         {(f) => (
         <Choice version={version} stored={style.language ?? workspaceLanguage} save={(v) => save({ language: v })}>
           {(value, pick) => (
-            <select id={f.id} aria-describedby={f.hintId} data-testid="select-style-language" value={value} disabled={readOnly} onChange={(e) => pick(e.currentTarget.value as DocLanguage)} className={selectClass}>
+            <Select id={f.id} aria-describedby={f.hintId} data-testid="select-style-language" value={value} disabled={readOnly} onChange={(e) => pick(e.currentTarget.value as DocLanguage)} className={selectClass}>
               {(Object.keys(T.languages) as DocLanguage[]).map((l) => (
                 <option key={l} value={l}>
                   {T.languages[l]}
                 </option>
               ))}
-            </select>
+            </Select>
           )}
         </Choice>
         )}
@@ -142,7 +143,7 @@ export function StylePanel({
                   aria-pressed={value === a}
                   disabled={readOnly}
                   onClick={() => pick(a)}
-                  className="h-[26px] w-[26px] rounded-full shadow-[inset_0_0_0_1px_rgba(0,0,0,.15)] aria-pressed:shadow-[0_0_0_2px_var(--im-surface),0_0_0_4px_var(--c)]"
+                  className="size-target rounded-full shadow-[inset_0_0_0_1px_rgba(0,0,0,.15)] aria-pressed:shadow-[0_0_0_2px_var(--im-surface),0_0_0_4px_var(--c)]"
                   style={{ background: ACCENT_COLOURS[a], ["--c" as string]: ACCENT_COLOURS[a] }}
                 />
               ))}
@@ -170,13 +171,13 @@ export function StylePanel({
         {(f) => (
         <Choice version={version} stored={style.keepRows} save={(v) => save({ keepRows: v })}>
           {(value, pick) => (
-            <select id={f.id} aria-describedby={f.hintId} data-testid="select-style-keepRows" value={value} disabled={readOnly} onChange={(e) => pick(Number(e.currentTarget.value) as DocumentStyle["keepRows"])} className={selectClass}>
+            <Select id={f.id} aria-describedby={f.hintId} data-testid="select-style-keepRows" value={value} disabled={readOnly} onChange={(e) => pick(Number(e.currentTarget.value) as DocumentStyle["keepRows"])} className={selectClass}>
               {KEEP_ROWS.map((n) => (
                 <option key={n} value={n}>
                   {T.keepRowsChoices[n]}
                 </option>
               ))}
-            </select>
+            </Select>
           )}
         </Choice>
         )}
@@ -185,13 +186,13 @@ export function StylePanel({
         {(f) => (
         <Choice version={version} stored={style.smallestPt} save={(v) => save({ smallestPt: v })}>
           {(value, pick) => (
-            <select id={f.id} aria-describedby={f.hintId} data-testid="select-style-smallestPt" value={value} disabled={readOnly} onChange={(e) => pick(Number(e.currentTarget.value) as DocumentStyle["smallestPt"])} className={selectClass}>
+            <Select id={f.id} aria-describedby={f.hintId} data-testid="select-style-smallestPt" value={value} disabled={readOnly} onChange={(e) => pick(Number(e.currentTarget.value) as DocumentStyle["smallestPt"])} className={selectClass}>
               {SMALLEST_PT.map((n) => (
                 <option key={n} value={n}>
                   {n} pt
                 </option>
               ))}
-            </select>
+            </Select>
           )}
         </Choice>
         )}
@@ -271,5 +272,6 @@ function Choice<T>({ stored, save, version, children }: { stored: T; save: (v: T
   return <>{children(choice.value, choice.choose)}</>;
 }
 
-const selectClass = "h-8 w-full rounded-md border border-im-line bg-im-surface px-2 text-im-ink";
+// slice 37 (step 6): the shared select; its own padding
+const selectClass = "px-2";
 

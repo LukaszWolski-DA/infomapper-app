@@ -13,6 +13,8 @@ import type { TabDialogProps } from "@/ui/modules";
 import { BUS_MATRIX_TEXTS as T, type BusMatrix } from "../domain/bus-matrix";
 import { CubeIcon } from "../ui/cube-icon";
 import { busMatrixAction } from "./actions";
+import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
 
 const nameButton = "max-w-[160px] truncate rounded px-1 text-left font-medium text-im-ink hover:bg-im-hover hover:underline";
 
@@ -118,7 +120,7 @@ export function BusMatrixDialog({ workspaceId, openEntity, openRelationship, onC
         </div>
         <p className="mt-2 text-xs text-im-ink-3">{T.legend}</p>
         <DialogFooter className="mt-4">
-          <button type="button" className="rounded-md border border-im-line px-3 py-1.5 hover:bg-im-hover" onClick={onClose} data-testid="button-bus-close">
+          <button type="button" className={cn(buttonVariants(), "px-3")} onClick={onClose} data-testid="button-bus-close">
             {T.close}
           </button>
         </DialogFooter>

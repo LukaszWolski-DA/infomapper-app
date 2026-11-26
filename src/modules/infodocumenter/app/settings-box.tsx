@@ -8,6 +8,7 @@ import { useState } from "react";
 import { updateWorkspaceSettingsAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
 import { useChoice } from "@/app/_panels/fields";
+import { CHECK_LABEL } from "@/ui/components/check";
 
 export const INFODOC_BOX_TEXT =
   "Documents generated from the model: data dictionary, mappings and the dimensional model. Turning it off deletes nothing: the documents are kept and come back when it is turned on again.";
@@ -48,7 +49,7 @@ export function InfoDocumenterBox({ workspaceId, version, on, licensed, organiza
         InfoDocumenter
       </h4>
       <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2">{INFODOC_BOX_TEXT}</p>
-      <label className="flex items-center gap-2">
+      <label className={CHECK_LABEL}>
         <input
           type="checkbox"
           data-testid="checkbox-infodoc"

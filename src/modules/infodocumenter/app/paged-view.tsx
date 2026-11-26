@@ -11,6 +11,8 @@ import { PAGES_SCREEN_CSS } from "../ui/document-css";
 import { FigureImages, imagesReady, removeHolders } from "../ui/figure-images";
 import { loadFigureFonts } from "./figure-fonts";
 import { localTimes, localTimesIn } from "@/ui/local-time";
+import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
 
 export const LAYING_OUT = "Laying out pages…";
 export const pagesText = (n: number) => `${n} page${n === 1 ? "" : "s"}`;
@@ -88,7 +90,7 @@ export function PagedView({ sourceId, css, print, printOff = null }: { sourceId:
           disabled={!ready || !!printOff}
           title={printOff ?? undefined}
           onClick={() => window.print()}
-          className="h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover disabled:opacity-50"
+          className={cn(buttonVariants({ size: "sm" }), "px-[9px] text-xs")}
         >
           Print
         </button>

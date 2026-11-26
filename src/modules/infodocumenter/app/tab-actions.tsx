@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/ui/component
 import { DOCUMENT_TEXTS } from "../domain/commands";
 import type { DocumentPreset } from "../domain/types";
 import { createDocumentAction, deleteDocumentAction, duplicateDocumentAction } from "./actions";
+import { cn } from "@/ui/lib/utils";
+import { cardVariants } from "@/ui/components/card";
 
 export const NEW_DOCUMENT_TEXT = "Start from a preset; everything can be changed afterwards. A new document is private until you share it.";
 
@@ -44,7 +46,7 @@ export function NewDocumentButton({ workspaceId, presets }: { workspaceId: strin
                   title={p.off ?? undefined}
                   data-testid={`button-preset-${p.code}`}
                   onClick={() => void create(p.code)}
-                  className="rounded-lg border border-im-line bg-im-surface px-3 py-2 text-left hover:border-im-logical disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-im-line"
+                  className={cn(cardVariants({ pad: "none" }), "px-3 py-2 text-left hover:border-im-logical disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-im-line")}
                 >
                   <b className="block font-semibold">{p.label}</b>
                   <span className="block text-[12px] text-im-ink-2">{p.description}</span>

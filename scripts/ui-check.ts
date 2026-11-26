@@ -316,6 +316,25 @@ function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[
       },
     },
     { id: "editor", path: `${w}/d/${ids.document}`, ready: '[data-testid="page-document-editor"]' },
+    // slice 37, step 6: the Markdown dialog and the list of section types
+    {
+      id: "editor-markdown",
+      path: `${w}/d/${ids.document}`,
+      ready: '[data-testid="page-document-editor"]',
+      then: async (page: Page) => {
+        await page.getByTestId("button-markdown").click();
+        await page.getByRole("dialog").waitFor();
+      },
+    },
+    {
+      id: "editor-add-section",
+      path: `${w}/d/${ids.document}`,
+      ready: '[data-testid="page-document-editor"]',
+      then: async (page: Page) => {
+        await page.getByTestId("button-add-section").click();
+        await page.getByTestId("list-add-section").waitFor();
+      },
+    },
     {
       id: "editor-section",
       path: `${w}/d/${ids.document}`,

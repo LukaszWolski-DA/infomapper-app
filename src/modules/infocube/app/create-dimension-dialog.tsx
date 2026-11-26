@@ -83,7 +83,7 @@ export function CreateDimensionDialog({ entityId, onClose }: { entityId: Uuid; o
           {duplicate && <Note warn testId="note-dimension-duplicate">{duplicateNameWarning(typed)}</Note>}
           <div className="mt-2 max-h-[40vh] overflow-auto" data-testid="list-dimension-attributes">
             {attributes.map((a) => (
-              <label key={a.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-im-hover" data-testid="dimension-attribute">
+              <label key={a.id} className="flex min-h-target cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-im-hover" data-testid="dimension-attribute">
                 <input
                   type="checkbox"
                   checked={ticked.has(a.id)}

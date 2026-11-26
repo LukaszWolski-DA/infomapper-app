@@ -165,3 +165,10 @@ describe("the top bar's pieces (step 4)", () => {
     expect(QUIET_FIELD.split(/\s+/)).not.toContain("border");
   });
 });
+
+describe("the check box (step 6)", () => {
+  it("its label is a 24 px target", async () => {
+    const { CHECK_LABEL } = await import("@/ui/components/check");
+    has(CHECK_LABEL, "min-h-target", "items-center");
+  });
+});

@@ -18,20 +18,8 @@ const EXCEPTIONS: Readonly<Record<string, string>> = {
 /** Slice 37, step 2: every file that styled a control on its own after `fields.tsx`' constants became the shared look.
  * Step 3a converted the inspector's panels and InfoCube's sections (15 files); step 3b the left panel, the toolbox and
  * the import wizard (6); step 4 the top bar, the navigation row and the canvas's switches (16);
- * step 5 the homes, settings, people, baselines and dialogs (12). */
+ * step 5 the homes, settings, people, baselines and dialogs (12); steps 6 and 7 InfoDocumenter and InfoCube (10). */
 const TO_CONVERT: readonly string[] = [
-  // step 6: InfoDocumenter
-  "src/modules/infodocumenter/app/editor.tsx",
-  "src/modules/infodocumenter/app/figure-editor.tsx",
-  "src/modules/infodocumenter/app/markdown-dialog.tsx",
-  "src/modules/infodocumenter/app/paged-view.tsx",
-  "src/modules/infodocumenter/app/panel-handles.tsx",
-  "src/modules/infodocumenter/app/preview.tsx",
-  "src/modules/infodocumenter/app/section-options.tsx",
-  "src/modules/infodocumenter/app/style-panel.tsx",
-  "src/modules/infodocumenter/app/tab-actions.tsx",
-  // step 7: InfoCube's dialogs
-  "src/modules/infocube/app/bus-matrix-dialog.tsx",
   // step 8: sign-in, links, errors
   "src/app/_components/canvas-error-boundary.tsx",
   "src/app/_components/change-password.tsx",

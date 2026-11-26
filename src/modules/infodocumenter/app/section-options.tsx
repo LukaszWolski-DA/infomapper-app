@@ -21,6 +21,8 @@ import {
   SOURCE_COLUMNS,
   TRACE_COLUMNS,
 } from "../domain/sections";
+import { Check as UiCheck } from "@/ui/components/check";
+import { Select } from "@/ui/components/select";
 
 type Answer = ReturnType<ReturnType<typeof useAction>["saveRow"]>;
 
@@ -398,21 +400,21 @@ export function SectionOptions(props: {
                 {(ids) => (
                 <Choice version={version} stored={Number(o[f.key])} save={(v) => save({ [f.key]: v })}>
                   {(value, pick) => (
-                    <select
+                    <Select
                       id={ids.id}
                       aria-describedby={ids.hintId}
                       data-testid={`select-${type}-${f.key}`}
                       value={value}
                       disabled={readOnly}
                       onChange={(e) => pick(Number(e.currentTarget.value))}
-                      className="h-8 w-full rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
+                      className="px-2"
                     >
                       {f.items.map(([v, l]) => (
                         <option key={v} value={v}>
                           {l}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   )}
                 </Choice>
                 )}
@@ -424,14 +426,14 @@ export function SectionOptions(props: {
                 {(ids) => (
                   <Choice version={version} stored={typeof o[f.key] === "string" ? (o[f.key] as string) : ""} save={(v) => save({ [f.key]: v || null })}>
                     {(value, pick) => (
-                      <select
+                      <Select
                         id={ids.id}
                         aria-describedby={ids.hintId}
                         data-testid={`select-${type}-${f.key}`}
                         value={value}
                         disabled={readOnly}
                         onChange={(e) => pick(e.currentTarget.value)}
-                        className="h-8 w-full rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
+                        className="px-2"
                       >
                         {value && !f.items.some(([v]) => v === value) && (
                           <option value={value} disabled>
@@ -443,7 +445,7 @@ export function SectionOptions(props: {
                             {l}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     )}
                   </Choice>
                 )}
@@ -542,21 +544,21 @@ export function ModuleOptions(props: {
                 {(ids) => (
                 <Choice version={version} stored={Number(o[f.key])} save={(v) => save({ [f.key]: v })}>
                   {(value, pick) => (
-                    <select
+                    <Select
                       id={ids.id}
                       aria-describedby={ids.hintId}
                       data-testid={`select-${type}-${f.key}`}
                       value={value}
                       disabled={readOnly}
                       onChange={(e) => pick(Number(e.currentTarget.value))}
-                      className="h-8 w-full rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
+                      className="px-2"
                     >
                       {f.items.map(([v, l]) => (
                         <option key={v} value={v}>
                           {l}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   )}
                 </Choice>
                 )}
@@ -576,20 +578,20 @@ export function ModuleOptions(props: {
                   ).map(([key, items, name]) => (
                     <Choice version={version} key={key} stored={String(o[key])} save={(v) => save({ [key]: v })}>
                       {(value, pick) => (
-                        <select
+                        <Select
                           aria-label={name}
                           data-testid={`select-${type}-${key}`}
                           value={value}
                           disabled={readOnly}
                           onChange={(e) => pick(e.currentTarget.value)}
-                          className="h-8 w-full min-w-0 rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
+                          className="min-w-0 px-2"
                         >
                           {items.map(([v, l]) => (
                             <option key={v} value={v}>
                               {l}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       )}
                     </Choice>
                   ))}
@@ -623,12 +625,7 @@ function Choice<T>({ stored, save, version, children }: { stored: T; save: (v: T
 
 export function Check({ label, stored, onSave, version, disabled, testId }: { label: string; stored: boolean; onSave: (v: boolean) => Answer; version: number; disabled?: boolean; testId: string }) {
   const choice = useChoice(stored, onSave, version);
-  return (
-    <label className="mt-2 flex items-center gap-2">
-      <input type="checkbox" data-testid={testId} checked={choice.value} disabled={disabled} onChange={(e) => choice.choose(e.currentTarget.checked)} />
-      {label}
-    </label>
-  );
+  return <UiCheck label={label} className="mt-2" data-testid={testId} checked={choice.value} disabled={disabled} onChange={(e) => choice.choose(e.currentTarget.checked)} />;
 }
 
 /** A subset of a fixed list, kept in the list's order; `mine`: the list's own keys (a list split in two saves the rest). */
