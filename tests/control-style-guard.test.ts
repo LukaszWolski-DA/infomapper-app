@@ -17,25 +17,8 @@ const EXCEPTIONS: Readonly<Record<string, string>> = {
 
 /** Slice 37, step 2: every file that styled a control on its own after `fields.tsx`' constants became the shared look.
  * Step 3a converted the inspector's panels and InfoCube's sections (15 files); step 3b the left panel, the toolbox and
- * the import wizard (6). */
+ * the import wizard (6); step 4 the top bar, the navigation row and the canvas's switches (16). */
 const TO_CONVERT: readonly string[] = [
-  // step 4: the top bar, the navigation row, the status bar, the canvas's switches
-  "src/app/_components/history-nav.tsx",
-  "src/app/_components/side-panels.tsx",
-  "src/app/_components/top-bar.tsx",
-  "src/app/_components/undo.tsx",
-  "src/app/_components/view-state-bar.tsx",
-  "src/app/_components/working-context.tsx",
-  "src/canvas/Changes.tsx",
-  "src/canvas/EntityToolButton.tsx",
-  "src/canvas/Focus.tsx",
-  "src/canvas/FrameToolButton.tsx",
-  "src/canvas/HandToolButton.tsx",
-  "src/canvas/LayerSwitch.tsx",
-  "src/canvas/NotationSwitch.tsx",
-  "src/canvas/NoteToolButton.tsx",
-  "src/canvas/ZoomControls.tsx",
-  "src/canvas/look.tsx",
   // step 5: the homes, settings, people, baselines, dialogs
   "src/app/_components/new-organization-dialog.tsx",
   "src/app/w/[workspaceId]/_components/baselines.tsx",

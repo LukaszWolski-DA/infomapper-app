@@ -13,6 +13,8 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 import { navigationApi, prunePlaces, traversal } from "@/ui/history-places";
+import { cn } from "@/ui/lib/utils";
+import { iconButtonVariants } from "@/ui/components/icon-button";
 
 /** "hidden" without the Navigation API, else whether Back and Forward can go: "00", "10", "01", "11". */
 function snapshot(): string {
@@ -137,7 +139,7 @@ function NavButton({ step, enabled }: { step: -1 | 1; enabled: boolean }) {
       aria-label={back ? "Back" : "Forward"}
       disabled={!enabled}
       onClick={() => historyStep(step)}
-      className="grid size-6 flex-none place-items-center rounded text-im-ink-2 hover:bg-im-surface hover:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
+      className={cn(iconButtonVariants({ size: "xs" }), "enabled:hover:bg-im-surface")}
     >
       <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.6] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden>
         <path d={back ? "M10 3.5L5.5 8l4.5 4.5" : "M6 3.5L10.5 8 6 12.5"} />

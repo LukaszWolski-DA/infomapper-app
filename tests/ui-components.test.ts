@@ -144,3 +144,24 @@ describe("the menus' look (step 3b)", () => {
     expect(merged.split(/\s+/)).not.toContain("py-[7px]");
   });
 });
+
+describe("the top bar's pieces (step 4)", () => {
+  it("a tool button is the bar's 30 px, no edge, pressed in its tone; its padding is the caller's", async () => {
+    const { toolButtonVariants } = await import("@/ui/components/tool-button");
+    has(toolButtonVariants(), "h-control-bar", "rounded-md", "aria-pressed:bg-im-logical-soft");
+    has(toolButtonVariants({ tone: "warn" }), "aria-pressed:bg-im-warn-soft", "aria-pressed:text-im-warn");
+    has(toolButtonVariants({ tone: "plain" }), "aria-pressed:text-im-ink");
+    expect(toolButtonVariants().split(/\s+/).some((c) => /^p[xl]?-/.test(c))).toBe(false);
+    expect(toolButtonVariants().split(/\s+/)).not.toContain("border");
+  });
+  it("the bar's segmented switch has no gap between its buttons (widths kept, F15)", async () => {
+    const { SEGMENTED_BAR_BUTTON, SEGMENTED_BAR_TRACK } = await import("@/ui/components/segmented");
+    expect(SEGMENTED_BAR_TRACK.split(/\s+/).some((c) => c.startsWith("gap-"))).toBe(false);
+    has(SEGMENTED_BAR_BUTTON, "h-[26px]", "px-2.5", "aria-pressed:bg-im-surface");
+  });
+  it("the quiet field shows an edge only when focused", async () => {
+    const { QUIET_FIELD } = await import("@/ui/components/input");
+    has(QUIET_FIELD, "h-control-sm", "bg-transparent", "focus:bg-im-surface");
+    expect(QUIET_FIELD.split(/\s+/)).not.toContain("border");
+  });
+});

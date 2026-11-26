@@ -24,6 +24,10 @@ export const inputVariants = cva(FIELD_LOOK, {
 
 export const textareaVariants = cva(`${FIELD_LOOK} min-h-[76px] resize-y px-2.5 py-1.5 text-body`)
 
+/** A field that reads as text until hovered or focused (the top bar's zoom, step 4): 28 px, its edge only when focused. */
+export const QUIET_FIELD =
+  "h-control-sm rounded-md bg-transparent text-im-ink-2 outline-none hover:bg-im-hover focus:bg-im-surface focus:text-im-ink focus:shadow-[0_0_0_1px_var(--im-line-control),0_0_0_4px_var(--im-logical-soft)]"
+
 type InputProps = Omit<React.ComponentProps<"input">, "size"> & VariantProps<typeof inputVariants>
 
 function Input({ className, size, type = "text", ...props }: InputProps) {

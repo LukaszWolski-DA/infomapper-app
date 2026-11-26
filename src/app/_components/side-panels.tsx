@@ -24,6 +24,8 @@ import {
   type PanelSide,
   type SidePanelsState,
 } from "@/ui/side-panels-cookie";
+import { cn } from "@/ui/lib/utils";
+import { toolButtonVariants } from "@/ui/components/tool-button";
 
 const NARROW = "(max-width: 1000px)";
 
@@ -304,7 +306,7 @@ export function PanelToggle({ side }: { side: PanelSide }) {
       aria-label={TITLE[side]}
       data-testid={side === "left" ? "button-toggle-left" : "button-toggle-right"}
       onClick={() => toggle(side)}
-      className="inline-flex h-[30px] flex-none items-center rounded-md px-2 text-im-ink-2 hover:bg-im-hover hover:text-im-ink aria-pressed:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
+      className={cn(toolButtonVariants({ tone: "plain" }), "px-2")}
     >
       <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden>
         <rect x="1.5" y="2.5" width="13" height="11" rx="2" />

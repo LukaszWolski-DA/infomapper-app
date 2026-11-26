@@ -8,6 +8,8 @@ import { useContext } from "react";
 import { useToast } from "@/ui/components/toast";
 import { NOTE_TOOL_HINT } from "./CanvasModes";
 import { CanvasUiCtx } from "./context";
+import { cn } from "@/ui/lib/utils";
+import { toolButtonVariants } from "@/ui/components/tool-button";
 
 export function NoteToolButton() {
   const ui = useContext(CanvasUiCtx);
@@ -23,7 +25,7 @@ export function NoteToolButton() {
         ui.setMode(on ? null : { kind: "note" });
         if (!on) toast(NOTE_TOOL_HINT);
       }}
-      className="inline-flex h-[30px] flex-none items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover max-[2101px]:px-1.5 hover:text-im-ink aria-pressed:bg-im-logical-soft aria-pressed:text-im-logical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
+      className={cn(toolButtonVariants(), "px-2 max-[2101px]:px-1.5")}
     >
       <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.5] [stroke-linejoin:round]" aria-hidden>
         <path d="M3 2.5h10v7.5l-3.5 3.5H3z" />

@@ -6,6 +6,8 @@
 
 import type { CanvasLayer } from "@/domain/types";
 import { useCanvasLook } from "./look";
+import { cn } from "@/ui/lib/utils";
+import { SEGMENTED_BAR_BUTTON, SEGMENTED_BAR_TRACK } from "@/ui/components/segmented";
 
 const OPTIONS: { value: CanvasLayer; label: string; short: string }[] = [
   { value: "all", label: "Everything", short: "All" },
@@ -17,7 +19,7 @@ export function LayerSwitch() {
   const api = useCanvasLook();
   if (!api) return null;
   return (
-    <div role="group" aria-label="What to show" data-testid="switch-layer" className="inline-flex flex-none rounded-[7px] bg-im-hover p-0.5">
+    <div role="group" aria-label="What to show" data-testid="switch-layer" className={cn("inline-flex flex-none", SEGMENTED_BAR_TRACK)}>
       {OPTIONS.map((o) => (
         <button
           key={o.value}
@@ -26,7 +28,7 @@ export function LayerSwitch() {
           aria-pressed={api.look.layer === o.value}
           data-layer={o.value}
           onClick={() => api.look.layer !== o.value && api.setLook({ layer: o.value })}
-          className="h-[26px] whitespace-nowrap rounded-[5px] px-2.5 text-im-ink-2 max-[1001px]:px-1.5 aria-pressed:bg-im-surface aria-pressed:text-im-ink aria-pressed:shadow-[0_0_0_1px_var(--im-line),0_1px_2px_var(--im-shadow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
+          className={cn(SEGMENTED_BAR_BUTTON, "max-[1001px]:px-1.5")}
         >
           <span className="hidden min-[2101px]:inline">{o.label}</span>
           <span className="min-[2101px]:hidden">{o.short}</span>

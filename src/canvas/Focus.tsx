@@ -15,6 +15,8 @@ import { CanvasUiCtx } from "./context";
 import { currentFade, fadeKey, focusOn, requestFade, type FocusTarget } from "./fade";
 import type { CanvasLines, Selection } from "./line-data";
 import { useValue } from "./value-store";
+import { cn } from "@/ui/lib/utils";
+import { toolButtonVariants } from "@/ui/components/tool-button";
 
 export const FOCUS_HINT = "Focus fades everything not connected to what you select.";
 
@@ -123,7 +125,7 @@ export function FocusButton() {
       title="Fade everything not connected to the selection"
       data-testid="button-focus"
       onClick={() => toggleFocus(ui.selection, toast)}
-      className="inline-flex h-[30px] flex-none items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover max-[2101px]:px-1.5 hover:text-im-ink aria-pressed:bg-im-logical-soft aria-pressed:text-im-logical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
+      className={cn(toolButtonVariants(), "px-2 max-[2101px]:px-1.5")}
     >
       <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.4] [stroke-linecap:round]" aria-hidden>
         <circle cx="8" cy="8" r="3" />

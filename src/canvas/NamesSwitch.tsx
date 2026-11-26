@@ -30,7 +30,7 @@ function NameBox({ dimension, label, title, testId }: (typeof NAMES_SWITCHES)[nu
   return (
     <label
       title={editable ? title : NAMES_READ_ONLY}
-      className={`inline-flex h-[26px] flex-none items-center gap-1 whitespace-nowrap rounded-[5px] px-1 text-im-ink-2 ${editable ? "cursor-pointer hover:bg-im-hover hover:text-im-ink" : "cursor-default opacity-60"}`}
+      className={`inline-flex h-[26px] flex-none items-center gap-1 whitespace-nowrap rounded-[6px] px-1 text-im-ink-2 ${editable ? "cursor-pointer hover:bg-im-hover hover:text-im-ink" : "cursor-default opacity-60"}`}
     >
       <input
         ref={box}

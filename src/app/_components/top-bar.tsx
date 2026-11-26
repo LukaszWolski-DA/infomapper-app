@@ -33,6 +33,10 @@ import { ROLE_CAN, ROLE_LABEL } from "../_lib/roles";
 import { NewOrganizationDialog } from "./new-organization-dialog";
 import { SavePair } from "./save-indicator";
 import { PanelToggle } from "./side-panels";
+import { Select } from "@/ui/components/select";
+import { inputVariants } from "@/ui/components/input";
+import { MENU_CONTENT, MENU_ITEM, MENU_LABEL, MENU_SEPARATOR } from "@/ui/components/menu";
+import { toolButtonVariants } from "@/ui/components/tool-button";
 
 /**
  * `savePair`: the save indicator and the server badge (slice 30), before the details panel's button, else before the
@@ -58,7 +62,7 @@ export function TopBar({ shell, tools, panelToggles = false, savePair = true }: 
       {/* the switchers' names shorten first, and the tools that do not fit move into “More” at fixed widths (slice 6a),
           so nothing is cut off from 800 to 2,560 px; what is still missing comes out of the working context's label, the
           only tool that shrinks (slice 16, item 5): the tools' tiny shrink weight lets the switchers reach their minimum first */}
-      {tools && <div data-testid="bar-tools" className="flex min-w-0 shrink-[0.001] items-center gap-2.5 max-[2101px]:gap-2 max-[1001px]:gap-1">{tools}</div>}
+      {tools && <div data-testid="bar-tools" className="flex min-w-0 shrink-[0.001] items-center gap-2.5 max-[2101px]:gap-2 max-[1301px]:gap-[7px] max-[1001px]:gap-1">{tools}</div>}
       {savePair && <SavePair server={shell.server} />}
       {panelToggles && <PanelToggle side="right" />}
       <UserIndicator shell={shell} />
@@ -73,7 +77,7 @@ function SwitcherButton({ testId, title, children }: { testId: string; title: st
     <DropdownMenuTrigger
       data-testid={testId}
       title={title}
-      className="inline-flex h-[30px] min-w-[56px] max-w-[260px] items-center gap-1.5 rounded-md px-2 font-medium max-[2101px]:max-w-[150px] max-[2101px]:px-1.5 max-[1501px]:max-w-[128px] max-[1501px]:px-[5px] max-[1301px]:max-w-[110px] max-[1001px]:min-w-[44px] text-im-ink-2 outline-none hover:bg-im-hover hover:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical data-[state=open]:bg-im-hover"
+      className={cn(toolButtonVariants(), "min-w-[56px] max-w-[260px] flex-initial px-2 font-medium max-[2101px]:max-w-[150px] max-[2101px]:px-1.5 max-[1501px]:max-w-[128px] max-[1501px]:px-[5px] max-[1301px]:max-w-[110px] max-[1001px]:min-w-[44px]")}
     >
       <span className="min-w-0 truncate">{children}</span>
       <svg viewBox="0 0 16 16" className="size-3 flex-none fill-none stroke-current stroke-[1.6]" aria-hidden>
@@ -83,11 +87,10 @@ function SwitcherButton({ testId, title, children }: { testId: string; title: st
   );
 }
 
-const menuClass =
-  "min-w-[230px] max-w-[300px] rounded-lg border-0 bg-im-surface p-1 text-[13px] text-im-ink shadow-[0_0_0_1px_var(--im-line),0_12px_28px_-10px_var(--im-shadow)]";
-const sectionClass = "truncate px-2.5 pb-1 pt-1.5 text-[11px] font-semibold text-im-ink-2";
-const itemClass =
-  "flex cursor-pointer items-center justify-between gap-4 rounded-[5px] px-2.5 py-[7px] focus:bg-im-hover data-[highlighted]:bg-im-hover";
+// slice 37 (step 4): the menus' shared look (menu.ts)
+const menuClass = cn("min-w-[230px] max-w-[300px]", MENU_CONTENT);
+const sectionClass = cn(MENU_LABEL, "truncate");
+const itemClass = cn(MENU_ITEM, "justify-between gap-4");
 
 function MenuLink({
   href,
@@ -150,7 +153,7 @@ function OrganizationSwitcher({ shell }: { shell: ShellData }) {
           {/* slice 29 (DB10), slice 30: no new organization online; scripts make them there until the people slice */}
           {shell.server.kind === "local" && (
             <>
-              <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+              <DropdownMenuSeparator className={MENU_SEPARATOR} />
               <DropdownMenuItem className={itemClass} data-testid="menu-item-new-organization" onSelect={() => setCreating(true)}>
                 New organization…
               </DropdownMenuItem>
@@ -185,7 +188,7 @@ function WorkspaceSwitcher({ shell }: { shell: ShellData }) {
             {w.name}
           </MenuLink>
         ))}
-        <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+        <DropdownMenuSeparator className={MENU_SEPARATOR} />
         <MenuLink href={workspaceHref(shell.workspace.id)}>Workspace home</MenuLink>
         {shell.canCreateWorkspace && (
           <NewWorkspaceField organizationId={shell.organization.id} />
@@ -217,7 +220,7 @@ function ProjectSwitcher({ shell }: { shell: ShellData }) {
         ))}
         {project && (
           <>
-            <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+            <DropdownMenuSeparator className={MENU_SEPARATOR} />
             <MenuLink href={projectHref(workspace.id, project.id)}>Project home</MenuLink>
           </>
         )}
@@ -250,7 +253,8 @@ function NewWorkspaceField({ organizationId }: { organizationId: string }) {
         create={(name) => createWorkspaceAction({ organizationId, name, docLanguage: language })}
         success={(name) => `Created the workspace ${name}.`}
       />
-      <select
+      <Select
+        size="sm"
         aria-label={DOC_LANGUAGE_LABEL}
         title={DOC_LANGUAGE_LABEL}
         data-testid="select-new-workspace-language"
@@ -258,14 +262,14 @@ function NewWorkspaceField({ organizationId }: { organizationId: string }) {
         onChange={(e) => setLanguage(e.currentTarget.value as DocLanguage)}
         // keep the menu's type-ahead and its arrow keys out of the select
         onKeyDown={(e) => e.stopPropagation()}
-        className="mb-0.5 mt-1 h-[30px] flex-none rounded-md border border-im-line bg-im-surface px-1 text-xs"
+        className="mb-0.5 mt-1 w-auto flex-none text-xs"
       >
         {DOC_LANGUAGE_OPTIONS.map(([value, label]) => (
           <option key={value} value={value}>
             {label}
           </option>
         ))}
-      </select>
+      </Select>
     </div>
   );
 }
@@ -292,7 +296,7 @@ function NameThenEnter({
       autoComplete="off"
       spellCheck={false}
       disabled={pending}
-      className={`${className} h-[30px] rounded-md border border-im-line bg-im-surface px-2`}
+      className={cn(inputVariants({ size: "sm" }), className)}
       onKeyDown={async (e) => {
         e.stopPropagation(); // keep the menu's type-ahead out of the field
         const name = e.currentTarget.value.trim();
@@ -328,7 +332,7 @@ function UserIndicator({ shell }: { shell: ShellData }) {
         data-standing={standing}
         title={title}
         className={cn(
-          "ml-1 inline-flex h-[30px] flex-none items-center gap-1.5 rounded-[15px] py-0 pl-[3px] pr-2 outline-none hover:shadow-[0_0_0_1px_var(--im-line)] focus-visible:ring-2 focus-visible:ring-im-logical",
+          "ml-1 inline-flex h-control-bar flex-none items-center gap-1.5 rounded-full py-0 pl-[3px] pr-2 outline-none hover:shadow-[0_0_0_1px_var(--im-line)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-im-logical",
           standing === "full" && "bg-im-hover text-im-ink-2 hover:text-im-ink",
           standing === "review" && "bg-im-review-soft text-im-review",
           standing === "none" && "bg-im-warn-soft text-im-warn",
@@ -363,13 +367,13 @@ function UserIndicator({ shell }: { shell: ShellData }) {
           .<br />
           {workspace.archived ? "The workspace is archived, so everything is read-only." : ROLE_CAN[role]}
         </div>
-        <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+        <DropdownMenuSeparator className={MENU_SEPARATOR} />
         <MenuLink href={workspaceHref(workspace.id, "people")}>People and roles</MenuLink>
         <MenuLink href={workspaceHref(workspace.id)}>Workspace home</MenuLink>
-        <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+        <DropdownMenuSeparator className={MENU_SEPARATOR} />
         {/* slice 32 (D-85): Light, Dark or System */}
         <ThemeChoice headingClass={sectionClass} />
-        <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+        <DropdownMenuSeparator className={MENU_SEPARATOR} />
         {shell.server.kind === "online" && (
           <DropdownMenuItem asChild className={itemClass} onSelect={() => setChangingPassword(true)}>
             <button type="button" data-testid="button-change-password" className="w-full">

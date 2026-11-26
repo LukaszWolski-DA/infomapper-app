@@ -52,7 +52,7 @@ export function Breadcrumbs({ shell, trail, children }: { shell: ShellData; trai
                   data-testid="breadcrumb"
                   aria-current={current ? "page" : undefined}
                   className={
-                    "block max-w-[220px] truncate rounded px-[5px] py-0.5 hover:bg-im-surface hover:text-im-ink " +
+                    "block min-h-target max-w-[220px] truncate rounded px-[5px] py-1 leading-4 hover:bg-im-surface hover:text-im-ink " +
                     (current ? "font-medium text-im-ink" : "text-im-ink-2")
                   }
                 >

@@ -16,6 +16,9 @@ import type { ChangesImport } from "./changes-import";
 import { currentFade, fadeKey, requestFade } from "./fade";
 import type { FadeData } from "./fade-canvas";
 import { useValue } from "./value-store";
+import { Select } from "@/ui/components/select";
+import { cn } from "@/ui/lib/utils";
+import { toolButtonVariants } from "@/ui/components/tool-button";
 
 const isChangesRequest = () => fadeKey(currentFade()).startsWith("lit:changes:");
 
@@ -59,7 +62,7 @@ export function ChangesButton() {
       title={CHANGES_TITLE}
       data-testid="button-changes"
       onClick={toggleChanges}
-      className="inline-flex h-[30px] flex-none items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover max-[2101px]:px-1.5 hover:text-im-ink aria-pressed:bg-im-warn-soft aria-pressed:text-im-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
+      className={cn(toolButtonVariants({ tone: "warn" }), "px-2 max-[2101px]:px-1.5")}
     >
       <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.4] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden>
         <path d="M8 2l6 11H2z" />
@@ -87,9 +90,10 @@ export function ChangesBar({ imports }: { imports: readonly ChangesImport[] }) {
       onPointerDown={(e) => e.stopPropagation()}
     >
       <b className="font-semibold">Changes</b>
-      <select
+      <Select
+        size="sm"
         aria-label="Which changes"
-        className="h-[26px] max-w-[260px] rounded-md border border-im-line bg-im-surface px-1.5 text-[12.5px]"
+        className="w-auto max-w-[260px]"
         value={view.sel}
         onChange={(e) => {
           const i = imports.find((x) => x.id === e.target.value);
@@ -103,7 +107,7 @@ export function ChangesBar({ imports }: { imports: readonly ChangesImport[] }) {
             {i.label}
           </option>
         ))}
-      </select>
+      </Select>
       <span className="text-im-ink-3" data-testid="text-changes-counts">
         {!counts ? "" : counts.tables ? `${plural(counts.tables, "table")}, ${plural(counts.mappings, "mapping")}, ${plural(counts.attributes, "attribute")}` : NOTHING_ON_RECORD}
       </span>

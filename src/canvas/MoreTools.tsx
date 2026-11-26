@@ -30,6 +30,9 @@ import { NAMES_READ_ONLY, NAMES_SWITCHES } from "./NamesSwitch";
 import { MORE_FOCUS, MORE_NAMES, MORE_TOOLS } from "./more-breakpoints";
 import { toggleFocus } from "./Focus";
 import { useValue } from "./value-store";
+import { MENU_CONTENT, MENU_LABEL } from "@/ui/components/menu";
+import { cn } from "@/ui/lib/utils";
+import { toolButtonVariants } from "@/ui/components/tool-button";
 
 const TOOLS: { kind: "entity" | "frame" | "note" | "hand"; label: string; hint: string; testId: string; who: "edit" | "note" | "all" }[] = [
   { kind: "entity", label: "Entity tool (E)", hint: ENTITY_TOOL_HINT, testId: "more-tool-entity", who: "edit" },
@@ -61,7 +64,7 @@ export function MoreTools({ editable, canNote }: { editable: boolean; canNote: b
         data-testid="button-more-tools"
         title="More tools"
         aria-label="More tools"
-        className={`inline-flex h-[30px] flex-none items-center rounded-md px-1.5 text-im-ink-2 outline-none hover:bg-im-hover hover:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical data-[state=open]:bg-im-hover ${MORE_NAMES.inMenu}`}
+        className={cn(toolButtonVariants(), "px-1.5", MORE_NAMES.inMenu)}
       >
         <svg viewBox="0 0 16 16" className="size-4 fill-current" aria-hidden>
           <circle cx="3.5" cy="8" r="1.3" />
@@ -72,7 +75,7 @@ export function MoreTools({ editable, canNote }: { editable: boolean; canNote: b
       <DropdownMenuContent
         align="end"
         data-testid="menu-more-tools"
-        className="min-w-[220px] rounded-lg border-0 bg-im-surface p-1 text-[13px] text-im-ink shadow-[0_0_0_1px_var(--im-line),0_12px_28px_-10px_var(--im-shadow)]"
+        className={cn("min-w-[220px]", MENU_CONTENT)}
       >
         {NAMES_SWITCHES.map((n) => {
           const state = names?.[n.dimension] ?? "name";
@@ -105,7 +108,7 @@ export function MoreTools({ editable, canNote }: { editable: boolean; canNote: b
           Changes
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator className={`mx-0.5 my-1 bg-im-line ${MORE_FOCUS.inMenu}`} />
-        <DropdownMenuLabel className={`px-2.5 pb-1 pt-1.5 text-[11px] font-semibold text-im-ink-2 ${MORE_FOCUS.inMenu}`}>Relationship notation</DropdownMenuLabel>
+        <DropdownMenuLabel className={cn(MENU_LABEL, MORE_FOCUS.inMenu)}>Relationship notation</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={ui.notation} onValueChange={(v) => ui.setNotation(v as Notation)}>
           {NOTATIONS.map((n) => (
             <DropdownMenuRadioItem key={n.value} value={n.value} data-testid="more-notation" data-notation={n.value} className={`${itemClass} ${MORE_FOCUS.inMenu}`}>

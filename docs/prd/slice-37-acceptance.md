@@ -796,3 +796,56 @@ again as a single file and reported.
     S4A-05, S4A-06, S4B1-03, S6B-08, S7A-02, S7A-07, S7A-09, S7A-16, S7B-01, S10A-04, S13-04, S15-01, S15-22, S17-01,
     S25-04, S26-04, S28-07.
 - No full run in this step (Łukasz's instruction).
+
+**Łukasz's answer (26 November 2026):** step 3b accepted. If `S7B-01` fails again, its trace and report folder are copied
+before any rerun, then it is run again alone and both are reported.
+
+## Step 4: the top bar, the navigation row, the status bar and the canvas's switches (26 November 2026)
+
+**What changed:**
+- **New in `src/ui`:** `tool-button.ts` (`toolButtonVariants`: the bar's 30 px, no edge, pressed in `logical`, `warn`
+  or `plain`; no padding of its own, so each tool keeps its breakpoints' padding and its width, F15); the segmented
+  control's bar size (`SEGMENTED_BAR_TRACK` without the gap, `SEGMENTED_BAR_BUTTON` 26 px in the bar's text: the layer and
+  notation switches keep their widths); `QUIET_FIELD` (the zoom: text until hovered or focused, 28 px, before 26).
+- **The top bar:** the switchers, the tools (Entity, Frame, Note, Hand, Focus, Changes in `warn`), undo and redo, zoom,
+  "More", the side panels' toggles (`plain`) and the working context are tool buttons; the switchers' and the user's
+  menus and "More"'s take the menus' look (`menu.ts`); "New workspace"'s field the 28 px input and its language `Select`
+  (`sm`); the user indicator 30 px as before, a pill. The theme's choice and the names' check boxes: radius 6 (before 5).
+- **The working context** (the finding: 16 × 30 px at 390 px, its icon running out of it): a target of at least 24 px
+  (`min-w-target` on the button and its wrapper), 4 px padding up to 1,000 px (8 before), the label `min-w-0` so it is
+  cut inside the button. At 1,201 px it had 19 px (every other control at its width): the tools' gap is 7 px from 1,201
+  to 1,300 px (8 before), which gives it 30 px. **This is my call** (F15 keeps the controls' widths; the gap is the
+  only room): the tools move by up to 11 px at those widths, and the flexible switchers gain 2 to 8 px from 1,101 to
+  1,300 px. S6A-10's widths, before and after, are the same for every other control; the context's: 1,000 px 70 → 62
+  (the padding), 1,201 px 19 → 30, 1,300 px 118 → 120.
+- **The navigation row:** the path's links 24 px (`py-1 leading-4`, before 20); Back and Forward the 24 px icon button.
+- **The view-state bar:** chips 24 px (before 22), a pill; a chip's × the 24 px icon button (before 18); "Show all" the
+  button's `xs` (24 px, as before).
+- **The status bar:** "Model checks" 24 px (before 17), as the prototype's `.sb-chk`; it is the bar's only button (the
+  other counts are text, S6A-07).
+- **The canvas's switches:** the look's background swatches as they were; its grid and the page outline's choices the
+  shared segmented control; the Changes bar's select `Select` (`sm`).
+- **The check script:** React Flow's attribution link is a named exception (a library's link, kept as its licence
+  asks). A control's text is measured as shown: text cut with an ellipsis inside its control ends at the control's edge
+  (text out of its box is "spill"). **The finding "the switchers run together" at 1280 and 1440 px came from this**: the
+  switchers' names are cut ("Retail C…"), and the script read the whole name, past the chevron and into the next
+  switcher; on the screen they are about 20 px apart (the screenshots). The fix is in the script, not in the bar. Five
+  more screens: `canvas-focus` (with Focus's chip), `canvas-changes`, `canvas-user-menu`, `canvas-switcher`,
+  `canvas-more`.
+- **The guard:** 16 files left the list: 29 files to convert and the one exception.
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test` (216 files, 2,618 tests).
+- **The check script**, before (`.data/ui-check/before4-20261126-2116/`, the committed code, the same script) and after
+  (`.data/ui-check/step4-20261126-2109/`, the context again in `step4b-20261126-2149/`), every canvas screen, the homes,
+  1280 to 1920 px light and dark and 390 px: before, the working context (16 × 30, its icon out of it) and the path's
+  links (20 px) at 390 px; after, nothing small, nothing crowded, nothing out of its control at any width. What is left
+  is at 390 px only: the top bar does not fit (the context against the details toggle, undo and redo against the user
+  indicator), the path over the canvas's cards, and a panel field over a note's ✓ (the details panel lies over the canvas
+  at that width): slice 38's layout (A7).
+- **The specs of the screens touched** (32 specs, 61 tests, one local run with nothing beside it): 60 passed, S6A-10
+  failed (at 1,201 px the context at 32 px overlapped Undo). Its trace and the run's log are in
+  `.data/ui-check/s6a10-fail/`. After the fix above S6A-10 and S3B-01 passed (3 tests), twice. The specs: S0-02, S0-03,
+  S0-07, S0-08, S1A-03, S1A-06, S2A-10, S3B-01, S4B1-06, S5A-01, S5A-02, S5A-03, S6A-01 to S6A-08, S6A-10, S6A-11,
+  S6B-09, S7B-14, S8-08, S11-02, S12A-01, S14B-07, S20-05, S20-06, S32-01, S32-02.
+- No full run in this step (Łukasz's instruction).

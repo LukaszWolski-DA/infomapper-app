@@ -5,6 +5,8 @@
 
 import { useContext } from "react";
 import { CanvasUiCtx, type Notation } from "./context";
+import { cn } from "@/ui/lib/utils";
+import { SEGMENTED_BAR_BUTTON, SEGMENTED_BAR_TRACK } from "@/ui/components/segmented";
 
 const OPTIONS: { value: Notation; label: string; short: string; title: string }[] = [
   { value: "ie", label: "Crow's foot", short: "IE", title: "Crow's foot (Information Engineering)" },
@@ -14,7 +16,7 @@ const OPTIONS: { value: Notation; label: string; short: string; title: string }[
 export function NotationSwitch() {
   const ui = useContext(CanvasUiCtx);
   return (
-    <div role="group" aria-label="Relationship notation" data-testid="switch-notation" className="inline-flex flex-none rounded-[7px] bg-im-hover p-0.5">
+    <div role="group" aria-label="Relationship notation" data-testid="switch-notation" className={cn("inline-flex flex-none", SEGMENTED_BAR_TRACK)}>
       {OPTIONS.map((o) => (
         <button
           key={o.value}
@@ -23,7 +25,7 @@ export function NotationSwitch() {
           aria-pressed={ui.notation === o.value}
           data-notation={o.value}
           onClick={() => ui.setNotation(o.value)}
-          className="h-[26px] whitespace-nowrap rounded-[5px] px-2.5 text-im-ink-2 aria-pressed:bg-im-surface aria-pressed:text-im-ink aria-pressed:shadow-[0_0_0_1px_var(--im-line),0_1px_2px_var(--im-shadow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
+          className={SEGMENTED_BAR_BUTTON}
         >
           <span className="hidden min-[2101px]:inline">{o.label}</span>
           <span className="min-[2101px]:hidden">{o.short}</span>

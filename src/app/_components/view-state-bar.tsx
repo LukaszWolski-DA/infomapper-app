@@ -22,6 +22,9 @@ import { viewCounts } from "@/canvas/view-counts";
 import { fitChips } from "@/ui/fit-chips";
 import { useToast } from "@/ui/components/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/components/dropdown-menu";
+import { cn } from "@/ui/lib/utils";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { buttonVariants } from "@/ui/components/button";
 
 export interface ViewChip {
   /** Names its test id (`chip-<id>`, its × `chip-<id>-off`). */
@@ -247,17 +250,16 @@ export function ViewStateBar({ editable, live }: { editable: boolean; live: { la
   );
 }
 
+// slice 37 (step 4): 24 px, so a chip's × is a 24 px target inside it
 const chipClass =
-  "inline-flex h-[22px] flex-none items-center gap-[3px] whitespace-nowrap rounded-[11px] bg-im-surface pl-2 text-im-ink-2 shadow-[0_0_0_1px_var(--im-line)]";
+  "inline-flex h-6 flex-none items-center gap-[3px] whitespace-nowrap rounded-full bg-im-surface pl-2 text-im-ink-2 shadow-[0_0_0_1px_var(--im-line)]";
 /** The prototype's `.btn.sm.vreset`. */
-const showAllClass =
-  "inline-flex h-6 flex-none items-center whitespace-nowrap rounded-md border border-im-line bg-im-surface px-2.5 text-xs text-im-ink hover:bg-im-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical";
-const offClass =
-  "grid size-[18px] place-items-center rounded-full text-im-ink-3 hover:bg-im-hover hover:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical";
+const showAllClass = cn(buttonVariants({ size: "xs" }), "inline-flex flex-none items-center px-2.5 text-xs");
+const offClass = cn(iconButtonVariants({ size: "xs" }), "rounded-full text-im-ink-3");
 
 function Chip({ chip, measure = false }: { chip: ViewChip; measure?: boolean }) {
   return (
-    <span data-testid={measure ? undefined : `chip-${chip.id}`} title={chip.title} className={`${chipClass} ${chip.off ? "pr-[3px]" : "pr-2"}`}>
+    <span data-testid={measure ? undefined : `chip-${chip.id}`} title={chip.title} className={`${chipClass} ${chip.off ? "pr-0" : "pr-2"}`}>
       {chip.text}
       {chip.off && (
         <button

@@ -16,6 +16,8 @@ import { useToast } from "@/ui/components/toast";
 import { reportSave } from "@/ui/save-state";
 import { rowSaves } from "@/ui/row-saves";
 import { undoAction, type UndoState } from "../_actions/undo";
+import { cn } from "@/ui/lib/utils";
+import { toolButtonVariants } from "@/ui/components/tool-button";
 
 interface UndoApi {
   state: UndoState;
@@ -128,8 +130,7 @@ export const useUndo = () => useContext(UndoCtx);
 /** The page's “undo the newest step”, for toasts (slice 12a); stable while the undo state changes. */
 export const useUndoNow = () => useContext(UndoNowCtx);
 
-const btn =
-  "inline-flex h-[30px] items-center rounded-md px-1.5 text-im-ink-2 hover:bg-im-hover hover:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical disabled:pointer-events-none disabled:opacity-40";
+const btn = cn(toolButtonVariants(), "px-1.5");
 const svg = "size-4 fill-none stroke-current stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]";
 
 /** The top bar's Undo and Redo buttons. */

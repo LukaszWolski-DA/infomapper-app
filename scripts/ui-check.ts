@@ -209,6 +209,66 @@ function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[
         await page.getByTestId("dialog-rich-text").waitFor();
       },
     },
+    // slice 37, step 4: the top bar's menus and switches, a view-state chip, the Changes bar
+    {
+      id: "canvas-focus",
+      path: `${canvas}?card=entity:${ids.entity}`,
+      ready: NODE,
+      then: async (page: Page) => {
+        const focus = page.getByTestId("button-focus");
+        if (await focus.isVisible()) await focus.click();
+        else {
+          await page.getByTestId("button-more-tools").click();
+          await page.getByTestId("more-focus").click();
+        }
+        await page.locator('[data-testid^="chip-"]').first().waitFor();
+      },
+    },
+    {
+      id: "canvas-changes",
+      path: canvas,
+      ready: NODE,
+      minWidth: 1001,
+      then: async (page: Page) => {
+        const changes = page.getByTestId("button-changes");
+        if (await changes.isVisible()) await changes.click();
+        else {
+          await page.getByTestId("button-more-tools").click();
+          await page.getByTestId("more-changes").click();
+        }
+        await page.getByTestId("bar-changes").waitFor();
+      },
+    },
+    {
+      id: "canvas-user-menu",
+      path: canvas,
+      ready: NODE,
+      then: async (page: Page) => {
+        await page.getByTestId("indicator-user").click();
+        await page.getByTestId("menu-user").waitFor();
+      },
+    },
+    {
+      id: "canvas-switcher",
+      path: canvas,
+      ready: NODE,
+      then: async (page: Page) => {
+        await page.getByTestId("switcher-workspace").click();
+        await page.getByRole("menu").waitFor();
+      },
+    },
+    {
+      id: "canvas-more",
+      path: canvas,
+      ready: NODE,
+      then: async (page: Page) => {
+        const more = page.getByTestId("button-more-tools");
+        if (await more.isVisible()) {
+          await more.click();
+          await page.getByRole("menu").waitFor();
+        }
+      },
+    },
     { id: "star", path: star, ready: NODE },
     {
       id: "star-picker",
@@ -256,7 +316,7 @@ interface Collected {
 /** Runs in the page as plain JavaScript (a string, so no build helper is serialised into it). */
 const COLLECT = String.raw`(() => {
   const SEL = 'button, a[href], input:not([type="hidden"]), select, textarea, [role="tab"], [role="button"], summary, [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"]';
-  const EXEMPT = [[".react-flow__node", "canvas card (scales with zoom)"], [".pagedjs_pages, .dpages, [data-testid=document-host], [data-testid=document-quick-box]", "generated document"]];
+  const EXEMPT = [[".react-flow__node", "canvas card (scales with zoom)"], [".pagedjs_pages, .dpages, [data-testid=document-host], [data-testid=document-quick-box]", "generated document"], [".react-flow__attribution", "a library's link (React Flow's attribution, kept as its licence asks)"]];
   const els = [...document.querySelectorAll(SEL)];
   const ids = new Map(els.map((e, i) => [e, i + 1]));
   const shown = (e) => {
@@ -310,7 +370,9 @@ const COLLECT = String.raw`(() => {
       rect: { x: r.left, y: r.top, w: r.width, h: r.height }, visible: clipOf(e, r), inside, inline: inlineLink(e), exempt: ex ? ex[1] : null,
       floating: (() => { for (let n = e; n && n !== document.body; n = n.parentElement) if (getComputedStyle(n).position === "fixed") return true; return false; })(),
       spill: s.overflowX === "visible" && e.tagName !== "INPUT" && e.tagName !== "SELECT" && e.tagName !== "TEXTAREA" ? Math.max(0, e.scrollWidth - e.clientWidth) : 0,
-      textBox: (() => { const g = document.createRange(); g.selectNodeContents(e); const b = g.getBoundingClientRect(); return (e.innerText || "").trim() && b.width > 0 ? { x: b.left, y: b.top, w: b.width, h: b.height } : null; })(),
+      // the text as shown: a name cut with an ellipsis inside its control ends at the control's edge (step 4: the
+      // switchers' clipped text was read as running into the next switcher); text out of its box is "spill" instead
+      textBox: (() => { const g = document.createRange(); g.selectNodeContents(e); const b = g.getBoundingClientRect(); if (!(e.innerText || "").trim() || b.width <= 0) return null; const x = Math.max(b.left, r.left), rt = Math.min(b.right, r.right); return rt > x ? { x, y: b.top, w: rt - x, h: b.height } : null; })(),
       coveredBy: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!h || h === e || e.contains(h)) return null; for (let n = h; n; n = n.parentElement) if (ids.has(n)) return n.contains(e) ? null : ids.get(n); return e.contains(h) ? null : "other"; })(),
       look: { height: r.height, fontSize: parseFloat(s.fontSize), radius: parseFloat(s.borderTopLeftRadius) || 0, borderWidth: bw, borderColor: bw > 0 ? s.borderTopColor : "" },
     });

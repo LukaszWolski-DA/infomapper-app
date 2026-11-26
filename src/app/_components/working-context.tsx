@@ -15,6 +15,10 @@ import { useWorkingContext, WorkingContextCtx, type WorkingContextApi } from "@/
 import { CONTEXT_COOKIE_MAX_AGE, contextCookieName, formatContextCookie } from "@/ui/working-context-cookie";
 import { useAction } from "./use-action";
 import { TagIcon } from "../_panels/labels-field";
+import { cn } from "@/ui/lib/utils";
+import { MENU_CONTENT, MENU_HEAD, MENU_ITEM } from "@/ui/components/menu";
+import { inputVariants } from "@/ui/components/input";
+import { toolButtonVariants } from "@/ui/components/tool-button";
 
 const writeCookie = (name: string, value: string | null) => {
   document.cookie = value === null ? `${name}=; path=/; max-age=0; samesite=lax` : `${name}=${value}; path=/; max-age=${CONTEXT_COOKIE_MAX_AGE}; samesite=lax`;
@@ -109,8 +113,10 @@ export function WorkingContextProvider({
   return <WorkingContextCtx.Provider value={api}>{children}</WorkingContextCtx.Provider>;
 }
 
-const btn =
-  "inline-flex h-[30px] min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover hover:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical aria-pressed:bg-im-logical-soft aria-pressed:text-im-ink";
+// the bar's flexible item (slice 16): it shrinks, but never below a 24 px target (slice 37, step 4: 19 px at 1,201 px
+// before; the tools' gap gives up 1 px each from 1,201 to 1,300 px for it; 4 px padding up to 1,000 px), and its
+// label is cut inside it rather than running out of it
+const btn = cn(toolButtonVariants(), "min-w-target max-w-full flex-initial px-2 max-[1001px]:px-1 aria-pressed:text-im-ink");
 
 /** The top bar's switch left of Undo, and its menu (PRD item 1). */
 export function WorkingContextButton() {
@@ -159,7 +165,7 @@ export function WorkingContextButton() {
   // slice 16, item 5: the bar's flexible item once the switchers are at their minimum; the label shrinks, so a font's
   // extra pixels never make the bar scroll
   return (
-    <div ref={box} className="relative flex min-w-0">
+    <div ref={box} className="relative flex min-w-target">
       <button
         type="button"
         className={btn}
@@ -172,7 +178,7 @@ export function WorkingContextButton() {
         {active ? (
           <>
             <span className="size-2 flex-none rounded-full bg-im-logical" aria-hidden />
-            <span className="min-w-10 max-w-[180px] truncate max-[1301px]:max-w-[90px] max-[1201px]:max-w-[56px] max-[1001px]:max-w-[40px]">Working on {active.name}</span>
+            <span className="min-w-0 max-w-[180px] truncate max-[1301px]:max-w-[90px] max-[1201px]:max-w-[56px] max-[1001px]:max-w-[40px]">Working on {active.name}</span>
           </>
         ) : (
           <>
@@ -186,10 +192,10 @@ export function WorkingContextButton() {
           <div
             ref={menu}
             style={{ left: open.left, top: open.top }}
-            className="fixed z-50 flex w-[300px] flex-col rounded-lg bg-im-surface p-1.5 text-[13px] text-im-ink shadow-[0_0_0_1px_var(--im-line),0_10px_24px_-12px_var(--im-shadow)]"
+            className={cn("fixed z-50 flex w-[300px] flex-col p-1.5", MENU_CONTENT)}
             data-testid="menu-context"
           >
-            <div className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-im-ink-3">Working context</div>
+            <div className={MENU_HEAD}>Working context</div>
             <p className="px-2 pb-2 text-xs leading-snug text-im-ink-2">
               While a context is on, everything you create or change in the model gets its label, and shows up on its live canvas. Layout changes are
               not labeled.
@@ -202,7 +208,7 @@ export function WorkingContextButton() {
               placeholder="Find or create a label, e.g. CR-23"
               autoComplete="off"
               spellCheck={false}
-              className="mx-1 mb-1 rounded-md border border-im-line bg-im-surface px-2 py-1.5 outline-none focus:outline-2 focus:-outline-offset-1 focus:outline-im-logical"
+              className={cn(inputVariants(), "mx-1 mb-1 w-auto")}
               data-testid="input-context"
             />
             <div role="listbox" className="flex flex-col" data-testid="list-context">
@@ -211,7 +217,7 @@ export function WorkingContextButton() {
                   type="button"
                   role="option"
                   aria-selected
-                  className="flex items-center gap-2 rounded-[5px] bg-im-hover px-2 py-1.5 text-left"
+                  className={cn(MENU_ITEM, "bg-im-hover px-2 py-1.5")}
                   onClick={() => pick({ create: entries.create! })}
                   data-testid="option-context-create"
                 >
@@ -225,7 +231,7 @@ export function WorkingContextButton() {
                   type="button"
                   role="option"
                   aria-selected={entries.create === null && i === 0}
-                  className={`flex items-center gap-2 rounded-[5px] px-2 py-1.5 text-left hover:bg-im-hover ${entries.create === null && i === 0 ? "bg-im-hover" : ""}`}
+                  className={cn(MENU_ITEM, "px-2 py-1.5", entries.create === null && i === 0 && "bg-im-hover")}
                   onClick={() => pick(l)}
                   data-testid="option-context"
                 >
@@ -241,7 +247,7 @@ export function WorkingContextButton() {
             {active && (
               <>
                 <hr className="my-1 border-im-line" />
-                <button type="button" className="rounded-[5px] px-2 py-1.5 text-left hover:bg-im-hover" onClick={() => (close(), api.set(null))} data-testid="button-context-off">
+                <button type="button" className={cn(MENU_ITEM, "px-2 py-1.5")} onClick={() => (close(), api.set(null))} data-testid="button-context-off">
                   Stop working on {active.name}
                 </button>
               </>

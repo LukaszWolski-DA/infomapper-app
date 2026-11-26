@@ -11,6 +11,14 @@ export const SEGMENTED_TRACK = "rounded-md bg-im-hover p-0.5 gap-0.5"
 export const SEGMENTED_BUTTON =
   "min-h-6 whitespace-nowrap rounded-[6px] px-2.5 text-[12.5px] font-medium text-im-ink-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-im-logical enabled:hover:text-im-ink disabled:cursor-not-allowed aria-pressed:bg-im-surface aria-pressed:text-im-ink aria-pressed:shadow-[0_1px_2px_rgba(22,32,48,0.12),0_0_0_1px_var(--im-line)]"
 
+/**
+ * The top bar's segmented switches (the layer, the notation; step 4, F15): the track without the gap and buttons 26 px in
+ * the bar's own text, so each switch keeps its width; the chosen one as `SEGMENTED_BUTTON`'s.
+ */
+export const SEGMENTED_BAR_TRACK = "rounded-md bg-im-hover p-0.5"
+export const SEGMENTED_BAR_BUTTON =
+  "h-[26px] whitespace-nowrap rounded-[6px] px-2.5 text-im-ink-2 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-im-logical enabled:hover:text-im-ink aria-pressed:bg-im-surface aria-pressed:text-im-ink aria-pressed:shadow-[0_1px_2px_rgba(22,32,48,0.12),0_0_0_1px_var(--im-line)]"
+
 export function Segmented<V extends string>({
   value,
   options,
