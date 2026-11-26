@@ -733,3 +733,66 @@ documents and three documents of every section type: Markdown, HTML, CSS).
     single-file check, [run 45866858712](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45866858712),
     passed 3 of 3. A race in the test, not in this slice: its fix (a retrying `toHaveText` on the two times) belongs to a
     `fix/` branch from `dev`.
+
+**Łukasz's answer (26 November 2026):** step 3a accepted. `S36-list` waits: its fix goes to its own `fix/` branch from
+`dev` after slice 37 is merged (one session at a time in one checkout); if it fails again in a later full run, it is run
+again as a single file and reported.
+
+## Step 3b: the left panel, the toolbox and menus, the import wizard, the rich text, the picker (26 November 2026)
+
+**What changed:**
+- **The menus' look** is `src/ui/components/menu.ts` (`MENU_CONTENT`, `MENU_ITEM`, `MENU_LABEL`, `MENU_HEAD`,
+  `MENU_SEPARATOR`): a pop-over radius 12 with a hairline and `shadow-pop`, an item radius 8, at least 28 px (today's
+  34 px rows kept), body text; a section's name `small` in `ink-3`, a kind's head the uppercase `label`.
+  `canvas-menu.tsx`' `menuClass`, `itemClass` and `sectionClass` are now that look (every `DropdownMenu` that uses them:
+  the canvas tab's, the concept's, the project home tile's, "More"); the toolbox, the picker and the labels' suggestions
+  draw it too. The items keep their `span.min-w-0` (A3's list).
+- **The left panel:** the tabs are `src/ui`'s panel tabs (natural width, 14 px apart, the selected one with the accent
+  underline; four fit the 264 px panel, more scroll sideways). The search is the 32 px input, a concept's rename the
+  28 px one; "+" and "⋯" on a group's head the 24 px icon button (before 22); collapse and expand the 28 px icon button;
+  "New concept", "New source table", "Import sources…", "New requirement" and the module tab's creates and "Bus matrix"
+  the button's `sm` (28 px, before 26). Tree rows, requirement rows, group heads and schema heads have `min-h-target`
+  (24 px): all were 24 px or more already (the check script finds none below), so nothing moved. No row needed slice 38.
+- **The toolbox:** the pop-over's look, its search the 32 px input, its results and actions menu items (results 28 px,
+  actions 32 px as before), its segmented choice the shared `Segmented` track and buttons (a choice already chosen still
+  runs its action, as before), the shortcuts 12 px.
+- **The picker** (`src/ui/pick-popover.tsx`): the pop-over's look, its filter the 32 px input, its items menu items,
+  "Link" and its extra button the button's `sm` (primary and secondary).
+- **The labels field:** the field's edge in `line-control` with the focus ring; a label's × the 24 px icon button (before
+  18 px) inside its 24 px chip; the suggestions a pop-over list.
+- **The import wizard:** the steps are quiet `sm` buttons (28 px, pill); the review's filters filter chips (28 px, before
+  30); the rename's and the vendor's drop-downs `Select` (the rename's 28 px, before no height); the code boxes' text
+  areas the shared text area (monospaced; their height is their rows: the pasted result's box is 6 rows, 120 px, before
+  140 px; the translated standard 8 rows); "Read the script" the primary `sm` button; the two folds' summaries 24 px
+  (before 19.5). The target's radio track ("An existing system", "A new system") is a radio group, kept as it is.
+- **The rich text** (F16): `.rt-view` has the `line-control` edge and radius 8 (before `line`, 6), the accent's edge and
+  ring when focused from the keyboard; the field's label is `Field`'s (12/16 500 `ink-2`, before 11.5 `ink-3`); "Edit",
+  "Show more" and the conflict line's buttons the button's `sm` (28 px, before 24 and 26). The dialog is radius 12 with a
+  hairline and `shadow-pop`, its title `section`, its close the 28 px icon button; the editor's tools the 28 px icon
+  button (a pressed tool in the accent's soft fill, before `hover`), "Insert template", the link field and its buttons
+  28 px, Cancel and Save the button's `md` (secondary and primary).
+- **The concepts' check boxes** in the document editor's scope (`IdChecks`, `editor.tsx`): each row is a 24 px label
+  (`min-h-target`) with no gap, so the boxes are 24 px apart (before 23.5) and pass WCAG's spacing; they moved down 3 to
+  4 px in all.
+- **The check script** (`scripts/ui-check.ts`): five screens more (`canvas-toolbox`, `canvas-concept-menu`,
+  `dialog-import`, `dialog-rich-text`, `star-picker`); menu items and options (`role="menuitem…"`, `role="option"`) are
+  collected as targets; a control inside a pop-over (`position: fixed`) does not collide with the control it covers
+  (`floating`, `overlaps`; a test).
+- **The guard:** 6 files left the list (the import wizard's three, `labels-field.tsx`, `left-panel.tsx`,
+  `toolbox.tsx`): 45 files to convert and the one exception.
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test`.
+- **The check script on the step's screens**, before (`.data/ui-check/before3b-20261126-2023/`, on `4b0d647`) and after
+  (`.data/ui-check/step3b-20261126-2018/`): before, "Sources" and "Requirements" ran together (6.6 px) on every left
+  panel at 1280, 1440 and 1920 px, and the editor's four concept check boxes failed WCAG; after, neither. Nothing else on
+  these screens at 1280 px or wider but the top bar's switchers ("words run together", step 4) and React Flow's
+  attribution link. At 390 px: the top bar and the navigation row (slice 38's, A7) and the working context's spill.
+- **The specs of the screens touched** (30 specs, 54 tests, one local run with nothing beside it): 53 passed, 1 failed.
+  `S7B-01` waited 15 s for the second import's toast and still read the first one's ("7 missing from source, 2 to
+  resolve"). Alone it passed 3 of 3. Its trace was lost to the reruns (they reuse `test-results/`), so the cause is not
+  known; nothing in this step touches the import's write or its toast. To watch in the next full run.
+  - The specs: S0-05, S1A-07, S1A-10, S1A-11, S2A-02, S2A-08, S2B-06, S2B-13, S2C-07, S3A-01, S3A-02, S4A-01, S4A-04,
+    S4A-05, S4A-06, S4B1-03, S6B-08, S7A-02, S7A-07, S7A-09, S7A-16, S7B-01, S10A-04, S13-04, S15-01, S15-22, S17-01,
+    S25-04, S26-04, S28-07.
+- No full run in this step (Łukasz's instruction).

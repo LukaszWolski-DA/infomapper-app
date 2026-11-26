@@ -16,15 +16,9 @@ const EXCEPTIONS: Readonly<Record<string, string>> = {
 };
 
 /** Slice 37, step 2: every file that styled a control on its own after `fields.tsx`' constants became the shared look.
- * Step 3a converted the inspector's panels and InfoCube's sections (15 files). */
+ * Step 3a converted the inspector's panels and InfoCube's sections (15 files); step 3b the left panel, the toolbox and
+ * the import wizard (6). */
 const TO_CONVERT: readonly string[] = [
-  // step 3b: the left panel, the toolbox and menus, the import wizard
-  "src/app/_panels/import/import-wizard.tsx",
-  "src/app/_panels/import/review-step.tsx",
-  "src/app/_panels/import/source-step.tsx",
-  "src/app/_panels/labels-field.tsx",
-  "src/app/_panels/left-panel.tsx",
-  "src/app/_panels/toolbox.tsx",
   // step 4: the top bar, the navigation row, the status bar, the canvas's switches
   "src/app/_components/history-nav.tsx",
   "src/app/_components/side-panels.tsx",

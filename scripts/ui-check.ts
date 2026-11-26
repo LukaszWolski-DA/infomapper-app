@@ -165,7 +165,62 @@ function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[
         await page.getByRole("dialog").waitFor();
       },
     },
+    // slice 37, step 3b: the toolbox, a concept's menu, the import wizard, the rich-text dialog and the concept picker
+    {
+      id: "canvas-toolbox",
+      path: canvas,
+      ready: NODE,
+      then: async (page: Page) => {
+        const pane = page.locator(".react-flow__pane");
+        const box = (await pane.boundingBox())!;
+        await page.mouse.click(box.x + 24, box.y + box.height - 40, { button: "right" });
+        await page.getByTestId("menu-toolbox").waitFor();
+      },
+    },
+    {
+      id: "canvas-concept-menu",
+      path: canvas,
+      ready: NODE,
+      minWidth: 1001,
+      then: async (page: Page) => {
+        await page.locator('[data-testid="panel-left"] [data-testid="tab-model"]').click();
+        await page.getByTestId("tree-concept-head").first().hover();
+        await page.getByTestId("button-concept-menu").first().click();
+        await page.getByRole("menu").waitFor();
+      },
+    },
+    {
+      id: "dialog-import",
+      path: canvas,
+      ready: NODE,
+      minWidth: 1001,
+      then: async (page: Page) => {
+        await page.locator('[data-testid="panel-left"] [data-testid="tab-sources"]').click();
+        await page.getByTestId("button-import-sources").click();
+        await page.getByTestId("dialog-import").waitFor();
+      },
+    },
+    {
+      id: "dialog-rich-text",
+      path: `${canvas}?card=entity:${ids.entity}`,
+      ready: NODE,
+      then: async (page: Page) => {
+        await page.getByTestId("field-entity-definition-view").click();
+        await page.getByTestId("dialog-rich-text").waitFor();
+      },
+    },
     { id: "star", path: star, ready: NODE },
+    {
+      id: "star-picker",
+      path: star,
+      ready: NODE,
+      minWidth: 1001,
+      then: async (page: Page) => {
+        await page.locator('[data-testid="panel-left"] [role="tab"]').filter({ hasText: "Cube" }).click();
+        await page.getByTestId("button-new-fact").click();
+        await page.locator('[data-testid="picker-concept"][data-shown="true"]').waitFor();
+      },
+    },
     { id: "star-cube-mapping", path: `${star}?ext=cube_mapping:${ids.cubeMapping}`, ready: NODE },
     { id: "star-fact", path: `${star}?card=entity:${ids.fact}`, ready: NODE },
     { id: "star-dimension", path: `${star}?card=entity:${ids.dimension}`, ready: NODE },
@@ -200,7 +255,7 @@ interface Collected {
 
 /** Runs in the page as plain JavaScript (a string, so no build helper is serialised into it). */
 const COLLECT = String.raw`(() => {
-  const SEL = 'button, a[href], input:not([type="hidden"]), select, textarea, [role="tab"], [role="button"], summary';
+  const SEL = 'button, a[href], input:not([type="hidden"]), select, textarea, [role="tab"], [role="button"], summary, [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"]';
   const EXEMPT = [[".react-flow__node", "canvas card (scales with zoom)"], [".pagedjs_pages, .dpages, [data-testid=document-host], [data-testid=document-quick-box]", "generated document"]];
   const els = [...document.querySelectorAll(SEL)];
   const ids = new Map(els.map((e, i) => [e, i + 1]));
@@ -253,6 +308,7 @@ const COLLECT = String.raw`(() => {
       id: ids.get(e), kind, tag, testId: e.getAttribute("data-testid"),
       text: (e.getAttribute("aria-label") || (kind === "check" ? (e.closest("label")?.innerText || (e.id && document.querySelector("label[for=\"" + e.id + "\"]")?.innerText) || "") : "") || e.innerText || (kind === "field" || kind === "select" ? "" : e.value) || e.getAttribute("title") || "").slice(0, 80),
       rect: { x: r.left, y: r.top, w: r.width, h: r.height }, visible: clipOf(e, r), inside, inline: inlineLink(e), exempt: ex ? ex[1] : null,
+      floating: (() => { for (let n = e; n && n !== document.body; n = n.parentElement) if (getComputedStyle(n).position === "fixed") return true; return false; })(),
       spill: s.overflowX === "visible" && e.tagName !== "INPUT" && e.tagName !== "SELECT" && e.tagName !== "TEXTAREA" ? Math.max(0, e.scrollWidth - e.clientWidth) : 0,
       textBox: (() => { const g = document.createRange(); g.selectNodeContents(e); const b = g.getBoundingClientRect(); return (e.innerText || "").trim() && b.width > 0 ? { x: b.left, y: b.top, w: b.width, h: b.height } : null; })(),
       coveredBy: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!h || h === e || e.contains(h)) return null; for (let n = h; n; n = n.parentElement) if (ids.has(n)) return n.contains(e) ? null : ids.get(n); return e.contains(h) ? null : "other"; })(),

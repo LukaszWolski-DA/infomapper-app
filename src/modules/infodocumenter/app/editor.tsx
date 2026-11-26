@@ -1065,9 +1065,9 @@ function IdChecks({
   const shown = useMemo(() => JSON.parse(shownKey) as string[], [shownKey]);
   const choice = useChoice<readonly string[]>(shown, (v) => onSave([...v]), version);
   return (
-    <div className="flex flex-col gap-1" role="group" aria-labelledby={labelledBy} data-testid={testId}>
+    <div className="flex flex-col" role="group" aria-labelledby={labelledBy} data-testid={testId}>
       {items.map((i) => (
-        <label key={i.id} className="flex items-center gap-2">
+        <label key={i.id} className="flex min-h-target items-center gap-2">
           <input
             type="checkbox"
             data-testid={`${testId}-item`}

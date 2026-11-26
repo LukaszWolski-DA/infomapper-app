@@ -250,11 +250,13 @@
 .tc-attn { @variant dark { color: #e9b949; } }
 .tc-ok { @variant dark { color: #4ade80; } }
 .tc-info { @variant dark { color: #7aa7ff; } }
+/* a field's look (slice 37, F16): the line-control edge, radius 8, the accent's edge and ring when focused */
 .rt-view {
-  border: 1px solid var(--im-line); border-radius: 6px; background: var(--im-surface); padding: 8px 10px; min-height: 40px;
+  border: 1px solid var(--im-line-control); border-radius: 8px; background: var(--im-surface); padding: 8px 10px; min-height: 40px;
   max-height: 9.2em; overflow: hidden; font-size: 12.5px; line-height: 1.5; text-align: left; width: 100%; color: var(--im-ink);
 }
 .rt-view.open { max-height: none; }
+.rt-view:focus-visible { outline: none; border-color: var(--im-logical); box-shadow: 0 0 0 3px var(--im-logical-soft); }
 .rt-view.empty { color: var(--im-ink-3); font-style: italic; }
 .rte-ed { min-height: 300px; padding: 16px 18px; outline: none; font-size: 13.5px; line-height: 1.6; color: var(--im-ink); }
 .rte-ed p.is-empty[data-placeholder]:not([data-placeholder=""])::before {

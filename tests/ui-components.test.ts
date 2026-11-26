@@ -8,6 +8,7 @@ import { DISCLOSURE_HEADER } from "@/ui/components/disclosure";
 import { cn } from "@/ui/lib/utils";
 import { FIELD_LABEL, FIELD_HINT } from "@/ui/components/field";
 import { iconButtonVariants } from "@/ui/components/icon-button";
+import { MENU_CONTENT, MENU_HEAD, MENU_ITEM, MENU_LABEL } from "@/ui/components/menu";
 import { FIELD_LOOK, inputVariants, textareaVariants } from "@/ui/components/input";
 import { SEGMENTED_BUTTON, SEGMENTED_TRACK } from "@/ui/components/segmented";
 import { selectVariants } from "@/ui/components/select";
@@ -126,5 +127,20 @@ describe("fields.tsx' constants re-export the components' look", () => {
     expect(dangerClass).toBe(buttonVariants({ variant: "danger", size: "md" }));
     expect(primaryClass).toBe(buttonVariants({ variant: "primary", size: "md" }));
     expect(inputClass).toBe(inputVariants({ size: "md" }));
+  });
+});
+
+describe("the menus' look (step 3b)", () => {
+  it("a pop-over is radius 12 with a hairline and the pop shadow; an item is radius 8, at least 28 px, in body text", () => {
+    has(MENU_CONTENT, "rounded-lg", "border", "border-im-line", "shadow-pop", "text-body");
+    has(MENU_ITEM, "rounded-md", "min-h-control-sm", "hover:bg-im-hover", "data-[highlighted]:bg-im-hover");
+    has(MENU_LABEL, "text-small", "text-im-ink-3");
+    has(MENU_HEAD, "text-label", "uppercase");
+  });
+  it("an item's own padding and gap replace the shared ones", () => {
+    const merged = cn(MENU_ITEM, "justify-between gap-4 py-1");
+    has(merged, "gap-4", "py-1", "justify-between");
+    expect(merged.split(/\s+/)).not.toContain("gap-2");
+    expect(merged.split(/\s+/)).not.toContain("py-[7px]");
   });
 });

@@ -5,6 +5,10 @@
 // canvas page does not carry Tiptap. Esc and Cancel with unsaved changes ask first; Ctrl + Enter saves. While the text
 // differs from what the dialog opened with (or was given by "Use this"), leaving the page asks first (slice 14b).
 
+import { buttonVariants } from "@/ui/components/button";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { inputVariants } from "@/ui/components/input";
+import { cn } from "@/ui/lib/utils";
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { guard, release } from "../leave-guard";
@@ -157,7 +161,7 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
       aria-label={title}
       aria-pressed={on || undefined}
       data-testid={testId}
-      className={`h-7 min-w-7 rounded-[5px] px-1.5 text-[13px] text-im-ink-2 hover:bg-im-hover hover:text-im-ink aria-pressed:bg-im-hover aria-pressed:text-im-ink ${extra}`}
+      className={cn(iconButtonVariants(), "w-auto min-w-control-sm px-1.5 text-body", extra)}
       // keep the selection in the editor
       onMouseDown={(e) => e.preventDefault()}
       onClick={run}
@@ -210,7 +214,7 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
           <button
             type="button"
             title="Insert the template for this kind of requirement"
-            className="h-7 rounded-[5px] border border-im-line bg-im-surface px-2 text-xs text-im-ink-2 hover:bg-im-hover"
+            className={buttonVariants({ size: "sm" })}
             onMouseDown={(e) => e.preventDefault()}
             onClick={insertTemplate}
             data-testid="button-rte-template"
@@ -227,13 +231,13 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://… or mailto:…"
             autoComplete="off"
-            className="h-[30px] flex-1 rounded-md border border-im-line bg-im-surface px-2 text-im-ink outline-none focus:border-im-logical"
+            className={cn(inputVariants({ size: "sm" }), "flex-1")}
             data-testid="input-rte-url"
           />
-          <button type="button" className="h-[30px] rounded-md border border-im-line bg-im-surface px-2.5 text-xs hover:bg-im-hover" onClick={addLink} data-testid="button-rte-link-ok">
+          <button type="button" className={buttonVariants({ size: "sm" })} onClick={addLink} data-testid="button-rte-link-ok">
             Add link
           </button>
-          <button type="button" className="h-[30px] rounded-md border border-im-line bg-im-surface px-2.5 text-xs hover:bg-im-hover" onClick={closeLink}>
+          <button type="button" className={buttonVariants({ size: "sm" })} onClick={closeLink}>
             Cancel
           </button>
         </div>
@@ -247,12 +251,12 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
           {armed ? UNSAVED_WARNING : FOOTER_HINT}
         </span>
         <span className="flex-1" />
-        <button type="button" className="h-8 rounded-md border border-im-line bg-im-surface px-3 text-[13px] text-im-ink hover:bg-im-hover" onClick={tryCancel} data-testid="button-rte-cancel">
+        <button type="button" className={buttonVariants()} onClick={tryCancel} data-testid="button-rte-cancel">
           Cancel
         </button>
         <button
           type="button"
-          className="h-8 rounded-md bg-im-logical px-3 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className={buttonVariants({ variant: "primary" })}
           onClick={save}
           disabled={!editor || saving}
           data-testid="button-rte-save"

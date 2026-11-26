@@ -17,7 +17,9 @@ import { planFingerprint } from "@/domain/import/compare";
 import { readDdl } from "@/domain/import/ddl";
 import { buildPlan } from "@/domain/import/plan";
 import { readStandard } from "@/domain/import/standard";
+import { buttonVariants } from "@/ui/components/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui/components/dialog";
+import { cn } from "@/ui/lib/utils";
 import { useToast } from "@/ui/components/toast";
 import { gzipJson, MAX_UPLOAD_BYTES, TOO_LARGE, UPLOAD_TYPE } from "@/ui/import-upload";
 import { reportSave } from "@/ui/save-state";
@@ -196,7 +198,7 @@ export function ImportWizard({
                     aria-current={current ? "step" : undefined}
                     disabled={!canGo(n, s, model, plan)}
                     onClick={() => go(n)}
-                    className={`inline-flex h-7 items-center gap-[7px] rounded-[14px] pl-1.5 pr-2.5 disabled:cursor-default disabled:opacity-55 ${current ? "bg-im-logical-soft text-im-logical" : done ? "text-im-ink-2" : "text-im-ink-3"}`}
+                    className={cn(buttonVariants({ variant: "quiet", size: "sm" }), "inline-flex items-center gap-[7px] rounded-full pl-1.5 pr-2.5 text-body disabled:opacity-55", current ? "bg-im-logical-soft text-im-logical" : done ? "text-im-ink-2" : "text-im-ink-3")}
                     data-testid={`wizard-step-${n}`}
                   >
                     <span className={`inline-grid size-[18px] place-items-center rounded-full border text-[11px] ${done ? "border-im-ink-2 bg-im-ink-2 text-im-surface" : "border-current"}`}>{n}</span>

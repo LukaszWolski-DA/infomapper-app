@@ -7,6 +7,10 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
+import { MENU_CONTENT, MENU_HEAD, MENU_ITEM } from "@/ui/components/menu";
+import { cn } from "@/ui/lib/utils";
 import { clampAt, createText, enterAction, nextFocus, noneText, visibleItems, type PickOptions } from "./pick";
 
 export type { PickItem, PickOptions } from "./pick";
@@ -132,19 +136,19 @@ function Picker({ options }: { options: PickOptions }) {
       aria-label={options.title}
       data-testid={options.testId ?? "picker"}
       data-shown={pos ? "true" : undefined}
-      className="fixed z-50 flex max-h-[min(70vh,520px)] min-w-[260px] max-w-[340px] flex-col overflow-hidden rounded-lg border border-im-line bg-im-surface p-1 text-[13px] shadow-lg"
+      className={cn("fixed z-50 flex max-h-[min(70vh,520px)] min-w-[260px] max-w-[340px] flex-col overflow-hidden", MENU_CONTENT)}
       style={{ left: pos?.x ?? options.at.x, top: pos?.y ?? options.at.y, visibility: pos ? "visible" : "hidden" }}
       onKeyDown={onKeyDown}
       onKeyUp={(e) => e.stopPropagation()}
     >
-      <div className="truncate px-2 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-im-ink-3" data-testid="picker-title">
+      <div className={MENU_HEAD} data-testid="picker-title">
         {options.title}
       </div>
-      {options.note && <div className="px-2 pb-1 text-[12.5px] text-im-ink-3">{options.note}</div>}
+      {options.note && <div className="px-2 pb-1 text-small text-im-ink-3">{options.note}</div>}
       <div className="px-1 pb-1">
         <input
           ref={field}
-          className="h-8 w-full rounded-md border border-im-line bg-im-surface px-2 text-[13px] outline-none focus:border-im-logical"
+          className={inputVariants()}
           placeholder={options.placeholder}
           autoComplete="off"
           spellCheck={false}
@@ -170,7 +174,7 @@ function Picker({ options }: { options: PickOptions }) {
                 aria-selected={multi ? undefined : false}
                 disabled={it.done}
                 title={it.done ? options.doneTitle : undefined}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-im-hover focus-visible:bg-im-hover focus-visible:outline-none disabled:opacity-60 disabled:hover:bg-transparent"
+                className={cn(MENU_ITEM, "w-full px-2 py-1.5 disabled:opacity-60")}
                 onClick={() => (multi ? toggle(it.id) : choose([it.id]))}
               >
                 {multi && (
@@ -198,7 +202,7 @@ function Picker({ options }: { options: PickOptions }) {
             data-testid="picker-create"
             role="option"
             aria-selected={false}
-            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-im-logical hover:bg-im-hover focus-visible:bg-im-hover focus-visible:outline-none ${shown.length ? "mt-0.5 border-t border-im-line" : ""}`}
+            className={cn(MENU_ITEM, "w-full px-2 py-1.5 text-im-logical", shown.length > 0 && "mt-0.5 rounded-t-none border-t border-im-line")}
             onClick={() => createNow(create)}
           >
             <span className="w-3 flex-none text-center font-semibold" aria-hidden>
@@ -214,7 +218,7 @@ function Picker({ options }: { options: PickOptions }) {
             <button
               type="button"
               data-testid="picker-extra"
-              className="h-7 rounded-md border border-im-line px-2.5 text-[12px] hover:bg-im-hover"
+              className={buttonVariants({ size: "sm" })}
               onClick={() => {
                 const act = options.extra!.act;
                 closePick();
@@ -231,7 +235,7 @@ function Picker({ options }: { options: PickOptions }) {
               type="button"
               data-testid="picker-confirm"
               disabled={!checked.size}
-              className="h-7 rounded-md bg-im-logical px-3 text-[12px] font-medium text-white disabled:opacity-45"
+              className={buttonVariants({ variant: "primary", size: "sm" })}
               onClick={() => choose([...checked])}
             >
               {(options.confirm ?? ((n: number) => (n ? `Link ${n}` : "Link")))(checked.size)}

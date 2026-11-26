@@ -22,6 +22,17 @@ describe("overlaps", () => {
     const underPanel = control({ x: 0, y: 0, w: 60, h: 24 }, { coveredBy: "other" });
     expect(overlaps([a, touching, child, hidden, card, underPanel])).toEqual([]);
   });
+  it("a pop-over over the page hides what it covers; two controls in it, or two below it, still collide", () => {
+    const row = control({ x: 0, y: 0, w: 200, h: 24 });
+    const item = control({ x: 10, y: 4, w: 200, h: 28 }, { floating: true });
+    const underItem = control({ x: 0, y: 40, w: 200, h: 24 }, { coveredBy: 99 });
+    const overUnder = control({ x: 10, y: 44, w: 200, h: 28 }, { floating: true });
+    const twin = control({ x: 20, y: 50, w: 200, h: 28 }, { floating: true });
+    // the row below is not covered at its centre: both are seen, they collide
+    expect(overlaps([row, item]).length).toBe(1);
+    // the covered one is under the pop-over: no collision with it; the two items in the pop-over do collide
+    expect(overlaps([underItem, overUnder, twin]).map((o) => [o.a.id, o.b.id])).toEqual([[overUnder.id, twin.id]]);
+  });
   it("compares the shown parts: a control scrolled out of its list does not overlap", () => {
     const a = control({ x: 0, y: 0, w: 60, h: 24 });
     const scrolled = control({ x: 0, y: 0, w: 60, h: 24 }, { visible: { x: 0, y: 30, w: 60, h: 0.5 } });

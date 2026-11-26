@@ -44,6 +44,8 @@ export interface Control {
   /** What lies on top at its centre: itself (null), another control (its id) or something else, such as a panel that
    *  slides over the page on a narrow screen ("other"). */
   readonly coveredBy: number | "other" | null;
+  /** In a pop-over that lies over the page (it or an ancestor is `position: fixed`: the toolbox, the picker, a menu). */
+  readonly floating?: boolean;
 }
 
 export interface Overlap {
@@ -76,6 +78,8 @@ export function overlaps(controls: readonly Control[], tolerance = OVERLAP_PX): 
       if (a.inside.includes(b.id) || b.inside.includes(a.id)) continue;
       // a control under a panel or a dialog lying over the page is not seen, so it collides with nothing
       if (a.coveredBy === "other" || b.coveredBy === "other") continue;
+      // a pop-over over the page covers what it lies on: the covered control below it is not seen (slice 37, step 3b)
+      if (!!a.floating !== !!b.floating && (a.floating ? b : a).coveredBy !== null) continue;
       const box = intersect(a.visible!, b.visible!);
       if (box && box.w > tolerance && box.h > tolerance) out.push({ a, b, w: Math.round(box.w), h: Math.round(box.h) });
     }
