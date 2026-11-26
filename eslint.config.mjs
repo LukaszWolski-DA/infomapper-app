@@ -128,6 +128,8 @@ const eslintConfig = defineConfig([
     ".next-demo/**",
     // slice 29: npm run dev:pg's build folder
     ".next-pg/**",
+    // slice 37: npm run ui:check's build folder
+    ".next-ui-check/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

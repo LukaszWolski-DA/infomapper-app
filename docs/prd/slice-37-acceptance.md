@@ -605,3 +605,75 @@ changed; this slice migrates nothing).
 - Shortcuts in icon buttons' tooltips, with the "?" sheet (F7).
 - A drawn check box in `line-control` if the 4.5:1 native one is ever not enough (F9).
 - The BK chip's contrast (4.07:1), with the physical colours.
+
+## Step 2: tokens, components, the guard and the check script (26 November 2026)
+
+**(a) The check script** (`npm run ui:check`, `scripts/ui-check.ts`, rules in `scripts/lib/ui-check-rules.ts`, tested in
+`tests/ui-check-rules.test.ts`) and `scripts/document-texts.ts`.
+
+Three rules were added to the PRD's after the first trial:
+- **Text out of its control:** a control whose own text runs past its box without clipping.
+- **Words run together:** the words of two controls side by side less than 8 px apart. This is how today's left panel
+  reads "SourcesRequirements": the tabs widen to fit, so neither overlap nor cut text catches it.
+- **A control under a panel** lying over the page (its centre covered by something that is not a control) collides with
+  nothing.
+
+Screen-reader-only text (1 px wide) is not "cut". The left panel's tabs and the bus matrix are not checked below 1,001 px,
+where the left panel is hidden.
+
+**The "before" run** (`.data/ui-check/before-20261126-1349/`, git-ignored): `dev`'s look, served from a worktree of
+`1bb5ad9` (the app unchanged), 177 screen views (25 screens at 1280, 1440 and 1920 px in light and dark, 21 at 390 px),
+no errors.
+
+| Finding | Views | What |
+| --- | --- | --- |
+| Overlaps | 54, all at 390 px | the top bar's controls (working context, Undo, Redo, the panel toggle, zoom, the user) run into one another; the details panel lying over the page covers the navigation row |
+| Text out of its control | 18 | a mapping row's source text (`fname Customer.preferred_contact_channel…`) runs out of its row at every width; the working context's label at 390 px |
+| Words run together | 156 | the left panel's tabs "Sources" and "Requirements" 2 to 7 px apart (every width); the top bar's switchers and the layer switch at 1280 and 1440 px |
+| Past the edge, page wider | 0 | |
+| Cut without an ellipsis | 0 | |
+| Under 24 px, no room around (WCAG fails) | 43 | the concepts' check boxes (13 px, close together), the working context (16 × 30), the navigation row's links (20 px), the overview's toggle (22 × 20), a source table's system chip (19 px), the attribute's entity link (19 px) |
+| Under 24 px, with room (WCAG passes by spacing) | 2,135 | the breadcrumbs, the folds' headers (20 px), InfoDocumenter's ↑ ↓ ✕ (22 px), the note's ✓ (17 px), the status bar's "Model checks" (17 px), the check boxes, the bus matrix's dots, React Flow's attribution link |
+
+**Kinds in light at 1280 to 1920 px** (dark has the same number): 49 button shapes plus 5 tab shapes (47 different
+height, font and radius combinations); 14 kinds of field; 5 kinds of drop-down (33, 32, 28 and 26 px; radius 6.5 px). The
+audit's 37 counted fewer screens.
+- **Button heights seen:** 20, 22, 24, 26, 28, 29.5, 30, 31.5, 32 and 37.5 px.
+- **Radii seen:** 0, 2, 4, 5, 6, 6.5, 7, 10, 13, 14 and 15 px.
+- **Field heights seen:** 25.5, 26, 32, 33.5 and 60 px.
+
+**Generated documents:** `scripts/document-texts.ts before` and again after (b): `diff -r` is empty (the demo's three
+documents and three documents of every section type: Markdown, HTML, CSS).
+
+**(b) What changed:**
+- **The tokens in `globals.css`:** `ink-3`, `map`, `warn` and `line` (light), `ink-3` (dark); new `line-control`,
+  `card-line`, `on-accent`, `shadow-pop`, the size and type scales; one radius scale (4, 8, 12 px); shadcn's
+  `--background` → `im-surface` (the body is white), `--primary` → the accent, `--input` → `line-control`; check boxes in
+  the accent (F9).
+- **The canvas** draws with `--im-card-line` (16 uses in `canvas.css`), so its cards keep their edge (A1).
+- **`src/ui/components`:**
+  - `button.tsx` rewritten (`primary`, `secondary`, `quiet`, `danger`; `md`, `sm`, `bar`; `buttonVariants` the look
+    alone);
+  - new `icon-button.tsx`, `input.tsx`, `select.tsx`, `segmented.tsx`, `tabs.tsx`, `chip.tsx`, `card.tsx` and `field.tsx`;
+  - `dialog.tsx`, `dropdown-menu.tsx` and `toast.tsx` on the tokens (radius 12, `shadow-pop`; the dialog's close as a
+    28 px icon button).
+- **`fields.tsx`:** `buttonClass`, `smallButtonClass`, `dangerClass`, `primaryClass` and `inputClass` re-export the
+  components' look. Every panel that uses them changes now: 32 and 28 px, radius 8, the 3:1 field edge, the focus ring.
+- **The guard** (`tests/control-style-guard.test.ts`, rules in `tests/lib/control-style.ts`):
+  - offences: 324 in 81 files before the re-exports, 215 in 67 after;
+  - one exception (the canvas tabs, slice 38);
+  - 66 files to convert, listed by the step that converts them: 3a 15, 3b 6, 4 16, 5 12, 6 9, 7 1, 8 7.
+- **The slice-32 specs:** `e2e/slice-32/helpers.ts` (`TOKENS["--im-map"]` `#087a65`; `BODY_BG` white and `#1f262f`) and
+  `e2e/slice-29/S32-smoke-theme.spec.ts` (the body's two colours), because the decision changes those values. Their
+  assertions are unchanged.
+
+**Two calls I made in step 2:**
+- The small button keeps 12 px text (`text-small`), not appendix B's 13 px, so its width hardly changes (S33-05, S6A-10).
+- `Seg` keeps its look until step 3: `Segmented` exists, but `fields.tsx`' `Seg` is not re-pointed yet, because of
+  S28-07's no-wrap check in the editor.
+
+**Checks:**
+- `npm run lint`, `npm run typecheck` and `npm test` pass (216 files, 2,606 tests).
+- The slice-32 specs pass as single files (12 tests).
+- A first `npm test` run while the before run and a second dev server loaded the laptop timed out in 8 tests. All of
+  them pass on their own and in the next full run.

@@ -5,7 +5,7 @@ import { isCutWithoutEllipsis, kindKey, kinds, overlaps, pastTheEdge, smallTarge
 let next = 0;
 const look = { height: 28, fontSize: 12, radius: 8, borderWidth: 1, borderColor: "rgb(226, 230, 235)" };
 function control(rect: Box, o: Partial<Control> = {}): Control {
-  return { id: ++next, kind: "button", tag: "button", testId: null, text: "", rect, visible: rect, inside: [], inline: false, exempt: null, look, spill: 0, textBox: null, ...o };
+  return { id: ++next, kind: "button", tag: "button", testId: null, text: "", rect, visible: rect, inside: [], inline: false, exempt: null, look, spill: 0, textBox: null, coveredBy: null, ...o };
 }
 
 describe("overlaps", () => {
@@ -19,7 +19,8 @@ describe("overlaps", () => {
     const child = control({ x: 10, y: 2, w: 20, h: 20 }, { inside: [a.id] });
     const hidden = control({ x: 0, y: 0, w: 60, h: 24 }, { visible: null });
     const card = control({ x: 0, y: 0, w: 60, h: 24 }, { exempt: "canvas card" });
-    expect(overlaps([a, touching, child, hidden, card])).toEqual([]);
+    const underPanel = control({ x: 0, y: 0, w: 60, h: 24 }, { coveredBy: "other" });
+    expect(overlaps([a, touching, child, hidden, card, underPanel])).toEqual([]);
   });
   it("compares the shown parts: a control scrolled out of its list does not overlap", () => {
     const a = control({ x: 0, y: 0, w: 60, h: 24 });

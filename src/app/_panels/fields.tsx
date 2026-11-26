@@ -8,6 +8,8 @@
 // object and field (`fieldKey`), never by their stored value.
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
+import { buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
 import { useToast } from "@/ui/components/toast";
 import { choiceLanded, choiceSettled, choiceShown, FieldDraft, storedBy, versionBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
 import { dropDraft, isGone, keepDraft, markGone, takeDraft, unmarkGone, updateDraft } from "@/ui/field-drafts";
@@ -32,8 +34,8 @@ export function Field({ label, children, htmlFor }: { label: string; children: R
   );
 }
 
-export const inputClass =
-  "min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 text-im-ink outline-none focus:border-im-logical disabled:opacity-50 read-only:bg-im-panel";
+/** Slice 37 (S37-02): the fields' shared look (src/ui/components/input.tsx), 32 px, for inputs, selects and text areas. */
+export const inputClass = inputVariants({ size: "md" });
 
 /**
  * The key of a panel field that shows the field `field` of the object `id`: stable while the object lives, so a save's
@@ -680,10 +682,13 @@ export const TypeDot = ({ ok }: { ok: boolean }) => <span className={`size-2.5 f
 
 export const Actions = ({ children }: { children: ReactNode }) => <div className="mt-5 flex flex-wrap gap-2">{children}</div>;
 
-export const buttonClass = "h-8 rounded-md border border-im-line bg-im-surface px-3 text-im-ink hover:bg-im-hover disabled:opacity-50";
-export const smallButtonClass = "h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover";
-export const dangerClass = `${buttonClass} text-im-warn`;
-export const primaryClass = "h-8 rounded-md border border-im-logical bg-im-logical px-3 font-medium text-im-surface disabled:opacity-50";
+// Slice 37 (S37-02, F1): the shared look of src/ui/components, re-exported under the names every panel imports, until
+// steps 3 to 8 move the panels onto the components themselves. The look alone: a button keeps laying out its content as
+// before.
+export const buttonClass = buttonVariants({ variant: "secondary", size: "md" });
+export const smallButtonClass = buttonVariants({ variant: "secondary", size: "sm" });
+export const dangerClass = buttonVariants({ variant: "danger", size: "md" });
+export const primaryClass = buttonVariants({ variant: "primary", size: "md" });
 
 /** A select with option groups (columns by table). */
 export function GroupedSelect({

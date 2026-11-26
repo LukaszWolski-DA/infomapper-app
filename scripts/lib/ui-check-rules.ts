@@ -41,6 +41,9 @@ export interface Control {
   readonly spill: number;
   /** The box of its own text (a DOM range over it), or null without text. */
   readonly textBox: Box | null;
+  /** What lies on top at its centre: itself (null), another control (its id) or something else, such as a panel that
+   *  slides over the page on a narrow screen ("other"). */
+  readonly coveredBy: number | "other" | null;
 }
 
 export interface Overlap {
@@ -71,6 +74,8 @@ export function overlaps(controls: readonly Control[], tolerance = OVERLAP_PX): 
     for (let j = i + 1; j < cs.length; j++) {
       const a = cs[i]!, b = cs[j]!;
       if (a.inside.includes(b.id) || b.inside.includes(a.id)) continue;
+      // a control under a panel or a dialog lying over the page is not seen, so it collides with nothing
+      if (a.coveredBy === "other" || b.coveredBy === "other") continue;
       const box = intersect(a.visible!, b.visible!);
       if (box && box.w > tolerance && box.h > tolerance) out.push({ a, b, w: Math.round(box.w), h: Math.round(box.h) });
     }

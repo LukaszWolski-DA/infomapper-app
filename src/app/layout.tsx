@@ -40,7 +40,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const theme = themeAttribute(parseTheme((await cookies()).get(THEME_COOKIE)?.value));
   return (
     <html lang="en" data-theme={theme} className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col bg-im-panel font-sans text-[13px] text-im-ink">
+      <body className="flex min-h-full flex-col bg-background font-sans text-[13px] text-im-ink">
         {/* slice 16 (item 7, D-71): no browser context menu in the app's own surfaces */}
         <NoBrowserMenu />
         {/* slice 32 (P3): a page restored from the back-forward cache, or another tab shown again, takes the cookie's theme */}

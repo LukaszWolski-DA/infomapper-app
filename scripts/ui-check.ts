@@ -129,6 +129,8 @@ interface Screen {
   readonly ready: string;
   /** Clicks after the page is ready (a tab, a dialog). */
   readonly then?: (page: Page) => Promise<void>;
+  /** Not shown below this width (the left panel and its tabs: hidden up to 1000 px). */
+  readonly minWidth?: number;
 }
 
 function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[]): Screen[] {
@@ -145,6 +147,7 @@ function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[
       id: `canvas-left-${tab.replace(/^tab-/, "")}`,
       path: canvas,
       ready: NODE,
+      minWidth: 1001,
       then: (page: Page) => page.locator(`[data-testid="panel-left"] [data-testid="${tab}"]`).click(),
     })),
     { id: "canvas-entity", path: `${canvas}?card=entity:${ids.entity}`, ready: NODE },
@@ -170,6 +173,7 @@ function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[
       id: "star-bus-matrix",
       path: star,
       ready: NODE,
+      minWidth: 1001,
       then: async (page: Page) => {
         await page.locator('[data-testid="panel-left"] [role="tab"]').filter({ hasText: "Cube" }).click();
         await page.getByTestId("button-bus-matrix").click();
@@ -247,10 +251,11 @@ const COLLECT = String.raw`(() => {
     const bw = Math.max(parseFloat(s.borderTopWidth) || 0, parseFloat(s.borderBottomWidth) || 0);
     controls.push({
       id: ids.get(e), kind, tag, testId: e.getAttribute("data-testid"),
-      text: (e.getAttribute("aria-label") || e.innerText || e.value || e.getAttribute("title") || "").slice(0, 80),
+      text: (e.getAttribute("aria-label") || (kind === "check" ? (e.closest("label")?.innerText || (e.id && document.querySelector("label[for=\"" + e.id + "\"]")?.innerText) || "") : "") || e.innerText || (kind === "field" || kind === "select" ? "" : e.value) || e.getAttribute("title") || "").slice(0, 80),
       rect: { x: r.left, y: r.top, w: r.width, h: r.height }, visible: clipOf(e, r), inside, inline: inlineLink(e), exempt: ex ? ex[1] : null,
       spill: s.overflowX === "visible" && e.tagName !== "INPUT" && e.tagName !== "SELECT" && e.tagName !== "TEXTAREA" ? Math.max(0, e.scrollWidth - e.clientWidth) : 0,
       textBox: (() => { const g = document.createRange(); g.selectNodeContents(e); const b = g.getBoundingClientRect(); return (e.innerText || "").trim() && b.width > 0 ? { x: b.left, y: b.top, w: b.width, h: b.height } : null; })(),
+      coveredBy: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!h || h === e || e.contains(h)) return null; for (let n = h; n; n = n.parentElement) if (ids.has(n)) return n.contains(e) ? null : ids.get(n); return e.contains(h) ? null : "other"; })(),
       look: { height: r.height, fontSize: parseFloat(s.fontSize), radius: parseFloat(s.borderTopLeftRadius) || 0, borderWidth: bw, borderColor: bw > 0 ? s.borderTopColor : "" },
     });
   }
@@ -262,7 +267,7 @@ const COLLECT = String.raw`(() => {
     if (e.scrollWidth <= e.clientWidth + 1) continue;
     if (EXEMPT.some(([sel]) => e.closest(sel)) || !shown(e)) continue;
     const r = e.getBoundingClientRect();
-    if (r.width < 1 || r.bottom < 0 || r.top > innerHeight) continue;
+    if (r.width <= 1.5 || r.height <= 1.5 || r.bottom < 0 || r.top > innerHeight) continue; // screen-reader-only text is 1 px
     cut.push({ testId: e.getAttribute("data-testid") || e.closest("[data-testid]")?.getAttribute("data-testid") || null, tag: e.tagName.toLowerCase(), text: e.innerText.replace(/\s+/g, " ").slice(0, 80),
       box: { overflowX: s.overflowX, textOverflow: s.textOverflow, scrollWidth: e.scrollWidth, clientWidth: e.clientWidth } });
   }
@@ -474,6 +479,7 @@ async function main() {
       const leftTabs = await page.locator('[data-testid="panel-left"] [role="tab"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-testid") ?? "").filter(Boolean));
       for (const screen of screens(ids, wsTabs, leftTabs)) {
         if (only && !only.some((o) => screen.id.startsWith(o))) continue;
+        if (screen.minWidth && view.width < screen.minWidth) continue;
         const r = await check(page, base, screen, view, dir);
         results.push(r);
         console.log(`${r.screen} ${viewName(view)}: ${r.error ? `error: ${r.error}` : `${r.controls.length} controls, ${r.overlaps.length} overlaps, ${r.spills.length} spill, ${r.crowded.length} crowded, ${r.past.length} past, ${r.small.length} small, ${r.cut.length} cut`}`);
