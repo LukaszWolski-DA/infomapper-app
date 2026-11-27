@@ -1,6 +1,7 @@
 "use client";
 
-// “Entity aliases” and “Attribute aliases” in the top bar, after the layer switch (slice 11, D-64, F7): checked shows
+// “Entity aliases” and “Attribute aliases”, under the canvas toolbar's “Names ▾” since slice 38 (`NamesMenu`; slice 11,
+// D-64, F7): checked shows
 // aliases, unchecked names, indeterminate while a card has an exception in that dimension. A click sets the canvas's
 // mode and clears the cards' exceptions there, one undo step (`ui.setNames`). Editors only; reviewers and readers see
 // them disabled, as saved (F6). Their state comes from `namesState` (data), and `indeterminate` is set in an effect:
@@ -30,7 +31,7 @@ function NameBox({ dimension, label, title, testId }: (typeof NAMES_SWITCHES)[nu
   return (
     <label
       title={editable ? title : NAMES_READ_ONLY}
-      className={`inline-flex h-[26px] flex-none items-center gap-1 whitespace-nowrap rounded-[6px] px-1 text-im-ink-2 ${editable ? "cursor-pointer hover:bg-im-hover hover:text-im-ink" : "cursor-default opacity-60"}`}
+      className={`flex min-h-control-sm items-center gap-2 whitespace-nowrap rounded-md px-2.5 text-im-ink-2 ${editable ? "cursor-pointer hover:bg-im-hover hover:text-im-ink" : "cursor-default opacity-60"}`}
     >
       <input
         ref={box}
@@ -40,7 +41,7 @@ function NameBox({ dimension, label, title, testId }: (typeof NAMES_SWITCHES)[nu
         checked={state === "alias"}
         disabled={!editable}
         onChange={() => void ui.setNames(dimension, nextMode(state))}
-        className="size-3.5 accent-[var(--im-logical)]"
+        className="size-3.5 flex-none accent-[var(--im-logical)]"
       />
       {label}
     </label>
@@ -49,7 +50,7 @@ function NameBox({ dimension, label, title, testId }: (typeof NAMES_SWITCHES)[nu
 
 export function NamesSwitch() {
   return (
-    <div role="group" aria-label="Names or aliases" data-testid="switch-names" className="inline-flex flex-none items-center">
+    <div role="group" aria-label="Names or aliases" data-testid="switch-names" className="flex flex-col">
       {NAMES_SWITCHES.map((s) => (
         <NameBox key={s.dimension} {...s} />
       ))}

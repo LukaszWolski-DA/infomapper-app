@@ -17,7 +17,6 @@ import { currentFade, fadeKey, requestFade } from "./fade";
 import type { FadeData } from "./fade-canvas";
 import { useValue } from "./value-store";
 import { Select } from "@/ui/components/select";
-import { cn } from "@/ui/lib/utils";
 import { toolButtonVariants } from "@/ui/components/tool-button";
 
 const isChangesRequest = () => fadeKey(currentFade()).startsWith("lit:changes:");
@@ -60,15 +59,15 @@ export function ChangesButton() {
       type="button"
       aria-pressed={on}
       title={CHANGES_TITLE}
+      aria-label="Changes"
       data-testid="button-changes"
       onClick={toggleChanges}
-      className={cn(toolButtonVariants({ tone: "warn" }), "px-2 max-[2101px]:px-1.5")}
+      className={toolButtonVariants({ tone: "warn", size: "toolbar" })}
     >
       <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.4] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden>
         <path d="M8 2l6 11H2z" />
         <path d="M8 6.5v3M8 11.3v.2" />
       </svg>
-      <span className="hidden min-[1881px]:inline">Changes</span>
     </button>
   );
 }
@@ -77,7 +76,8 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 /**
  * The view's bar (prototype renderChgBar): “Changes”, the select (all open changes or one import), what it lights or
- * “Nothing on record”, and Close. Over the canvas at the top, centred; it reads no layout.
+ * “Nothing on record”, and Close. Over the canvas at the top, centred, under the canvas toolbar (slice 38: 8 px below
+ * its bottom); it reads no layout.
  */
 export function ChangesBar({ imports }: { imports: readonly ChangesImport[] }) {
   const view = useValue(changesOn);
@@ -85,7 +85,7 @@ export function ChangesBar({ imports }: { imports: readonly ChangesImport[] }) {
   if (!view) return null;
   return (
     <div
-      className="absolute left-1/2 top-2.5 z-40 flex max-w-[calc(100%-20px)] -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-lg border border-im-warn bg-im-surface py-1.5 pl-3 pr-2.5 text-[12.5px] shadow-[0_4px_16px_var(--im-shadow)]"
+      className="absolute left-1/2 top-[58px] z-40 flex max-w-[calc(100%-20px)] -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-lg border border-im-warn bg-im-surface py-1.5 pl-3 pr-2.5 text-[12.5px] shadow-[0_4px_16px_var(--im-shadow)]"
       data-testid="bar-changes"
       onPointerDown={(e) => e.stopPropagation()}
     >

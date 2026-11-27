@@ -1,6 +1,7 @@
 "use client";
 
-// Zoom out, the zoom value, zoom in and fit, in the top bar as in the prototype (#zOut, #zoomv, #zIn, #zFit).
+// Zoom out, the zoom value, zoom in and fit, at the canvas toolbar's end as in the prototype (#zOut, #zoomv, #zIn, #zFit;
+// slice 38: 28 px buttons, the value 42 px in 12 px text, `#ctb .zoomv`).
 // Slice 9 (D-60): the value is a field. While someone types in it, the typed text is this component's own state, so
 // typing re-renders only the zoom group, never `ModelCanvas`. Enter or leaving the field applies the zoom around the
 // view's centre, as − and + do, in one `setViewport` (the canvas's size from React Flow's store, no layout read); a
@@ -15,7 +16,7 @@ import { QUIET_FIELD } from "@/ui/components/input";
 import { cn } from "@/ui/lib/utils";
 import { toolButtonVariants } from "@/ui/components/tool-button";
 
-const btn = cn(toolButtonVariants(), "px-1.5");
+const btn = toolButtonVariants({ size: "toolbar" });
 const svg = "size-4 fill-none stroke-current stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]";
 
 export function ZoomControls() {
@@ -50,8 +51,8 @@ export function ZoomControls() {
   };
 
   return (
-    <div className="flex flex-none items-center" data-testid="group-zoom">
-      <button type="button" className={btn} title="Zoom out" data-testid="button-zoom-out" onClick={() => zoomBy(1 / 1.2)}>
+    <div className="flex flex-none items-center gap-0.5" data-testid="group-zoom">
+      <button type="button" className={btn} title="Zoom out" aria-label="Zoom out" data-testid="button-zoom-out" onClick={() => zoomBy(1 / 1.2)}>
         <svg viewBox="0 0 16 16" className={svg} aria-hidden>
           <path d="M3.5 8h9" />
         </svg>
@@ -64,7 +65,7 @@ export function ZoomControls() {
         spellCheck={false}
         aria-label="Zoom"
         title="Type a zoom and press Enter"
-        className={cn(QUIET_FIELD, "w-[44px] px-0 text-center tabular-nums")}
+        className={cn(QUIET_FIELD, "w-[42px] px-0 text-center text-xs tabular-nums")}
         data-testid="value-zoom"
         value={draft ?? shown}
         onFocus={(e) => {
@@ -87,12 +88,12 @@ export function ZoomControls() {
         }}
         onBlur={apply}
       />
-      <button type="button" className={btn} title="Zoom in" data-testid="button-zoom-in" onClick={() => zoomBy(1.2)}>
+      <button type="button" className={btn} title="Zoom in" aria-label="Zoom in" data-testid="button-zoom-in" onClick={() => zoomBy(1.2)}>
         <svg viewBox="0 0 16 16" className={svg} aria-hidden>
           <path d="M3.5 8h9M8 3.5v9" />
         </svg>
       </button>
-      <button type="button" className={btn} title="Fit everything on screen (F)" data-testid="button-zoom-fit" onClick={ui.fit}>
+      <button type="button" className={btn} title="Fit everything on screen (F)" aria-label="Fit everything on screen (F)" data-testid="button-zoom-fit" onClick={ui.fit}>
         <svg viewBox="0 0 16 16" className={svg} aria-hidden>
           <path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5" />
         </svg>

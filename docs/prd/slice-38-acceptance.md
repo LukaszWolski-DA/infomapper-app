@@ -37,6 +37,13 @@ Each item is explained further down (the F-numbers in section 11). The first opt
 
 Everything else below is a correction or a proposal that I take unless Łukasz says otherwise.
 
+**Łukasz's answers (27 November 2026):**
+- **B1 to B8:** all option (a), the recommendations above.
+- **B6's bar is approved:** pan and zoom to the screen within 3 % of `slice-37` at 30 % and 100 %.
+- **The corrections of section 11 are accepted as proposed:** the Changes bar under the toolbar (F9); every fit and
+  placement leaving a fixed 70 px for the toolbar (F10); the document's name with an ellipsis only while it has no focus,
+  its full name in its title (F13); the save indicator stays in the document's bar (F13, D-84).
+
 ### 2. Q1: the toolbar's host
 
 **Fact.** The canvas page (`c/[canvasId]/page.tsx:431-455`, `CanvasTools`) passes the tools into `AppShell`'s `tools`,

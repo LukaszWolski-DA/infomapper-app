@@ -13,8 +13,10 @@ interface ProjectFrame {
   view: ProjectView;
   currentCanvasId: string | null;
   renameOnOpen?: boolean;
-  /** Tools for the top bar: the canvas's on canvas pages, Undo and Redo on the project home (slice 12a). */
+  /** Tools for the top bar: the working context and Undo and Redo on canvas pages, Undo and Redo on the project home (slice 12a). */
   tools?: ReactNode;
+  /** The canvas toolbar over the canvas's area, on canvas pages (slice 38): before the page's content, so it comes after the navigation row in Tab order. */
+  canvasTools?: ReactNode;
   /** Panel contents on canvas pages; project pages show placeholders. */
   left?: ReactNode;
   right?: ReactNode;
@@ -71,7 +73,10 @@ export async function AppShell({
         <LookFrame className="flex min-h-0 min-w-0 flex-col">
           <CanvasTabs view={project.view} currentCanvasId={project.currentCanvasId} renameOnOpen={!!project.renameOnOpen} />
           <Breadcrumbs shell={shell}>{project.viewState}</Breadcrumbs>
-          <main className="relative min-h-0 flex-1 overflow-auto">{children}</main>
+          <main className="relative min-h-0 flex-1 overflow-auto">
+            {project.canvasTools}
+            {children}
+          </main>
         </LookFrame>
       </SidePanelsGrid>
       {project.status}

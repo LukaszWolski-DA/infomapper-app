@@ -98,6 +98,7 @@ import {
   cardHeight,
   cardWidth,
   contentBounds,
+  belowToolbar,
   fitViewport,
   freeSpot,
   inside,
@@ -108,6 +109,7 @@ import {
   rowEnd,
   snap8,
   stackSpot,
+  TOOLBAR_TOP_ROOM,
   type Placed,
   type Rect,
 } from "./geometry";
@@ -122,6 +124,7 @@ import { OverlayLayer } from "./OverlayLayer";
 import { createValueStore } from "./value-store";
 import { bundleLines, mapGeom, type Bundle } from "./line-geometry";
 import { Overview, type MiniNote } from "./Overview";
+import { showBounds } from "./show-bounds";
 import NoteLayer, { type ShownNote } from "./NoteLayer";
 import { grownVersions, mergeFresh } from "./fresh";
 import { cardCheck, ChecksCtx, sameCheck } from "./checks";
@@ -489,7 +492,8 @@ export function ModelCanvas({
             return { x: x0, y: y0, w: Math.max(...boxes.map((r) => r.x + r.w)) - x0, h: Math.max(...boxes.map((r) => r.y + r.h)) - y0 };
           })()
         : null;
-      return fitViewport(bounds, { width: w, height: h }, ui.overviewOpen);
+      // the canvas toolbar's room at the top (slice 38, F10)
+      return fitViewport(bounds, { width: w, height: h }, ui.overviewOpen, TOOLBAR_TOP_ROOM);
     },
     [cardsNow, frameRectsNow, ui.overviewOpen, rf],
   );
@@ -1001,6 +1005,8 @@ export function ModelCanvas({
     const { width: w, height: h, transform: [tx, ty, z] } = storeApi.getState();
     return { x: -tx / z, y: -ty / z, w: w / z, h: h / z };
   }, [storeApi]);
+  /** Where placements put new cards: the view below the canvas toolbar's room (slice 38, F10). */
+  const placeRect = useCallback((): Rect => belowToolbar(viewRect(), storeApi.getState().transform[2]), [viewRect, storeApi]);
 
   /** What a new card must not cover: the cards drawn, the blocks of collapsed frames (slice 2c, item 9) and the notes. */
   const occupied = useCallback(
@@ -1216,9 +1222,9 @@ export function ModelCanvas({
   const place = useCallback(
     (target: CardTarget, rows: number, options?: { quiet?: boolean }) => {
       const h = newCardHeight(rows);
-      return placeAt(target, stackSpot(viewRect(), occupied(), h), h, !options?.quiet);
+      return placeAt(target, stackSpot(placeRect(), occupied(), h), h, !options?.quiet);
     },
-    [placeAt, viewRect, occupied],
+    [placeAt, placeRect, occupied],
   );
 
   /** “Remove from this canvas (unlabel)…” on a live canvas: the question, then the label comes off (PRD item 11). */
@@ -1304,10 +1310,10 @@ export function ModelCanvas({
   const placeRequirementCard = useCallback(
     (requirementId: string) => {
       if (reqNodeOf(requirementId)) return;
-      const v = viewRect();
+      const v = placeRect();
       void placeReqCards([{ requirementId, x: snap8(v.x + v.w / 2 - REQ_CARD.width / 2), y: snap8(v.y + 60) }]);
     },
-    [reqNodeOf, viewRect, placeReqCards],
+    [reqNodeOf, placeRect, placeReqCards],
   );
   /** Takes a requirement's card off this canvas; the requirement stays (item 7). */
   const removeRequirementCard = useCallback(
@@ -1377,13 +1383,13 @@ export function ModelCanvas({
         const all = [a, ...placed];
         const x0 = Math.min(...all.map((r) => r.x)), y0 = Math.min(...all.map((r) => r.y));
         const x1 = Math.max(...all.map((r) => r.x + r.w)), y1 = Math.max(...all.map((r) => r.y + r.h));
-        void rf.fitBounds({ x: x0 - 40, y: y0 - 40, width: x1 - x0 + 80, height: y1 - y0 + 80 }, { duration: 250, padding: 0 });
+        showBounds(rf, storeApi.getState(), { x: x0 - 40, y: y0 - 40, width: x1 - x0 + 80, height: y1 - y0 + 80 });
       }
       const n = missing.length;
       const what = isEntity(missing[0]!.target) ? `entit${n === 1 ? "y" : "ies"}` : `source table${n === 1 ? "" : "s"}`;
       toast(`Added ${n} ${what} next to the selection.`);
     },
-    [rf, cardOf, toast, occupied, placeCards, ui, viewRect, frameRefs, frameRectsNow, live, placeAt],
+    [rf, cardOf, toast, occupied, placeCards, ui, viewRect, storeApi, frameRefs, frameRectsNow, live, placeAt],
   );
 
   // ---- frames (slice 2b) ----
@@ -1676,7 +1682,7 @@ export function ModelCanvas({
       const frames = frameRectsNow()
         .filter(({ f }) => !f.collapsed)
         .map(({ r }) => ({ x: r.x, y: r.y - 30, w: r.w, h: r.h + 30 }));
-      const spots = requirementCardSpots(anchor, viewRect(), heights, occupied(), frames);
+      const spots = requirementCardSpots(anchor, placeRect(), heights, occupied(), frames);
       const sent = ui.selectionNow();
       const ids = await placeReqCards(missing.map((id, i) => ({ requirementId: id, ...spots[i]! })));
       if (!ids) return;
@@ -1687,12 +1693,12 @@ export function ModelCanvas({
         const all = anchor ? [anchor, ...placed] : placed;
         const x0 = Math.min(...all.map((r) => r.x)), y0 = Math.min(...all.map((r) => r.y));
         const x1 = Math.max(...all.map((r) => r.x + r.w)), y1 = Math.max(...all.map((r) => r.y + r.h));
-        void rf.fitBounds({ x: x0 - 40, y: y0 - 40, width: x1 - x0 + 80, height: y1 - y0 + 80 }, { duration: 250, padding: 0 });
+        showBounds(rf, storeApi.getState(), { x: x0 - 40, y: y0 - 40, width: x1 - x0 + 80, height: y1 - y0 + 80 });
       }
       const n = ids.length;
       toast(`Placed ${n} requirement card${n === 1 ? "" : "s"} on this canvas.`);
     },
-    [editable, requirementIndex, reqNodeOf, elementAnchor, viewRect, occupied, frameRectsNow, placeReqCards, ui, rf, toast],
+    [editable, requirementIndex, reqNodeOf, elementAnchor, viewRect, placeRect, storeApi, occupied, frameRectsNow, placeReqCards, ui, rf, toast],
   );
   /** A requirement's card already here (the row's “Place card”): selected and brought into view (prototype showReqCard). */
   const showRequirementCard = useCallback(
@@ -1700,17 +1706,17 @@ export function ModelCanvas({
       const n = reqNodeOf(requirementId);
       if (!n) return;
       select({ t: "req", id: requirementId });
-      void rf.fitBounds({ x: n.position.x - 200, y: n.position.y - 150, width: 630, height: 400 }, { duration: 250, padding: 0 });
+      showBounds(rf, storeApi.getState(), { x: n.position.x - 200, y: n.position.y - 150, width: 630, height: 400 });
     },
-    [reqNodeOf, select, rf],
+    [reqNodeOf, select, rf, storeApi],
   );
   /** “Add to this canvas” on an entity or table panel without its card (item 16): the view's centre, upper third. */
   const addToCanvas = useCallback(
     (target: CardTarget, rows: number) => {
-      const v = viewRect();
+      const v = placeRect();
       void placeAt(target, { x: snap8(v.x + v.w / 2 - CARD_W / 2), y: snap8(v.y + v.h / 3) }, newCardHeight(rows), false);
     },
-    [viewRect, placeAt],
+    [placeRect, placeAt],
   );
   const reqMarks = useMemo(
     () =>
@@ -2049,7 +2055,7 @@ export function ModelCanvas({
       remove,
       centerOn,
       showPlace,
-      freeSpot: () => freeSpot(viewRect(), occupied()),
+      freeSpot: () => freeSpot(placeRect(), occupied()),
       besideSpot: (anchorCardId, height, side, gap) => {
         const anchor = rf.getNode(anchorCardId) as CardNodeT | undefined;
         if (!anchor) return null;
@@ -2160,7 +2166,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, frameRectsNow, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, withCard, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, noteState.drafts, notesNow, nameOf, select, centerOnRect, live, toast, flashRowNow]);
+  }, [registerCanvas, frameRectsNow, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, placeRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, withCard, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, noteState.drafts, notesNow, nameOf, select, centerOnRect, live, toast, flashRowNow]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   // ---- a requirement dragged from the left panel (slice 4b-2, items 17–19): the target under the pointer in a store

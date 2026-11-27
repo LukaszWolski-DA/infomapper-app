@@ -14,7 +14,8 @@
 // selection (they may not move cards or frames); readers nothing. Align, stack, line up and fit widths leave notes alone.
 
 import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
-import { applyNodeChanges, useReactFlow, type NodeChange } from "@xyflow/react";
+import { applyNodeChanges, useReactFlow, useStoreApi, type NodeChange } from "@xyflow/react";
+import { showBounds } from "./show-bounds";
 import { useToast } from "@/ui/components/toast";
 import { ARRANGED, arrange, type ArrangeMode } from "./arrange";
 import type { CardData } from "./card-data";
@@ -87,6 +88,7 @@ const rectOf = (n: CardNodeT): Rect => ({ x: n.position.x, y: n.position.y, w: c
 
 export function useGroupActions(o: Options) {
   const rf = useReactFlow();
+  const storeApi = useStoreApi();
   const toast = useToast();
   const { editable, selection, deselectDeleted, setNodes, patchCard, enqueueGroup, versions, pending, removedHere, undo, occupied, viewRect } = o;
   const { saveLayout, removeCards, placeCards, items, framesNow, patchFrames, frameRect, canNote, notes: noteMover, saveNoteMoves, reqs: reqMover } = o;
@@ -534,12 +536,12 @@ export function useGroupActions(o: Options) {
         const all = [...entities.map(rectOf), ...boxes];
         const x0 = Math.min(...all.map((r) => r.x)), y0 = Math.min(...all.map((r) => r.y));
         const x1 = Math.max(...all.map((r) => r.x + r.w)), y1 = Math.max(...all.map((r) => r.y + r.h));
-        void rf.fitBounds({ x: x0 - 40, y: y0 - 40, width: x1 - x0 + 80, height: y1 - y0 + 80 }, { duration: 250, padding: 0 });
+        showBounds(rf, storeApi.getState(), { x: x0 - 40, y: y0 - 40, width: x1 - x0 + 80, height: y1 - y0 + 80 });
       }
       const n = placed.length;
       toast(`Added ${n} source table${n === 1 ? "" : "s"} next to the selection.`);
     },
-    [editable, selectedNodes, rf, occupied, viewRect, placeCards, toast],
+    [editable, selectedNodes, rf, storeApi, occupied, viewRect, placeCards, toast],
   );
 
   const placeSources = useCallback(

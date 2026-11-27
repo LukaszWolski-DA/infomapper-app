@@ -19,7 +19,7 @@ import {
 } from "@/domain/__fixtures__/domain";
 import type { SourceChange, WorkspaceModel } from "@/domain/types";
 import { buildCards, visibleRows, type CardData } from "./card-data";
-import { besideAnchor, besideSpots, cardHeight, contentBounds, EDGE_SPEED, edgePush, fitViewport, freeSpot, newCardHeight, stackSpot, typedZoom, zoomAround } from "./geometry";
+import { belowToolbar, besideAnchor, besideSpots, boundsViewport, cardHeight, contentBounds, EDGE_SPEED, edgePush, fitViewport, freeSpot, MAX_ZOOM, newCardHeight, stackSpot, TOOLBAR_TOP_ROOM, typedZoom, zoomAround } from "./geometry";
 import { splitName } from "./names";
 import { lineNeedsClip, ROLE_MARK } from "./text-fit";
 
@@ -174,6 +174,34 @@ describe("view", () => {
   it("never zooms an empty or tiny canvas beyond 110 %", () => {
     expect(fitViewport(null, { width: 1000, height: 800 }, true)).toEqual({ x: 40, y: 40, zoom: 1 });
     expect(fitViewport({ x: 0, y: 0, w: 10, h: 10 }, { width: 1000, height: 800 }, false).zoom).toBe(1.1);
+  });
+
+  it("leaves the toolbar's room at the top of a fit (slice 38, F10)", () => {
+    const b = { x: 0, y: 0, w: 400, h: 2000 };
+    const v = fitViewport(b, { width: 1200, height: 800 }, false, TOOLBAR_TOP_ROOM);
+    expect(v.y + b.y * v.zoom).toBeGreaterThanOrEqual(TOOLBAR_TOP_ROOM - 0.1);
+    expect(v.y + (b.y + b.h) * v.zoom).toBeLessThanOrEqual(800 - 40 + 0.1);
+    expect(fitViewport(null, { width: 1000, height: 800 }, true, TOOLBAR_TOP_ROOM)).toEqual({ x: 40, y: TOOLBAR_TOP_ROOM, zoom: 1 });
+    // a tall box is fitted to the height below the room: the room costs zoom, it never covers the top
+    expect(v.zoom).toBeCloseTo((800 - TOOLBAR_TOP_ROOM - 40) / 2000);
+  });
+
+  it("frames a box below the toolbar as React Flow's fitBounds would (slice 38)", () => {
+    const b = { x: 100, y: 100, w: 500, h: 300 };
+    const plain = boundsViewport(b, { width: 1000, height: 800 }, { padding: 0.08 });
+    // without a room: React Flow's rule, the box centred
+    expect(plain.zoom).toBeCloseTo(Math.min(1000 / (500 * 1.08), 800 / (300 * 1.08)));
+    expect(plain.x + (b.x + b.w / 2) * plain.zoom).toBeCloseTo(500);
+    expect(plain.y + (b.y + b.h / 2) * plain.zoom).toBeCloseTo(400);
+    const v = boundsViewport(b, { width: 1000, height: 800 }, { padding: 0.08, top: TOOLBAR_TOP_ROOM });
+    expect(v.y + b.y * v.zoom).toBeGreaterThanOrEqual(TOOLBAR_TOP_ROOM);
+    expect(v.y + (b.y + b.h / 2) * v.zoom).toBeCloseTo(TOOLBAR_TOP_ROOM + (800 - TOOLBAR_TOP_ROOM) / 2);
+    expect(boundsViewport({ x: 0, y: 0, w: 1, h: 1 }, { width: 1000, height: 800 }).zoom).toBe(MAX_ZOOM);
+  });
+
+  it("places below the toolbar's room (slice 38)", () => {
+    expect(belowToolbar({ x: 10, y: 20, w: 1000, h: 800 }, 0.5)).toEqual({ x: 10, y: 20 + TOOLBAR_TOP_ROOM / 0.5, w: 1000, h: 800 - TOOLBAR_TOP_ROOM / 0.5 });
+    expect(stackSpot(belowToolbar({ x: 0, y: 0, w: 1000, h: 800 }, 0.5), [], 100).y * 0.5).toBeGreaterThanOrEqual(TOOLBAR_TOP_ROOM);
   });
 
   it("zooms around the middle within 10–300 %", () => {
