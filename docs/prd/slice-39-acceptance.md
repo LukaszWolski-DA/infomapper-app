@@ -382,4 +382,86 @@ Each step ends with lint, typecheck, `npm test`, the touched specs as single fil
 - A guard in `pg:seed` like `devTargetRefusal` (today only `pg:kb` and `pg:accounts` have one).
 - The database's own search (`unaccent` and trigram indexes) when a model outgrows the read per search; not now.
 
-**Łukasz's answers:** (to come)
+### Łukasz's answers (27 November 2026)
+
+- **C1 to C10: option (a) each**, as recommended.
+  - **Claude's technical calls**, quoted for Łukasz's approval at the closing: C1 (one read per table across the
+    readable workspaces, no index, no cache), C5 (no seed grants `infocatalog`; the landing zone is `/`), C7 (the
+    catalog's state in its address, the way back in the tab's `sessionStorage`), C8 (`pg:licence` with
+    `devTargetRefusal`) and C10 (full runs in steps 2, 3, 4, 7 and 9).
+  - **Łukasz's own:** C2 (Entities, Attributes and Relationships logical only; InfoCube's kinds in tabs of their own),
+    C3 (one tab "Classifications and stereotypes"; no classifications on entities and attributes), C4 (documents that
+    include an item by their scope, through InfoDocumenter's contribution; a reader without a role sees none), C6 ("All
+    apps" always in the top bar, before the organization switcher) and C9 (no seed change; the specs make their own
+    workspace without a role; Łukasz makes one in step 8).
+- **The smaller corrections are accepted:** `MODULE_NAMES` is in `src/domain/model/module-switches.ts`; the composition
+  root applies the contributions after the port's read (the port never takes them); the control-style guard has no list
+  of components; requirements can be on a canvas as cards; a table's "last import" is its source system's; the
+  landing-zone rule holds for the organization-password sign-in too.
+- **Also accepted:** the "All" tab first, as in the prototype.
+
+## Step 2: the core and the port (28 November 2026)
+
+**Built** (no screen):
+- **The rights:** `catalogReadable` in `src/domain/permissions.ts` (with `CatalogOrganization`, `CatalogWorkspace`,
+  `CatalogRightsInput`): a live, unlocked organization holding the live `infocatalog` licence, the person its member (a
+  guest never), a live workspace with a role in it or its switch on; archived ones kept and marked; organizations and
+  workspaces by name. Tests: `src/domain/permissions-catalog.test.ts`.
+- **InfoMapper's domain** (`src/domain/catalog/`): `fold.ts` (case, accents, ł ß ø đ æ œ ı ς; a whole-string fast path
+  and a per-character fold with each character's original range for the highlight), `physical.ts` (`tableLocation`,
+  `physicalName`; the canvas's card and the left panel's `tablePath` now use it, guardrail 4), `items.ts` (`CatalogItem`,
+  `CORE_TABS`, `coreCatalogItems`), `match.ts` (the five tiers, every word, `highlightRanges`, `definitionLine`),
+  `read.ts` (the tables a catalog read takes, `CatalogScope`, `CatalogRead`, `scopeWorkspaces`), `contribution.ts`
+  (`CatalogContribution`, `CatalogViewer`, `CatalogDocument`).
+- **The port** `catalog` (`src/data/ports.ts`, both adapters, `src/data/catalog.ts` shared): `readable(userId,
+  unlocked)` and `read(userId, unlocked, scope, tables)`. On Postgres one read-only transaction: the rights' five reads,
+  then one statement per table with `workspace_id = any($1)`, **38 statements whatever the number of workspaces**; a
+  workspace the person may not read is never read. Contract test: `tests/contract/catalog.test.ts` (Postgres in its own
+  database `{name}_catalog`).
+- **The module** `src/modules/infocatalog/` (its `domain` part: `search.ts`, the tabs with "All" first, the counts, the
+  first 200 and how many more, the order), `"infocatalog"` in `eslint.config.mjs`, four probes in
+  `tests/layer-rules.test.ts`.
+- **The contributions** (`src/compose/catalog.ts`): InfoCube's five kinds (`src/modules/infocube/domain/catalog.ts`,
+  only where it is on) and InfoDocumenter's `documentsIncluding` (`src/modules/infodocumenter/domain/catalog.ts`, C4).
+  Tests: `tests/catalog.test.ts` on the full demo.
+- **Data:** migration `20261127120000_infocatalog.sql` (`workspace.catalog_shown`, the CHECK with `infocatalog`),
+  `LICENSED_MODULES`, `MODULE_NAMES`, `Workspace.catalog_shown`.
+- **The bench** `scripts/bench-catalog.ts` (reference figures, no bar).
+
+**Deviations from the PRD and from § 12, with the reasons:**
+1. **The data change came forward from step 3.** The port's rights read the licence and the switch, and the contract
+   test needs both on Postgres, where the CHECK refuses `infocatalog` without the migration. So the migration, the
+   column and the licence value are in step 2. Step 3 keeps the settings' box and the command's field, `pg:licence` and
+   the stop for Łukasz's `pg:migrate`. Until then `dev:pg` from this branch would fail on the missing column; nothing
+   runs it before step 3's stop.
+2. **No format 19** (§ 6 proposed it). The local adapter reads a workspace without `catalog_shown` as off, in `readDb`,
+   with no format step, as slice 35 did for baselines (F7): an older file is never written back for it, so KB's archive
+   stays untouched even if a dev server of this branch ever opened it. No format test changes.
+3. **Two reads, not three.** § 3's `catalog.item` is `catalog.read` with one workspace's scope; the drawer's lookups are
+   the domain's (step 6). An unreadable workspace's read answers `null` either way.
+4. **The rights function is in `permissions.ts`**, not a new file beside it (the prompt's place).
+5. **The matching and ranking are InfoMapper's domain** (`src/domain/catalog/match.ts`); the search over a read (tabs,
+   counts, the limit, the order) is InfoCatalog's (`search.ts`). Its parts other than `domain` come with the screens.
+6. **Left for step 6, where they are used:** `canvasesShowing` and the source system's last import (`source_import`,
+   one more table in the read).
+7. **The order of ties:** a tab's kinds before the workspace (in "Classifications and stereotypes" every classification
+   comes before every stereotype), then the workspace's place in the scope (by name, compared by code unit, not by a
+   locale), then the model order.
+8. **Assumption to confirm:** a document **from a baseline** is never listed as including a live item (it shows the
+   baseline's state); only documents from the live model are.
+
+**Figures** (`npx tsx scripts/bench-catalog.ts`, the local adapter and a Postgres cluster on 127.0.0.1, medians of 9;
+the model as in step 1, with the demo's workspaces: 5,626 items at KB's size, 21,904 at four times):
+
+| | KB's size, local | KB's size, Postgres | 4 × KB, local | 4 × KB, Postgres |
+| --- | --- | --- | --- | --- |
+| `catalog.read` | 9.0 ms (6.5 ms in a second run) | 86.2 ms (38 statements) | 71.1 ms (65.4 ms) | 298.7 ms (38 statements) |
+| the index (items, folded) | 25.3 ms | 24.0 ms | 84.9 ms (94.7 ms in a second local run) | 63.4 ms |
+| a search ("customer" / "a" / "qqqq") | 3.9 / 4.3 / 0.4 ms | 2.8 / 3.6 / 0.4 ms | 4.7 / 11.9 / 1.4 ms | 4.2 / 11.0 / 1.4 ms |
+
+On a local cluster the 38 statements take about as long as step 1's 296 (the rows' transfer dominates there); online
+each statement is a round trip, which is where the fewer statements count (step 7 measures it on `dev:pg` and the
+preview). The first fold of the index cost 300 ms at four times KB; the whole-string fast path brought it to 64–85 ms.
+
+**Checks:** lint and typecheck clean; `npm test` 222 files, 2,663 passed, 15 skipped; the whole contract suite on a local
+Postgres 18.3 with `INFOMAPPER_CONTRACT_DB` (54 passed) and `schema:check` (47 tables, 627 columns, RLS on every table).
