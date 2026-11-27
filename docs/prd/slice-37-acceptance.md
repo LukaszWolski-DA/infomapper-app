@@ -984,6 +984,16 @@ working context keeps a 24 px target there.
 - **The generated documents:** `npx tsx scripts/document-texts.ts after`, `diff -r` against `documents-before`: no
   difference in the 18 files.
 
+- **The full run** on `79e46bc`, [run 45953932114](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45953932114):
+  15 min 27 s wall-clock; 910 passed, **1 failed**, 16 skipped, no expected failures. Parts' times: 1 10.9 min, 2 11.9,
+  3 14.3, 4 8.6, 5 10.9, 6 13.5, 7 11.2, 8 13.5, 9 5.9, 10 7.4, 11 12.9 (heap peaks on the run's summary page).
+  - **The failure: `S16-08`** (part 8, slice 16): "1201: the label keeps 40 px at least", received 0. It checks that the
+    working context's label keeps at least 40 px at every width from 2,560 to 800 px. Step 4 changed the label's minimum
+    from 40 px to 0 so that it is cut inside its button (Łukasz's step 4 finding: it ran out of its button); at 1,201 px the
+    button has 30 px, the label 0. Before the slice the label kept 40 px by running 21 px out of a 19 px button. Not a
+    flake: a behaviour step 4 changed that a spec of slice 16 reads, and S16-08 is not on this slice's list of earlier
+    specs that change (section 6). Step 4's local specs did not include it. **Stopped for Łukasz's decision.**
+
 ## Step 9: Łukasz's acceptance, what to open and where to look
 
 1. **The side-by-side page first:** open `C:\Users\Lukas\Desktop\Lukasz\infomapper-app\.data\ui-check\slice-37-before-and-after.html`
