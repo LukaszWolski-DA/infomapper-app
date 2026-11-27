@@ -913,3 +913,19 @@ first, and the switch "“Draft” mark". **Slice 36's acceptance is complete.**
 peaks"), far below the 2 GB at which a part is added or the cuts move. Part 11 (`slice-27` to `slice-36`, 10 min 19 s) is
 not the longest in this run (part 8, 12 min 26 s), so the recut rule asks for nothing.
 - **PR 95** is marked ready for review; not merged.
+
+## 13. After the merge: `S36-list` raced (fix/s36-list-times, 27 November 2026)
+
+- **What raced:** `e2e/slice-36/S36-list.spec.ts` read the two "created" times after the reload with
+  `allTextContents()`, which reads once and does not retry. `LocalMinute` (`src/ui/local-minute.tsx`) draws a time only
+  once the page runs in the browser; until hydration its element is the invisible placeholder with the test id
+  `text-document-created-pending`, so the read could get `[]`. It failed in slice 37's full run
+  [45968457721](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45968457721) and in one of three rounds of
+  the single-file check [45970761266](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45970761266).
+- **The fix (the spec only):** the same locator with a retrying assertion,
+  `toHaveText([minute(NEWER), minute(OLDER)])`, which waits until both times are drawn. What the test asserts is
+  unchanged; no application code changed. The `href` read below it does not race: the links are in the server's HTML,
+  so they are there once `toHaveCount(2)` passes, and it runs after the times are drawn.
+- **The checks:** locally `npm run e2e -- e2e/slice-36/S36-list.spec.ts` passed; the single-file check with three rounds
+  [45994825989](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45994825989) on `2ec2f13`: **3 of 3
+  passed**.
