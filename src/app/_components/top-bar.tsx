@@ -65,8 +65,13 @@ export function TopBar({ shell, tools, panelToggles = false, savePair = true }: 
       {/* the switchers' names shorten first, so nothing is cut off from 800 to 2,560 px; what is still missing comes out of
           the working context's label down to its 40 px (slice 16, item 5; slice 38): the tools' tiny shrink weight lets the
           switchers reach their minimum first */}
-      {tools && <div data-testid="bar-tools" className="flex min-w-0 shrink-[0.001] items-center gap-2 max-[1001px]:gap-1">{tools}</div>}
-      {savePair && <SavePair server={shell.server} />}
+      {/* the phone (slice 38, S38-06): up to 600 px the bar keeps the toggles, the path and the account */}
+      {tools && <div data-testid="bar-tools" className="flex min-w-0 shrink-[0.001] items-center gap-2 max-[1001px]:gap-1 max-[601px]:hidden">{tools}</div>}
+      {savePair && (
+        <span className="contents max-[601px]:hidden">
+          <SavePair server={shell.server} />
+        </span>
+      )}
       {panelToggles && <PanelToggle side="right" />}
       <UserIndicator shell={shell} />
     </header>

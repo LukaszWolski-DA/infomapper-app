@@ -13,6 +13,8 @@ export const tabsListVariants = cva(
       density: {
         page: "gap-5 border-b border-im-line",
         panel: "gap-3.5",
+        // slice 38 (B8): the canvas tabs' strip, 38 px, its tabs standing on its bottom line
+        canvas: "h-[38px] flex-none items-end gap-0.5 overflow-y-hidden bg-im-surface px-2 [background:linear-gradient(var(--im-line),var(--im-line))_bottom/100%_1px_no-repeat,var(--im-surface)]",
       },
     },
     defaultVariants: { density: "page" },
@@ -34,3 +36,11 @@ export const tabVariants = cva(
 
 /** A count after a tab's name, in `ink-3` (the design system's words: "counts after a label"). */
 export const TAB_COUNT = "ml-1 font-normal text-im-ink-3"
+
+/**
+ * Slice 38 (B8): a canvas tab (the project home's and each canvas's): a raised tab, 31 px, its top corners rounded; the
+ * open one on the canvas's colour with its edges (`CANVAS_TAB_ON`). Drawn on `<Link role="tab">`, so plain classes.
+ */
+export const CANVAS_TAB =
+  "relative flex h-[31px] cursor-pointer select-none items-center gap-[7px] whitespace-nowrap rounded-t-[7px] text-im-ink-2 hover:bg-im-hover"
+export const CANVAS_TAB_ON = "bg-im-canvas font-medium text-im-ink shadow-[inset_1px_1px_0_var(--im-line),inset_-1px_0_0_var(--im-line)] hover:bg-im-canvas"

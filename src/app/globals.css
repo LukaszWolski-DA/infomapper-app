@@ -271,7 +271,9 @@
 .im-panels > aside[data-shown="false"] { visibility: hidden; border-width: 0; }
 @media (max-width: 1000px) {
   .im-panels { grid-template-columns: minmax(0, 1fr) !important; } /* over the page's columns: the panels lie over it */
-  .im-panels > aside { position: absolute; top: 0; bottom: 0; z-index: 40; width: 300px; visibility: hidden; box-shadow: 0 0 30px var(--im-shadow); }
+  /* slice 38 (S38-06): the panel slides over the canvas below its tabs (38 px), the navigation row (32 px) and the canvas
+     toolbar's band (58 px: 12 px from the top, 38 px high, 8 px more), so the toolbar and "More" stay within reach */
+  .im-panels > aside { position: absolute; top: 128px; bottom: 0; z-index: 40; width: 300px; visibility: hidden; box-shadow: 0 0 30px var(--im-shadow); }
   .im-panels > aside[data-side="left"] { left: 0; }
   .im-panels > aside[data-side="right"] { right: 0; }
   .im-panels > aside[data-overlay="true"] { visibility: visible; }

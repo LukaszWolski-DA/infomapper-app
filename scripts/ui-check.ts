@@ -451,7 +451,9 @@ const COLLECT = String.raw`(() => {
       // the text as shown: a name cut with an ellipsis inside its control ends at the control's edge (step 4: the
       // switchers' clipped text was read as running into the next switcher); text out of its box is "spill" instead
       textBox: (() => { const g = document.createRange(); g.selectNodeContents(e); const b = g.getBoundingClientRect(); if (!(e.innerText || "").trim() || b.width <= 0) return null; const x = Math.max(b.left, r.left), rt = Math.min(b.right, r.right); return rt > x ? { x, y: b.top, w: rt - x, h: b.height } : null; })(),
-      coveredBy: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!h || h === e || e.contains(h)) return null; for (let n = h; n; n = n.parentElement) if (ids.has(n)) return n.contains(e) ? null : ids.get(n); return e.contains(h) ? null : "other"; })(),
+      // slice 38 (S38-06): a side panel open over the canvas on a narrow screen (data-overlay) covers what lies under it,
+      // as a dialog does: a control below it is not seen
+      coveredBy: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!h || h === e || e.contains(h)) return null; const over = h.closest('aside[data-overlay="true"]'); if (over && !over.contains(e)) return "other"; for (let n = h; n; n = n.parentElement) if (ids.has(n)) return n.contains(e) ? null : ids.get(n); return e.contains(h) ? null : "other"; })(),
       look: { height: r.height, fontSize: parseFloat(s.fontSize), radius: parseFloat(s.borderTopLeftRadius) || 0, borderWidth: bw, borderColor: bw > 0 ? s.borderTopColor : "" },
     });
   }

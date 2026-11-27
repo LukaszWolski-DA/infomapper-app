@@ -740,3 +740,66 @@ ellipsis and title; editing shows the whole name).
   **nothing found** (no overlap, no text out of its control, no words run together, nothing past the edge, no failing
   target, nothing cut, no page wider than the screen).
 - No full run in this step (Łukasz's instruction).
+
+**Łukasz's answer (27 November 2026):** step 5 accepted.
+
+## Step 6: list rows, the phone and the canvas tabs (27 November 2026)
+
+**List rows (S38-05).** One shape in `src/ui/components/list-row.ts` (`ROW_NAME_WINS`, `ROW_PHYSICAL`, the prototype's
+`.li .n:has(+.m.mono)`): the name keeps its own width up to 65 % of the row, then is cut; the physical names take the
+rest, right-aligned, cut with an ellipsis, their full text in their title. **The rows changed:** the entity's
+"Attributes and their sources" (also a fact's or a dimension's "… and their feeds", the same list), in both its forms:
+read only (`Li` with its new `physical` prop) and editable (the reorder row, whose physical names were not cut at all
+and could squeeze the name to nothing). Step 1 found no other row of that shape: the source table's "Columns and where
+they go" has the physical name on the left and the model's names on the right (`Li` as before), and the rows with a short
+detail ("via attribute", "n mappings", a status) keep `Li`'s own shape.
+
+**The phone (S38-06).**
+- **The top bar up to 600 px** keeps the panels' toggles, the path and the account; the working context, Undo and Redo
+  (`bar-tools`) and the save pair (the indicator and "Local") are hidden (`top-bar.tsx`).
+- **The side panels on a narrow screen** (up to 1,000 px, where they slide over the canvas) start at 128 px, below the
+  canvas tabs (38), the navigation row (32) and the canvas toolbar's band (58: 12 px from the top, 38 px high, 8 px more)
+  (`globals.css`): the details panel no longer covers the navigation row or the toolbar's right end, and "More" is in
+  reach on every canvas screen (`canvas-focus` at 390 px clicks it).
+- **The canvas toolbar** fits the phone through "More" (at 390 px it has 366 px of room and needs 313); below 313 px of
+  room it scrolls sideways with the tab rows' fade at its end (`CanvasToolbar.tsx`). **The tab rows** scroll with the fade
+  up to 600 px (the workspace home's and the left panel's since slice 37; the canvas tabs now too, below). No page scrolls
+  sideways (the check script's "page wider" is empty on every screen).
+- **The check script's rule** (`scripts/ui-check.ts`, `scripts/lib/ui-check-rules.ts`, a unit test): a side panel open
+  over the canvas (`data-overlay`) covers what lies under it, as a dialog does, so a control below it is not seen; and a
+  control that is not seen is now also left out of "words run together" and "targets under 24 px", as it already was of
+  the overlaps. Before, a note's ✓ under the open panel, clipped to 4 × 4 px, counted as a failing target.
+
+**The canvas tabs (B8).** `tabs.tsx` has a third density, `canvas` (the strip, 38 px, the tabs on its bottom line, the
+shared fade up to 600 px), and `CANVAS_TAB` / `CANVAS_TAB_ON` (the raised tab and the open one); the tab's menu button is
+`IconButton`'s 24 px look, "New canvas" the quiet small button (28 px, was 26), the rename field the small `Input` (28 px,
+was 24). **The guard's exceptions: none** (`EXCEPTIONS` is empty; its "to convert" list was empty since slice 37).
+
+**The overlaps at 390 px** (the check script's views at 390 px, light):
+
+| Run | Views | Overlaps |
+| --- | --- | --- |
+| Before the slice (`before-20261127-1327`, `dev`'s look) | 31 | 50 (canvas 3, canvas-entity 4, canvas-attribute 4, canvas-source-table 4, canvas-mapping 6, canvas-requirement 3, canvas-note 4, canvas-toolbox 3, canvas-focus 4, star 3, star-cube-mapping 6, star-fact 3, star-dimension 3) |
+| After step 3 (`step3-20261127-1726`) | 24 | 29, and `canvas-focus` could not reach "More" |
+| **After step 6** (`step6-390-20261127-1921`) | **32** | **0** |
+
+**The earlier specs changed:** none. New: **S38-05** (the entity's "email" row with its two sources in a 280 px details
+panel, as an editor and as a reviewer: the name whole, at most 65 %, the sources cut with their full text in the title,
+nothing out of the row) and **S38-06** (390 px: what the top bar keeps and hides, the details panel below the navigation
+row and the toolbar, "More" in reach with the panel open and working, the canvas tabs' and the workspace home's tabs'
+fade, no page wider than the screen): 4 passed.
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test` (217 files, 2,628 tests; the control-style guard passes with no
+  exception; the rules' new test).
+- **The specs of the screens touched,** locally, one run with nothing beside it: every spec that reads the entity's
+  attribute list, the canvas tabs (their menu, the rename field, "New canvas") or runs at 1,000 px or less (53 files):
+  **105 passed**, none failed.
+- **The check script:** every screen at 390 px (`step6-390-20261127-1921`, 32 views) and the screens with list rows
+  (`canvas-entity`, `canvas-source-table`, `star-fact`, `star-dimension`) at every width (`step6-rows-20261127-1923`,
+  28 views): **nothing found** (no overlap, no text out of its control, no words run together, nothing past the edge, no
+  failing target, nothing cut, no page wider than the screen).
+- No full run in this step (Łukasz's instruction).
+- **Line ends:** Python edits in steps 2 to 6 wrote the working copies of 43 files with CRLF; git stored them as LF in
+  every commit (`.gitattributes`), so the pushed code and both full runs had LF. `tests/theme-css.test.ts` read the working
+  copy of `globals.css` and failed once; the working copies are LF again and it passes.

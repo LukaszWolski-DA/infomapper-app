@@ -7,6 +7,7 @@
 // after a refusal; a choice field shows the newest stored value after a refusal (`useChoice`). Fields are keyed by their
 // object and field (`fieldKey`), never by their stored value.
 
+import { ROW_NAME_WINS, ROW_PHYSICAL } from "@/ui/components/list-row";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
 import { buttonVariants } from "@/ui/components/button";
 import { filterChipVariants } from "@/ui/components/chip";
@@ -631,12 +632,30 @@ export const List = ({ children, testId }: { children: ReactNode; testId?: strin
  * (a column's attributes, `fname` → `Customer.preferred_contact_…`) is cut with an ellipsis at 60 % of the row, its full
  * text in its title, so it never runs out of the row.
  */
-export function Li({ children, meta, onClick, title, testId }: { children: ReactNode; meta?: ReactNode; onClick?: () => void; title?: string; testId?: string }) {
+export function Li({
+  children,
+  meta,
+  onClick,
+  title,
+  testId,
+  physical,
+}: {
+  children: ReactNode;
+  meta?: ReactNode;
+  onClick?: () => void;
+  title?: string;
+  testId?: string;
+  /** Slice 38 (S38-05): the meta is physical names, the name wins (`ROW_NAME_WINS`); this is their full text, the meta's title. */
+  physical?: string;
+}) {
   const body = (
     <>
-      <span className="min-w-0 flex-1 truncate">{children}</span>
+      <span className={physical !== undefined ? ROW_NAME_WINS : "min-w-0 flex-1 truncate"}>{children}</span>
       {meta !== undefined && (
-        <span className="min-w-0 max-w-[60%] truncate whitespace-nowrap text-[11.5px] text-im-ink-3" title={typeof meta === "string" ? meta : undefined}>
+        <span
+          className={physical !== undefined ? ROW_PHYSICAL : "min-w-0 max-w-[60%] truncate whitespace-nowrap text-[11.5px] text-im-ink-3"}
+          title={physical !== undefined ? physical || undefined : typeof meta === "string" ? meta : undefined}
+        >
           {meta}
         </span>
       )}
