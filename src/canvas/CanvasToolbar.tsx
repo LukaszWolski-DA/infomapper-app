@@ -6,7 +6,9 @@
 // query (“More”, `more-breakpoints.ts`) and its classes restyle nothing of the canvas (AD-24 rule 4), and nothing here
 // reads layout in a commit: the strip's width reaches “More”'s menu through a `ResizeObserver` (`toolbarRoom`). The strip
 // lets pointer events through to the canvas; only the toolbar takes them. Its box is fixed (its bottom 50 px below the
-// canvas's top), so the fits and placements keep `TOOLBAR_TOP_ROOM` free without measuring it.
+// canvas's top), so the fits and placements keep `TOOLBAR_TOP_ROOM` free without measuring it. It scrolls sideways only
+// where even “More” leaves it too wide (below 313 px of room, a phone): a scroller is a composited layer of its own in
+// Chrome, one drawing layer more over the canvas (S38-layers).
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { toolbarRoom } from "./toolbar-room";
@@ -31,7 +33,7 @@ export function CanvasToolbar({ children }: { children: ReactNode }) {
         role="toolbar"
         aria-label="Canvas"
         data-testid="bar-canvas"
-        className="pointer-events-auto flex min-w-0 max-w-full flex-none items-center gap-0.5 overflow-x-auto rounded-lg border border-im-line bg-im-surface p-1 shadow-pop [scrollbar-width:none]"
+        className="pointer-events-auto flex min-w-0 max-w-full flex-none items-center gap-0.5 rounded-lg border border-im-line bg-im-surface p-1 shadow-pop @max-[313px]:overflow-x-auto @max-[313px]:[scrollbar-width:none]"
       >
         {children}
       </div>
