@@ -412,3 +412,107 @@ and AD-24 (the toolbar outside React Flow, its container query, the fits' room).
 
 - The prototype's sideways-scrolling toolbar as an option for touch screens (B2 (b)), if "More" turns out awkward there.
 - A working context on the project home (F17).
+
+## Step 2: the canvas toolbar (27 November 2026)
+
+**The before run** of the check script on `dev`'s look (the branch before any application code): every screen, 1,280,
+1,440 and 1,920 px light and dark and 390 px, in `.data/ui-check/before-20261127-1327/`, kept for the side-by-side page.
+
+**What changed:**
+- **The toolbar** (`src/canvas/CanvasToolbar.tsx`): a strip over the canvas's area in `AppShell`'s `<main>` (the new
+  slot `canvasTools`, before the page's content), outside React Flow, `pointer-events: none` except on the toolbar; the
+  toolbar centred 12 px from the top, radius 12, `shadow-pop`, 4 px inside, 28 px controls, a hairline between groups,
+  `role="toolbar"` named "Canvas". Its order: the layer switch (All · Maps · Rels, the full names in the titles) |
+  Focus, Changes | Hand, Entity, Note, Frame (the criterion's and the prototype's order) | IE · UML | “Names ▾” | zoom
+  (−, the value, +, Fit) | “More”. Icons only (`toolButtonVariants({ size: "toolbar" })`, 28 px), each with an
+  `aria-label` from its title before the colon; every title, test id and shortcut as before. The top bar keeps the
+  path, the working context, Undo and Redo, the save pair, the toggles and the user (`TopBarTools`).
+- **“Names ▾”** (`NamesMenu.tsx`, B1): a Radix pop-over in a portal with slice 11's two check boxes, their states, titles,
+  rights and test ids; its content stays in the page while shut (`forceMount`, hidden).
+- **“More” by the toolbar's room** (`more-breakpoints.ts`, B2): a container query on the strip for each group's wrapper,
+  and for the menu's items (in a portal) the strip's width from a `ResizeObserver` (`toolbar-room.ts`). The widths
+  measured as an editor with every tool: 631 px with everything, 591 without “Names ▾” (with “More”), 440 without Focus,
+  Changes and the notation, 313 without the tools. **The breakpoints** (the strip's content width from which a group
+  stays): “Names ▾” 635 px; Focus, Changes and the notation 595 px; the tools 444 px. Below 313 px the toolbar scrolls
+  sideways. At 1,280 px with both panels at their defaults the strip offers 652 px: every control in the toolbar, 21 px to
+  spare. The layer switch and zoom always stay.
+- **The room** (F10): `TOOLBAR_TOP_ROOM` 70 px (`geometry.ts`); `fitViewport` takes it (the first view, Fit); zoom to
+  frame and the four “bring into view” calls go through `showBounds` (React Flow's `fitBounds` with the room,
+  `boundsViewport`); placements read the view below it (`placeRect`: a requirement's card, “Add to this canvas”, a placed
+  card's stack, “New entity”'s free spot, requirement cards beside an element).
+- **Under the toolbar** (F9): the Changes bar and the frame's concept question at 58 px (the toolbar's bottom + 8).
+- **The toolbar scrolls only below 313 px of room** (the phone): a scroller is a composited layer of its own (below).
+
+**Measuring (B6):**
+- **LayerTree** (`e2e/slice-38/S38-layers.spec.ts`, the measurement build, Performance test at S3B-15's views): with the
+  toolbar 49 drawing layers, without it 47, at 30 % and at 100 %; 68.7 against 68.5 and 68.5 against 68.4 megapixels; the
+  canvas's viewport elements unchanged (4,508 and 19,305); 61 elements in the toolbar. **Both extra layers are composited
+  by overlap** (CDP's compositing reasons): the strip with the toolbar's box over the canvas, and a squashing layer that
+  starts at the separator after the layer switch. A constant, never one per card (AD-24). A first build had a third, the
+  toolbar's own scroller (`overflow-x: auto`); the toolbar now scrolls only below 313 px. `will-change`, `isolation` and
+  `contain: paint` on the toolbar or the strip did not remove the second (tried with `DIAG_CSS`, no build).
+- **The element guard** (`S3B-15-elements`, `ELEMENTS_BASELINE` slice 8's counts): passed, every viewport count equal
+  (the toolbar is outside React Flow's viewport). Page totals 6,144, 20,941, 3,011 and 6,453.
+- **Pan and zoom to the screen against `slice-37` could not be measured.** The reference worktree and both builds are
+  ready (`measure:canvas --prepare-only --against slice-37`); the warm-up and the counted sitting (`--to-screen --only
+  pan --rounds 2`) dropped every round: the laptop never got below 2 % for 30 s before a side (Spotify, the Claude app,
+  Webex and iCloud about 3 % together). CLAUDE.md: a sitting that cannot start is a stop, and Łukasz's programs are not
+  closed. **Stopped for Łukasz** (below).
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test` (217 files, 2,627 tests; new: the fit's room, `boundsViewport`,
+  `belowToolbar`, the breakpoints' order and literals).
+- **The specs of the screens touched,** locally, one run with nothing beside it: 31 files, 55 passed, 3 failed (S2B-13,
+  S5A-06, S16-10: a card's header or a frame's name under the toolbar, below); then those and the rest of the changed
+  specs: 18 passed, then 11 passed.
+- **The check script on the canvas screens** (`.data/ui-check/step2-20261127-1431/`: the canvas and star screens and the
+  two new ones, `canvas-names-menu` and `canvas-narrow-more`): **at 1,280 px and wider nothing** (no overlap, no text out
+  of its control, no words run together, nothing past the edge, no failing target, nothing cut). At 390 px 29 overlaps
+  against the before run's 50 on the same screens: the top bar's are gone (its tools left it); left are the details
+  panel's overlay over the toolbar's right end (Rels, zoom, “More”: the overlay is `z-40`, the toolbar `z-30`), the panel
+  over the breadcrumbs, a note's ✓ and the Overview's toggle; `canvas-focus` at 390 px could not click “More” under the
+  open details panel. Step 6's (the phone).
+- **The full run** on `b8a16ce`, [run 46007612112](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46007612112):
+  15 min 43 s; 912 passed, **4 failed**, 16 skipped. The traces copied first (`.data/ci-46007612112/part-1`, `part-3`).
+  All four are this step's, exact by their numbers, not flakes: S1B-07 (the entity 48 px off: the view 50 px lower,
+  snapped to 8), S4B1-07 (499 canvas px at 10 %: the same 50 px), S4B2-02 and S4B2-05 (the placements below the room,
+  F10). Fixed in the specs and run alone locally: 11 passed.
+- **The full run again** on `557a974`, [run 46011865702](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46011865702):
+  14 min 27 s wall-clock (12 min 15 s of tests); **916 passed, 0 failed, 16 skipped**, no expected failures. Parts (time
+  from `part.json`, the server's heap peak against its 6,431 MB restart threshold, no restarts): 1 11.3 min 1,186 MB;
+  2 11.7 min 1,121; 3 11.0 min 1,480; 4 10.7 min 1,117; 5 6.4 min 1,674; 6 9.8 min 1,246; 7 6.2 min 1,454; 8 8.3 min
+  1,534; 9 3.9 min 1,125; 10 4.8 min 1,446; 11 10.3 min 1,437.
+
+**The earlier specs changed, with their reasons:**
+
+| Spec | Why |
+| --- | --- |
+| `playwright.config.ts` (the chromium project) | the e2e window 1280 × 770, 50 px taller than Desktop Chrome's, the toolbar's height (below) |
+| `slice-01a/helpers.ts` (`openCanvas`, `TOOLBAR_BOTTOM`, `belowToolbar`) | a spec's view is stored 50 px lower, under the toolbar (below) |
+| S6A-10 | the bar from 2,560 to 800 px without the canvas's controls; the toolbar at the same widths: no scroll, each group in it or “More” there |
+| S6A-11, S5A-07 | the view shown is the view `openCanvas` stored (`belowToolbar`) |
+| S30-09-room | the tools are icons only at every width (F15), their names in `aria-label` |
+| `slice-11/helpers.ts` (`clickBox`); S11-02, 03, 05, 06, 07, 10, 11, `fixes/write-after-reseed`, S14B-02 | a click on a names check box opens “Names ▾” first |
+| S11-13, S11-13-commits (MEASURE) | the check boxes clicked by a dispatched click with the pop-over shut, as the timing measured before |
+| S11-screens (SCREENS) | “More” on a narrow canvas, its screenshot's region |
+| S1B-10, S4P-fading, S15-18, `e2e/measure/switches.ts`, S30-measure (MEASURE) | a row picked below the toolbar (60 px, was 10) |
+| S1B-07, S4B1-07 | their points from the view under the toolbar (S4B1-07 opens its corners exactly at the pane's corners) |
+| S4B2-02, S4B2-05 | the placements below the toolbar's room (F10) |
+
+**Why the e2e window is 50 px taller.** The toolbar covers the canvas's top 50 px over almost its whole width (631 of
+676 px at 1,280 px). About 76 specs open a view with y below 40 and then click a card's header or a frame's name there:
+under the toolbar, Playwright scrolls `.react-flow` to reach it and the canvas scroll watch fails the test (S5A-06,
+S16-10, S2B-13 in the first local run). Storing every spec's view 50 px lower (`openCanvas`) moves those targets below the
+toolbar, but then content near the canvas's bottom met the Overview and the toasts, which are anchored to the bottom
+(S2B-13's `order_line` under the Overview). A window 50 px taller moves the bottom-anchored things down by the same
+50 px: each spec's canvas area shows what it showed before, in the same places against the Overview, the toasts and the
+status bar. Specs that set their own window size keep it (none failed). This is a test-infrastructure choice of this
+step; Łukasz may prefer another.
+
+**The prototype and the app** (section 13): the toolbar is the prototype's `#ctb`; its CSS `top:82px` counts the
+prototype's tabs and navigation row, the app's 12 px count from the canvas's `<main>`; “Names ▾” and “More” are not in the
+prototype (B1, B2); the separators are 2 px apart (the prototype's 4 px), so everything fits at 1,280 px with both panels.
+
+**Stopped for Łukasz:** the pan-and-zoom sitting (B6's gate: within 3 % of `slice-37` at 30 % and 100 %) needs a quiet
+laptop. Once Łukasz has closed or paused Spotify, Webex and the other programs, I run it on the builds already made: one
+warm-up round, then `npm run measure:canvas -- --to-screen --only pan --rounds 2 --no-build --against slice-37`.
