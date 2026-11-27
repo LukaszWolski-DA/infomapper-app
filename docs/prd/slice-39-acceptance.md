@@ -517,3 +517,10 @@ specs as single files: `S39-02-switch.spec.ts` (4 passed), `S15-03`, `S25-01`, `
 **Łukasz's migration** (the stop after this step): `pg:backup` from `dev`; `pg:migrate -- --dry-run` and `pg:migrate`
 from this branch; `pg:backup` again from this branch; the two backups' counts compared with `scripts/kb-counts.ts`. Then,
 for the acceptance, InfoMate's licence with `pg:licence` from this branch.
+
+**Step 3's full run:** [run 46082916804](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46082916804)
+on `43f7b0b`: success, 930 passed (step 2's 926 and S39-02-switch's 4), 16 skipped, 0 failed, 0 flaky; wall clock
+16.7 min (23:31:00 to 23:47:39 UTC); the longest part 11 (15.2 min, with `slice-39`), then part 2 (13.0 min); part 6's
+heap peak 1,843 MB of 8,039 MB (step 2's run: 1,181 MB), no restart. Part 6's peak is near the "about 2 GB" of the
+heap rule, which counts garbage not yet collected; part 11 is now the longest by more than a minute in this run, so the
+recut rule (the median of the last three full runs) is checked again at steps 4 and 7.
