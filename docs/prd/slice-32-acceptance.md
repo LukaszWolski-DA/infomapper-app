@@ -430,3 +430,13 @@ branch.
   spec), P10 (no measuring sitting), `@tailwindcss/node` in `devDependencies`, and the radio items built as one
   segmented row (`theme-choice.tsx`, not `Seg`).
 - **The full run** on the final commit; its numbers are in the closing report.
+
+## After the slice: fix/s32-user-menu (27 November 2026)
+
+- **What raced:** `openUserMenu` (`e2e/slice-32/helpers.ts`) after Escape. The person's menu stays on the page for its
+  closing animation (`data-state="closed"`) before Radix unmounts it; a click on `indicator-user` in that moment was
+  swallowed, the trigger stayed `aria-expanded="false"` and S32-03's second `chooseTheme` timed out. Seen once, in slice
+  38's step 7 full run (run 46055221229, part 11); it passed 3 of 3 alone (run 46057245561).
+- **The fix (test only, no application code):** the helper waits until no closed `menu-user` is on the page before it
+  clicks, and clicks again (`expect(...).toPass`) only while the trigger still says `aria-expanded="false"`. What every
+  caller asserts is unchanged: the trigger expanded and the menu `data-state="open"`.

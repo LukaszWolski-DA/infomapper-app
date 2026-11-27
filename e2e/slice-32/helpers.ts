@@ -35,11 +35,21 @@ export const themeItem = (page: Page, theme: ThemeChoice): Locator => page.getBy
 /**
  * Opens the person's menu (if it is not open). Asks the trigger, not the menu's visibility: after Escape the menu stays
  * visible for its closing animation, and a click on it then lands on an item that is leaving (step 4's full run).
+ * A click on the trigger while that closing menu is still on the page is swallowed too (S32-03 in slice 38's full run,
+ * fix/s32-user-menu): wait until a closed menu has left the page before the click, and click again only while the
+ * trigger still says it is not expanded.
  */
 export async function openUserMenu(page: Page) {
   const trigger = page.getByTestId("indicator-user");
-  if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
-  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  if ((await trigger.getAttribute("aria-expanded")) === "true") {
+    await expect(userMenu(page)).toHaveAttribute("data-state", "open");
+    return;
+  }
+  await expect(page.locator('[data-testid="menu-user"][data-state="closed"]')).toHaveCount(0);
+  await expect(async () => {
+    if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true", { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
   await expect(userMenu(page)).toHaveAttribute("data-state", "open");
 }
 
