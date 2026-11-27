@@ -9,14 +9,18 @@ import { joinAction, setPasswordAction } from "@/app/_actions/links";
 import type { ActionResult } from "@/app/_lib/run-command";
 import { PASSWORD_HINT } from "@/app/_lib/password-texts";
 import type { InvitationPage } from "@/domain/commands/invitations";
+import { cn } from "@/ui/lib/utils";
+import { inputVariants } from "@/ui/components/input";
+import { buttonVariants } from "@/ui/components/button";
 
-const input = "h-[30px] w-full rounded-md border border-im-line bg-im-surface px-2 text-[13px] disabled:cursor-default disabled:opacity-60";
-const primary = "rounded-md bg-im-logical px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50";
+// slice 37 (step 8): the shared field and button (32 px), each keeping its padding
+const input = cn(inputVariants(), "px-2");
+const primary = cn(buttonVariants({ variant: "primary" }), "px-3");
 
 /** The card the two pages share. */
 export function LinkCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section data-testid="panel-link" className="w-full max-w-md rounded-md border border-im-line bg-im-surface p-5">
+    <section data-testid="panel-link" className="w-full max-w-md rounded-lg border border-im-line bg-im-surface p-5">
       <h2 data-testid="title-link" className="text-[15px] font-semibold">
         {title}
       </h2>

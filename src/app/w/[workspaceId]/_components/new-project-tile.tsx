@@ -7,6 +7,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createProjectAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
+import { cn } from "@/ui/lib/utils";
+import { inputVariants } from "@/ui/components/input";
+import { ADD_TILE } from "@/ui/components/card";
 
 export function NewProjectTile({ workspaceId }: { workspaceId: string }) {
   const [editing, setEditing] = useState(false);
@@ -24,7 +27,7 @@ export function NewProjectTile({ workspaceId }: { workspaceId: string }) {
         type="button"
         data-testid="tile-new-project"
         onClick={() => setEditing(true)}
-        className="grid min-h-[200px] place-items-center rounded-[10px] bg-transparent font-medium text-im-ink-2 shadow-[inset_0_0_0_1.5px_var(--im-line)] hover:text-im-logical hover:shadow-[inset_0_0_0_1.5px_var(--im-logical)]"
+        className={ADD_TILE}
       >
         <span className="flex flex-col items-center gap-1.5">
           <PlusIcon />
@@ -34,13 +37,13 @@ export function NewProjectTile({ workspaceId }: { workspaceId: string }) {
     );
   }
   return (
-    <div className="grid min-h-[200px] place-items-center rounded-[10px] px-4 shadow-[inset_0_0_0_1.5px_var(--im-logical)]">
+    <div className="grid min-h-[200px] place-items-center rounded-lg px-4 shadow-[inset_0_0_0_1.5px_var(--im-logical)]">
       <input
         autoFocus
         data-testid="input-new-project-tile"
         placeholder="New project name, then Enter"
         disabled={pending}
-        className="h-[30px] w-full rounded-md border border-im-line bg-im-surface px-2"
+        className={cn(inputVariants(), "px-2")}
         onKeyDown={(e) => {
           if (e.key === "Escape") setEditing(false);
           if (e.key === "Enter" && e.currentTarget.value.trim()) void create(e.currentTarget.value);

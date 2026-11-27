@@ -13,7 +13,8 @@
 import { useContext, useEffect, useMemo } from "react";
 import { useAction } from "@/app/_components/use-action";
 import { useModules } from "@/app/_components/modules";
-import { Actions, dangerClass, Field, fieldKey, Fold, GroupedSelect, inputClass, Kind, List, Note, Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
+import { Actions, Field, fieldKey, Fold, GroupedSelect, Kind, List, Note, Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel, type PanelContext } from "@/app/_panels/inspector";
 import { CanvasUiCtx } from "@/canvas/context";
 import { useValue } from "@/canvas/value-store";
@@ -42,6 +43,9 @@ import { useCubeMappingDelete, useMappingIndex } from "./canvas-ext";
 import { ruleFocus } from "./rule-focus";
 import { ChecksBox } from "@/app/_panels/checks-box";
 import { CHECK_MAPPING_KIND } from "../domain/checks";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { cn } from "@/ui/lib/utils";
+import { Select } from "@/ui/components/select";
 
 const KINDS = [
   ["direct", "Direct copy"],
@@ -176,7 +180,7 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
         <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-im-ink-3 stroke-[1.6]" aria-hidden>
           <path d="M2.5 8h11M9.5 4l4 4-4 4" />
         </svg>
-        <button type="button" className={`${pillClass} border border-im-ink-3`} onClick={() => target && p.goAttribute(target.id)} data-testid="trace-target">
+        <button type="button" className={`${pillClass} shadow-[inset_0_0_0_1px_var(--im-ink-3)]`} onClick={() => target && p.goAttribute(target.id)} data-testid="trace-target">
           <small className="block text-[10.5px] opacity-80">{target ? index.entity(target.entity_id)?.name : ""}</small>
           <b className="block truncate font-medium">{target?.name}</b>
         </button>
@@ -195,7 +199,7 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
             {p.editable && inputs.length > 1 && (
               <button
                 type="button"
-                className="grid size-6 flex-none place-items-center rounded text-im-ink-3 hover:bg-im-hover hover:text-im-ink"
+                className={cn(iconButtonVariants({ size: "xs" }), "flex-none text-im-ink-3")}
                 title="Stop reading this attribute"
                 aria-label={`Stop reading ${index.label(i.attribute_id)}`}
                 data-testid="button-remove-cube-input"
@@ -214,12 +218,11 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
       )}
       </Fold>
       <Field label="Target attribute" htmlFor="f-cto">
-        <select
+        <Select
           key={fieldKey(m.id, "target")}
           id="f-cto"
           value={retarget.value}
           disabled={!p.editable}
-          className={inputClass}
           data-testid="select-cube-target"
           onChange={(e) => retarget.choose(e.target.value)}
         >
@@ -232,7 +235,7 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
               ))}
             </optgroup>
           ))}
-        </select>
+        </Select>
       </Field>
       <Field label="How the value is carried">
         <Seg value={kind.value} options={KINDS} onChange={kind.choose} disabled={!p.editable} testId="seg-cube-kind" />
@@ -277,7 +280,7 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
         <Actions>
           <button
             type="button"
-            className={dangerClass}
+            className={buttonVariants({ variant: "danger" })}
             data-testid="button-delete-cube-mapping"
             onClick={() =>
               void remove(m.id).then((deleted) => ui.deselectDeleted(deleted))
@@ -328,11 +331,10 @@ function LookupFields({
   return (
     <>
       <Field label="Through relationship" htmlFor={VIA_ID}>
-        <select
+        <Select
           id={VIA_ID}
           value={gone ? "" : via.value}
           disabled={!p.editable}
-          className={inputClass}
           data-testid="select-cube-lookup-via"
           onChange={(e) => via.choose(e.target.value)}
         >
@@ -342,7 +344,7 @@ function LookupFields({
               {relationshipText(index, r)}
             </option>
           ))}
-        </select>
+        </Select>
       </Field>
       {/* the one chosen is gone first (F15), and then whether there is another to choose */}
       {gone && (

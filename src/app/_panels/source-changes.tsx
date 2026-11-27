@@ -50,13 +50,15 @@ import {
 } from "@/domain/source-changes/texts";
 import type { SourceChange, Workspace } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
-import { Hint, inputClass, smallButtonClass } from "./fields";
+import { Hint } from "./fields";
 import { impactIndex, plural } from "./import/wizard-model";
 import { usePanel } from "./inspector";
 import { attributeLabel, attributeOptions, mappingsOfColumn } from "./model-index";
+import { Select } from "@/ui/components/select";
+import { buttonVariants } from "@/ui/components/button";
 
-const primarySmall = "h-[26px] rounded-md border border-im-logical bg-im-logical px-[9px] text-xs font-medium text-im-surface disabled:opacity-50";
-const dangerSmall = `${smallButtonClass} border-im-warn text-im-warn disabled:opacity-50`;
+const primarySmall = buttonVariants({ variant: "primary", size: "sm" });
+const dangerSmall = buttonVariants({ variant: "danger", size: "sm" });
 const pendClass = "mt-2.5 grid gap-2 rounded-md bg-im-panel px-3 py-2.5";
 const ReqTag = ({ children }: { children: string }) => (
   <span className="mr-1 rounded bg-im-req-soft px-1.5 text-[11px] font-medium text-im-req-ink" data-testid="change-requirement">
@@ -266,7 +268,7 @@ function ChangeCard({ change: c, keys }: { change: SourceChange; keys: ReadonlyM
             <button
               key={a}
               type="button"
-              className={`${smallButtonClass} disabled:opacity-50`}
+              className={`${buttonVariants({ size: "sm" })} disabled:opacity-50`}
               disabled={pending || (a === "approve" && blocked)}
               onClick={() => act(a)}
               data-testid={`change-action-${a}`}
@@ -290,7 +292,7 @@ const FormButtons = ({ label, onGo, onCancel, disabled, danger, testId }: { labe
     <button type="button" className={danger ? dangerSmall : primarySmall} disabled={disabled} onClick={onGo} data-testid={testId}>
       {label}
     </button>
-    <button type="button" className={smallButtonClass} onClick={onCancel} data-testid="button-form-cancel">
+    <button type="button" className={buttonVariants({ size: "sm" })} onClick={onCancel} data-testid="button-form-cancel">
       Cancel
     </button>
   </div>
@@ -314,7 +316,7 @@ function MoveForm({ change, rows, onMove, onCancel, pending }: { change: SourceC
         <span>
           Move {plural(n, "mapping")} from <span className="font-mono">{from?.name ?? change.object_label}</span> to
         </span>
-        <select className={inputClass} value={target} onChange={(e) => setTarget(e.target.value)} data-testid="select-move-target">
+        <Select value={target} onChange={(e) => setTarget(e.target.value)} data-testid="select-move-target">
           {groups.map((g) => (
             <optgroup key={g.table.id} label={`${g.table.schema_name}.${g.table.name}`}>
               {g.columns.map((c) => (
@@ -324,7 +326,7 @@ function MoveForm({ change, rows, onMove, onCancel, pending }: { change: SourceC
               ))}
             </optgroup>
           ))}
-        </select>
+        </Select>
       </label>
       {plan && !plan.ok && (
         <p className="text-im-warn" data-testid="move-refused">
@@ -364,7 +366,7 @@ function MapForm({ change, onMap, onCancel, pending }: { change: SourceChange; o
         <span>
           Map <span className="font-mono">{column?.name ?? change.object_label}</span> to
         </span>
-        <select className={inputClass} value={attribute} onChange={(e) => setAttribute(e.target.value)} data-testid="select-map-attribute">
+        <Select value={attribute} onChange={(e) => setAttribute(e.target.value)} data-testid="select-map-attribute">
           {groups.map((g) => (
             <optgroup key={g.label} label={g.label}>
               {g.columns.map((a) => (
@@ -374,7 +376,7 @@ function MapForm({ change, onMap, onCancel, pending }: { change: SourceChange; o
               ))}
             </optgroup>
           ))}
-        </select>
+        </Select>
       </label>
       <span className="text-xs text-im-ink-3">{MAP_HINT}</span>
       <FormButtons label="Map" onGo={() => onMap(attribute)} onCancel={onCancel} disabled={pending || !attribute} testId="button-map" />
@@ -495,7 +497,7 @@ export function ApproveAgainAll({ importId }: { importId: Uuid }) {
   if (!total || !p.canSetStatus) return null;
   if (!open) {
     return (
-      <button type="button" className={`${smallButtonClass} mt-1 block`} onClick={() => setOpen(true)} data-testid="button-approve-all">
+      <button type="button" className={`${buttonVariants({ size: "sm" })} mt-1 block`} onClick={() => setOpen(true)} data-testid="button-approve-all">
         {REVIEW_SENT_BACK(total)}
       </button>
     );

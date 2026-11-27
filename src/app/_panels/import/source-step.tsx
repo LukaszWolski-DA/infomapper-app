@@ -9,7 +9,11 @@ import { useState, type ReactNode } from "react";
 import { ddlSummaryText, skippedText } from "@/domain/import/ddl";
 import { STANDARD_TEMPLATE } from "@/domain/import/standard";
 import type { WorkspaceModel } from "@/domain/types";
-import { inputClass, smallButtonClass } from "../fields";
+import { buttonVariants } from "@/ui/components/button";
+import { textareaVariants } from "@/ui/components/input";
+import { Select } from "@/ui/components/select";
+import { cn } from "@/ui/lib/utils";
+import { inputVariants } from "@/ui/components/input";
 import { VENDORS, type Vendor } from "./catalog-queries";
 import { day, plural, type Channel, type WizardState } from "./wizard-model";
 
@@ -40,7 +44,8 @@ const CHANNELS: [Channel | "dbt", string, string][] = [
   ["dbt", "dbt project", "catalog.json, later"],
 ];
 
-const codeClass = "min-h-[140px] w-full resize-y overflow-auto whitespace-pre rounded-md border border-im-line bg-im-surface px-2 py-1.5 font-mono text-xs leading-normal";
+// the text area's look (slice 37): a code box's text, monospaced; its height is its rows
+const codeClass = cn(textareaVariants(), "overflow-auto whitespace-pre px-2 font-mono text-xs leading-normal");
 const sectionClass = "mb-5";
 const headClass = "mb-2 text-[13px] font-semibold";
 const hintClass = "mt-1 text-xs text-im-ink-3";
@@ -50,7 +55,7 @@ function CopyButton({ text, testId, label = "Copy" }: { text: string; testId: st
   return (
     <button
       type="button"
-      className={smallButtonClass}
+      className={buttonVariants({ size: "sm" })}
       data-testid={testId}
       onClick={() => {
         void navigator.clipboard?.writeText(text).then(
@@ -132,7 +137,7 @@ function ReadState({ s, onClear }: { s: WizardState; onClear: () => void }) {
           {r.warnings.length ? `, ${plural(r.warnings.length, "warning")} (shown in the review)` : ""}
         </span>
       </span>
-      <button type="button" className={smallButtonClass} onClick={onClear} data-testid="button-choose-another">
+      <button type="button" className={buttonVariants({ size: "sm" })} onClick={onClear} data-testid="button-choose-another">
         Choose another
       </button>
     </div>
@@ -178,7 +183,7 @@ export function SourceStep({
       {s.mode === "existing" ? (
         <div className="max-w-[560px]">
           {systems.length > 5 && (
-            <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a system" aria-label="Find a system" className={`${inputClass} mb-1.5`} data-testid="input-find-system" />
+            <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a system" aria-label="Find a system" className={`${inputVariants()} mb-1.5`} data-testid="input-find-system" />
           )}
           <div className="max-h-[220px] overflow-auto rounded-md border border-im-line" role="radiogroup" aria-label="Source system">
             {!systems.length && <p className="px-3 py-2 text-im-ink-3">No systems yet. Choose “A new system”.</p>}
@@ -200,7 +205,7 @@ export function SourceStep({
       ) : (
         <label className="block max-w-[560px]">
           <span className="mb-1 block text-[11.5px] text-im-ink-3">Name of the new system</span>
-          <input type="text" value={s.newName} onChange={(e) => set({ newName: e.target.value })} placeholder="e.g. HR or Salesforce EMEA production" className={inputClass} data-testid="input-new-system-name" autoFocus />
+          <input type="text" value={s.newName} onChange={(e) => set({ newName: e.target.value })} placeholder="e.g. HR or Salesforce EMEA production" className={inputVariants()} data-testid="input-new-system-name" autoFocus />
           <span className={hintClass}>Everything in the file will be new.</span>
         </label>
       )}
@@ -245,7 +250,7 @@ export function SourceStep({
       <>
         <label className="mb-2 block max-w-[320px]">
           <span className="mb-1 block text-[11.5px] text-im-ink-3">Database</span>
-          <select value={s.vendor} onChange={(e) => set({ vendor: e.target.value as Vendor })} className={inputClass} data-testid="select-vendor">
+          <Select value={s.vendor} onChange={(e) => set({ vendor: e.target.value as Vendor })} data-testid="select-vendor">
             {(Object.keys(VENDORS) as Vendor[]).map((k) => (
               <option key={k} value={k}>
                 {VENDORS[k].name}
@@ -253,7 +258,7 @@ export function SourceStep({
             ))}
             <option disabled>Snowflake (later)</option>
             <option disabled>Databricks (later)</option>
-          </select>
+          </Select>
         </label>
         <CodeBox
           head={
@@ -280,7 +285,7 @@ export function SourceStep({
                 <>
                   <span className="text-im-ink-3">Paste the result with its header row</span>
                   <span className="flex-1" />
-                  <button type="button" className={smallButtonClass} onClick={() => paste.trim() && takeText(paste, "pasted query result")} data-testid="button-read-paste">
+                  <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => paste.trim() && takeText(paste, "pasted query result")} data-testid="button-read-paste">
                     Read it
                   </button>
                 </>
@@ -306,7 +311,7 @@ export function SourceStep({
       {channels}
       <section className={sectionClass}>{input}</section>
       <details className="mb-2" data-testid="details-standard">
-        <summary className="cursor-pointer text-im-logical">InfoMapper’s source standard (v1)</summary>
+        <summary className="cursor-pointer leading-6 text-im-logical">InfoMapper’s source standard (v1)</summary>
         <p className={hintClass}>One row per column. Names of the columns as below; order does not matter. Other columns are ignored.</p>
         <p className={hintClass}>
           Flat files (Excel, CSV, TXT, JSON…) are described the same way: a made-up database and schema such as flat_files and ref_data, object_type file, the format in
@@ -343,7 +348,7 @@ export function SourceStep({
               </>
             }
           >
-            <textarea readOnly wrap="off" spellCheck={false} rows={3} value={STANDARD_TEMPLATE} className={`${codeClass} min-h-0`} data-testid="text-template" />
+            <textarea readOnly wrap="off" spellCheck={false} rows={3} value={STANDARD_TEMPLATE} className={cn(codeClass, "min-h-0")} data-testid="text-template" />
           </CodeBox>
         </div>
       </details>
@@ -373,7 +378,7 @@ function DdlInput({ s, set, readScript, clear }: { s: WizardState; set: (patch: 
               {ddlSummaryText(d.name || "DDL script", r.summary)}
               {r.warnings.length ? `, ${plural(r.warnings.length, "warning")} (shown in the review)` : ""}
             </span>
-            <button type="button" className={smallButtonClass} onClick={clear} data-testid="button-choose-another">
+            <button type="button" className={buttonVariants({ size: "sm" })} onClick={clear} data-testid="button-choose-another">
               Choose another
             </button>
           </div>
@@ -382,9 +387,9 @@ function DdlInput({ s, set, readScript, clear }: { s: WizardState; set: (patch: 
           Database <b className="font-mono">{r.databases.join(", ") || "–"}</b>, schema for unqualified names <b className="font-mono">{r.defaultSchema}</b>.{skipped ? ` ${skipped}.` : ""}
         </p>
         <details className="mt-2" data-testid="details-translated">
-          <summary className="cursor-pointer text-im-logical">The translated standard</summary>
+          <summary className="cursor-pointer leading-6 text-im-logical">The translated standard</summary>
           <p className={hintClass}>This is what the importer reads. If something is off, copy it, fix it in Excel or an editor and import it as a file.</p>
-          <textarea readOnly wrap="off" spellCheck={false} value={r.standard} className={`${codeClass} mt-1.5 min-h-[160px]`} data-testid="text-translated-standard" />
+          <textarea readOnly wrap="off" spellCheck={false} rows={8} value={r.standard} className={cn(codeClass, "mt-1.5")} data-testid="text-translated-standard" />
           <p className="mt-1.5">
             <CopyButton text={r.standard} testId="button-copy-standard" label="Copy the standard" />
           </p>
@@ -402,7 +407,7 @@ function DdlInput({ s, set, readScript, clear }: { s: WizardState; set: (patch: 
             <span className="flex-1" />
             <button
               type="button"
-              className={`${smallButtonClass} border-im-logical bg-im-logical text-im-surface hover:bg-im-logical`}
+              className={buttonVariants({ variant: "primary", size: "sm" })}
               onClick={() => d.text.trim() && readScript({ ...d, name: d.name || "pasted script" })}
               data-testid="button-read-ddl"
             >
@@ -431,12 +436,12 @@ function DdlInput({ s, set, readScript, clear }: { s: WizardState; set: (patch: 
       <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-[11.5px] text-im-ink-3">Database</span>
-          <input type="text" value={d.database} onChange={(e) => setDdl({ database: e.target.value })} placeholder="From USE, or the file name" className={inputClass} data-testid="input-ddl-database" />
+          <input type="text" value={d.database} onChange={(e) => setDdl({ database: e.target.value })} placeholder="From USE, or the file name" className={inputVariants()} data-testid="input-ddl-database" />
           <span className={hintClass}>For a script without USE or three-part names.</span>
         </label>
         <label className="block">
           <span className="mb-1 block text-[11.5px] text-im-ink-3">Schema for unqualified names</span>
-          <input type="text" value={d.schema} onChange={(e) => setDdl({ schema: e.target.value })} placeholder="Guessed: dbo or public" className={inputClass} data-testid="input-ddl-schema" />
+          <input type="text" value={d.schema} onChange={(e) => setDdl({ schema: e.target.value })} placeholder="Guessed: dbo or public" className={inputVariants()} data-testid="input-ddl-schema" />
           <span className={hintClass}>For tables named without a schema.</span>
         </label>
       </div>

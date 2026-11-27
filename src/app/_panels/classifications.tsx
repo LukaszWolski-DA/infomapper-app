@@ -20,8 +20,10 @@ import { dataVaultReading, READING_EMPTY, READING_FOOTER, readingText, type Read
 import type { Classification, ClassificationScope, SourceTable } from "@/domain/types";
 import { NOTE_REMOVED, NOTE_SAVED } from "@/domain/commands/source";
 import { DialogFooter } from "@/ui/components/dialog";
-import { buttonClass, dangerClass, Field, fieldKey, Fold, Hint, LongList, Li, TextArea } from "./fields";
+import { Field, fieldKey, Fold, Hint, LongList, Li, TextArea } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
+import { filterChipVariants } from "@/ui/components/chip";
 
 type Target = { kind: "source_table" | "source_column"; id: Uuid };
 const GROUPS = ["General", "Data Vault 2.0", "This workspace"] as const;
@@ -55,7 +57,7 @@ export function ClassificationsSection({ target }: { target: Target }) {
                     disabled={!p.editable}
                     onClick={() => toggle(c)}
                     data-testid="toggle-classification"
-                    className="h-[26px] rounded-[13px] border border-im-line bg-im-surface px-2.5 text-xs text-im-ink-2 hover:border-im-ink-3 disabled:cursor-not-allowed aria-pressed:border-im-physical aria-pressed:bg-im-physical-soft aria-pressed:text-im-physical"
+                    className={filterChipVariants({ on: mine.has(c.id), tone: "physical" })}
                   >
                     {c.name}
                   </button>
@@ -207,10 +209,10 @@ export function RemoveClassificationForm({ classification: c, impact, pending, o
       )}
       <p className="mt-2 text-[12px] text-im-ink-3">You can undo it right after.</p>
       <DialogFooter className="mt-4">
-        <button type="button" className={buttonClass} onClick={onCancel} data-testid="button-cancel-remove-classification">
+        <button type="button" className={buttonVariants()} onClick={onCancel} data-testid="button-cancel-remove-classification">
           Cancel
         </button>
-        <button type="button" className={dangerClass} disabled={pending} onClick={onRemove} data-testid="button-confirm-remove-classification">
+        <button type="button" className={buttonVariants({ variant: "danger" })} disabled={pending} onClick={onRemove} data-testid="button-confirm-remove-classification">
           Remove
         </button>
       </DialogFooter>

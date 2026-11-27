@@ -9,9 +9,11 @@ import { deleteConceptAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
 import type { TreeConcept } from "./tree-data";
+import { buttonVariants } from "@/ui/components/button";
+import { Select } from "@/ui/components/select";
 
 const entities = (n: number) => `${n} entit${n === 1 ? "y" : "ies"}`;
-const button = "h-8 rounded-md border border-im-line bg-im-surface px-3 text-im-ink hover:bg-im-hover";
+const button = buttonVariants();
 
 export function DeleteConceptDialog({
   workspaceId,
@@ -66,18 +68,17 @@ export function DeleteConceptDialog({
                 </p>
                 <label className="mt-2.5 block max-w-[320px]">
                   <span className="mb-1 block text-xs text-im-ink-2">Move them to</span>
-                  <select
+                  <Select
                     value={moveTo}
                     onChange={(e) => setMoveTo(e.target.value)}
                     data-testid="select-move-to"
-                    className="h-8 w-full rounded-md border border-im-line bg-im-surface px-2 text-im-ink"
                   >
                     {others.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
               </>
             )}
@@ -95,7 +96,7 @@ export function DeleteConceptDialog({
           {!blocked && (
             <button
               type="button"
-              className={`${button} text-im-warn`}
+              className={buttonVariants({ variant: "danger" })}
               disabled={pending}
               onClick={() => void confirm()}
               data-testid="button-confirm-delete-concept"

@@ -16,7 +16,8 @@ import { CanvasUiCtx } from "@/canvas/context";
 import { frameColor } from "@/canvas/frame-data";
 import { firstLine } from "@/canvas/note-data";
 import { LookControls, PageOutlineControls, useCanvasLook } from "@/canvas/look";
-import { Actions, Fold, Hint, Kind, Li, LongList, smallButtonClass, TypeDot } from "./fields";
+import { Actions, Fold, Hint, Kind, Li, LongList, TypeDot } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { NoteRow } from "./note-row";
 import { inputsLabel, typeCheckOf } from "./model-index";
@@ -41,7 +42,7 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
           This is the live canvas for <b className="font-semibold text-im-ink">{p.live.labelName}</b>. Everything labeled {p.live.labelName} appears here by itself.
           Adding an entity here adds the label; removing one takes the label off.
           <div className="mt-2">
-            <button type="button" className={smallButtonClass} onClick={() => p.goLabel(p.live!.labelId)} data-testid="button-live-open-label">
+            <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => p.goLabel(p.live!.labelId)} data-testid="button-live-open-label">
               Open label
             </button>
           </div>
@@ -163,16 +164,16 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
             {/* slice 2c, item 8: every role (reviewers and readers in their own tab only, item 11) */}
             {frames.length > 0 && (
               <>
-                <button type="button" className={smallButtonClass} onClick={() => ui.setAllFramesCollapsed(true)} data-testid="button-frames-collapse-all">
+                <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => ui.setAllFramesCollapsed(true)} data-testid="button-frames-collapse-all">
                   Collapse all
                 </button>
-                <button type="button" className={smallButtonClass} onClick={() => ui.setAllFramesCollapsed(false)} data-testid="button-frames-expand-all">
+                <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => ui.setAllFramesCollapsed(false)} data-testid="button-frames-expand-all">
                   Expand all
                 </button>
               </>
             )}
             {p.editable && (
-              <button type="button" className={smallButtonClass} onClick={() => ui.arrangeIntoFrames()} data-testid="button-arrange-frames">
+              <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => ui.arrangeIntoFrames()} data-testid="button-arrange-frames">
                 Arrange into frames by concept and system
               </button>
             )}

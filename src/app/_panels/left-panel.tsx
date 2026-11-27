@@ -18,6 +18,7 @@ import { createRequirementAction } from "@/app/_actions/requirement";
 import { KIND_NAMES } from "@/domain/model/requirements";
 import { useAction } from "@/app/_components/use-action";
 import type { ActionResult } from "@/app/_lib/run-command";
+import { MENU_SEPARATOR } from "@/ui/components/menu";
 import { DotsIcon, itemClass, menuClass, sectionClass } from "@/app/w/[workspaceId]/p/[projectId]/_components/canvas-menu";
 import { readPreference, writePreference } from "@/canvas/CanvasProvider";
 import { CanvasUiCtx, CARD_DRAG_TYPE, REQ_DRAG_TYPE, type CardTarget } from "@/canvas/context";
@@ -31,7 +32,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/components/dropdown-menu";
+import { buttonVariants } from "@/ui/components/button";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { inputVariants } from "@/ui/components/input";
+import { tabsListVariants, tabVariants } from "@/ui/components/tabs";
 import { useToast } from "@/ui/components/toast";
+import { cn } from "@/ui/lib/utils";
 import { DeleteConceptDialog } from "./delete-concept-dialog";
 import { ImportWizard } from "./import/import-wizard";
 import type { ImportData } from "./import/wizard-model";
@@ -281,10 +287,10 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                               New entity in {c.name}
                             </DropdownMenuItem>
                             <DropdownMenuItem className={itemClass} onSelect={() => setRenaming(c.id)}>
-                              Rename <kbd className="text-[11px] text-im-ink-3">Dbl-click</kbd>
+                              Rename <kbd className="text-small text-im-ink-3">Dbl-click</kbd>
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-im-line" />
-                            <DropdownMenuItem className={`${itemClass} text-im-warn`} onSelect={() => setDeleting(c)}>
+                            <DropdownMenuSeparator className={MENU_SEPARATOR} />
+                            <DropdownMenuItem className={cn(itemClass, "text-im-warn")} onSelect={() => setDeleting(c)}>
                               Delete concept…
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -396,7 +402,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                 <div key={name}>
                   <button
                     type="button"
-                    className={`sticky top-7 z-[1] flex w-full items-center gap-1.5 bg-im-panel py-[5px] pl-[18px] pr-1.5 pb-[3px] text-left font-mono text-[11px] text-im-ink-3 hover:text-im-ink`}
+                    className={`sticky top-7 z-[1] flex min-h-target w-full items-center gap-1.5 bg-im-panel py-[5px] pl-[18px] pr-1.5 pb-[3px] text-left font-mono text-[11px] text-im-ink-3 hover:text-im-ink`}
                     aria-expanded={isOpen(shut, sub, q)}
                     data-testid="tree-schema-head"
                     onClick={() => fold(sub)}
@@ -496,7 +502,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                   data-testid="tree-req"
                   data-key={r.key}
                   data-presence={r.presence}
-                  className="flex w-full items-center gap-2 rounded-md py-[5px] pl-3.5 pr-2 text-left hover:bg-im-hover"
+                  className="flex min-h-target w-full items-center gap-2 rounded-md py-[5px] pl-3.5 pr-2 text-left hover:bg-im-hover"
                 >
                   {/* its card's presence (slice 4b-2, J; prototype .oncanvas), as the Model tab's items */}
                   <span className={`size-[7px] flex-none rounded-full ${r.presence === "here" ? "bg-im-req" : r.presence === "elsewhere" ? "shadow-[inset_0_0_0_1.5px_var(--im-ink-3)]" : "opacity-0"}`} />
@@ -582,12 +588,12 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
         {(creates.length > 0 || actions.length > 0) && (
           <div className="flex flex-wrap gap-1.5 px-2.5 pb-0.5 pt-1.5">
             {creates.map((c) => (
-              <button key={c.key} type="button" className={`${smallButton} whitespace-nowrap`} data-testid={c.testId} onClick={(e) => createFromTab(c.key, e.currentTarget)}>
+              <button key={c.key} type="button" className={smallButton} data-testid={c.testId} onClick={(e) => createFromTab(c.key, e.currentTarget)}>
                 {c.button}
               </button>
             ))}
             {actions.map((a) => (
-              <button key={a.key} type="button" className={`${smallButton} whitespace-nowrap`} title={a.title} data-testid={a.testId} onClick={() => setTabDialog(a.key)}>
+              <button key={a.key} type="button" className={smallButton} title={a.title} data-testid={a.testId} onClick={() => setTabDialog(a.key)}>
                 {a.label}
               </button>
             ))}
@@ -649,7 +655,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
 
   return (
     <>
-      <div className="flex gap-0.5 px-2.5 pt-2.5" role="tablist">
+      <div className={cn(tabsListVariants({ density: "panel" }), "px-3 pt-2.5")} role="tablist">
         {tabIds.map((t) => {
           const moduleOne = tree.tabs.find((x) => x.id === t);
           return (
@@ -661,8 +667,8 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
               data-testid={`tab-${t}`}
               title={moduleOne?.title}
               onClick={() => setTab(t)}
-              // four tabs fit at 12 px (slice 15a, P18)
-              className={`h-[30px] flex-1 rounded-t-md border-b-2 border-transparent ${tabIds.length > 3 ? "text-[12px]" : "text-[12.5px]"} font-medium text-im-ink-3 aria-selected:border-im-ink aria-selected:text-im-ink`}
+              // at their natural width, 14 px apart (slice 37, F8): four tabs fit a 264 px panel; more scroll sideways
+              className={tabVariants({ density: "panel" })}
             >
               {moduleOne?.name ?? TAB_NAMES[t]}
             </button>
@@ -682,7 +688,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
           autoComplete="off"
           aria-label="Search names and fields"
           data-testid="input-tree-search"
-          className="h-8 w-full rounded-[7px] border border-im-line bg-im-surface pl-[30px] pr-2.5 outline-none focus:border-im-logical"
+          className={cn(inputVariants(), "pl-[30px]")}
         />
       </div>
       <label className="mx-3 mb-1.5 flex items-center gap-2 text-xs text-im-ink-2">
@@ -735,11 +741,14 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
   );
 }
 
-const addClass =
-  "grid size-[22px] flex-none place-items-center rounded-[5px] mr-1 text-[15px] leading-none text-im-ink-3 opacity-0 hover:bg-im-hover hover:text-im-logical focus-visible:opacity-100 group-hover/head:opacity-100 data-[state=open]:opacity-100";
-const barButton = "grid size-7 place-items-center rounded-md text-im-ink-3 hover:bg-im-hover hover:text-im-ink";
+// slice 37 (step 3b): the shared look; "+" and "⋯" show on the head's hover, 24 px in a head of at least 28
+const addClass = cn(
+  iconButtonVariants({ size: "xs" }),
+  "mr-1 text-[15px] leading-none text-im-ink-3 opacity-0 hover:text-im-logical focus-visible:opacity-100 group-hover/head:opacity-100 data-[state=open]:opacity-100",
+);
+const barButton = iconButtonVariants();
 const barIcon = "size-4 fill-none stroke-current stroke-[1.6]";
-const smallButton = "h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover";
+const smallButton = buttonVariants({ size: "sm" });
 
 const Chevron = ({ open }: { open: boolean }) => (
   <svg
@@ -777,7 +786,7 @@ function GroupHead({
       data-testid={testId}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
-      className={`flex min-w-0 flex-1 items-center gap-[7px] bg-im-panel px-1.5 pb-[5px] pt-2 text-left text-[11.5px] text-im-ink-3 hover:text-im-ink ${sticky ? "sticky top-0 z-[2] w-full" : ""}`}
+      className={`flex min-h-target min-w-0 flex-1 items-center gap-[7px] bg-im-panel px-1.5 pb-[5px] pt-2 text-left text-[11.5px] text-im-ink-3 hover:text-im-ink ${sticky ? "sticky top-0 z-[2] w-full" : ""}`}
     >
       <Chevron open={open} />
       {dot}
@@ -837,7 +846,7 @@ function TreeItem({
       data-testid="tree-item"
       data-presence={presence}
       data-missing={missing ?? undefined}
-      className="flex w-full cursor-grab items-center gap-2 rounded-md py-[5px] pl-3.5 pr-2 text-left hover:bg-im-hover"
+      className="flex min-h-target w-full cursor-grab items-center gap-2 rounded-md py-[5px] pl-3.5 pr-2 text-left hover:bg-im-hover"
     >
       <span className={`size-[7px] flex-none rounded-full ${dot}`} />
       <span className="min-w-0 flex-1">
@@ -891,7 +900,7 @@ function NameInput({
       placeholder={placeholder}
       autoComplete="off"
       data-testid="input-tree-name"
-      className="h-7 w-full rounded-md border border-im-logical bg-im-surface px-2 outline-none"
+      className={cn(inputVariants({ size: "sm" }), "border-im-logical")}
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Enter") finish(e.currentTarget.value);

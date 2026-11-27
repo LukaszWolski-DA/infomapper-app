@@ -12,10 +12,15 @@ import { createOrganizationAction, previewCreateOrganizationAction, type CreateO
 import type { ActionResult } from "../_lib/run-command";
 import { afterSessionChange } from "@/ui/after-session-change";
 import { DOC_LANGUAGE_LABEL, DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
+import { cn } from "@/ui/lib/utils";
+import { inputVariants } from "@/ui/components/input";
+import { buttonVariants } from "@/ui/components/button";
+import { Select } from "@/ui/components/select";
 
-const input = "h-[30px] w-full rounded-md border border-im-line bg-im-surface px-2 text-[13px]";
-const button = "rounded-md border border-im-line bg-im-surface px-3 py-1.5 text-[13px] hover:bg-im-hover disabled:opacity-50";
-const primary = "rounded-md bg-im-logical px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50";
+// slice 37 (step 8): the shared field and buttons (32 px), each keeping its padding
+const input = cn(inputVariants(), "px-2");
+const button = cn(buttonVariants(), "px-3");
+const primary = cn(buttonVariants({ variant: "primary" }), "px-3");
 
 /** "1 workspace" / "{n} workspaces", or "guest" for an organization the person is a guest in (F21). */
 export const workspacesHint = (o: SignInOrganization) => (o.guest ? "guest" : `${o.workspaceCount} workspace${o.workspaceCount === 1 ? "" : "s"}`);
@@ -96,7 +101,7 @@ export function SignInSteps({ next }: { next: string | null }) {
   };
 
   return (
-    <section data-testid="panel-sign-in" className="flex-1 rounded-md border border-im-line bg-im-surface p-4">
+    <section data-testid="panel-sign-in" className="flex-1 rounded-lg border border-im-line bg-im-surface p-4">
       <h2 className="mb-3 text-[15px] font-semibold">Sign in</h2>
       {!organizations && (
         <form onSubmit={findOrganizations} className="space-y-3" noValidate>
@@ -174,7 +179,7 @@ export function OrganizationLinkForm({ organization, email: initialEmail, next }
   };
 
   return (
-    <section data-testid="panel-organization-link" className="w-full rounded-md border border-im-line bg-im-surface p-4">
+    <section data-testid="panel-organization-link" className="w-full rounded-lg border border-im-line bg-im-surface p-4">
       <h2 className="mb-3 text-[15px] font-semibold">
         Sign in to <span data-testid="text-link-organization">{organization.name}</span>
       </h2>
@@ -248,7 +253,7 @@ export function CreateOrganizationForm() {
   };
 
   return (
-    <section data-testid="panel-create-organization" className="flex-1 rounded-md border border-im-line bg-im-surface p-4">
+    <section data-testid="panel-create-organization" className="flex-1 rounded-lg border border-im-line bg-im-surface p-4">
       <h2 className="mb-3 text-[15px] font-semibold">Create an organization</h2>
       {summary === null ? (
         <form onSubmit={review} className="space-y-3" noValidate>
@@ -266,13 +271,13 @@ export function CreateOrganizationForm() {
           ))}
           {/* slice 23 (F1): the first workspace's documentation language, a deliberate difference from the prototype */}
           <Field label={DOC_LANGUAGE_LABEL} error={errors.workspaceLanguage}>
-            <select data-testid="select-create-workspaceLanguage" className={input} value={form.workspaceLanguage} onChange={(e) => setForm({ ...form, workspaceLanguage: e.target.value })}>
+            <Select data-testid="select-create-workspaceLanguage" value={form.workspaceLanguage} onChange={(e) => setForm({ ...form, workspaceLanguage: e.target.value })}>
               {DOC_LANGUAGE_OPTIONS.map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
           <Message text={message} />
           <button type="submit" data-testid="button-create-continue" className={primary} disabled={pending}>
@@ -317,7 +322,7 @@ export function AccountSignInForm({ next }: { next: string | null }) {
   };
 
   return (
-    <section data-testid="panel-account-sign-in" className="w-full max-w-md rounded-md border border-im-line bg-im-surface p-4">
+    <section data-testid="panel-account-sign-in" className="w-full max-w-md rounded-lg border border-im-line bg-im-surface p-4">
       <h2 className="mb-3 text-[15px] font-semibold">Sign in</h2>
       <form onSubmit={signIn} className="space-y-3" noValidate>
         <Field label="E-mail">

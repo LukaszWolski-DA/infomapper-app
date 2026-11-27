@@ -4,6 +4,8 @@
 
 import { archiveWorkspaceAction, unarchiveWorkspaceAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
+import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
 
 interface Props {
   workspaceId: string;
@@ -12,8 +14,8 @@ interface Props {
   archived: boolean;
 }
 
-export const btnClass =
-  "inline-flex h-[26px] items-center rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover disabled:cursor-default disabled:opacity-50 disabled:hover:bg-im-surface";
+// slice 37 (step 5): the button's `sm` (28 px, before 26), its padding kept so its width stays (People's columns, S33-05)
+export const btnClass = cn(buttonVariants({ size: "sm" }), "inline-flex items-center px-[9px] text-xs");
 
 function useArchive({ workspaceId, workspaceName, version, archived }: Props) {
   const { saveRow, pending } = useAction();
@@ -32,7 +34,7 @@ export function ArchiveBox(props: Props & { isOwner: boolean }) {
   const { archived, isOwner } = props;
   const verb = archived ? "Unarchive" : "Archive";
   return (
-    <div className="rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-archive">
+    <div className="rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-archive">
       <h4 className="m-0 mb-1 text-[13.5px] font-semibold">{verb}</h4>
       <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2">
         {archived

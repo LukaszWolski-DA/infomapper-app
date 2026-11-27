@@ -12,7 +12,7 @@ import { copiesImpactRow, requirementsImpactRow, type EntityImpact } from "@/dom
 import type { Entity } from "@/domain/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
 import { useToast } from "@/ui/components/toast";
-import { buttonClass, dangerClass } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 
 const count = (n: number, word: string, plural = `${word}s`) => `${n} ${n === 1 ? word : plural}`;
@@ -110,10 +110,10 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
           </div>
         </DialogDescription>
         <DialogFooter className="mt-5">
-          <button type="button" className={buttonClass} onClick={onClose}>
+          <button type="button" className={buttonVariants()} onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className={dangerClass} disabled={!impact || pending} onClick={() => void confirm()} data-testid="button-confirm-delete-entity">
+          <button type="button" className={buttonVariants({ variant: "danger" })} disabled={!impact || pending} onClick={() => void confirm()} data-testid="button-confirm-delete-entity">
             Delete {e.name}
           </button>
         </DialogFooter>

@@ -13,10 +13,12 @@ import { CanvasUiCtx, type FramePatch } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { FREE_FRAME_COLORS } from "@/domain/model/frames";
 import type { FrameKind } from "@/domain/types";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextField, useChoice } from "./fields";
+import { Actions, Field, fieldKey, Kind, Li, List, Section, Seg, TextField, useChoice } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { usePanels } from "./panels-context";
 import { NotesHere } from "./notes-here";
+import { Select } from "@/ui/components/select";
 
 const KINDS = [
   ["free", "Free area"],
@@ -114,10 +116,9 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       </Field>
       {f.kind === "concept" && (
         <Field label="Concept" htmlFor="f-fr">
-          <select
+          <Select
             key={fieldKey(f.id, "concept")}
             id="f-fr"
-            className={inputClass}
             value={concept.value}
             disabled={!p.editable}
             data-testid="select-frame-concept"
@@ -130,15 +131,14 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
                   {c.name}
                 </option>
               ))}
-          </select>
+          </Select>
         </Field>
       )}
       {f.kind === "source_system" && (
         <Field label="Source system" htmlFor="f-fr">
-          <select
+          <Select
             key={fieldKey(f.id, "system")}
             id="f-fr"
-            className={inputClass}
             value={system.value}
             disabled={!p.editable}
             data-testid="select-frame-system"
@@ -149,7 +149,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
                 {s.name}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
       )}
       {f.kind === "free" && (
@@ -163,7 +163,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
                 aria-label={`Colour ${c}`}
                 disabled={!p.editable}
                 onClick={() => c !== f.color && update({ color: c })}
-                className="size-[22px] rounded-md shadow-[0_0_0_1px_var(--im-line)] aria-pressed:shadow-[0_0_0_2px_var(--im-surface),0_0_0_3.5px_var(--im-ink)]"
+                className="size-target rounded-md shadow-[0_0_0_1px_var(--im-line)] aria-pressed:shadow-[0_0_0_2px_var(--im-surface),0_0_0_3.5px_var(--im-ink)]"
                 style={{ background: c }}
               />
             ))}
@@ -209,7 +209,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
                       {entity.name} <span className="text-[11.5px] text-im-ink-3">is in {now}</span>
                     </span>
                     {p.editable && frameConcept && (
-                      <button type="button" className={smallButtonClass} onClick={() => moveToFrameConcept(entity.id)} data-testid="button-frame-move-entity">
+                      <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => moveToFrameConcept(entity.id)} data-testid="button-frame-move-entity">
                         Move to {frameConcept.name}
                       </button>
                     )}
@@ -230,19 +230,19 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
 
       <Actions>
         {/* every role: reviewers and readers collapse and expand in their own tab only (slice 2c, item 11) */}
-        <button type="button" className={buttonClass} onClick={() => ui.setFrameCollapsed(f.id, !f.collapsed)} data-testid="button-frame-collapse">
+        <button type="button" className={buttonVariants()} onClick={() => ui.setFrameCollapsed(f.id, !f.collapsed)} data-testid="button-frame-collapse">
           {f.collapsed ? "Expand frame" : "Collapse frame"}
         </button>
-        <button type="button" className={buttonClass} onClick={() => ui.zoomToFrame(f.id)} data-testid="button-frame-zoom">
+        <button type="button" className={buttonVariants()} onClick={() => ui.zoomToFrame(f.id)} data-testid="button-frame-zoom">
           Zoom to frame
         </button>
         {p.editable && !f.collapsed && (
-          <button type="button" className={buttonClass} onClick={() => ui.fitFrame(f.id)} data-testid="button-frame-fit">
+          <button type="button" className={buttonVariants()} onClick={() => ui.fitFrame(f.id)} data-testid="button-frame-fit">
             Fit frame to its content
           </button>
         )}
         {p.editable && (
-          <button type="button" className={dangerClass} onClick={() => ui.deleteFrame(f.id)} data-testid="button-frame-delete">
+          <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => ui.deleteFrame(f.id)} data-testid="button-frame-delete">
             Delete frame
           </button>
         )}

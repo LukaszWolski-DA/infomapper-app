@@ -20,10 +20,13 @@ import { marks } from "@/domain/model/labels";
 import type { TraceTarget } from "@/domain/model/requirements";
 import type { Requirement } from "@/domain/types";
 import { openPick } from "@/ui/pick-popover";
-import { Fold, Hint, List, smallButtonClass } from "./fields";
+import { Fold, Hint, List } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { usePanels } from "./panels-context";
 import { KindIcon } from "./requirement-ui";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { cn } from "@/ui/lib/utils";
 
 /** The name field a requirement panel focuses after “+ New requirement…” (`usePanels().nameFocus`). */
 export const requirementNameFocus = (requirementId: string) => `req:${requirementId}`;
@@ -108,7 +111,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
       {p.editable && (
         <button
           type="button"
-          className="grid size-6 flex-none place-items-center rounded text-im-req hover:bg-im-surface"
+          className={cn(iconButtonVariants({ size: "xs" }), "flex-none text-im-req enabled:hover:bg-im-surface enabled:hover:text-im-req")}
           aria-label={`Place ${r.key}'s card`}
           title={ui.requirementCard(r.id) ? "Its card is on this canvas: show it" : "Place its card next to this element (or drag the row onto the canvas)"}
           onClick={() => placeCard(r)}
@@ -123,7 +126,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
       {!viaText && p.editable && (
         <button
           type="button"
-          className="mr-1 grid size-6 flex-none place-items-center rounded text-im-ink-3 hover:bg-im-surface hover:text-im-warn"
+          className={cn(iconButtonVariants({ size: "xs" }), "mr-1 flex-none text-im-ink-3 enabled:hover:bg-im-surface enabled:hover:text-im-warn")}
           aria-label={`Unlink ${r.key}`}
           title="Unlink"
           onClick={() => unlink(r)}
@@ -147,7 +150,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
       )}
       {p.editable && missing.length > 0 && (
         <div className="mt-1.5">
-          <button type="button" className={smallButtonClass} onClick={() => ui.placeRequirementCardsBeside(missing.map((r) => r.id), target)} data-testid="button-requirements-add-all">
+          <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => ui.placeRequirementCardsBeside(missing.map((r) => r.id), target)} data-testid="button-requirements-add-all">
             {missing.length === listed.length ? "Add all to this canvas" : `Add the ${missing.length} missing to this canvas`}
           </button>
         </div>
@@ -158,7 +161,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
             type="button"
             id={`f-req-${target.kind}`}
             data-pop=""
-            className={smallButtonClass}
+            className={buttonVariants({ size: "sm" })}
             data-testid="button-link-requirements"
             onClick={(e) => openPicker(e.currentTarget, false)}
           >
@@ -167,7 +170,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
           {target.kind === "entity" && attributes.length > 0 && (
             <button
               type="button"
-              className={smallButtonClass}
+              className={buttonVariants({ size: "sm" })}
               title="Link chosen requirements to each attribute of this entity"
               data-testid="button-link-all-attributes"
               onClick={(e) => openPicker(e.currentTarget, true)}

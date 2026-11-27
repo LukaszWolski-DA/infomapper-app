@@ -6,6 +6,7 @@
 // key event from bubbling past it. Esc goes through the editor: it closes the link field, or warns about unsaved
 // changes before a second Esc discards them.
 
+import { iconButtonVariants } from "@/ui/components/icon-button";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { lazy, Suspense, useRef, type ReactNode, type RefObject } from "react";
 import type { RichTextEditorHandle } from "./rich-text-editor";
@@ -36,7 +37,7 @@ export function RichTextDialog({ open, subtitle, title, html, template = null, s
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[90] bg-[rgba(15,20,30,.45)]" />
         <DialogPrimitive.Content
-          className="fixed left-1/2 top-1/2 z-[90] flex max-h-[90vh] w-[min(760px,96vw)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl bg-im-surface text-im-ink shadow-[0_0_0_1px_var(--im-line),0_24px_60px_-20px_rgba(0,0,0,.45)] outline-none"
+          className="fixed left-1/2 top-1/2 z-[90] flex max-h-[90vh] w-[min(760px,96vw)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-im-line bg-im-surface text-im-ink shadow-pop outline-none"
           data-testid="dialog-rich-text"
           aria-describedby={undefined}
           // the editor focuses its first empty section itself
@@ -63,14 +64,14 @@ export function RichTextDialog({ open, subtitle, title, html, template = null, s
         >
           <div className="flex items-start gap-2.5 border-b border-im-line px-4 pb-2.5 pt-3.5">
             <div className="min-w-0 flex-1">
-              <div className="text-[11.5px] text-im-ink-3" data-testid="text-rte-subtitle">
+              <div className="text-small text-im-ink-3" data-testid="text-rte-subtitle">
                 {subtitle}
               </div>
-              <DialogPrimitive.Title className="text-[15px] font-semibold">{title}</DialogPrimitive.Title>
+              <DialogPrimitive.Title className="text-section">{title}</DialogPrimitive.Title>
             </div>
             <button
               type="button"
-              className="size-7 rounded-md text-im-ink-2 hover:bg-im-hover"
+              className={iconButtonVariants()}
               aria-label="Close"
               title="Close (Esc)"
               onClick={() => editor.current?.escape()}

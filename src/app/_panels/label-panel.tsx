@@ -14,7 +14,8 @@ import { useOpenLiveCanvas } from "@/app/_components/live-canvas";
 import type { Uuid } from "@/domain/ids";
 import { targetOf, type LabelTargetKind } from "@/domain/model/labels";
 import type { Label } from "@/domain/types";
-import { Actions, dangerClass, Field, fieldKey, Fold, Kind, Li, LongList, primaryClass, TextField, TypeDot } from "./fields";
+import { Actions, Field, fieldKey, Fold, Kind, Li, LongList, TextField, TypeDot } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { attributeLabel, inputsLabel, typeCheckOf } from "./model-index";
 
@@ -117,7 +118,7 @@ export function LabelPanel({ label }: { label: Label }) {
       </p>
       {(liveCanvas || p.canCreateCanvas) && (
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className={primaryClass} disabled={openLive.pending} onClick={() => void openLive.open(label.id)} data-testid="button-label-live">
+          <button type="button" className={buttonVariants({ variant: "primary" })} disabled={openLive.pending} onClick={() => void openLive.open(label.id)} data-testid="button-label-live">
             {liveCanvas ? "Go to its live canvas" : "Open as live canvas"}
           </button>
         </div>
@@ -130,7 +131,7 @@ export function LabelPanel({ label }: { label: Label }) {
       {p.editable && (
         <>
           <Actions>
-            <button type="button" className={dangerClass} disabled={pending} onClick={() => void remove()} data-testid="button-label-delete">
+            <button type="button" className={buttonVariants({ variant: "danger" })} disabled={pending} onClick={() => void remove()} data-testid="button-label-delete">
               Delete label
             </button>
           </Actions>

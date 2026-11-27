@@ -76,7 +76,7 @@ export function StatusBar({
           data-testid="status-checks"
           data-high={checks.high || undefined}
           title={CHECK_TEXTS.statusTitle}
-          className={`-mx-1 cursor-pointer rounded px-1 text-inherit hover:bg-im-hover hover:underline focus-visible:outline-2 focus-visible:outline-im-logical ${checks.high ? "[&_b]:!text-im-warn text-im-warn" : ""}`}
+          className={`-mx-1 inline-block min-h-target cursor-pointer rounded px-1 py-1 leading-4 text-inherit hover:bg-im-hover hover:underline focus-visible:outline-2 focus-visible:outline-im-logical ${checks.high ? "[&_b]:!text-im-warn text-im-warn" : ""}`}
           onClick={() => {
             // nothing selected, the details panel shown (also when hidden; narrow: slid over), at its group
             ui.select(null);

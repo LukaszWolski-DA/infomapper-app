@@ -28,12 +28,16 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot, useDraft, DraftLine } from "./fields";
+import { Actions, Field, fieldKey, Fold, GroupedSelect, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot, useDraft, DraftLine } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { RequirementsSection } from "./requirements-section";
 import { ItemLabels } from "./item-labels";
 import { usePanels } from "./panels-context";
 import { columnLabel, columnOptions, inputsLabel, typeCheckOf } from "./model-index";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { textareaVariants } from "@/ui/components/input";
+import { cn } from "@/ui/lib/utils";
 
 const KINDS = [
   ["direct", "Direct copy"],
@@ -45,7 +49,7 @@ const STATUSES = [
   ["approved", STATUS_LABEL.approved],
 ] as const;
 
-const iconButton = "grid size-6 flex-none place-items-center rounded text-im-ink-3 hover:bg-im-hover hover:text-im-ink disabled:opacity-30";
+const iconButton = cn(iconButtonVariants({ size: "xs" }), "flex-none text-im-ink-3");
 
 export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   const p = usePanel();
@@ -334,7 +338,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
           readOnly={!p.editable}
           placeholder={`e.g. CAST(${first?.name ?? "column"} AS date), a lookup, or plain words`}
           data-testid="input-mapping-rule"
-          className={`${inputClass} min-h-[60px] resize-y font-mono text-xs`}
+          className={cn(textareaVariants(), "font-mono text-xs")}
           onBlur={(e) => {
             // a transformation chosen and its rule left empty: nothing to save, and the hint goes
             if (wantsRule && !pending && !e.currentTarget.value.trim()) setWantsRule(false);
@@ -348,10 +352,10 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
         <Note warn testId="note-rule-needed">
           A mapping with more than one input needs a transformation rule. Write it, then save.
           <div className="mt-2 flex gap-2">
-            <button type="button" className={buttonClass} onClick={() => void savePending()} data-testid="button-save-input">
+            <button type="button" className={buttonVariants()} onClick={() => void savePending()} data-testid="button-save-input">
               Save
             </button>
-            <button type="button" className={buttonClass} onClick={() => setPending(null)}>
+            <button type="button" className={buttonVariants()} onClick={() => setPending(null)}>
               Cancel
             </button>
           </div>
@@ -437,15 +441,15 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
               defaultValue={m.rule_expression ?? ""}
               placeholder="e.g. COALESCE(crm_email, web_email)"
               data-testid="input-merge-rule"
-              className={`${inputClass} min-h-[60px] resize-y font-mono text-xs`}
+              className={cn(textareaVariants(), "font-mono text-xs")}
             />
           </Field>
           <Note warn>The merged mapping is a transformation and goes to review; it needs a rule.</Note>
           <div className="mt-2 flex gap-2">
-            <button type="button" className={buttonClass} disabled={!merging.size} onClick={() => void merge()} data-testid="button-merge">
+            <button type="button" className={buttonVariants()} disabled={!merging.size} onClick={() => void merge()} data-testid="button-merge">
               Merge
             </button>
-            <button type="button" className={buttonClass} onClick={() => setMerging(null)}>
+            <button type="button" className={buttonVariants()} onClick={() => setMerging(null)}>
               Cancel
             </button>
           </div>
@@ -455,16 +459,16 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
       {p.editable && (
         <Actions>
           {inputs.length > 1 && (
-            <button type="button" className={buttonClass} onClick={() => void split()} data-testid="button-split-mapping">
+            <button type="button" className={buttonVariants()} onClick={() => void split()} data-testid="button-split-mapping">
               Split into separate mappings
             </button>
           )}
           {others.length > 0 && !merging && (
-            <button type="button" className={buttonClass} onClick={() => setMerging(new Set())} data-testid="button-merge-mappings">
+            <button type="button" className={buttonVariants()} onClick={() => setMerging(new Set())} data-testid="button-merge-mappings">
               Merge mappings…
             </button>
           )}
-          <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-mapping">
+          <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => void remove()} data-testid="button-delete-mapping">
             Delete mapping
           </button>
         </Actions>

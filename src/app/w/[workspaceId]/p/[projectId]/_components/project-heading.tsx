@@ -14,11 +14,13 @@ import { DraftLine, fieldKey, useDraft } from "@/app/_panels/fields";
 import { PROJECT_NAME_REQUIRED } from "@/domain/commands/project";
 import { useToast } from "@/ui/components/toast";
 import { rowSaves } from "@/ui/row-saves";
+import { QUIET_TEXT } from "@/ui/components/input";
 
 /** The description's lines, for `rows` where `field-sizing` is missing (wrapped lines are not counted). */
 const lines = (text: string) => text.split("\n").length;
 
-const fieldClass = "w-full rounded border-0 bg-transparent py-0.5 outline-none hover:bg-im-surface hover:shadow-[0_0_0_1px_var(--im-line)] focus:bg-im-surface focus:shadow-[0_0_0_1px_var(--im-line)]";
+// slice 37 (step 5): the shared heading field
+const fieldClass = QUIET_TEXT;
 
 export function ProjectHeading({
   workspaceId,

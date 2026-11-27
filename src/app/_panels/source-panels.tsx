@@ -22,7 +22,8 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { SourceColumn, SourceRelationship, SourceTable } from "@/domain/types";
 import { STATUS_LABEL } from "./attribute-panel";
 import { ClassificationsSection, DataVaultReading, SourceNote } from "./classifications";
-import { Actions, buttonClass, dangerClass, Field, Fold, GroupedSelect, Hint, Kind, Li, LongList, smallButtonClass, TypeDot } from "./fields";
+import { Actions, Field, Fold, GroupedSelect, Hint, Kind, Li, LongList, TypeDot } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
@@ -32,6 +33,7 @@ import { attributeLabel, attributeOptions, fedEntities, mappingsOfColumn, tableP
 import { RequirementsSection } from "./requirements-section";
 import { day } from "./import/wizard-model";
 import { ChangesList, SourceDeleteForm } from "./source-changes";
+import { linkChipVariants } from "@/ui/components/chip";
 
 /**
  * “Missing from source since 2026-10-23” (slice 7a; the review's date format); a retired one “Retired: historical since
@@ -105,7 +107,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
         <span data-testid="source-table-kind">
           {KIND_OF[t.object_type](t)} of{" "}
           {system ? (
-            <button type="button" className="rounded-md bg-im-physical-soft px-1.5 py-px text-im-physical" onClick={() => p.goSystem(system.id)} data-testid="button-table-system">
+            <button type="button" className={linkChipVariants({ tone: "physical" })} onClick={() => p.goSystem(system.id)} data-testid="button-table-system">
               {system.name}
             </button>
           ) : (
@@ -217,7 +219,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
         )}
         {p.editable && cardId && missing.length > 0 && (
           <div className="mt-2 flex gap-2">
-            <button type="button" className={smallButtonClass} onClick={() => ui.placeBeside(missing, cardId, "right")} data-testid="button-feed-all">
+            <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => ui.placeBeside(missing, cardId, "right")} data-testid="button-feed-all">
               {missing.length === feeds.length ? "Add all to this canvas" : `Add the ${missing.length} missing to this canvas`}
             </button>
           </div>
@@ -232,17 +234,17 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
       {p.editable && (
         <Actions>
           {cardId ? (
-            <button type="button" className={buttonClass} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
+            <button type="button" className={buttonVariants()} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
               {p.live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas"}
             </button>
           ) : (
             // slice 4b-2, item 16 (prototype add-card): where “Remove from this canvas” stands when the card is not here
-            <button type="button" className={buttonClass} onClick={() => ui.addToCanvas({ sourceTableId: t.id }, columns.length)} data-testid="button-add-card">
+            <button type="button" className={buttonVariants()} onClick={() => ui.addToCanvas({ sourceTableId: t.id }, columns.length)} data-testid="button-add-card">
               Add to this canvas
             </button>
           )}
           {/* what goes with it first, as a change's “Delete…” (slice 7b, D-47, Q7) */}
-          <button type="button" className={dangerClass} onClick={() => setDeleting(true)} disabled={deleting} data-testid="button-delete-table">
+          <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => setDeleting(true)} disabled={deleting} data-testid="button-delete-table">
             Delete table…
           </button>
         </Actions>
@@ -327,7 +329,7 @@ export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
             Marked not needed
           </span>
           {p.editable && (
-            <button type="button" className={smallButtonClass} onClick={markNeeded} data-testid="button-mark-needed">
+            <button type="button" className={buttonVariants({ size: "sm" })} onClick={markNeeded} data-testid="button-mark-needed">
               Mark as needed
             </button>
           )}

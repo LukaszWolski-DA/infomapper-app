@@ -9,7 +9,8 @@ import { createSourceTableAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
-import { buttonClass, inputClass } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
 
 export function NewSourceTableDialog({ workspaceId, systems, onClose }: { workspaceId: string; systems: string[]; onClose: () => void }) {
   const ui = useContext(CanvasUiCtx);
@@ -31,7 +32,7 @@ export function NewSourceTableDialog({ workspaceId, systems, onClose }: { worksp
   const field = (label: string, key: Exclude<keyof typeof form, "columns">, extra?: object) => (
     <label className="block">
       <span className="mb-1 block text-[11.5px] text-im-ink-3">{label}</span>
-      <input value={form[key]} onChange={set(key)} required autoComplete="off" className={inputClass} data-testid={`input-new-table-${key}`} {...extra} />
+      <input value={form[key]} onChange={set(key)} required autoComplete="off" className={inputVariants()} data-testid={`input-new-table-${key}`} {...extra} />
     </label>
   );
 
@@ -61,16 +62,16 @@ export function NewSourceTableDialog({ workspaceId, systems, onClose }: { worksp
               onChange={set("columns")}
               rows={6}
               placeholder={"cust_id int\nemail varchar(255)\namount decimal(18,2)"}
-              className={`${inputClass} resize-y font-mono text-xs`}
+              className={`${inputVariants()} resize-y font-mono text-xs`}
               data-testid="input-new-table-columns"
             />
             <span className="mt-1 block text-[11.5px] text-im-ink-3">A name and a type; lines pasted from CREATE TABLE work too.</span>
           </label>
           <DialogFooter className="mt-2">
-            <button type="button" className={buttonClass} onClick={onClose}>
+            <button type="button" className={buttonVariants()} onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className={`${buttonClass} border-im-map bg-im-map font-medium text-im-surface hover:bg-im-map`} disabled={pending} data-testid="button-create-table">
+            <button type="submit" className={`${buttonVariants()} border-im-map bg-im-map font-medium text-im-surface hover:bg-im-map`} disabled={pending} data-testid="button-create-table">
               Create table
             </button>
           </DialogFooter>

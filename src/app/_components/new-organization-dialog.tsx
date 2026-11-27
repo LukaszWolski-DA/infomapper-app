@@ -11,9 +11,15 @@ import { useToast } from "@/ui/components/toast";
 import { createOrganizationFromMenuAction, previewNewOrganizationAction, type NewOrganizationFormInput } from "../_actions/organization";
 import type { ActionResult } from "../_lib/run-command";
 import { DOC_LANGUAGE_LABEL, DOC_LANGUAGE_OPTIONS } from "@/ui/doc-languages";
+import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
+import { FIELD_LABEL } from "@/ui/components/field";
+import { Select } from "@/ui/components/select";
 
-const input = "h-[30px] w-full rounded-md border border-im-line bg-im-surface px-2 text-[13px]";
-const button = "rounded-md border border-im-line bg-im-surface px-3 py-1.5 text-[13px] hover:bg-im-hover disabled:opacity-50";
+// slice 37 (step 5): the shared field and button
+const input = cn(inputVariants(), "px-2");
+const button = cn(buttonVariants(), "px-3");
 
 const FIELDS: { key: keyof NewOrganizationFormInput; label: string; type?: string }[] = [
   { key: "organizationName", label: "Organization name" },
@@ -93,14 +99,14 @@ export function NewOrganizationDialog({ onClose }: { onClose: () => void }) {
               </label>
             ))}
             <label className="block">
-              <span className="mb-1 block text-im-ink-2">{DOC_LANGUAGE_LABEL}</span>
-              <select data-testid="select-new-organization-workspaceLanguage" className={input} value={form.workspaceLanguage} onChange={(e) => setForm({ ...form, workspaceLanguage: e.target.value })}>
+              <span className={FIELD_LABEL}>{DOC_LANGUAGE_LABEL}</span>
+              <Select data-testid="select-new-organization-workspaceLanguage" value={form.workspaceLanguage} onChange={(e) => setForm({ ...form, workspaceLanguage: e.target.value })}>
                 {DOC_LANGUAGE_OPTIONS.map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             {message && (
               <p role="alert" data-testid="message-start" className="text-im-warn">

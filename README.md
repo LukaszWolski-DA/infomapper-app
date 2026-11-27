@@ -229,6 +229,7 @@ is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at 
 | `npm run lint` | ESLint, including the layer rules (AD-19) |
 | `npm run typecheck` | Route types, then TypeScript (strict) |
 | `npm test` | Vitest unit tests (`src/**/*.test.ts`, `tests/`) |
+| `npm run ui:check -- --label <name>` | Slice 37: the automatic UI check on a dev server (127.0.0.1:3400) and a data file (`.data/ui-check-db.json`) of its own: every screen of its list at 1280, 1440 and 1920 px light and dark and at 390 px, listing overlaps, text out of its control, words run together, targets under 24 px, cut text and pages wider than the screen, with the kinds of control, into `.data/ui-check/<name>-<time>/`; `--only <screens>`, `--widths`, `--themes`, `--url <server>`; `-- --compare <before> <after>` writes a side-by-side page. Not in the e2e run or CI |
 | `npm run e2e` | Playwright end-to-end tests (`e2e/`) in eleven parts by folder (`e2e/parts.ts`), each with its own fresh dev server on port 3200 and `.data/e2e-db.json`, freshly seeded before every test; one merged result (`playwright-report/`), failure traces in `test-results/part-<n>/`. It refuses to start while something listens on port 3200 |
 | `npm run e2e -- --part <n>` | One part on its own; `npm run e2e -- <files or folders>` is one run as before |
 | `npm run e2e -- --list` | Each part's files, as CI runs them (`--part <n>`: one part); starts no server |

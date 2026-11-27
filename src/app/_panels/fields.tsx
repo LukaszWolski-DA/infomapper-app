@@ -8,6 +8,14 @@
 // object and field (`fieldKey`), never by their stored value.
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
+import { buttonVariants } from "@/ui/components/button";
+import { filterChipVariants } from "@/ui/components/chip";
+import { DISCLOSURE_HEADER } from "@/ui/components/disclosure";
+import { Field as UiField } from "@/ui/components/field";
+import { inputVariants, textareaVariants } from "@/ui/components/input";
+import { Segmented } from "@/ui/components/segmented";
+import { Select } from "@/ui/components/select";
+import { cn } from "@/ui/lib/utils";
 import { useToast } from "@/ui/components/toast";
 import { choiceLanded, choiceSettled, choiceShown, FieldDraft, storedBy, versionBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
 import { dropDraft, isGone, keepDraft, markGone, takeDraft, unmarkGone, updateDraft } from "@/ui/field-drafts";
@@ -21,19 +29,14 @@ export const Section = ({ children }: { children: ReactNode }) => (
 
 export const Hint = ({ children }: { children: ReactNode }) => <p className="mt-1 text-im-ink-2">{children}</p>;
 
+/** Slice 37 (F10): the shared field (src/ui/components/field.tsx), its label 12/16 500 in `ink-2`, 12 px above the last. */
 export function Field({ label, children, htmlFor }: { label: string; children: ReactNode; htmlFor?: string }) {
   return (
-    <div className="mt-3">
-      <label htmlFor={htmlFor} className="mb-1 block text-[11.5px] text-im-ink-3">
-        {label}
-      </label>
+    <UiField label={label} htmlFor={htmlFor} className="mt-3">
       {children}
-    </div>
+    </UiField>
   );
 }
-
-export const inputClass =
-  "min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 text-im-ink outline-none focus:border-im-logical disabled:opacity-50 read-only:bg-im-panel";
 
 /**
  * The key of a panel field that shows the field `field` of the object `id`: stable while the object lives, so a save's
@@ -387,14 +390,14 @@ export function DraftLine({ mark, onUse, onKeep, mono, inline }: { mark: DraftMa
         <div data-testid="draft-other">Cleared meanwhile.</div>
       )}
       <div className="mt-1.5 flex flex-wrap gap-1.5">
-        <button type="button" className={smallButtonClass} onClick={onUse} data-testid="button-use-this">
+        <button type="button" className={buttonVariants({ size: "sm" })} onClick={onUse} data-testid="button-use-this">
           Use this
         </button>
-        <button type="button" className={smallButtonClass} onClick={onKeep} data-testid="button-keep-mine">
+        <button type="button" className={buttonVariants({ size: "sm" })} onClick={onKeep} data-testid="button-keep-mine">
           Keep mine
         </button>
         {long && (
-          <button type="button" className={smallButtonClass} onClick={() => setMore((m) => !m)} data-testid="button-draft-more">
+          <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => setMore((m) => !m)} data-testid="button-draft-more">
             {more ? "Show less" : "Show more"}
           </button>
         )}
@@ -403,7 +406,7 @@ export function DraftLine({ mark, onUse, onKeep, mono, inline }: { mark: DraftMa
   );
 }
 
-const inlineButtonClass = "h-[22px] flex-none rounded border border-im-line bg-im-surface px-2 text-xs font-normal text-im-ink hover:bg-im-hover";
+const inlineButtonClass = cn(buttonVariants({ size: "xs" }), "flex-none");
 
 /**
  * The same mark on one row after a field (slice 14b, a canvas's name in its tab, F4): the other value cut to fit, its full
@@ -524,7 +527,7 @@ export function TextField({
         autoComplete="off"
         aria-invalid={invalid ? true : undefined}
         title={invalid || undefined}
-        className={`${inputClass} ${mono ? "font-mono text-xs" : ""} ${invalid ? "border-im-warn" : ""}`}
+        className={cn(inputVariants(), mono && "font-mono text-xs")}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
           keyDown(e);
@@ -572,7 +575,7 @@ export function TextArea({
         {...props}
         ref={bind}
         defaultValue={initial}
-        className={`${inputClass} min-h-[60px] resize-y ${code ? "font-mono text-xs" : ""}`}
+        className={cn(textareaVariants(), code && "font-mono text-xs")}
         onKeyDown={(e) => {
           props.onKeyDown?.(e);
           keyDown(e);
@@ -587,46 +590,8 @@ export function TextArea({
   );
 }
 
-/** Segmented buttons (prototype .seg): one of a few values. */
-export function Seg<V extends string>({
-  value,
-  options,
-  onChange,
-  disabled,
-  testId,
-  columns,
-  labelledBy,
-  describedBy,
-}: {
-  value: V;
-  options: readonly (readonly [V, string])[];
-  onChange: (v: V) => void;
-  disabled?: boolean;
-  testId?: string;
-  /** Slice 19 (prototype .seg.g2): the choices in a grid of two columns. */
-  columns?: 2;
-  /** Slice 28: the group's name and description, by the ids of its label and hint. */
-  labelledBy?: string;
-  describedBy?: string;
-}) {
-  const layout = columns === 2 ? "grid grid-cols-2 gap-0.5" : "inline-flex";
-  return (
-    <div className={`${layout} rounded-[7px] bg-im-hover p-0.5`} role="group" aria-labelledby={labelledBy} aria-describedby={describedBy} data-testid={testId}>
-      {options.map(([v, label]) => (
-        <button
-          key={v}
-          type="button"
-          aria-pressed={v === value}
-          disabled={disabled}
-          onClick={() => v !== value && onChange(v)}
-          className="h-[26px] whitespace-nowrap rounded-[5px] px-2.5 text-im-ink-2 disabled:cursor-not-allowed aria-pressed:bg-im-surface aria-pressed:text-im-ink aria-pressed:shadow-[0_0_0_1px_var(--im-line),0_1px_2px_var(--im-shadow)]"
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
+/** Segmented buttons (prototype .seg): one of a few values. Slice 37: the shared `Segmented`, its props unchanged. */
+export const Seg = Segmented;
 
 /** A flag that toggles (prototype .flag). */
 export function Flag({ on, label, onToggle, disabled }: { on: boolean; label: string; onToggle: () => void; disabled?: boolean }) {
@@ -636,7 +601,7 @@ export function Flag({ on, label, onToggle, disabled }: { on: boolean; label: st
       aria-pressed={on}
       disabled={disabled}
       onClick={onToggle}
-      className="rounded-[14px] border border-im-line bg-im-surface px-2.5 py-[3px] text-im-ink-2 disabled:cursor-not-allowed aria-pressed:border-transparent aria-pressed:bg-im-logical-soft aria-pressed:font-medium aria-pressed:text-im-logical"
+      className={filterChipVariants({ on })}
     >
       {label}
     </button>
@@ -655,12 +620,20 @@ export const List = ({ children, testId }: { children: ReactNode; testId?: strin
   </div>
 );
 
-/** A list row (prototype .li): name, then a muted meta text. Without onClick it is not a button. */
+/**
+ * A list row (prototype .li): name, then a muted meta text. Without onClick it is not a button. Slice 37: a long meta
+ * (a column's attributes, `fname` → `Customer.preferred_contact_…`) is cut with an ellipsis at 60 % of the row, its full
+ * text in its title, so it never runs out of the row.
+ */
 export function Li({ children, meta, onClick, title, testId }: { children: ReactNode; meta?: ReactNode; onClick?: () => void; title?: string; testId?: string }) {
   const body = (
     <>
       <span className="min-w-0 flex-1 truncate">{children}</span>
-      {meta !== undefined && <span className="whitespace-nowrap text-[11.5px] text-im-ink-3">{meta}</span>}
+      {meta !== undefined && (
+        <span className="min-w-0 max-w-[60%] truncate whitespace-nowrap text-[11.5px] text-im-ink-3" title={typeof meta === "string" ? meta : undefined}>
+          {meta}
+        </span>
+      )}
     </>
   );
   const cls = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left";
@@ -680,11 +653,6 @@ export const TypeDot = ({ ok }: { ok: boolean }) => <span className={`size-2.5 f
 
 export const Actions = ({ children }: { children: ReactNode }) => <div className="mt-5 flex flex-wrap gap-2">{children}</div>;
 
-export const buttonClass = "h-8 rounded-md border border-im-line bg-im-surface px-3 text-im-ink hover:bg-im-hover disabled:opacity-50";
-export const smallButtonClass = "h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover";
-export const dangerClass = `${buttonClass} text-im-warn`;
-export const primaryClass = "h-8 rounded-md border border-im-logical bg-im-logical px-3 font-medium text-im-surface disabled:opacity-50";
-
 /** A select with option groups (columns by table). */
 export function GroupedSelect({
   id,
@@ -702,14 +670,7 @@ export function GroupedSelect({
   testId?: string;
 }) {
   return (
-    <select
-      id={id}
-      value=""
-      disabled={disabled}
-      data-testid={testId}
-      className={inputClass}
-      onChange={(e) => e.target.value && onPick(e.target.value)}
-    >
+    <Select id={id} value="" disabled={disabled} data-testid={testId} onChange={(e) => e.target.value && onPick(e.target.value)}>
       <option value="">{placeholder}</option>
       {groups.map((g) => (
         <optgroup key={g.label} label={g.label}>
@@ -720,7 +681,7 @@ export function GroupedSelect({
           ))}
         </optgroup>
       ))}
-    </select>
+    </Select>
   );
 }
 
@@ -780,7 +741,7 @@ export function ConfirmDelete({
     <button
       type="button"
       // armed, the text may name an attribute's copies (slice 10c, F7): the button grows to hold it
-      className={armed ? `${dangerClass.replace("h-8", "min-h-8 py-1.5 text-left")} border-im-warn bg-im-warn-soft` : dangerClass}
+      className={armed ? cn(buttonVariants({ variant: "danger" }), "h-auto min-h-control-md whitespace-normal border-im-warn bg-im-warn-soft py-1.5 text-left") : buttonVariants({ variant: "danger" })}
       data-testid={testId}
       data-armed={armed || undefined}
       onBlur={() => setArmed(false)}
@@ -873,7 +834,7 @@ export function Fold({ title, count, children, testId, openOn, flash, sectionRef
           type="button"
           aria-expanded={!shut}
           onClick={toggle}
-          className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left hover:bg-im-hover hover:text-im-ink"
+          className={DISCLOSURE_HEADER}
         >
           <svg viewBox="0 0 16 16" aria-hidden className={`size-2.5 flex-none fill-none stroke-current stroke-[1.8] transition-transform ${shut ? "-rotate-90" : ""}`}>
             <path d="M4 6l4 4 4-4" />
@@ -915,12 +876,12 @@ export function LongList<T>({
           placeholder={`Filter ${items.length} items…`}
           aria-label="Filter the list"
           data-testid="input-list-filter"
-          className="mb-1.5 h-7 w-full rounded-md border border-im-line bg-im-surface px-2 text-xs outline-none focus:border-im-logical"
+          className={cn(inputVariants({ size: "sm" }), "mb-1.5")}
         />
       )}
       <List testId={testId}>{shown.map(render)}</List>
       {long && !all && !query && hits.length > 20 && (
-        <button type="button" className={`${smallButtonClass} mt-1`} onClick={() => setAll(true)} data-testid="button-show-all">
+        <button type="button" className={`${buttonVariants({ size: "sm" })} mt-1`} onClick={() => setAll(true)} data-testid="button-show-all">
           Show all ({hits.length})
         </button>
       )}

@@ -10,12 +10,13 @@ import { useState } from "react";
 import { changesImport } from "@/canvas/changes-import";
 import { changesOn } from "@/canvas/changes-view";
 import type { SourceSystem } from "@/domain/types";
-import { Fold, Hint, Kind, primaryClass } from "./fields";
+import { Fold, Hint, Kind } from "./fields";
 import { ImportWizard } from "./import/import-wizard";
 import { useImported } from "./import/use-imported";
 import { plural } from "./import/wizard-model";
 import { usePanel } from "./inspector";
 import { ApproveAgainAll, ChangesList } from "./source-changes";
+import { buttonVariants } from "@/ui/components/button";
 
 export function SystemPanel({ system: s }: { system: SourceSystem }) {
   const p = usePanel();
@@ -45,7 +46,7 @@ export function SystemPanel({ system: s }: { system: SourceSystem }) {
       </p>
       {p.editable && p.importData && (
         <div className="mb-1 mt-2.5">
-          <button type="button" className={`${primaryClass} h-[26px] px-[9px] text-xs`} onClick={() => setReimporting(true)} data-testid="button-reimport">
+          <button type="button" className={buttonVariants({ variant: "primary", size: "sm" })} onClick={() => setReimporting(true)} data-testid="button-reimport">
             Re-import {s.name}…
           </button>
         </div>

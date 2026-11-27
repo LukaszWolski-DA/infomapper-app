@@ -112,7 +112,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   return (
     <UndoProvider workspaceId={ws} state={history}>
     <AppShell shell={shell} project={{ view, currentCanvasId: null, tools: <UndoButtons /> }}>
-      <div data-testid="page-project-home" className="min-h-full bg-im-canvas px-[clamp(16px,4vw,48px)] pb-12 pt-7">
+      <div data-testid="page-project-home" className="min-h-full bg-im-surface px-[clamp(16px,4vw,48px)] pb-12 pt-7">
         <div className="mx-auto max-w-[1180px]">
           <div className="mb-1 text-xs text-im-ink-3">Project</div>
           <ProjectHeading workspaceId={ws} project={view.project} editable={view.canEditProject} />

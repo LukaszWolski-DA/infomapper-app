@@ -21,6 +21,8 @@ import { DocumentHtml } from "../ui/document-html";
 import { FigureImages, imagesReady, removeHolders } from "../ui/figure-images";
 import { loadFigureFonts } from "./figure-fonts";
 import { LAYING_OUT, LAYOUT_FAILED, pagesText } from "./paged-view";
+import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
 
 export type PreviewMode = "auto" | "exact" | "quick";
 export type PreviewZoom = "fit" | "0.75" | "1";
@@ -417,4 +419,4 @@ const PREVIEW_CSS = `
 @media print{.im-doc-quick,[data-testid="note-stale"],[data-testid="note-skipped"],[data-testid="note-baseline"]{display:none!important}}
 `;
 
-const smallButton = "h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover disabled:opacity-50";
+const smallButton = cn(buttonVariants({ size: "sm" }), "px-[9px] text-xs");

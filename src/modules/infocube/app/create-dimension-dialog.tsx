@@ -8,7 +8,9 @@
 
 import { useContext, useMemo, useState } from "react";
 import { useAction } from "@/app/_components/use-action";
-import { buttonClass, Field, inputClass, Note, primaryClass } from "@/app/_panels/fields";
+import { Field, Note } from "@/app/_panels/fields";
+import { buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
 import { usePanel } from "@/app/_panels/inspector";
 import { CanvasUiCtx } from "@/canvas/context";
 import { newCardHeight } from "@/canvas/geometry";
@@ -78,12 +80,12 @@ export function CreateDimensionDialog({ entityId, onClose }: { entityId: Uuid; o
         </DialogDescription>
         <div className="mt-3">
           <Field label="Name" htmlFor="dm-name">
-            <input id="dm-name" value={name} onChange={(ev) => setName(ev.target.value)} className={inputClass} data-testid="input-dimension-name" />
+            <input id="dm-name" value={name} onChange={(ev) => setName(ev.target.value)} className={inputVariants()} data-testid="input-dimension-name" />
           </Field>
           {duplicate && <Note warn testId="note-dimension-duplicate">{duplicateNameWarning(typed)}</Note>}
           <div className="mt-2 max-h-[40vh] overflow-auto" data-testid="list-dimension-attributes">
             {attributes.map((a) => (
-              <label key={a.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-im-hover" data-testid="dimension-attribute">
+              <label key={a.id} className="flex min-h-target cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-im-hover" data-testid="dimension-attribute">
                 <input
                   type="checkbox"
                   checked={ticked.has(a.id)}
@@ -105,10 +107,10 @@ export function CreateDimensionDialog({ entityId, onClose }: { entityId: Uuid; o
           </div>
         </div>
         <DialogFooter className="mt-5">
-          <button type="button" className={buttonClass} onClick={onClose}>
+          <button type="button" className={buttonVariants()} onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className={primaryClass} disabled={pending} onClick={() => void create()} data-testid="button-create-dimension">
+          <button type="button" className={buttonVariants({ variant: "primary" })} disabled={pending} onClick={() => void create()} data-testid="button-create-dimension">
             Create dimension
           </button>
         </DialogFooter>

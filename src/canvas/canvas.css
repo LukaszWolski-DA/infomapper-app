@@ -24,9 +24,9 @@
 
 /* ---------- cards (prototype .card / .c-head / .row) ---------- */
 .im-canvas .card { height: 100%; background: var(--im-surface); border-radius: 10px; user-select: none;
-  box-shadow: 0 0 0 1px var(--im-line), 0 1px 2px var(--im-shadow), 0 8px 18px -12px var(--im-shadow) }
+  box-shadow: 0 0 0 1px var(--im-card-line), 0 1px 2px var(--im-shadow), 0 8px 18px -12px var(--im-shadow) }
 .im-canvas .card.src { border-radius: 3px }
-.im-canvas .c-head { height: 54px; padding: 7px 8px 0 14px; position: relative; border-bottom: 1px solid var(--im-line) }
+.im-canvas .c-head { height: 54px; padding: 7px 8px 0 14px; position: relative; border-bottom: 1px solid var(--im-card-line) }
 .im-canvas .card.collapsed .c-head { border-bottom-color: transparent }
 .im-canvas .ent .c-head::before { content: ""; position: absolute; left: 0; top: 0; bottom: -1px; width: 4px; border-radius: 10px 0 0 0; background: var(--cc) }
 .im-canvas .ent.collapsed .c-head::before { border-radius: 10px 0 0 10px }
@@ -47,7 +47,7 @@
 .im-canvas .c-name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; white-space: nowrap }
 .im-canvas .clip-name .c-name { overflow: hidden; text-overflow: ellipsis }
 .im-canvas .src .c-name { font-family: var(--font-plex-mono), ui-monospace, monospace; font-weight: 500; font-size: 13.5px }
-.im-canvas .cov { width: 42px; height: 4px; border-radius: 2px; background: var(--im-line); flex: none }
+.im-canvas .cov { width: 42px; height: 4px; border-radius: 2px; background: var(--im-card-line); flex: none }
 .im-canvas .cov i { display: block; height: 100%; border-radius: 2px; background: var(--im-map) }
 .im-canvas .src .cov i { background: var(--im-physical) }
 .im-canvas .cov-t { font-size: 11px; color: var(--im-ink-3); font-variant-numeric: tabular-nums; flex: none }
@@ -167,7 +167,7 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 .im-canvas .ric.non_functional { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round' stroke-linecap='round'%3E%3Crect x='3.5' y='7' width='9' height='6.5' rx='1'/%3E%3Cpath d='M5.5 7V5a2.5 2.5 0 015 0v2'/%3E%3C/svg%3E") }
 .im-canvas .rq-card .rn { padding: 8px 10px 6px; font-weight: 600; font-size: 13px; line-height: 17px; overflow-wrap: anywhere }
 .im-canvas .rq-card .tri { height: 5px; margin: 0 10px 6px; border-radius: 3px;
-  background: linear-gradient(to right, var(--im-map) 0 var(--a), var(--im-review-strong) var(--a) var(--b), var(--im-line) var(--b) 100%) }
+  background: linear-gradient(to right, var(--im-map) 0 var(--a), var(--im-review-strong) var(--a) var(--b), var(--im-card-line) var(--b) 100%) }
 .im-canvas .rq-card .rf { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 9px; font-size: 11px; color: var(--im-ink-3) }
 .im-canvas .rq-card .st-pill { background: var(--im-req-soft); color: var(--im-req-ink); border-radius: 6px; padding: 1px 6px; font-weight: 500 }
 
@@ -177,10 +177,12 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 
 /* ---------- Overview (prototype .mini) ---------- */
 .im-canvas .overview { margin: 12px; width: 216px; background: var(--im-surface); border-radius: 8px; overflow: hidden; user-select: none;
-  box-shadow: 0 0 0 1px var(--im-line), 0 6px 16px -10px var(--im-shadow) }
-.im-canvas .overview-h { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 4px 0 10px; font-size: 11.5px; color: var(--im-ink-2); border-bottom: 1px solid var(--im-line) }
+  box-shadow: 0 0 0 1px var(--im-card-line), 0 6px 16px -10px var(--im-shadow) }
+.im-canvas .overview-h { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 4px 0 10px; font-size: 11.5px; color: var(--im-ink-2); border-bottom: 1px solid var(--im-card-line) }
 .im-canvas .overview.closed .overview-h { border-bottom: 0 }
 .im-canvas .overview-z { margin-left: auto; color: var(--im-ink-3); font-variant-numeric: tabular-nums }
+/* slice 37 (S37-03): the toggle reaches 24 px; its margin keeps it where it was (22 × 20 before) */
+.im-canvas .overview .ib { height: 24px; min-width: 24px; padding: 0 5px; margin: 0 -1px }
 .im-canvas .overview .ib svg { transition: transform .15s }
 .im-canvas .overview.closed .ib svg { transform: rotate(180deg) }
 .im-canvas .overview-box { position: relative }
@@ -243,7 +245,7 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 .im-canvas path.ltag { fill: none; stroke: var(--im-ink-2); stroke-width: .806; stroke-linejoin: round }
 .im-canvas .dimmed .lnk:not(.hl) .ltag { stroke-opacity: .12; fill-opacity: .12 }
 .im-canvas .rlab { pointer-events: none }
-.im-canvas .rlab rect { fill: var(--im-canvas); stroke: var(--im-line) }
+.im-canvas .rlab rect { fill: var(--im-canvas); stroke: var(--im-card-line) }
 .im-canvas .rlab text, .im-canvas .mult { font: 500 11px var(--font-plex-sans), system-ui, sans-serif; fill: var(--im-ink-2); text-anchor: middle; dominant-baseline: central }
 /* a selection: its lines stay, the others fade (prototype .dimmed .lnk:not(.hl)) */
 .im-canvas .dimmed .lnk:not(.hl) .s,
@@ -269,7 +271,7 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 .im-canvas .row.sel { background: var(--im-logical-soft); box-shadow: inset 3px 0 var(--im-logical) }
 .im-canvas .src .row.sel { background: var(--im-physical-soft); box-shadow: inset 3px 0 var(--im-physical) }
 .im-canvas .react-flow__node.draggable .c-head { cursor: move }
-.im-canvas .react-flow__node.dragging .card { box-shadow: 0 0 0 1px var(--im-line), 0 18px 36px -14px var(--im-shadow) }
+.im-canvas .react-flow__node.dragging .card { box-shadow: 0 0 0 1px var(--im-card-line), 0 18px 36px -14px var(--im-shadow) }
 
 /* ---------- mapping by drag (slice 1b, D-48; prototype .tmp, .row.drop, .card.drop, body.connecting) ---------- */
 .im-canvas .draft-layer .tmp { fill: none; stroke: var(--im-ink-2); stroke-width: 1.6; stroke-dasharray: 4 4 }
@@ -288,7 +290,7 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 
 /* ---------- card width (slice 1b, D-37, C-09; prototype .c-rs) ---------- */
 .im-canvas .c-rs { position: absolute; top: 0; bottom: 0; right: -4px; width: 8px; cursor: ew-resize; z-index: 3 }
-.im-canvas .c-rs::after { content: ""; position: absolute; top: 50%; right: 3px; width: 3px; height: 28px; margin-top: -14px; border-radius: 2px; background: var(--im-line); visibility: hidden }
+.im-canvas .c-rs::after { content: ""; position: absolute; top: 50%; right: 3px; width: 3px; height: 28px; margin-top: -14px; border-radius: 2px; background: var(--im-card-line); visibility: hidden }
 .im-canvas .card:hover .c-rs::after, .im-canvas .c-rs:hover::after { visibility: visible }
 /* While a card is resized, Chrome repaints that card instead of re-rastering the whole layer (spike follow-up, C-09). */
 .im-canvas.resizing .react-flow__viewport { will-change: auto }
@@ -364,7 +366,7 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 .im-canvas .page-outline .pg { position: absolute; box-sizing: border-box; border: 2px dashed color-mix(in srgb, var(--im-logical) 70%, transparent); border-radius: 2px }
 .im-canvas .page-outline .pg.more { border-color: color-mix(in srgb, var(--im-warn) 55%, transparent); border-width: 1.5px }
 .im-canvas .page-outline .pg.ok { border-color: color-mix(in srgb, var(--im-map) 75%, transparent) }
-.im-canvas .page-outline .pg::before { content: attr(data-label); position: absolute; left: -2px; bottom: 100%; margin-bottom: 4px; font: 500 13px var(--font-plex-sans), sans-serif; color: var(--im-ink-2); white-space: nowrap; background: var(--im-surface); padding: 1px 8px; border-radius: 6px; box-shadow: 0 0 0 1px var(--im-line) }
+.im-canvas .page-outline .pg::before { content: attr(data-label); position: absolute; left: -2px; bottom: 100%; margin-bottom: 4px; font: 500 13px var(--font-plex-sans), sans-serif; color: var(--im-ink-2); white-space: nowrap; background: var(--im-surface); padding: 1px 8px; border-radius: 6px; box-shadow: 0 0 0 1px var(--im-card-line) }
 .im-canvas .page-outline .pg.more::before { font-size: 12px; color: var(--im-ink-3) }
 .im-canvas .im-frame { position: absolute; border-radius: 16px; pointer-events: all; cursor: move; box-sizing: border-box;
   border: 1.5px solid color-mix(in srgb, var(--fc) 50%, transparent); background: color-mix(in srgb, var(--fc) 7%, transparent) }
@@ -378,7 +380,7 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 .im-canvas .f-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--fc) }
 .im-canvas .im-frame.free .f-dot { border-radius: 50% }
 .im-canvas .f-chip { font-size: 11px; white-space: nowrap; color: var(--im-ink-2); background: var(--im-surface); border-radius: 10px; padding: 1px 8px;
-  box-shadow: 0 0 0 1px var(--im-line) }
+  box-shadow: 0 0 0 1px var(--im-card-line) }
 .im-canvas .f-chip.w { color: var(--im-warn) }
 .im-canvas .f-chip.m { color: var(--im-physical) }
 .im-canvas .f-rs { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; border-radius: 4px; pointer-events: all; cursor: nwse-resize;
@@ -408,8 +410,8 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 /* A collapsed frame's block (slice 2c, D-07; prototype .fblock, .b-body, .brow, .b-foot): a card with a stack behind
    it, in the frame's colour. No opacity (AD-24); its text scales with the canvas like a card's. */
 .im-canvas .card.fblock { border-radius: 12px; overflow: hidden;
-  box-shadow: 0 0 0 1px var(--im-line), 4px 4px 0 -1px var(--im-surface), 4px 4px 0 0 var(--im-line), 8px 8px 0 -1px var(--im-surface), 8px 8px 0 0 var(--im-line), 0 12px 24px -12px var(--im-shadow) }
-.im-canvas .card.fblock.sel { box-shadow: 0 0 0 2px var(--fc), 4px 4px 0 -1px var(--im-surface), 4px 4px 0 0 var(--im-line), 8px 8px 0 -1px var(--im-surface), 8px 8px 0 0 var(--im-line), 0 12px 24px -12px var(--im-shadow) }
+  box-shadow: 0 0 0 1px var(--im-card-line), 4px 4px 0 -1px var(--im-surface), 4px 4px 0 0 var(--im-card-line), 8px 8px 0 -1px var(--im-surface), 8px 8px 0 0 var(--im-card-line), 0 12px 24px -12px var(--im-shadow) }
+.im-canvas .card.fblock.sel { box-shadow: 0 0 0 2px var(--fc), 4px 4px 0 -1px var(--im-surface), 4px 4px 0 0 var(--im-card-line), 8px 8px 0 -1px var(--im-surface), 8px 8px 0 0 var(--im-card-line), 0 12px 24px -12px var(--im-shadow) }
 .im-canvas .fblock .c-head { background: color-mix(in srgb, var(--fc) 10%, var(--im-surface)); cursor: move }
 .im-canvas .fblock .c-head::before { content: ""; position: absolute; left: 0; top: 0; bottom: -1px; width: 4px; background: var(--fc) }
 .im-canvas .fblock .b-body { padding: 6px 0 }
@@ -422,15 +424,15 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 .im-canvas .fblock .brow .dt { color: var(--im-ink-3); font-size: 11px; font-variant-numeric: tabular-nums }
 .im-canvas .fblock .brow.more, .im-canvas .fblock .brow.none { color: var(--im-ink-3); cursor: default }
 .im-canvas .fblock .brow.more:hover, .im-canvas .fblock .brow.none:hover { background: transparent }
-.im-canvas .fblock .b-foot { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-top: 1px solid var(--im-line); overflow: hidden }
+.im-canvas .fblock .b-foot { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-top: 1px solid var(--im-card-line); overflow: hidden }
 .im-canvas .overview-svg .mb { fill-opacity: .35; stroke: none }
 
 /* The drop's concept question (slice 2b; prototype #ask) */
 .im-canvas .concept-ask { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 8px;
   width: max-content; max-width: min(680px, 94%); background: var(--im-surface); border-radius: 10px; padding: 10px 10px 10px 14px;
-  box-shadow: 0 0 0 1px var(--im-line), 0 12px 30px -12px var(--im-shadow) }
+  box-shadow: 0 0 0 1px var(--im-card-line), 0 12px 30px -12px var(--im-shadow) }
 .im-canvas .concept-ask span { flex: 1; font-size: 12.5px }
-.im-canvas .concept-ask button { height: 26px; padding: 0 9px; border-radius: 6px; font-size: 12px; white-space: nowrap; border: 1px solid var(--im-line); background: var(--im-surface); color: var(--im-ink) }
+.im-canvas .concept-ask button { height: 26px; padding: 0 9px; border-radius: 6px; font-size: 12px; white-space: nowrap; border: 1px solid var(--im-card-line); background: var(--im-surface); color: var(--im-ink) }
 .im-canvas .concept-ask button:hover { background: var(--im-hover) }
 .im-canvas .concept-ask .ask-yes { background: var(--im-logical); border-color: var(--im-logical); color: #fff }
 .im-canvas .concept-ask .ask-yes:hover { background: color-mix(in srgb, var(--im-logical) 88%, black) }

@@ -11,9 +11,11 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { useReactFlow, useStore } from "@xyflow/react";
 import { CanvasUiCtx } from "./context";
 import { typedZoom, zoomAround } from "./geometry";
+import { QUIET_FIELD } from "@/ui/components/input";
+import { cn } from "@/ui/lib/utils";
+import { toolButtonVariants } from "@/ui/components/tool-button";
 
-const btn =
-  "inline-flex h-[30px] items-center rounded-md px-1.5 text-im-ink-2 hover:bg-im-hover hover:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical";
+const btn = cn(toolButtonVariants(), "px-1.5");
 const svg = "size-4 fill-none stroke-current stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]";
 
 export function ZoomControls() {
@@ -62,7 +64,7 @@ export function ZoomControls() {
         spellCheck={false}
         aria-label="Zoom"
         title="Type a zoom and press Enter"
-        className="h-[26px] w-[44px] rounded bg-transparent px-0 text-center text-im-ink-2 tabular-nums outline-none hover:bg-im-hover focus:bg-im-surface focus:text-im-ink focus:shadow-[0_0_0_1px_var(--im-line)]"
+        className={cn(QUIET_FIELD, "w-[44px] px-0 text-center tabular-nums")}
         data-testid="value-zoom"
         value={draft ?? shown}
         onFocus={(e) => {

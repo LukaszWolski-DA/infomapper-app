@@ -31,7 +31,7 @@ export function ThemeChoice({ headingClass }: { headingClass: string }) {
         }}
         aria-labelledby={id}
         data-testid="seg-theme"
-        className="mx-1.5 mb-1 flex rounded-[7px] bg-im-hover p-0.5"
+        className="mx-1.5 mb-1 flex rounded-md bg-im-hover p-0.5"
       >
         {THEME_OPTIONS.map(([value, label]) => (
           <DropdownMenuPrimitive.RadioItem
@@ -39,7 +39,7 @@ export function ThemeChoice({ headingClass }: { headingClass: string }) {
             value={value}
             onSelect={(e) => e.preventDefault()}
             data-testid={`theme-${value}`}
-            className="flex h-[26px] flex-1 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-[5px] px-2 text-im-ink-2 outline-none data-[highlighted]:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical/50 aria-checked:bg-im-surface aria-checked:text-im-ink aria-checked:shadow-[0_0_0_1px_var(--im-line),0_1px_2px_var(--im-shadow)]"
+            className="flex h-[26px] flex-1 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-[6px] px-2 text-im-ink-2 outline-none data-[highlighted]:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical/50 aria-checked:bg-im-surface aria-checked:text-im-ink aria-checked:shadow-[0_0_0_1px_var(--im-line),0_1px_2px_var(--im-shadow)]"
           >
             {label}
           </DropdownMenuPrimitive.RadioItem>

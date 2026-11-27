@@ -23,30 +23,9 @@ import { checkMappingTypes } from "@/domain/model/type-check";
 import { LOGICAL_TYPES, type Attribute, type LogicalType } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
-import {
-  Actions,
-  attributeDeleteParts,
-  ConfirmDelete,
-  dangerClass,
-  Field,
-  Flag,
-  GroupedSelect,
-  Hint,
-  fieldKey,
-  inputClass,
-  Kind,
-  Li,
-  Note,
-  Fold,
-  LongList,
-  smallButtonClass,
-  TextField,
-  TypeDot,
-  useChoice,
-  useDraft,
-  DraftLine,
-  type FieldSave,
-} from "./fields";
+import { Actions, attributeDeleteParts, ConfirmDelete, Field, Flag, GroupedSelect, Hint, fieldKey, Kind, Li, Note, Fold, LongList, TextField, TypeDot, useChoice, useDraft, DraftLine, type FieldSave } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { useMoveAttribute } from "./move-attribute";
@@ -54,6 +33,9 @@ import { attributeLabel, businessKeyHint, columnLabel, columnOptions, inputColum
 import { usePanels } from "./panels-context";
 import { RequirementsSection } from "./requirements-section";
 import { ChecksBox } from "./checks-box";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { linkChipVariants } from "@/ui/components/chip";
+import { Select } from "@/ui/components/select";
 
 export const STATUS_LABEL = { draft: "Draft", review: "In review", approved: "Approved" } as const;
 
@@ -157,7 +139,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         Attribute of{" "}
         <button
           type="button"
-          className="rounded-md bg-im-logical-soft px-1.5 py-px text-im-logical"
+          className={linkChipVariants()}
           onClick={() => p.goEntity(a.entity_id)}
           data-testid="link-attribute-entity"
         >
@@ -179,16 +161,16 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
           </span>
           {p.editable && (
             <>
-              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move to the top (Ctrl Shift ↑)" aria-label="Move to the top" disabled={position === 1} onClick={() => void move(a.id, "top")}>
+              <button type="button" className={iconButtonVariants()} title="Move to the top (Ctrl Shift ↑)" aria-label="Move to the top" disabled={position === 1} onClick={() => void move(a.id, "top")}>
                 ⤒
               </button>
-              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move up (Ctrl ↑)" aria-label="Move up" disabled={position === 1} onClick={() => void move(a.id, "up")}>
+              <button type="button" className={iconButtonVariants()} title="Move up (Ctrl ↑)" aria-label="Move up" disabled={position === 1} onClick={() => void move(a.id, "up")}>
                 ↑
               </button>
-              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move down (Ctrl ↓)" aria-label="Move down" disabled={position === siblings.length} onClick={() => void move(a.id, "down")}>
+              <button type="button" className={iconButtonVariants()} title="Move down (Ctrl ↓)" aria-label="Move down" disabled={position === siblings.length} onClick={() => void move(a.id, "down")}>
                 ↓
               </button>
-              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move to the bottom (Ctrl Shift ↓)" aria-label="Move to the bottom" disabled={position === siblings.length} onClick={() => void move(a.id, "bottom")}>
+              <button type="button" className={iconButtonVariants()} title="Move to the bottom (Ctrl Shift ↓)" aria-label="Move to the bottom" disabled={position === siblings.length} onClick={() => void move(a.id, "bottom")}>
                 ⤓
               </button>
             </>
@@ -210,7 +192,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
           )}
           {p.editable && (
             <div className="mt-2">
-              <button type="button" className={smallButtonClass} onClick={() => void save({ stopFollowing: true })} data-testid="button-stop-following">
+              <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => void save({ stopFollowing: true })} data-testid="button-stop-following">
                 Stop following
               </button>
             </div>
@@ -221,12 +203,12 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       <Field label="Data type" htmlFor="f-at">
         {/* the parameters sit next to the type, and wrap under it when the panel is narrow */}
         <div className="flex flex-wrap gap-2" data-testid="field-attribute-type">
-          <select
+          <Select
             key={fieldKey(a.id, "type")}
             id="f-at"
             value={dataType.value}
             disabled={!followEditable}
-            className={`${inputClass} min-w-[120px] flex-1 basis-[120px]`}
+            className="min-w-[120px] flex-1 basis-[120px]"
             data-testid="select-attribute-type"
             onChange={(e) => dataType.choose(e.target.value as LogicalType)}
           >
@@ -235,7 +217,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
                 {t}
               </option>
             ))}
-          </select>
+          </Select>
           {a.data_type === "string" && (
             <ParamField key={fieldKey(a.id, "length")} version={a.version} label="Length" value={a.type_length} disabled={!followEditable} onSave={(n) => saveType({ length: n })} testId="input-type-length" />
           )}
@@ -277,7 +259,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
           source. Is {a.name} a business key too?
           {p.editable && (
             <div className="mt-2">
-              <button type="button" className={smallButtonClass} onClick={() => void save({ isBusinessKey: true })} data-testid="button-accept-bk">
+              <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => void save({ isBusinessKey: true })} data-testid="button-accept-bk">
                 Mark as business key
               </button>
             </div>
@@ -372,7 +354,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
               testId="button-delete-attribute"
             />
           ) : (
-            <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-attribute">
+            <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => void remove()} data-testid="button-delete-attribute">
               Delete attribute
             </button>
           )}
@@ -420,7 +402,7 @@ function ParamField({
       disabled={disabled}
       data-testid={testId}
       // 84 px, not the input's usual full width (which made the type's parameters run out of the panel)
-      className={`${inputClass.replace("w-full", "w-[84px]")} flex-none`}
+      className={`${inputVariants().replace("w-full", "w-[84px]")} flex-none`}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
         keyDown(e);

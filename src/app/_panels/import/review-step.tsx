@@ -12,6 +12,9 @@
 // classifications", ticked by default, the unticked ones sent with the choices.
 
 import { useState } from "react";
+import { filterChipVariants } from "@/ui/components/chip";
+import { Select } from "@/ui/components/select";
+import { cn } from "@/ui/lib/utils";
 import { formatColumnType } from "@/domain/model/type-check";
 import type { ClassificationHint, ImportPlan, PlanColumn, PlanTable } from "@/domain/import/plan";
 import { isDataVault } from "@/domain/model/classifications";
@@ -196,10 +199,11 @@ export function ReviewStep({
       <div className="col-span-full flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-md bg-im-logical-soft px-2.5 py-1.5 md:col-start-2">
         <label className="flex items-center gap-1.5">
           What happened to <b className="font-mono">{r.from}</b>?
-          <select
+          <Select
+            size="sm"
             value={r.choice}
             onChange={(e) => set({ renames: new Map(s.renames).set(r.key, e.target.value) })}
-            className="rounded-md border border-im-line bg-im-surface px-2 py-1"
+            className="w-auto"
             data-testid="select-rename"
             data-key={r.key}
           >
@@ -210,7 +214,7 @@ export function ReviewStep({
                 {o === r.suggested ? " (suggested: same position and type)" : ""}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <span className="text-im-ink-3">A rename keeps its mappings, classifications and notes.</span>
       </div>
@@ -268,7 +272,7 @@ export function ReviewStep({
             type="button"
             aria-pressed={F === k}
             onClick={() => set({ filter: k })}
-            className={`inline-flex h-[30px] items-center gap-1.5 rounded-[15px] border px-2.5 ${F === k ? "border-im-logical bg-im-logical-soft text-im-logical" : "border-im-line bg-im-surface text-im-ink-2"}`}
+            className={cn(filterChipVariants({ on: F === k }), "gap-1.5 px-2.5")}
             data-testid={`filter-${k}`}
           >
             <b className={F === k ? "text-im-logical" : "text-im-ink"}>{v.toLocaleString("en-GB")}</b> {label}

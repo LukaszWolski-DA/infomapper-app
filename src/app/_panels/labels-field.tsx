@@ -14,6 +14,9 @@ import { useAction } from "@/app/_components/use-action";
 import type { Uuid } from "@/domain/ids";
 import { labelItemCounts, labelSuggestions, marks, normalizeLabelName, type LabelTarget } from "@/domain/model/labels";
 import type { Label, LabelLink } from "@/domain/types";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { MENU_CONTENT, MENU_ITEM } from "@/ui/components/menu";
+import { cn } from "@/ui/lib/utils";
 import { Field } from "./fields";
 
 /** How the × names the item: “Remove from this {noun}”. */
@@ -103,7 +106,7 @@ export function LabelsField({ workspaceId, target, labels, links, editable, onOp
   return (
     <Field label="Labels" htmlFor={editable ? "f-labels" : undefined}>
       <div
-        className={`flex min-h-[34px] flex-wrap items-center gap-1.5 rounded-md border border-im-line bg-im-surface px-1.5 py-1 ${editable ? "cursor-text focus-within:outline-2 focus-within:-outline-offset-1 focus-within:outline-im-logical" : ""}`}
+        className={cn("flex min-h-[34px] flex-wrap items-center gap-1.5 rounded-md border border-im-line-control bg-im-surface px-1.5 py-1", editable && "cursor-text focus-within:border-im-logical focus-within:ring-3 focus-within:ring-im-logical-soft")}
         data-testid="field-labels"
         onPointerDown={(e) => {
           if (editable && e.target === e.currentTarget) {
@@ -115,7 +118,7 @@ export function LabelsField({ workspaceId, target, labels, links, editable, onOp
         {mine.map(({ link, label }) => (
           <span
             key={link.id}
-            className="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-xl border border-dashed border-im-ink-3 bg-im-hover pl-[7px] pr-0.5 text-xs text-im-ink"
+            className="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-xl border border-dashed border-im-ink-3 bg-im-hover pl-[7px] text-xs text-im-ink"
             data-testid="chip-label"
             data-label={label.name}
           >
@@ -128,7 +131,7 @@ export function LabelsField({ workspaceId, target, labels, links, editable, onOp
             {editable ? (
               <button
                 type="button"
-                className="size-[18px] rounded-full p-0 text-sm leading-none text-im-ink-3 hover:bg-im-line hover:text-im-ink"
+                className={cn(iconButtonVariants({ size: "xs" }), "-my-px rounded-full text-sm leading-none text-im-ink-3")}
                 aria-label={`Remove label ${label.name}`}
                 title={`Remove from this ${NOUN[target.kind]}`}
                 onClick={() => void remove(link)}
@@ -151,7 +154,7 @@ export function LabelsField({ workspaceId, target, labels, links, editable, onOp
             spellCheck={false}
             aria-autocomplete="list"
             aria-controls="f-labels-suggestions"
-            className="min-w-[120px] flex-1 border-0 bg-transparent px-0.5 py-[3px] outline-none"
+            className="min-w-[120px] flex-1 bg-transparent px-0.5 py-[3px] outline-none"
             data-testid="input-label"
             onChange={(e) => {
               setText(e.target.value);
@@ -172,7 +175,7 @@ export function LabelsField({ workspaceId, target, labels, links, editable, onOp
         <div
           id="f-labels-suggestions"
           role="listbox"
-          className="mt-1 flex flex-col rounded-lg bg-im-surface p-1 shadow-[0_0_0_1px_var(--im-line),0_10px_24px_-12px_var(--im-shadow)]"
+          className={cn("mt-1 flex flex-col", MENU_CONTENT)}
           data-testid="list-label-suggestions"
         >
           {items.map((it, i) => (
@@ -182,7 +185,7 @@ export function LabelsField({ workspaceId, target, labels, links, editable, onOp
               role="option"
               aria-selected={i === at}
               tabIndex={-1}
-              className={`flex items-center gap-2 rounded-[5px] px-2 py-1.5 text-left text-im-ink hover:bg-im-hover ${i === at ? "bg-im-hover" : ""}`}
+              className={cn(MENU_ITEM, "px-2 py-1.5 text-im-ink", i === at && "bg-im-hover")}
               data-testid="option-label"
               data-kind={it.kind}
               onPointerDown={(e) => {

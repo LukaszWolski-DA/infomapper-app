@@ -655,6 +655,16 @@ and undoes with Ctrl+Z. Idea in `docs/ideas.md` (“A top bar that fits narrow w
 
 - **Found** in slice 5a, step 2; left for a later slice. **Later:** not planned yet.
 
+### The working context's name at 1,201–1,250 px (slice 37)
+
+With the working context on, from 1,201 to 1,250 px the top bar leaves the context's button about 30 px: its label
+("Working on CR-23") is cut by the browser to the icon alone, and the context's name shows only in the button's tooltip
+(its title). From 1,300 px up the label keeps at least 40 px. Before slice 37 the label kept 40 px by running out of its
+button; slice 37 keeps it inside (step 4) and S16-08 checks that (step 8, Łukasz's choice).
+
+- **Found** in slice 37, step 8 (the full run's S16-08). **Later:** slice 38 gives the label at least 40 px again at
+  every width, once the canvas's controls leave the top bar.
+
 ### The status bar has no “Open notes on canvas {n}”
 
 **Closed in slice 6a** ([PRD](prd/slice-06a-view-state-bar.md), [acceptance](prd/slice-06a-acceptance.md)): the status bar follows Requirements with “Open notes on canvas {n}”, counting open
@@ -668,6 +678,11 @@ stops at Requirements and the working context (`src/app/_panels/status-bar.tsx`)
 ## Text contrast (slice 4b-1, step 6)
 
 ### Grey text and two tags are below WCAG AA on a plain card
+
+**Mostly closed in slice 37** (D-89, [acceptance](prd/slice-37-acceptance.md)): `--im-ink-3` is #667383, 4.8:1 on white
+(dark #8a96a6, 5.1:1 on `im-surface`), and the PII tag (`--im-warn` #b33c0b on `--im-warn-soft`) 5.0:1. **Still open:**
+the BK tag, `--im-physical` on `--im-physical-soft`, 4.07:1 (an idea in `docs/ideas.md`, with the physical colours). The
+text below is kept as it was written.
 
 Found while checking the text under slice 4b-1's coverage colours (step 6). On a plain white card, three texts are
 below WCAG AA's 4.5:1 for normal text, with or without any tint:

@@ -10,7 +10,8 @@ import { useModules } from "@/app/_components/modules";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { CardinalityMax, CardinalityMin, Relationship } from "@/domain/types";
-import { Actions, buttonClass, ConfirmDelete, dangerClass, Field, fieldKey, Kind, Seg, TextField } from "./fields";
+import { Actions, ConfirmDelete, Field, fieldKey, Kind, Seg, TextField } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { PANEL_SECTIONS } from "@/compose/panels";
 import { usePanel } from "./inspector";
 import { ChecksBox } from "./checks-box";
@@ -147,7 +148,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
         <Actions>
           <button
             type="button"
-            className={buttonClass}
+            className={buttonVariants()}
             data-testid="button-swap-relationship"
             onClick={() => void saveRow(r, (v) => swapRelationshipAction(p.workspaceId, ref(v)))}
           >
@@ -157,7 +158,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
             // slice 18 (F14): with lookups through it, a second click that says what they lose
             <ConfirmDelete label="Delete relationship" then={lookups.join("; ")} onConfirm={() => void remove()} testId="button-delete-relationship" />
           ) : (
-            <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-relationship">
+            <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => void remove()} data-testid="button-delete-relationship">
               Delete relationship
             </button>
           )}

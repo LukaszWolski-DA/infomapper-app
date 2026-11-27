@@ -8,7 +8,8 @@
 import { useContext } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
-import { List, Section, smallButtonClass } from "./fields";
+import { List, Section } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { NoteRow } from "./note-row";
 
@@ -30,7 +31,7 @@ export function NotesHere({ pin }: { pin: { cardId: Uuid } | { frameId: Uuid } }
       )}
       {p.canNote && (
         <div className="mt-1.5">
-          <button type="button" className={smallButtonClass} onClick={() => ui.newNote(pin)} data-testid="button-add-note">
+          <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => ui.newNote(pin)} data-testid="button-add-note">
             Add a note
           </button>
         </div>

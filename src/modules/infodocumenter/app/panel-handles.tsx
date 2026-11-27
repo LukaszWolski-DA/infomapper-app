@@ -19,6 +19,8 @@
 import { useRef, useState, type RefObject } from "react";
 import { PANEL_LIMITS, clampWidth, formatSidePanelsCookie, type PanelSide } from "@/ui/side-panels-cookie";
 import { DOC_PANELS_COOKIE_MAX_AGE, docPanelsCookieName, type DocPanels } from "../ui/panels-cookie";
+import { cn } from "@/ui/lib/utils";
+import { toolButtonVariants } from "@/ui/components/tool-button";
 
 export const HANDLE_TEXTS = {
   left: "Width of the sections panel",
@@ -88,7 +90,7 @@ export function PanelToggle({ side, panels }: { side: PanelSide; panels: DocPane
       aria-controls={side === "left" ? "editor-left" : "editor-right"}
       data-testid={side === "left" ? "button-toggle-sections" : "button-toggle-options"}
       onClick={() => panels.toggle(side)}
-      className="inline-flex h-[30px] flex-none items-center rounded-md px-2 text-im-ink-2 hover:bg-im-hover hover:text-im-ink aria-pressed:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
+      className={cn(toolButtonVariants({ tone: "plain" }), "h-control-sm px-2")}
     >
       <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden>
         <rect x="1.5" y="2.5" width="13" height="11" rx="2" />

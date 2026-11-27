@@ -49,7 +49,9 @@
     ".next-demo/types/**/*.ts",
     ".next-demo/dev/types/**/*.ts",
     ".next-pg/types/**/*.ts",
-    ".next-pg/dev/types/**/*.ts"
+    ".next-pg/dev/types/**/*.ts",
+    ".next-ui-check/types/**/*.ts",
+    ".next-ui-check/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

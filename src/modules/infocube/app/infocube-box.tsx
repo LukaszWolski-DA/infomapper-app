@@ -11,6 +11,7 @@ import { updateWorkspaceSettingsAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
 import { useChoice } from "@/app/_panels/fields";
 import { CubeIcon } from "../ui/cube-icon";
+import { CHECK_LABEL } from "@/ui/components/check";
 
 export const INFOCUBE_BOX_TEXT =
   "Dimensional modelling on top of the logical model: facts, dimensions, and mappings from logical attributes. It can be turned off only while the workspace has no facts or dimensions.";
@@ -48,7 +49,7 @@ export function InfoCubeBox({ workspaceId, version, on, licensed, organizationNa
         InfoCube
       </h4>
       <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2">{INFOCUBE_BOX_TEXT}</p>
-      <label className="flex items-center gap-2">
+      <label className={CHECK_LABEL}>
         <input
           type="checkbox"
           data-testid="checkbox-infocube"

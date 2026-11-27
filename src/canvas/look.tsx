@@ -14,6 +14,8 @@ import { useToast } from "@/ui/components/toast";
 import { rowSaves } from "@/ui/row-saves";
 import { DEFAULT_CANVAS_LOOK, OUTLINE_PAPERS, OUTLINE_PT, type CanvasLook, type PageOutline } from "@/domain/types";
 import { applyLookPatch, HIDDEN_RELATIONSHIP_KEYS, type CanvasLookPatch } from "@/domain/model/canvas-look";
+import { cn } from "@/ui/lib/utils";
+import { SEGMENTED_BUTTON, SEGMENTED_TRACK } from "@/ui/components/segmented";
 
 export type LookPatch = CanvasLookPatch;
 
@@ -134,8 +136,7 @@ export function LookFrame({ className, children }: { className?: string; childre
   );
 }
 
-const segClass =
-  "h-[26px] flex-1 whitespace-nowrap rounded-[5px] px-2 text-im-ink-2 aria-pressed:bg-im-surface aria-pressed:text-im-ink aria-pressed:shadow-[0_0_0_1px_var(--im-line),0_1px_2px_var(--im-shadow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical";
+const segClass = cn(SEGMENTED_BUTTON, "flex-1 px-2");
 
 /** Background swatches and the grid choice (prototype lookControls, gridControls), for the tab menu and the panel. */
 export function LookControls({
@@ -171,7 +172,7 @@ export function LookControls({
     );
   }
   return (
-    <div className="flex rounded-[7px] bg-im-hover p-0.5" role="group" aria-label="Grid" data-testid="group-canvas-grid">
+    <div className={cn("flex", SEGMENTED_TRACK)} role="group" aria-label="Grid" data-testid="group-canvas-grid">
       {GRIDS.map(([value, label]) => (
         <button key={value} type="button" aria-pressed={look.grid === value} data-grid={value} onClick={() => onChange({ grid: value })} className={segClass}>
           {label}
@@ -191,7 +192,7 @@ export function PageOutlineControls({ outline, onChange }: { outline: PageOutlin
   const on = outline ?? null;
   const set = (patch: Partial<PageOutline>) => onChange({ pageOutline: { ...(on ?? DEFAULT_OUTLINE), ...patch } });
   const seg = (label: string, testId: string, items: readonly (readonly [string, string, boolean, () => void])[]) => (
-    <div className="flex rounded-[7px] bg-im-hover p-0.5" role="group" aria-label={label} data-testid={testId}>
+    <div className={cn("flex", SEGMENTED_TRACK)} role="group" aria-label={label} data-testid={testId}>
       {items.map(([key, text, pressed, pick]) => (
         <button key={key} type="button" aria-pressed={pressed} data-value={key} onClick={pick} className={segClass}>
           {text}

@@ -11,6 +11,10 @@ import type { useAction } from "@/app/_components/use-action";
 import { TextField, useChoice } from "@/app/_panels/fields";
 import { uuidv7 } from "@/domain/ids";
 import { newFigure, type FigureEntry } from "@/domain/document/figure-entry";
+import { cn } from "@/ui/lib/utils";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { buttonVariants } from "@/ui/components/button";
+import { Select } from "@/ui/components/select";
 
 type Answer = ReturnType<ReturnType<typeof useAction>["saveRow"]>;
 
@@ -76,8 +80,9 @@ export function figureEditorName(f: Pick<FigureEntry, "canvasId" | "frameId">, s
   return `${canvas.name} · ${sources.find((s) => s.frameId === f.frameId)?.name ?? FIGURE_TEXTS.noFrame}`;
 }
 
-const selectClass = "h-7 min-w-0 flex-1 rounded-md border border-im-line bg-im-surface px-1.5 text-[12px] text-im-ink";
-const iconButton = "grid h-6 w-6 place-items-center rounded-md text-im-ink-3 hover:bg-im-hover hover:text-im-ink disabled:opacity-40";
+// slice 37 (step 6): the shared select (28 px) and icon button (24 px in a figure's row)
+const selectClass = "min-w-0 flex-1 px-1.5 text-[12px]";
+const iconButton = cn(iconButtonVariants({ size: "xs" }), "text-im-ink-3");
 
 export function FigureEditor(props: {
   sectionId: string;
@@ -120,7 +125,8 @@ export function FigureEditor(props: {
       {figures.map((f, i) => {
         const name = figureEditorName(f, sources);
         const sel = <K extends "view" | "size" | "orientation" | "rows">(key: K, items: readonly (readonly [string, string])[]) => (
-          <select
+          <Select
+              size="sm"
             data-testid={`select-figure-${key}`}
             aria-label={FIGURE_TEXTS.names[key]}
             className={selectClass}
@@ -133,7 +139,7 @@ export function FigureEditor(props: {
                 {l}
               </option>
             ))}
-          </select>
+          </Select>
         );
         return (
           // slice 28 (F6): each class a whole word of its own; `p-2${…}` was one token for Tailwind's scanner, never generated
@@ -207,17 +213,17 @@ export function FigureEditor(props: {
       {!figures.length && <div className="text-[11.5px] text-im-ink-3">{FIGURE_TEXTS.none}</div>}
       {!readOnly && sources.length > 0 && (
         <div className="mt-2 flex gap-1.5">
-          <select data-testid="select-figure-add" aria-label={FIGURE_TEXTS.add} className={selectClass} value={pick} onChange={(e) => setPick(Number(e.currentTarget.value))}>
+          <Select size="sm" data-testid="select-figure-add" aria-label={FIGURE_TEXTS.add} className={selectClass} value={pick} onChange={(e) => setPick(Number(e.currentTarget.value))}>
             {sources.map((s, k) => (
               <option key={`${s.canvasId}|${s.frameId ?? ""}`} value={k}>
                 {s.frameId ? ` › ${s.name}` : s.name}
               </option>
             ))}
-          </select>
+          </Select>
           <button
             type="button"
             data-testid="button-figure-add"
-            className="h-7 rounded-md border border-im-line bg-im-surface px-2.5 text-xs text-im-ink hover:bg-im-hover"
+            className={cn(buttonVariants({ size: "sm" }), "text-xs")}
             onClick={() => {
               const s = sources[pick] ?? sources[0]!;
               choice.choose([...figures, newFigure(uuidv7(), s.canvasId, s.frameId)]);

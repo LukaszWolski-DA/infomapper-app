@@ -7,6 +7,8 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui/components/dialog";
 import { useToast } from "@/ui/components/toast";
+import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
 
 export const MARKDOWN_TEXTS = {
   button: "Markdown",
@@ -28,8 +30,9 @@ export interface MarkdownShown {
 /** The size as the prototype writes it: the UTF-8 bytes in KB, one decimal. */
 export const markdownKb = (text: string): string => (new TextEncoder().encode(text).length / 1024).toFixed(1);
 
-const btnClass = "inline-flex h-[26px] items-center rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover";
-const primaryClass = "inline-flex h-[26px] items-center rounded-md bg-im-logical px-[9px] text-xs font-medium text-white hover:opacity-90";
+// slice 37 (step 6): the button's `sm`, its padding kept
+const btnClass = cn(buttonVariants({ size: "sm" }), "inline-flex items-center px-[9px] text-xs");
+const primaryClass = cn(buttonVariants({ variant: "primary", size: "sm" }), "inline-flex items-center px-[9px] text-xs");
 
 export function MarkdownDialog({ shown, onClose }: { shown: MarkdownShown | null; onClose: () => void }) {
   const toast = useToast();

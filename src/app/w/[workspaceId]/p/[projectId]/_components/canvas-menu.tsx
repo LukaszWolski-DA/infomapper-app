@@ -34,12 +34,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/components/dropdown-menu";
+import { MENU_CONTENT, MENU_ITEM, MENU_LABEL } from "@/ui/components/menu";
+import { cn } from "@/ui/lib/utils";
 
-export const menuClass =
-  "min-w-[200px] max-w-[300px] rounded-lg border-0 bg-im-surface p-1 text-[13px] text-im-ink shadow-[0_0_0_1px_var(--im-line),0_12px_28px_-10px_var(--im-shadow)]";
-export const itemClass =
-  "flex cursor-pointer items-center justify-between gap-4 rounded-[5px] px-2.5 py-[7px] focus:bg-im-hover data-[highlighted]:bg-im-hover";
-export const sectionClass = "px-2.5 pb-1 pt-1.5 text-[11px] font-normal text-im-ink-3";
+// slice 37 (step 3b): the menus' look is src/ui's (menu.ts); these names stay for their many callers
+export const menuClass = `min-w-[200px] max-w-[300px] ${MENU_CONTENT}`;
+export const itemClass = cn(MENU_ITEM, "justify-between gap-4");
+export const sectionClass = MENU_LABEL;
 
 export const DotsIcon = () => (
   <svg viewBox="0 0 16 16" className="size-4 fill-current" aria-hidden>

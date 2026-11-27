@@ -7,7 +7,8 @@
 import { useContext } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
-import { Li, List, Section, smallButtonClass } from "./fields";
+import { Li, List, Section } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 
 const KIND_TEXT = { concept: "concept", source_system: "source system", free: "free area" } as const;
@@ -30,7 +31,7 @@ export function CardFrame({ cardId, kind }: { cardId: Uuid; kind: "ent" | "src" 
           <p className="text-im-ink-2">Not in a frame on this canvas.</p>
           {p.editable && (
             <div className="mt-2">
-              <button type="button" className={smallButtonClass} onClick={() => ui.putInNewFrame([cardId], true)} data-testid="button-card-put-in-frame">
+              <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => ui.putInNewFrame([cardId], true)} data-testid="button-card-put-in-frame">
                 Put in a new {kind === "ent" ? "concept" : "source system"} frame
               </button>
             </div>

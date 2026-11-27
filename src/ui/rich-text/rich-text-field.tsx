@@ -5,6 +5,9 @@
 // shows a hint. Reviewers and readers see the text without “Edit”, and a click opens nothing. The HTML comes from the
 // server, which sanitized it when it was stored (AD-17). Saving is one undo step and toasts “Saved.”
 
+import { buttonVariants } from "@/ui/components/button";
+import { FIELD_LABEL } from "@/ui/components/field";
+import { cn } from "@/ui/lib/utils";
 import { useLayoutEffect, useRef, useState } from "react";
 import { shownHtml } from "@/domain/model/plain-text";
 import { useToast } from "@/ui/components/toast";
@@ -95,7 +98,7 @@ export function RichTextField({ label, html: stored, text = null, empty, editabl
 
   return (
     <div className="mt-3" data-testid={testId}>
-      <div className="mb-1 block text-[11.5px] text-im-ink-3">{label}</div>
+      <div className={FIELD_LABEL}>{label}</div>
       <div
         ref={view}
         role={editable ? "button" : undefined}
@@ -103,7 +106,7 @@ export function RichTextField({ label, html: stored, text = null, empty, editabl
         title={editable ? "Click to edit (opens the editor)" : undefined}
         onClick={editable ? openEditor : undefined}
         onKeyDown={editable ? (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), openEditor()) : undefined}
-        className={`rt-view rich ${more ? "open" : ""} ${has ? "" : "empty"} ${editable ? "cursor-text hover:border-im-ink-3" : "cursor-default"}`}
+        className={cn("rt-view rich", more && "open", !has && "empty", editable ? "cursor-text hover:border-im-ink-3" : "cursor-default")}
         data-testid={`${testId}-view`}
         // sanitized by the server when stored (AD-17)
         {...(has ? { dangerouslySetInnerHTML: { __html: html! } } : { children: empty })}
@@ -111,12 +114,12 @@ export function RichTextField({ label, html: stored, text = null, empty, editabl
       {(editable || cut || more) && (
         <div className="mt-1 flex gap-1.5">
           {editable && (
-            <button type="button" className="h-6 rounded-md border border-im-line bg-im-surface px-2 text-xs hover:bg-im-hover" onClick={openEditor} data-testid={`${testId}-edit`}>
+            <button type="button" className={buttonVariants({ size: "sm" })} onClick={openEditor} data-testid={`${testId}-edit`}>
               Edit
             </button>
           )}
           {(cut || more) && (
-            <button type="button" className="h-6 rounded-md border border-im-line bg-im-surface px-2 text-xs hover:bg-im-hover" onClick={() => setMore((m) => !m)} data-testid={`${testId}-more`}>
+            <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => setMore((m) => !m)} data-testid={`${testId}-more`}>
               {more ? "Show less" : "Show more"}
             </button>
           )}
@@ -154,7 +157,7 @@ const isLong = (text: string): boolean => text.split("\n").length > 3 || text.le
 function RichConflict({ html, text, onUse, onKeep }: { html: string | null; text: string; onUse: () => void; onKeep: () => void }) {
   const [more, setMore] = useState(false);
   const long = isLong(text);
-  const button = "h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover";
+  const button = buttonVariants({ size: "sm" });
   return (
     <div className="border-t border-im-line bg-im-warn-soft px-4 py-2 text-xs text-im-ink" data-testid="draft-conflict" role="status">
       {html ? (

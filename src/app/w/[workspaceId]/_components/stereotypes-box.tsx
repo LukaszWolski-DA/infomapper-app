@@ -11,7 +11,9 @@
 import { useMemo, useState } from "react";
 import { addStereotypeAction, removeStereotypeAction, renameStereotypeAction, setStereotypeDefinitionAction } from "@/app/_actions/stereotype";
 import { useAction } from "@/app/_components/use-action";
-import { buttonClass, dangerClass, DraftLine, fieldKey, inputClass, smallButtonClass, TextArea, useDraft } from "@/app/_panels/fields";
+import { DraftLine, fieldKey, TextArea, useDraft } from "@/app/_panels/fields";
+import { buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
 import {
   STEREOTYPE_ADDED,
   STEREOTYPE_DEFINITION_CLEARED,
@@ -32,6 +34,7 @@ import {
 } from "@/domain/model/stereotypes";
 import type { Stereotype } from "@/domain/types";
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/ui/components/dialog";
+import { Select } from "@/ui/components/select";
 
 export const STEREOTYPES_HINT =
   "What an entity is in the model. Names and definitions are the workspace's; codes never change, so entities, imports and exports keep them while names change. The five built-in ones stay (Object is a new entity's stereotype and every fact's and dimension's); own ones can be added and removed. Facts and dimensions show their InfoCube role instead.";
@@ -54,7 +57,7 @@ export interface StereotypesBoxProps {
 }
 
 const trimmed = (t: string) => t.trim();
-const boxClass = "mt-3.5 rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]";
+const boxClass = "mt-3.5 rounded-lg bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]";
 const hintClass = "m-0 mb-1.5 max-w-[90ch] text-[12.5px] text-im-ink-3";
 
 export function StereotypesBox(p: StereotypesBoxProps) {
@@ -144,7 +147,7 @@ function Row({ s, onRemove, ...p }: StereotypesBoxProps & { s: Stereotype; onRem
                 if (e.key === "Enter") e.currentTarget.blur();
                 keyDown(e);
               }}
-              className={`${inputClass} h-7 min-w-[140px] max-w-[240px]`}
+              className={`${inputVariants()} h-7 min-w-[140px] max-w-[240px]`}
               data-testid="input-stereotype-name"
             />
           ) : (
@@ -192,7 +195,7 @@ function Row({ s, onRemove, ...p }: StereotypesBoxProps & { s: Stereotype; onRem
       </td>
       <td className="border-b border-im-line py-1.5 text-right">
         {p.editable && own && (
-          <button type="button" className={`${smallButtonClass} text-im-warn`} onClick={onRemove} data-testid="button-remove-stereotype">
+          <button type="button" className={`${buttonVariants({ size: "sm" })} text-im-warn`} onClick={onRemove} data-testid="button-remove-stereotype">
             Remove
           </button>
         )}
@@ -244,7 +247,7 @@ function AddRow(p: StereotypesBoxProps) {
           placeholder="New stereotype, e.g. Event"
           aria-label="New stereotype"
           aria-invalid={!!nameError}
-          className={inputClass}
+          className={inputVariants()}
           data-testid="input-new-stereotype"
         />
         <input
@@ -259,10 +262,10 @@ function AddRow(p: StereotypesBoxProps) {
           placeholder="Code, e.g. event"
           aria-label="Code"
           aria-invalid={!!codeError}
-          className={`${inputClass} font-mono text-xs`}
+          className={`${inputVariants()} font-mono text-xs`}
           data-testid="input-new-stereotype-code"
         />
-        <button type="button" className={smallButtonClass + " h-8"} onClick={() => void add()} data-testid="button-add-stereotype">
+        <button type="button" className={buttonVariants({ size: "sm" }) + " h-8"} onClick={() => void add()} data-testid="button-add-stereotype">
           Add
         </button>
       </div>
@@ -295,20 +298,20 @@ function RemoveDialog({ s, n, others, pending, onCancel, onRemove }: { s: Stereo
           <label htmlFor="st-move-to" className="text-im-ink-2">
             Stereotype
           </label>
-          <select id="st-move-to" value={to} onChange={(e) => setTo(e.target.value)} className={inputClass} data-testid="select-stereotype-move-to">
+          <Select id="st-move-to" value={to} onChange={(e) => setTo(e.target.value)} data-testid="select-stereotype-move-to">
             {others.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <p className="mt-2 text-[12px] text-im-ink-3">{STEREOTYPE_MOVE_NOTE}</p>
         <DialogFooter className="mt-4">
-          <button type="button" className={buttonClass} onClick={onCancel} data-testid="button-cancel-remove-stereotype">
+          <button type="button" className={buttonVariants()} onClick={onCancel} data-testid="button-cancel-remove-stereotype">
             Cancel
           </button>
-          <button type="button" className={dangerClass} disabled={pending || !to} onClick={() => onRemove(to)} data-testid="button-confirm-remove-stereotype">
+          <button type="button" className={buttonVariants({ variant: "danger" })} disabled={pending || !to} onClick={() => onRemove(to)} data-testid="button-confirm-remove-stereotype">
             {removeButton(n)}
           </button>
         </DialogFooter>

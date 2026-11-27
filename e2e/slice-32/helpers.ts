@@ -15,16 +15,18 @@ export const BANK = SEED_IDS.wsBankX;
 export const CANVAS = `/w/${SEED_IDS.wsRetailDwh}/p/${SEED_IDS.projCustomer360}/c/${SEED_IDS.canvasCustomerOrders}`;
 export const OM_HOME = `/w/${SEED_IDS.wsRetailDwh}/p/${SEED_IDS.projOrderManagement}`;
 
-/** The palette's values (globals.css) the tests compare with: light, then dark. */
+/** The palette's values (globals.css) the tests compare with: light, then dark. Slice 37 (D-89 as proposed): the mapping
+ *  green is the design system's (#087a65 in light, 5.3:1 on white; dark unchanged). */
 export const TOKENS = {
   "--im-surface": ["#ffffff", "#1f262f"],
   "--im-panel": ["#f6f7f9", "#181e25"],
   "--im-canvas": ["#e8ecf0", "#13181e"],
-  "--im-map": ["#0b8a72", "#3ecfae"],
+  "--im-map": ["#087a65", "#3ecfae"],
   "--im-physical": ["#a0660f", "#e2a74b"],
 } as const;
 export type Token = keyof typeof TOKENS;
-export const BODY_BG = { light: "rgb(246, 247, 249)", dark: "rgb(24, 30, 37)" } as const;
+/** The page behind everything: `im-surface` since slice 37 (white pages, Q9; it was `im-panel`). */
+export const BODY_BG = { light: "rgb(255, 255, 255)", dark: "rgb(31, 38, 47)" } as const;
 
 export const userMenu = (page: Page): Locator => page.getByTestId("menu-user");
 export const themeGroup = (page: Page): Locator => page.getByTestId("seg-theme");

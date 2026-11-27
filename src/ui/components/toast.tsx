@@ -49,7 +49,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         data-kind={toast?.kind}
         data-visible={visible}
         className={
-          "fixed bottom-11 left-1/2 z-50 flex max-w-[min(560px,90vw)] items-center gap-3 rounded-lg bg-im-ink py-2 pl-3.5 pr-2 text-im-surface shadow-[0_10px_30px_-10px_var(--im-shadow)] transition-[opacity,transform] duration-150 " +
+          "fixed bottom-11 left-1/2 z-50 flex max-w-[min(560px,90vw)] items-center gap-3 rounded-lg bg-im-ink py-2 pl-3.5 pr-2 text-im-surface shadow-pop transition-[opacity,transform] duration-150 " +
           (visible ? "-translate-x-1/2 translate-y-0 opacity-100" : "pointer-events-none -translate-x-1/2 translate-y-3 opacity-0")
         }
       >

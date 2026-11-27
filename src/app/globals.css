@@ -35,16 +35,23 @@
   --im-hover: #f1f4f7;
   --im-ink: #18212c;
   --im-ink-2: #4a5767;
-  --im-ink-3: #7c8998;
-  --im-line: #d6dce3;
+  --im-ink-3: #667383; /* slice 37 (D-89): 4.8:1 on white (was #7c8998, 3.6:1) */
+  --im-line: #e2e6eb; /* slice 37: hairlines quieter (was #d6dce3); controls have their own edge */
+  /* slice 37 (D-89, Q2): the edge of fields, drop-downs and check boxes, 3:1 on white (WCAG 1.4.11) */
+  --im-line-control: #8a95a3;
+  /* slice 37 (A1): the canvas draws its cards, the overview and the lines' tracks with today's edge (DS2.3) */
+  --im-card-line: #d6dce3;
+  /* slice 37: text on a primary button; dialogs, menus and pop-overs' shadow */
+  --im-on-accent: #ffffff;
+  --im-shadow-pop: 0 12px 32px rgba(22, 32, 48, 0.16);
   --im-logical: #3346c4;
   --im-logical-soft: #e7eafb;
   --im-physical: #a0660f;
   --im-physical-soft: #f6ecda;
-  --im-map: #0b8a72;
+  --im-map: #087a65; /* slice 37: 5.3:1 on white (was #0b8a72) */
   --im-map-soft: #dcf1eb;
   --im-rel: #556273;
-  --im-warn: #c2410c;
+  --im-warn: #b33c0b; /* slice 37: 5.9:1 on white (was #c2410c) */
   --im-warn-soft: #fceadd;
   --im-review: #854f0b;
   --im-review-strong: #ba7517;
@@ -68,8 +75,12 @@
     --im-hover: #252d37;
     --im-ink: #e5eaf0;
     --im-ink-2: #a8b3c0;
-    --im-ink-3: #798595;
+    --im-ink-3: #8a96a6; /* slice 37: 5.1:1 on surface (was #798595) */
     --im-line: #2f3944;
+    --im-line-control: #6b7787;
+    --im-card-line: #2f3944;
+    --im-on-accent: #11163a;
+    --im-shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.5);
     --im-logical: #8f9cff;
     --im-logical-soft: #262d55;
     --im-alias-soft: #3d2433;
@@ -103,15 +114,14 @@
 
 /* shadcn/ui variables, mapped onto the prototype palette (they follow light and dark through it). */
 :root {
-  --radius: 0.5rem;
-  --background: var(--im-panel);
+  --background: var(--im-surface); /* slice 37: white pages (Q9; was im-panel) */
   --foreground: var(--im-ink);
   --card: var(--im-surface);
   --card-foreground: var(--im-ink);
   --popover: var(--im-surface);
   --popover-foreground: var(--im-ink);
-  --primary: var(--im-map);
-  --primary-foreground: var(--im-surface);
+  --primary: var(--im-logical); /* slice 37: the accent (was the mapping green) */
+  --primary-foreground: var(--im-on-accent);
   --secondary: var(--im-hover);
   --secondary-foreground: var(--im-ink);
   --muted: var(--im-hover);
@@ -120,17 +130,20 @@
   --accent-foreground: var(--im-ink);
   --destructive: var(--im-warn);
   --border: var(--im-line);
-  --input: var(--im-line);
+  --input: var(--im-line-control);
   --ring: var(--im-logical);
 }
 
 @theme inline {
   --font-sans: var(--font-plex-sans);
   --font-mono: var(--font-plex-mono);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
+  /* slice 37 (D-89, A2): one scale. 4 px chips, badges and cells; 8 px every control; 12 px cards, dialogs, pop-overs
+     and menus (were calc(var(--radius) * 0.6, 0.8, 1, 1.4): 4.8, 6.4, 8 and 11.2 px). `rounded` stays Tailwind's 4 px. */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
+  --shadow-pop: var(--im-shadow-pop);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -158,6 +171,9 @@
   --color-im-ink-2: var(--im-ink-2);
   --color-im-ink-3: var(--im-ink-3);
   --color-im-line: var(--im-line);
+  --color-im-line-control: var(--im-line-control);
+  --color-im-card-line: var(--im-card-line);
+  --color-im-on-accent: var(--im-on-accent);
   --color-im-logical: var(--im-logical);
   --color-im-logical-soft: var(--im-logical-soft);
   --color-im-physical: var(--im-physical);
@@ -175,12 +191,44 @@
   --color-im-req-ink: var(--im-req-ink);
 }
 
+/* slice 37 (D-89, Q2): the design system's sizes and type. Spacing tokens, so `h-control-md`, `min-h-control-sm`,
+   `size-control-sm`, `size-target` and `min-h-target` exist; type tokens give `text-title` … `text-code` with their line
+   heights (and weights where the style has one). */
+@theme {
+  --spacing-control-md: 32px;
+  --spacing-control-sm: 28px;
+  --spacing-control-bar: 30px;
+  --spacing-target: 24px;
+  --text-title: 24px;
+  --text-title--line-height: 30px;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.01em;
+  --text-section: 15px;
+  --text-section--line-height: 22px;
+  --text-section--font-weight: 600;
+  --text-body: 13px;
+  --text-body--line-height: 20px;
+  --text-small: 12px;
+  --text-small--line-height: 16px;
+  --text-label: 11px;
+  --text-label--line-height: 16px;
+  --text-label--font-weight: 500;
+  --text-label--letter-spacing: 0.06em;
+  --text-code: 12.5px;
+  --text-code--line-height: 18px;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+  }
+  /* slice 37 (F9): native check boxes and radios in the accent; their own edge is 4.5:1 */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--im-logical);
   }
 }
 
@@ -202,11 +250,13 @@
 .tc-attn { @variant dark { color: #e9b949; } }
 .tc-ok { @variant dark { color: #4ade80; } }
 .tc-info { @variant dark { color: #7aa7ff; } }
+/* a field's look (slice 37, F16): the line-control edge, radius 8, the accent's edge and ring when focused */
 .rt-view {
-  border: 1px solid var(--im-line); border-radius: 6px; background: var(--im-surface); padding: 8px 10px; min-height: 40px;
+  border: 1px solid var(--im-line-control); border-radius: 8px; background: var(--im-surface); padding: 8px 10px; min-height: 40px;
   max-height: 9.2em; overflow: hidden; font-size: 12.5px; line-height: 1.5; text-align: left; width: 100%; color: var(--im-ink);
 }
 .rt-view.open { max-height: none; }
+.rt-view:focus-visible { outline: none; border-color: var(--im-logical); box-shadow: 0 0 0 3px var(--im-logical-soft); }
 .rt-view.empty { color: var(--im-ink-3); font-style: italic; }
 .rte-ed { min-height: 300px; padding: 16px 18px; outline: none; font-size: 13.5px; line-height: 1.6; color: var(--im-ink); }
 .rte-ed p.is-empty[data-placeholder]:not([data-placeholder=""])::before {

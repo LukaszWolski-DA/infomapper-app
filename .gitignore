@@ -6,6 +6,7 @@ node_modules/
 .next-e2e*/
 .next-measure/
 .next-demo/
+.next-ui-check/
 .next-pg/
 out/
 build/

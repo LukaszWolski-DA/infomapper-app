@@ -5,8 +5,9 @@
 import { expect, test } from "@playwright/test";
 import { PEOPLE, signIn } from "./helpers";
 
-const DARK_BODY = "rgb(24, 30, 37)";
-const LIGHT_BODY = "rgb(246, 247, 249)";
+// the body is `im-surface` since slice 37 (white pages, Q9; it was `im-panel`)
+const DARK_BODY = "rgb(31, 38, 47)";
+const LIGHT_BODY = "rgb(255, 255, 255)";
 const theme = (page: import("@playwright/test").Page) => page.locator("html").getAttribute("data-theme");
 const body = (page: import("@playwright/test").Page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 

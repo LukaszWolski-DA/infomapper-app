@@ -19,11 +19,15 @@ import { REQUIREMENT_KINDS, REQUIREMENT_PRIORITIES, REQUIREMENT_STATUSES, type R
 import { NAME_REQUIRED } from "@/domain/validation";
 import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
-import { Actions, buttonClass, dangerClass, Field, Hint, inputClass, Kind, List, Note, Section, Seg, TextArea, TextField, fieldKey, useChoice } from "./fields";
+import { Actions, Field, Hint, Kind, List, Note, Section, Seg, TextArea, TextField, fieldKey, useChoice } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { attributeLabel, columnLabel, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
 import { requirementNameFocus } from "./requirements-section";
+import { Select } from "@/ui/components/select";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { cn } from "@/ui/lib/utils";
 
 type Field = UpdateRequirementInput["field"];
 type Value<F extends Field> = Extract<UpdateRequirementInput, { field: F }>["value"];
@@ -113,13 +117,13 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
           <TextField key={fieldKey(rid, "key")} version={r.version} id="f-rqk" value={r.key} mono readOnly={!p.editable} onSave={(key) => save("key", key)} testId="input-req-key" keep={{ key: fieldKey(rid, "key"), field: "ID", object: r.key }} />
         </Field>
         <Field label="Kind" htmlFor="f-rqkind">
-          <select key={fieldKey(rid, "kind")} id="f-rqkind" className={inputClass} value={kind.value} disabled={!p.editable} onChange={(e) => kind.choose(e.target.value as Requirement["kind"])} data-testid="select-req-kind">
+          <Select key={fieldKey(rid, "kind")} id="f-rqkind" value={kind.value} disabled={!p.editable} onChange={(e) => kind.choose(e.target.value as Requirement["kind"])} data-testid="select-req-kind">
             {REQUIREMENT_KINDS.map((k) => (
               <option key={k} value={k}>
                 {KIND_NAMES[k]}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
       </div>
       <Field label="Name" htmlFor="f-rqn">
@@ -180,14 +184,14 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
         </Field>
       </div>
       <Field label="Part of" htmlFor="f-rqp">
-        <select key={fieldKey(rid, "parent")} id="f-rqp" className={inputClass} value={parent.value} disabled={!p.editable} onChange={(e) => parent.choose(e.target.value)} data-testid="select-req-parent">
+        <Select key={fieldKey(rid, "parent")} id="f-rqp" value={parent.value} disabled={!p.editable} onChange={(e) => parent.choose(e.target.value)} data-testid="select-req-parent">
           <option value="">None (top level)</option>
           {parents.map((x) => (
             <option key={x.id} value={x.id}>
               {`${x.key}  ${x.name}`}
             </option>
           ))}
-        </select>
+        </Select>
       </Field>
       {children.length > 0 && (
         <p className="mt-1.5 text-im-ink-2" data-testid="text-req-children">
@@ -247,7 +251,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
                 </button>
                 <span className="whitespace-nowrap text-[11.5px] text-im-ink-3">{t.type}</span>
                 {p.editable && (
-                  <button type="button" className="mr-1 grid size-6 flex-none place-items-center rounded text-im-ink-3 hover:bg-im-surface hover:text-im-warn" aria-label="Unlink" title="Unlink" onClick={() => unlink(k)} data-testid="button-trace-unlink">
+                  <button type="button" className={cn(iconButtonVariants({ size: "xs" }), "mr-1 flex-none text-im-ink-3 enabled:hover:bg-im-surface enabled:hover:text-im-warn")} aria-label="Unlink" title="Unlink" onClick={() => unlink(k)} data-testid="button-trace-unlink">
                     ×
                   </button>
                 )}
@@ -262,15 +266,15 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       {p.editable && (
         <Actions>
           {ui.requirementCard(r.id) ? (
-            <button type="button" className={buttonClass} onClick={() => ui.removeRequirementCard(r.id)} data-testid="button-requirement-uncard">
+            <button type="button" className={buttonVariants()} onClick={() => ui.removeRequirementCard(r.id)} data-testid="button-requirement-uncard">
               Remove its card from this canvas
             </button>
           ) : (
-            <button type="button" className={buttonClass} onClick={() => ui.placeRequirementCard(r.id)} data-testid="button-requirement-card">
+            <button type="button" className={buttonVariants()} onClick={() => ui.placeRequirementCard(r.id)} data-testid="button-requirement-card">
               Place its card on this canvas
             </button>
           )}
-          <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-requirement">
+          <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => void remove()} data-testid="button-delete-requirement">
             Delete requirement
           </button>
         </Actions>
