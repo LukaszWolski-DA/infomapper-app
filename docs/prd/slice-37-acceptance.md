@@ -1002,6 +1002,18 @@ working context keeps a 24 px target there.
   - **Łukasz's answer:** his option 1, until slice 38: the label stays inside its button, cut by the browser, with the
     context's name in the title; at 1,201–1,250 px it may be cut to the icon alone. S16-08 is changed to that rule and is
     on the list of earlier specs that change (section 6); the limitation is in `docs/known-limitations.md`.
+- **The full run again** on `3cb7118`, [run 45968457721](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45968457721):
+  16 min 5 s wall-clock (13 min 32 s of tests); 910 passed, **1 failed**, 16 skipped, no expected failures. S16-08 passed
+  (part 8). Parts (time from `part.json`, heap peak against the restart threshold, no restarts): 1 13.1 min 1,164 MB of
+  6,431; 2 8.6 min 1,317 of 6,431; 3 9.4 min 1,445 of 6,318; 4 8.2 min 1,549 of 6,431; 5 6.3 min 1,722 of 6,318; 6 9.7 min
+  1,676 of 6,431; 7 6.4 min 1,569 of 6,431; 8 8.3 min 1,619 of 6,431; 9 3.8 min 1,271 of 6,318; 10 5.7 min 1,273 of 6,431;
+  11 12.9 min 1,440 of 6,431. Lowest available memory 9,019 MB (part 1).
+  - **The failure: `S36-list`** (part 11), the known one (step 3a, its fix on a `fix/` branch after slice 37): the
+    Documentation list's times came back empty (`[]` for `["2026-11-20 10:16", "2026-11-20 10:15"]`). Its trace and the
+    report were copied first (`.data/ci-45968457721/s36-list-trace-copy/`, `s36-list-report-copy/`). **Alone,** the
+    single-file check [run 45970761266](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45970761266)
+    (3 rounds side by side): round 1 failed the same way, rounds 2 and 3 passed (round 1's trace in
+    `.data/ci-45970761266/round-1/`). A flake of the spec, unrelated to this slice's controls.
 
 ## Step 9: Łukasz's acceptance, what to open and where to look
 
