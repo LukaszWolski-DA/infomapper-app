@@ -420,7 +420,7 @@ export function DocumentEditor(props: EditorProps) {
     if (r.ok) router.push(r.value.href);
   };
 
-  const text = (key: string, value: string | null, patch: (v: string | null) => Patch, opts: { placeholder?: string; testId: string; required?: boolean; id?: string; inputRef?: (el: HTMLInputElement | null) => void }) => (
+  const text = (key: string, value: string | null, patch: (v: string | null) => Patch, opts: { placeholder?: string; testId: string; required?: boolean; id?: string; inputRef?: (el: HTMLInputElement | null) => void; title?: string; ellipsis?: boolean }) => (
     <TextField
       key={`${doc.id}:${key}`}
       id={opts.id}
@@ -432,6 +432,8 @@ export function DocumentEditor(props: EditorProps) {
       placeholder={opts.placeholder}
       testId={opts.testId}
       inputRef={opts.inputRef}
+      title={opts.title}
+      ellipsis={opts.ellipsis}
       onType={typed(key)}
       onSave={(v) => save(patch(v.trim() ? v : null))}
     />
@@ -443,23 +445,30 @@ export function DocumentEditor(props: EditorProps) {
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] bg-im-canvas" data-testid="page-document-editor" data-version={doc.version}>
       <style>{EDITOR_CSS}</style>
-      {/* the top bar */}
-      <div className="flex flex-wrap items-center gap-2.5 border-b border-im-line bg-im-surface px-3.5 py-2" data-testid="editor-top">
+      {/* the document's bar (slice 38, S38-04, the prototype's .de-top): one row, 48 px, under the app's top bar, in today's
+          order; only the name gives way (200 px, at least 160, at most 340), the rest keeps its width. Below 900 px it may
+          wrap. A conflict line under the name (D-66) makes the row taller while it shows. */}
+      <div
+        className="flex min-h-12 flex-nowrap items-center gap-2 border-b border-im-line bg-im-surface px-3 max-[901px]:flex-wrap max-[901px]:py-1.5 [&>*]:flex-none"
+        data-testid="editor-top"
+      >
         <PanelToggle side="left" panels={docPanels} />
         <Link href={tabHref} data-testid="link-documentation" title={EDITOR_TEXTS.backTitle} className={smallLink}>
           {EDITOR_TEXTS.back}
         </Link>
-        <div className="w-[min(340px,40vw)]">
+        {/* the name: an ellipsis while it is not being edited, the full name in its title (slice 38) */}
+        <div className="min-w-[160px] max-w-[340px] !flex-[1_1_200px]">
           {/* slice 28 (finding 1): the name's field is named */}
           <label htmlFor="document-name" className="sr-only">
             {EDITOR_TEXTS.nameLabel}
           </label>
-          {text("name", doc.name, (v) => ({ name: v ?? "" }), { testId: "input-document-name", required: true, id: "document-name" })}
+          {text("name", doc.name, (v) => ({ name: v ?? "" }), { testId: "input-document-name", required: true, id: "document-name", title: doc.name, ellipsis: true })}
         </div>
         <Badge testId="badge-sharing">{doc.shared ? "Shared" : "Private"}</Badge>
         {ro && <Badge testId="badge-read-only">Read only</Badge>}
-        <span className="flex-1" />
-        <span data-testid="text-pages" className="text-[12px] text-im-ink-3" role="status">
+        <span className="!flex-1" />
+        {/* the longest text, "Laying out pages…", fits, so the row never jumps while pages are laid out */}
+        <span data-testid="text-pages" className="min-w-[104px] whitespace-nowrap text-right text-[12px] text-im-ink-3" role="status">
           {status}
         </span>
         <Select

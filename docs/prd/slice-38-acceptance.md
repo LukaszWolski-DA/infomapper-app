@@ -680,3 +680,63 @@ its absence on another tab and for the only workspace of an organization; the ca
   83 views, **nothing found** (no overlap, no text out of its control, no words run together, nothing past the edge, no
   failing target, nothing cut, no page wider than the screen).
 - No full run in this step (Łukasz's instruction).
+
+**Łukasz's answer (27 November 2026):** step 4 accepted; the new texts approved word for word ("Other projects", its
+hint, "1 canvas" / "{n} canvases"; "Other workspaces in {organization}", "archived"), and the client left out (no new
+read).
+
+## Step 5: InfoDocumenter's bar (27 November 2026)
+
+**What changed** (`src/modules/infodocumenter/app/editor.tsx`; `TextField` in `src/app/_panels/fields.tsx`):
+- **The document's bar is one row of 48 px** under the app's top bar (which is unchanged: the path, the account), the
+  prototype's `.de-top`: `flex-nowrap`, at least 48 px, 8 px between controls, 12 px at the ends. **Nothing is added and
+  the order is today's:** the sections' toggle, back ("← Documentation"), the name, Shared / Private, Read only (when read
+  only), a spacer, the page count, the preview mode, zoom, Print / PDF, Markdown, the save pair (the indicator and
+  "Local"), the options' toggle. Every control keeps its test id and behaviour; the read-only banner stays under the
+  bar. Below 900 px the row may wrap (the prototype's step); at 1,280 px and wider it never does.
+- **Only the name gives way:** 200 px by default, at least 160, at most 340 (was a fixed `min(340px, 40vw)`); every other
+  control keeps its width (`flex: none`).
+- **The name's field** shows the browser's ellipsis while it is not being edited and has the full name in its title
+  (two optional props on the shared `TextField`, `title` and `ellipsis`; no other field uses them). Focused, the whole
+  name is there to edit, as before. A conflict line under the name (D-66) still makes the row taller while it shows.
+- **The page count** keeps the width of its longest text, "Laying out pages…" (104 px), so the row does not move while
+  pages are laid out.
+- The section list and the options panel are as slice 37 left them.
+
+**The bar at 1,280 px with a long name** (S38-04: "Order management – source-to-target mapping of every order table for
+the ETL team, second review"; widths in px, all in one row, the bar 48 px high):
+
+| Control | Editor (Łukasz) | Read only (Piotr, the shared document, with the banner) |
+| --- | --- | --- |
+| `button-toggle-sections` | 32 | 32 |
+| `link-documentation` | 122 | 122 |
+| `input-document-name` (cut, its title the full name) | 276 | 236 |
+| `badge-sharing` | 55 | 55 |
+| `badge-read-only` | – | 70 |
+| `text-pages` | 104 | 104 |
+| `select-preview-mode` | 110 | 110 |
+| `select-preview-zoom` | 81 | 81 |
+| `button-print` | 80 | 80 |
+| `button-markdown` | 78 | 78 |
+| `group-save` | 124 | 124 |
+| `button-toggle-options` | 32 | 32 |
+
+At 1,536 px the name reaches its 340 px.
+
+**The generated documents:** `npx tsx scripts/document-texts.ts s38-step5` and `diff -r` against slice 37's
+`.data/ui-check/documents-before` (18 files: six documents' Markdown, HTML and CSS): **no difference.**
+
+**The earlier specs changed:** none. The bar's order stays, so S28-01 (the order of `editor-top`'s controls), S34-01
+(Print / PDF before Markdown) and S30-09-editor (the save pair after Print / PDF, not in the top bar) pass unchanged.
+New: **S38-04** (one 48 px row at 1,280 px with a long name, as an editor and read only with the banner; the name's
+ellipsis and title; editing shows the whole name).
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test` (217 files, 2,627 tests; the control-style guard passes).
+- **InfoDocumenter's specs,** locally, one run with nothing beside it: slices 25, 26, 27, 28, 34 and 36, S30-09-editor
+  and S38-04 (52 files): **104 passed, 12 skipped** (the measuring and screenshot specs), none failed.
+- **The check script on the editor at every width** (`.data/ui-check/step5-20261127-1902/`: the editor, the Markdown
+  dialog, "+ Add section" and a section's options, at 1,280, 1,440 and 1,920 px light and dark and at 390 px): 28 views,
+  **nothing found** (no overlap, no text out of its control, no words run together, nothing past the edge, no failing
+  target, nothing cut, no page wider than the screen).
+- No full run in this step (Łukasz's instruction).
