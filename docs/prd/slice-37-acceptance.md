@@ -1102,3 +1102,12 @@ and `Seg` kept until step 3 (step 2); the top bar's tools 7 px apart from 1,201 
 (step 4); S16-08's new rule, the working context's label inside its button with 40 px only from 1,300 px up, until
 slice 38 (step 8); Segmented's buttons sharing a wider track (step 9's finding, here).
 
+**The full run** on `d20e6b639cb66ff1cb0796bdc0c47e3c7a73aea0`,
+[run 45987763761](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/45987763761): 15 min 54 s wall-clock
+(13 min 7 s of tests); **911 passed, 0 failed, 16 skipped** (the measuring and screenshot specs), no flaky tests, no
+expected failures; CI and Schema passed on the same commit. Parts (time from `part.json`, server heap peak against the
+restart threshold, no restarts): 1 8.0 min 1,304 MB of 6,431; 2 11.2 min 1,374 of 6,431; 3 9.3 min 1,373 of 6,318;
+4 10.9 min 1,125 of 6,431; 5 8.1 min 1,416 of 6,431; 6 10.9 min 1,254 of 6,431; 7 7.7 min 1,360 of 6,431; 8 9.6 min
+1,571 of 6,431; 9 5.8 min 1,206 of 6,431; 10 4.0 min 1,385 of 6,318; 11 12.7 min 1,505 of 6,431. Lowest available memory
+8,356 MB (part 1). A later commit that changes only Markdown in `docs/` keeps the run valid (`git diff --stat`).
+
