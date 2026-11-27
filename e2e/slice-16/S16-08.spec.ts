@@ -2,9 +2,9 @@
 // platform: at 1,201 px too (S6A-10's case, docs/known-limitations.md "The top bar overflows by 1 px at 1,201 px on
 // Linux"). The working context's label is the bar's flexible item, truncated by the browser, with its name in the
 // button's title. S6A-10 still checks that nothing is cut off at slice 6a's widths.
-// Slice 37 (step 8, Łukasz's choice until slice 38): the label stays inside its button at every width, cut by the
-// browser, with the context's name in the title; it keeps 40 px at least from 1,300 px up, and at 1,201–1,250 px it may
-// be cut to the icon alone (docs/known-limitations.md). Slice 38 gives it 40 px again at every width.
+// Slice 37 (step 8): the label stays inside its button at every width, cut by the browser, with the context's name in
+// the title. Slice 38 (step 3, S38-02): the canvas's controls left the bar, and the label keeps 40 px at least at every
+// one of the 13 widths (slice 37's limitation at 1,201–1,250 px closed).
 
 import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, contextOn, openCanvas, signInAs, WHOLE_CO } from "./helpers";
@@ -22,7 +22,7 @@ const labelOf = (page: Page) =>
     return { width: Math.round(r.width), cut: span.scrollWidth > span.clientWidth, past };
   });
 
-test("S16-08: the top bar never scrolls from 2,560 to 800 px; the working context's label gives way inside its button, its name in the title", async ({ page }) => {
+test("S16-08: the top bar never scrolls from 2,560 to 800 px; the working context's label keeps 40 px inside its button, its name in the title", async ({ page }) => {
   test.setTimeout(120_000);
   await signInAs(page, "Łukasz");
   await contextOn(page, "CR-23");
@@ -41,12 +41,7 @@ test("S16-08: the top bar never scrolls from 2,560 to 800 px; the working contex
     expect(scroll, `${width}: the bar scrolls`).toBe(0);
     expect(label.past, `${width}: the label runs past its button`).toBe(0);
     await expect(page.getByTestId("button-context"), `${width}: the title names the context`).toHaveAttribute("title", TITLE);
-    if (width >= 1300) expect(label.width, `${width}: the label keeps 40 px at least`).toBeGreaterThanOrEqual(40);
+    expect(label.width, `${width}: the label keeps 40 px at least`).toBeGreaterThanOrEqual(40);
   }
   console.log(`S16-08: ${JSON.stringify(table)}`);
-  // at 1,201 px the label is truncated by the browser, and its name stays in the title
-  await page.setViewportSize({ width: 1201, height: 900 });
-  await page.waitForTimeout(150);
-  expect((await labelOf(page)).cut, "1201: the label is truncated").toBe(true);
-  await expect(page.getByTestId("button-context")).toHaveAttribute("title", TITLE);
 });

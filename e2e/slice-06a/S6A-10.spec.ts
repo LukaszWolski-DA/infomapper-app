@@ -4,7 +4,8 @@
 // the bar or under another, nothing scrolls; both panel buttons, the working context, Undo and Redo, the save pair and
 // the user indicator are always in the top bar, the brand only above 1,600 px. Since slice 38 the canvas's controls
 // are in its toolbar: the layer switch and zoom always, the other groups either in the toolbar or in “More” (by the
-// toolbar's own room, S38-01), and the toolbar never scrolls. The measured widths are printed (the step's table).
+// toolbar's own room, S38-01), and the toolbar never scrolls. Step 3 (S38-02): every switcher keeps at least its 56 px
+// (44 px up to 1,000 px), the path's separators show above 1,000 px. The measured widths are printed (the step's table).
 
 import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, contextOn, openCanvas, signInAs, WHOLE_CO } from "./helpers";
@@ -66,6 +67,8 @@ test("S6A-10: nothing in the top bar or the canvas toolbar is cut off from 2,560
     expect(s.scroll, `${width}: the bar scrolls`).toBe(0);
     for (const id of ALWAYS) expect(s.ids, `${width}: ${id}`).toContain(id);
     expect(s.brand, `${width}: brand`).toBe(width > 1600);
+    // the path (slice 38, step 3): each switcher at least its minimum
+    for (const id of ["switcher-organization", "switcher-workspace", "switcher-project"]) expect(s.widths[id], `${width}: ${id}`).toBeGreaterThanOrEqual(width > 1000 ? 56 : 44);
     // the canvas's controls are in its toolbar, never in the top bar (slice 38)
     for (const id of [...TOOLBAR_ALWAYS, ...TOOLBAR_GROUPS]) expect(s.ids, `${width}: ${id} not in the top bar`).not.toContain(id);
     expect(t.scroll, `${width}: the toolbar scrolls`).toBe(0);
