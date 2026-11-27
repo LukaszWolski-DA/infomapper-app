@@ -1214,3 +1214,14 @@ decide.
   them over the panel's width, text centred, never narrower than its text; the pages' tabs (the workspace home's) stay at
   the left.
 
+## Slice 38's follow-ups (27 November 2026)
+
+- **The prototype's sideways-scrolling toolbar on touch screens** (B2 (b)): if "More" turns out awkward there, the
+  canvas toolbar could scroll with a fade, as the prototype's does, in place of "More" on a touch screen.
+- **A working context on the project home** (F17): the context lives on canvas pages only; on the home it would be a
+  new feature (what it labels there, how it is shown).
+- **The workspace's client in "Other workspaces in …"**: the prototype shows it; the shell does not read it, so it
+  would be a new read (left out at step 4).
+- **`SEGMENTED_BAR_TRACK` and `SEGMENTED_BAR_BUTTON` are unused** since the layer and notation switches moved into the
+  canvas toolbar (they take `SEGMENTED_TRACK` and `SEGMENTED_BUTTON`); only `tests/ui-components.test.ts` reads them.
+  A later cleanup removes both with their tests.

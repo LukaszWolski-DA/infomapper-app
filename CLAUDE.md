@@ -120,6 +120,13 @@ Slice 37 (D-89) is the design system's foundation, the look and not the layout: 
 scale, targets of at least 24 px, white pages, and every control of InfoMapper and both modules drawn by the shared
 components in `src/ui/components`; nothing moves, the canvas's cards keep their geometry and the generated documents
 are byte for byte as before; a guard refuses control styles outside `src/ui`, and `npm run ui:check` checks the screens.
+Slice 38 (D-90) is the layout: the canvas's controls in a toolbar floating over the canvas (the layer switch, Focus and
+Changes, the four tools as icons, the notation, "Names ▾", zoom, "More" by the toolbar's own room), every fit and
+placement leaving it 70 px; the top bar with the path (switchers up to 240 or 280 px, their titles starting with the
+full name), the working context (its label at least 40 px), Undo, Redo, the save pair and the account; the homes as
+pages up to 1,320 px (the project home in two columns, "Other projects", "Other workspaces in …"); InfoDocumenter's
+bar in one 48 px row; list rows whose name wins; the phone (no overlaps at 390 px); the canvas tabs on the tab variants,
+the guard without an exception.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -505,10 +512,13 @@ visual polish may improve, behaviour may not change without a decision.
   `label` becomes `aria-label`, `title` passed unchanged), `Input`, `Textarea`, `QUIET_FIELD` and `QUIET_TEXT` (the zoom,
   the project heading), `Select` (a styled native `<select>`, sizes `md`, `sm`, `bar`; `className` for layout only),
   `Segmented` (`fields.tsx`' `Seg` is its alias; a group with `aria-pressed`; a wider track shared by its buttons
-  equally; `SEGMENTED_BAR_*` for the top bar's switches, which keep their widths), `Check` and `CHECK_LABEL` (a native
+  equally; `SEGMENTED_TRACK` and `SEGMENTED_BUTTON` for the canvas toolbar's switches; `SEGMENTED_BAR_*` is unused since
+  slice 38), `Check` and `CHECK_LABEL` (a native
   check box, a 24 px row), `Field` (label, hint, ids), `tabsListVariants` and `tabVariants` (`density: "panel"` for the
-  left panel), `chipVariants`, `cardVariants` and `ADD_TILE`, `menu.ts` (`MENU_CONTENT`, `MENU_ITEM`, …, shared by the
-  Radix menus and `canvas-menu.tsx`), `DISCLOSURE_HEADER`, `toolButtonVariants` (the top bar's 30 px tools, no edge).
+  left panel, `"canvas"` for the canvas tabs' strip with `CANVAS_TAB` and `CANVAS_TAB_ON`, slice 38), `chipVariants`, `cardVariants` and `ADD_TILE`, `menu.ts` (`MENU_CONTENT`, `MENU_ITEM`, …, shared by the
+  Radix menus and `canvas-menu.tsx`), `DISCLOSURE_HEADER`, `toolButtonVariants` (no edge; `size: "toolbar"`, the canvas toolbar's 28 px
+  icons, slice 38), `list-row.ts` (`ROW_NAME_WINS`, `ROW_PHYSICAL`: a row's name up to 65 %, its physical names cut;
+  `Li`'s `physical`, slice 38).
   `cn` is `@/ui/lib/utils` (tailwind-merge knows the scales). **The tokens** are in `globals.css`: `h-control-md`,
   `-sm`, `-bar`, `min-h-target`/`size-target` (24 px), `text-title`, `-section`, `-body`, `-small`, `-label`, `-code`,
   `rounded-sm`/`-md`/`-lg` (4, 8, 12 px), `shadow-pop`, `border-im-line-control`, `--im-card-line` (the canvas's own
@@ -517,8 +527,8 @@ visual polish may improve, behaviour may not change without a decision.
   `.tsx` file outside `src/ui`. On `<button>`, a field `<input>`, `<select>` and `<textarea>` it refuses an edge, an
   arbitrary radius or px height, a radius with a height or size, from a literal, a template, `cn`'s arguments or a
   constant of the file or of another under `src/`, and every native `<select>` but `Select`'s. `…Variants` calls and
-  constants exported by `src/ui` are the shared look; `min-h-target` is allowed. Its one exception is named in it (the
-  canvas tabs, slice 38); its "to convert" list is empty. **A new control** takes a component or its variants; a look
+  constants exported by `src/ui` are the shared look; `min-h-target` is allowed. Since slice 38 it has no exception (`EXCEPTIONS` is
+  empty) and its "to convert" list is empty. **A new control** takes a component or its variants; a look
   that does not exist yet goes into `src/ui/components` (layout classes, width and margin, stay at the call).
 - **The check script** `npm run ui:check -- --label <name>` (`scripts/ui-check.ts`, pure rules in
   `scripts/lib/ui-check-rules.ts`, `tests/ui-check-rules.test.ts`): its own dev server on 127.0.0.1:3400
@@ -527,9 +537,30 @@ visual polish may improve, behaviour may not change without a decision.
   390 px light: overlaps, controls past the edge, text out of its control, words run together, targets under 24 px
   (WCAG 2.5.8's spacing), cut text, pages wider than the screen, and the kinds of control, into
   `.data/ui-check/<label>-<time>/` (`report.md`, `report.json`, screenshots). `--only a,b` (screens by prefix),
-  `--widths`, `--themes`, `--url` (a running server). `--compare <before> <after>` writes
+  `--widths`, `--themes`, `--url` (a running server). A side panel open over the canvas (`aside[data-overlay="true"]`,
+  the only such rule, slice 38) covers what lies under it, as a dialog does: a control under it is left out of the
+  overlaps, words run together and small targets. `--compare <before> <after> [--slice <n>]` writes
   `.data/ui-check/slice-37-before-and-after.html`. React Flow's attribution link is a named exception. Not part of the
   e2e run or CI; never against Postgres.
+- **The canvas toolbar** (slice 38, D-90): `src/canvas/CanvasToolbar.tsx`, in `AppShell`'s `<main>` through the slot
+  `canvasTools` (before the page's content), outside React Flow: a strip over the canvas's area with `pointer-events:
+  none` and the `@container` query, the toolbar (`bar-canvas`, `role="toolbar"`) centred 12 px from the top. Its groups:
+  `LayerSwitch` | Focus, Changes | the tools | `NotationSwitch` | `NamesMenu` ("Names ▾", `button-names`, a Radix
+  pop-over with `forceMount`, `menu-names`, holding `NamesSwitch`) | `ZoomControls` | `MoreTools`. **"More"** is by the
+  strip's width, never the window's (`src/canvas/more-breakpoints.ts`: `MORE_NAMES` 635, `MORE_FOCUS` 595, `MORE_TOOLS`
+  444 px, each with its `@max-[N]:hidden` class for the bar, `MORE_BUTTON`, `inMore(group, room)` for the menu's items,
+  which read the strip's width from `toolbarRoom`, a `ResizeObserver`'s store; widths measured 631, 591, 440 and 313
+  px). Below 313 px the toolbar scrolls sideways with the tab rows' fade. **The room:** `TOOLBAR_TOP_ROOM` (70 px,
+  `src/domain/canvas/geometry.ts`) in `fitViewport` and `boundsViewport`; every bringing into view goes through
+  `showBounds` (`src/canvas/show-bounds.ts`), never `rf.fitBounds`; placements in the view read `placeRect()`
+  (`ModelCanvas`). The Changes bar and the concept question stand at 58 px. **A later control on the canvas** goes into a
+  group of the toolbar and, if it can leave, into "More" with a breakpoint measured as the others; **a later fit or
+  placement** leaves the room. The toolbar adds two drawing layers by overlap (`e2e/slice-38/S38-layers.spec.ts`,
+  MEASURE-only, kept out of the full run by the config's `testIgnore`).
+- **The homes as pages** (slice 38): `AppShell`'s `page` gives the project home no side panels, no toggles and no
+  read of the panels' cookie; both homes are `max-w-[1320px]`; the project home's grid is `columns-project-home`
+  (`column-project-work`, `column-project-lists`), "Other projects" `section-other-projects`, the workspace home's
+  "Other workspaces in …" `section-other-workspaces`, both from the shell's data.
 - **The generated documents** are compared with `npx tsx scripts/document-texts.ts <label>` and `diff -r` against
   `.data/ui-check/documents-before` (18 files: six documents' Markdown, HTML and CSS): a UI change leaves them unchanged.
 
@@ -637,6 +668,11 @@ local adapter no pool is made.
 - `domain`: Vitest unit tests next to the code (`*.test.ts`). Every business rule gets a test.
 - Each slice: Playwright end-to-end tests in `e2e/slice-XX/`, one per acceptance criterion in the PRD, named after
   the criterion id. They run against a seeded local database, never against production.
+- **The e2e window** is 1,280 × 770 px (`playwright.config.ts`, was 720 until slice 38) and slice 1a's `openCanvas`
+  stores the view it is given 50 px lower (`belowToolbar`, `TOOLBAR_BOTTOM`), both for the canvas toolbar (Łukasz,
+  slice 38): what a spec places at the view's top stands below the toolbar, with the canvas's height as before. A spec
+  that clicks a card row by its place on the screen counts the 50 px; a fixture with its own window says so (slice 11's
+  1,536 × 864).
 - **Test runs** (Łukasz, 4 November 2026; one regime for every slice, replacing slice 4b-2's and 5a's; the full run and
   the single-file check in GitHub Actions since chore CI e2e, 6 November 2026):
   - After each step: the slice's specs, the earlier specs of what the step touched, and CI (lint, typecheck, unit
@@ -1045,8 +1081,8 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     card menu's segment (`pickSegment`) and read the tints (`tintOf`);
   - views: `HALF` (50 %, every card's rows drawn) and `FULL` (100 %).
 
-  Slice 11's specs run in a 1,536 × 864 window (`e2e/slice-11/fixtures.ts`): up to 1,300 px the check boxes are in
-  “More”. Its measuring steps (`e2e/slice-11/measure.ts`) alias every entity and attribute of “Performance test” in the
+  Slice 11's specs run in a 1,536 × 864 window (`e2e/slice-11/fixtures.ts`). Since slice 38 the check boxes are in
+  “Names ▾” (in “More” below 635 px of the toolbar's room): `clickBox` opens it first; their states are read shut. Its measuring steps (`e2e/slice-11/measure.ts`) alias every entity and attribute of “Performance test” in the
   e2e data file (`aliasEverything`, prefix `PL `).
 
   Slice 12a's helpers do the following:
@@ -1316,7 +1352,8 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   S2A-14's lasso, S4P-fading, S4P-10) to it; the shared code is `e2e/measure/` (`trace.ts`, `switches.ts`) and
   `scripts/lib/to-screen.ts` (anchor, settled check, split, presented frames; `tests/to-screen.test.ts`). Raw traces go
   to `.data/measure/` (git-ignored, never committed).
-- **Side panels** (slice 5a): `src/app/_components/side-panels.tsx`; the layout is a cookie per person
+- **Side panels** (slice 5a; on canvas pages only since slice 38): `src/app/_components/side-panels.tsx`; the layout
+  is a cookie per person
   (`im-panels.<userId>`, `src/ui/side-panels-cookie.ts`) the server reads, so the first paint is right. Hiding,
   showing or resizing the left panel moves the view in the same event (`ui.shiftView`); `ModelCanvas` does not
   subscribe to the pane's size (S5A-07 checks zero commits). Never set a CSS variable or a page-wide class on an
@@ -1331,12 +1368,11 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   `ModelCanvas` (S6A-08), and never reads layout in a commit: the fold into “+{n}” takes its widths from a
   `ResizeObserver` (`src/ui/fit-chips.ts`, 16 px hysteresis). The breadcrumbs row is `contain: strict` (static). The
   filter and collapsed-card chips and the layout part of “Show all” are one undo step each through `resetCanvasView`
-  (`src/domain/commands/canvas.ts`). The top bar's narrow steps are classes on the tools' own elements; “More”
-  (`src/canvas/MoreTools.tsx`) takes the names' check boxes up to 1,300 px (`MORE_NAMES`, slice 11; “More” shows from
-  there, and the working context's label is cut at 90 px from 1,201 to 1,300 px), Focus and the notation up to
-  1,200 px and the four tools up to 1,100 px
-  (`src/canvas/more-breakpoints.ts`, a plain module the server page and the client menu share). Tailwind's `min-[N]` and
-  `max-[N]` meet at N: the app writes the prototype's “up to N px” as `max-[N+1px]`.
+  (`src/domain/commands/canvas.ts`). Since slice 38 the canvas's controls and “More” (`src/canvas/MoreTools.tsx`) are in the canvas
+  toolbar, by its own room (“The canvas toolbar” under “UI components”); the top bar's steps are classes on its own
+  elements (the switchers up to 1,500 and 1,000 px, the working context's label at 1,300 and 1,000 px, the phone at 600
+  px). Tailwind's `min-[N]` and `max-[N]` meet at N: the app writes the prototype's “up to N px” as `max-[N+1px]`, and
+  a container query's “below N px of room” as `@max-[N]`.
 - **Nothing above the canvas reads layout during a commit** (slice 6a, S6A-09-hand): no `offsetWidth`,
   `getBoundingClientRect` or similar in a render or a layout effect of anything that sits above or beside the canvas
   (bars, rows, panels). When the canvas restyles in the same commit (a tool's class), the read forces that restyle (about
@@ -1452,7 +1488,7 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   hint). **The switch:** `ui.setNames` → `ModelCanvas.setNames` shows the modes and the cleared exceptions in one
   commit, then `setCanvasNamesAction` on the canvas's queue (`enqueueGroup`), holding the canvas's row on the save
   chain while it is on its way (`rowSaves.saveRows`, slice 14b); its answer's versions go to the chain. A fresh page brings the names keyed on the canvas row's version too
-  (`names.version`): the switch's own page may be replaced by a later one. The check boxes (`NamesSwitch.tsx`, “More”)
+  (`names.version`): the switch's own page may be replaced by a later one. The check boxes (`NamesSwitch.tsx`, in “Names ▾” and “More”)
   read `namesState` (`names-state.ts`), which `ModelCanvas` publishes from an effect with `namesControl`, as
   `viewCounts`. The tint is the class `alt` on `.c-head` and on `.c-body`/`.c-lod` (`--im-alias-soft`). The search
   matches aliases in `tree-data.ts` (`show`; the hint “alias {alias}” or “attribute {name} · {alias}”).

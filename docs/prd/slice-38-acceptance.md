@@ -905,3 +905,38 @@ from `part.json`, the server's heap peak against its 6,431 MB restart threshold,
       opens; the canvas tabs and the workspace home's tabs scroll sideways with a fade at their end; no page scrolls
       sideways. In the entity panel's "Attributes and their sources": the attribute's name whole, its source columns cut
       with an ellipsis, their full text in the tooltip.
+
+**Łukasz's answer (27 November 2026), with step 8:** **S32-03 is left as it is** in this slice and known: its fix
+(slice 32's helper `openUserMenu` waits for the closing menu to be gone before its click) goes to its own `fix/` branch
+from `dev` after this slice's merge, as S36-list's did.
+
+**Step 8, Łukasz's acceptance (27 November 2026):** on `npm run dev:pg` with the demo accounts (KB not opened): the
+side-by-side page, then the canvas at 1,280 px and narrower (the toolbar, "Names ▾", a fit, the Changes bar, "More"),
+the top bar's path, both homes, InfoDocumenter's bar and a phone-width window. "It looks great", no notes. `dev:pg` is
+stopped.
+
+## Step 9: the closing (27 November 2026)
+
+**The docs:**
+- `docs/decisions.md`: **D-90 (new)**, the layout, with a note of the calls Łukasz accepted; **notes (slice 38, D-90)**
+  on D-54 (the panels on canvas pages only, the overlay below the toolbar), D-60 (the zoom in the toolbar), D-64 (the
+  names' check boxes in "Names ▾"), D-84 (the top bar's room), D-89 (the working context's limitation closed, the 7 px gap
+  gone), AD-20 (the guard without an exception, the check script's overlay rule and `--slice`) and AD-24 (the toolbar
+  outside React Flow, its layers, the fits' room). Slices 6a's, 11's and 16's places of "More", the names' check boxes and
+  the working context are PRD items, not D-entries (step 1, section 14): D-90 holds them, and D-64's note covers slice 11's.
+- `CLAUDE.md`: slice 38's sentence; "UI components" (the canvas toolbar, the homes as pages, the tab variants' `canvas`
+  density, `toolButtonVariants`' `toolbar` size, `list-row.ts`, the guard without an exception, the check script's
+  overlay rule and `--slice`); the view-state bar's paragraph ("More" in the toolbar); slice 11's helpers ("Names ▾");
+  the side panels on canvas pages only; "Testing": the e2e window 1,280 × 770 px and `openCanvas`' 50 px.
+- `docs/inventory-prototype-vs-app.md`: the layout done, the deliberate differences of slice 38.
+- `docs/known-limitations.md`: slice 11's "check boxes in More up to 1,300 px" changed (step 3 had closed the working
+  context's entry).
+- `docs/ideas.md`: slice 38's follow-ups (the scrolling toolbar on touch screens, a working context on the project home,
+  the workspace's client in "Other workspaces in …", the unused `SEGMENTED_BAR_*`).
+- `README.md`: slices 37 and 38 (slice 37's sentence and acceptance link were missing) and the check script's `--slice`.
+
+**Every deviation from the PRD and every call Łukasz accepted** (D-90's note quotes them): B1 to B8 as recommended, B6's
+bar; section 11's corrections (F9, F10, F12, F13, F14, F15, F17); "Generate version" not in the app; the e2e window
+1,280 × 770 px and `openCanvas`' 50 px (step 2); the measuring sitting's figures (step 2); the switchers' titles starting
+with the full name, a deviation from S38-07 (step 3); the homes' new texts and the client left out (step 4); the check
+script's overlay rule (step 6); S32-03 known, fixed on its own branch (step 7).

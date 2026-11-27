@@ -1574,7 +1574,8 @@ the app adds none.
 - **Reviewers and readers see a canvas's names as saved** (F6); unlike the layer mode they cannot switch them in their
   own browser (`docs/ideas.md`).
 - **Up to 1,300 px wide the check boxes are in "More"** (step 4, S6A-10): with the working context on and both panels
-  shown they do not fit the top bar there.
+  shown they do not fit the top bar there. **Changed in slice 38** (D-90): they are in the canvas toolbar's "Names ▾",
+  and in its "More" only below 635 px of the toolbar's room (at 1,280 px with both panels they stay in the toolbar).
 
 ### Relationships between source tables on the demo canvas (slice 10b, D-62)
 

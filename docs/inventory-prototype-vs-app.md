@@ -35,7 +35,7 @@ docs (some are repeated below where they explain an item).
 | Labels and notes | rich text in notes | known limitation |
 | Projects and workspace | workspace export, export and delete, duplicate, transfer | – |
 | Settings and roles | inviting people by e-mail (slice 8 adds them at once instead) | database (AD-04) |
-| The look and the layout (slice 37) | the layout: the canvas toolbar, the slim top bar, InfoDocumenter's bar in one row, the homes in two columns, list rows, the phone's top bar | slice 38; the look **done** (slice 37, D-89) |
+| The look and the layout (slices 37 and 38) | "All apps", "Proposals", InfoCatalog; a canvas in a second window | InfoCatalog's slices; the look **done** (slice 37, D-89), the layout **done** (slice 38, D-90) |
 | InfoDocumenter | logos, versions, links | idea (slice D); documents from a baseline and changes since a baseline **done** (slice 36, D-88) |
 
 ## Canvas
@@ -604,7 +604,7 @@ mark"; the list's "created {time}" and its order are the app's (Łukasz's B5.1);
   (the prototype: "empty"); hints under an option that is ticked while nothing in the document uses it (Source-to-target's
   Note, Source tables' table note and classifications, the dictionary's concept frames, the style's List of figures).
 
-## The look and the layout (slice 37, D-89)
+## The look and the layout (slice 37, D-89; slice 38, D-90)
 
 Slice 37 takes the prototype's look of 26 November 2026 (the design system's tokens, controls and targets) and none of
 its layout. **Done:** white pages, panels, navigation row and the canvas tabs' strip; `--ink-3`, `--map`, `--warn`,
@@ -614,14 +614,21 @@ controls with radius 8, fields 32 px on pages and in the inspector and 28 px in 
 buttons, folds, swatches and `.flag` at their sizes; InfoDocumenter's section actions on hover, on the selected section
 and on focus, 28 px, dimmed at 30 %, and the `dseg` look (a wider track shared by its buttons).
 
-**Not built, slice 38's (the layout):**
-- the canvas toolbar (`#ctb`) with "Names ▾", and the path's room above the canvas;
-- the slim top bar and the phone's top bar (at 390 px the app's page does not scroll sideways, A7, but its top bar and
-  navigation row do not fit);
-- InfoDocumenter's bar in one 48 px row (`.de-top`);
-- the homes without side panels, in two columns, 1,320 px wide; list rows where the name wins;
-- the working context's label at 40 px at every width (from 1,201 to 1,250 px it is cut to its icon, the name in its
-  title; `docs/known-limitations.md`).
+**Done in slice 38 (the layout, D-90):**
+- the canvas toolbar (`#ctb`) over the canvas, centred, with "Names ▾" and "More" by its own room; the fits and
+  placements leave it 70 px; the Changes bar under it;
+- the slim top bar (the path with 240 or 280 px switchers, the working context's label at least 40 px at every width,
+  Undo, Redo, the save pair, the account) and the phone's top bar (the toggles, the path, the account);
+- InfoDocumenter's bar in one 48 px row (`.de-top`), under the app's top bar;
+- the homes without side panels, the project home in two columns, both 1,320 px wide, "Other projects" and "Other
+  workspaces in …"; list rows where the name wins; the canvas tabs' fade on the phone.
+
+**Deliberate differences in slice 38:** "More" in place of the prototype's sideways-scrolling toolbar (the toolbar
+scrolls only below 313 px of room, B2); "Names ▾", which the prototype does not have (DS3.1, B1); the Changes bar, the
+app's own, under the toolbar; InfoDocumenter's bar under the app's top bar, not in its place (DS3.3), with the save
+pair (D-84); "Generate version" not built (not in the app); one lifecycle card in the prototype's grid of four (the
+others are not built); no panels' toggles on the homes (the panels there would be placeholders, B4); the switchers'
+titles start with the full name; "Other workspaces in …" without the client (a new read).
 
 **Not built, later:** "All apps" (`#tApps`), the "Proposals" tab and InfoCatalog (InfoCatalog's slices); a canvas in a
 second window.
@@ -629,7 +636,7 @@ second window.
 **Deliberate differences:** the dark values are written under Tailwind's `@variant dark`, not under
 `@media (prefers-color-scheme)` (D-85); the small button's text is 12 px, not 13 px (its width kept, S33-05, S6A-10);
 native selects and check boxes (F9); titles without shortcuts (A4, `docs/ideas.md`); from 1,001 to 1,300 px the top bar's
-tools are 7 px apart (was 8 px; they move by up to 11 px there), so the working context keeps a 24 px target.
+tools were 7 px apart in slice 37 (8 px again since slice 38).
 
 ## The app ahead of the prototype (slice 22)
 
