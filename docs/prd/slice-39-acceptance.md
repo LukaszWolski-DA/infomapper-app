@@ -450,6 +450,10 @@ Each step ends with lint, typecheck, `npm test`, the touched specs as single fil
 8. **Assumption to confirm:** a document **from a baseline** is never listed as including a live item (it shows the
    baseline's state); only documents from the live model are.
 
+**Łukasz's answers (28 November 2026):** deviations 1 to 7 are accepted, as Claude's technical calls, quoted at the
+closing. The assumption (8) is confirmed: a document made from a baseline is never listed as including a live item;
+only documents from the live model are.
+
 **Figures** (`npx tsx scripts/bench-catalog.ts`, the local adapter and a Postgres cluster on 127.0.0.1, medians of 9;
 the model as in step 1, with the demo's workspaces: 5,626 items at KB's size, 21,904 at four times):
 
@@ -465,3 +469,51 @@ preview). The first fold of the index cost 300 ms at four times KB; the whole-st
 
 **Checks:** lint and typecheck clean; `npm test` 222 files, 2,663 passed, 15 skipped; the whole contract suite on a local
 Postgres 18.3 with `INFOMAPPER_CONTRACT_DB` (54 passed) and `schema:check` (47 tables, 627 columns, RLS on every table).
+
+**Step 2's full run:** [run 46080324317](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46080324317)
+on `e3196cc`: success, 926 passed, 16 skipped, 0 failed, 0 flaky; wall clock 15 min (23:03:55 to 23:19:07 UTC);
+the longest parts 6 and 8 (13.7 min each); part 6's heap peak 1,181 MB of 8,039 MB, no restart.
+
+## Step 3: the switch and the licence (28 November 2026)
+
+**Built:**
+- **The command:** `updateWorkspaceSettings` takes `catalogShown` (Zod, strict) with InfoCatalog's licence state: on only
+  with the licence (`"{organization} has no InfoCatalog licence."`), off at any time; `workspace.edit_settings` (owners,
+  admins), an archived workspace refused; one change event of the workspace row, no undo step (`workspace` is outside
+  undo). The action reads the licence state only when the input has the field (`licenceState`, now shared with
+  InfoDocumenter's). Tests: three cases in `src/domain/commands/workspace.test.ts`.
+- **The box** `src/modules/infocatalog/app/settings-box.tsx`, after InfoDocumenter's through `settingsBoxes`, **only
+  while the organization holds the licence**: the heading "InfoCatalog", the check box "Shown in InfoCatalog to everyone
+  in the organization" (the shared `Check`) and the PRD's line under it, `aria-describedby` to it; enabled for owners
+  and admins outside an archived workspace; on the workspace's save chain (`saveRow`, `useChoice`).
+- **`npm run pg:licence -- grant "<organization name>" infocube|infodoc|infocatalog`** (`scripts/pg-licence.ts`, the
+  grant in `scripts/lib/licence-grant.ts`): `INFOMAPPER_MIGRATION_URL` refused unless it is infomapper-dev
+  (`devTargetRefusal`, before any connection), the organization by its exact name (one live organization or a refusal),
+  one transaction, idempotent, its first owner as the author, no change event; it prints the target as host/database and
+  the outcome only, never the name. Tests: `tests/pg-licence.test.ts` (the arguments; the refused target, by running the
+  script) and `tests/contract/licence.test.ts` (on Postgres in `{name}_licence`: granted once, held the second time, an
+  unknown name and a shared name refused with nothing changed).
+- **E2E:** `e2e/slice-39/` (fixtures, helpers) and `S39-02-switch.spec.ts` (four tests: no box without the licence; an
+  owner on and off with the line, the toasts, the stored value and two change events; read only for a modeler and in an
+  archived workspace; another organization's licence shows the box in its workspaces only).
+
+**Deviations and open words (for Łukasz):**
+1. **The toasts are mine** (the PRD gives the label and the line only): "{workspace} is shown in InfoCatalog to everyone
+   in {organization}." and "{workspace} is shown in InfoCatalog to its members only." The box's heading is
+   "InfoCatalog" with a magnifier, as the modules' boxes have their name and mark.
+2. **A licence that ends while the switch is on** leaves `catalog_shown` stored as on, hidden with the box; without the
+   licence the catalog shows nothing anyway (`catalogReadable`), and the switch reads as on again if the licence comes
+   back.
+3. **S39-02's spec for the switch is its own file** (`S39-02-switch.spec.ts`); what the switch does in the catalog is in
+   S39-02's specs of steps 5 and 6.
+4. **No e2e for `pg:licence`:** a script against infomapper-dev only; its rules are the unit and contract tests above.
+5. `scripts/licence.ts` (the local file's) takes `infocatalog` since step 2 (`LICENSED_MODULES`); only its usage line
+   changed.
+
+**Checks:** lint and typecheck clean; `npm test` 223 files, 2,669 passed, 18 skipped (the Postgres-only suites skip
+without `INFOMAPPER_CONTRACT_DB`); `tests/contract/licence.test.ts` on a local Postgres 18.3 (3 passed); the touched
+specs as single files: `S39-02-switch.spec.ts` (4 passed), `S15-03`, `S25-01`, `S0-07` (6 passed).
+
+**Łukasz's migration** (the stop after this step): `pg:backup` from `dev`; `pg:migrate -- --dry-run` and `pg:migrate`
+from this branch; `pg:backup` again from this branch; the two backups' counts compared with `scripts/kb-counts.ts`. Then,
+for the acceptance, InfoMate's licence with `pg:licence` from this branch.

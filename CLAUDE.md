@@ -877,6 +877,7 @@ npm run pg:kb -- .data/backups/<copy of a backup>.json   # slice 31: KB from a b
 npm run pg:kb -- --remove     # slice 31: remove KB from infomapper-dev (people and other organizations stay)
 npm run pg:backup        # slice 31: KB's rows from infomapper-dev into a new .data/backups/pg/kb-<yyyymmdd-hhmm>.json (the local file's shape), counts only
 npm run pg:restore -- .data/backups/pg/kb-<yyyymmdd-hhmm>.json   # slice 31: KB back as that backup holds it; KB's undo histories emptied
+npm run pg:licence -- grant "<organization name>" infocatalog   # slice 39: a module's licence in infomapper-dev (devTargetRefusal, grant only, idempotent); on Łukasz's command only
 npx tsx scripts/kb-counts.ts .data/backups/<copy of a backup>.json   # slice 31: a read-only count of KB in a copy of a backup (counts and schema names only)
 npx tsx scripts/pg-auth-check.ts       # Auth on infomapper-dev: Data API off, sign-ups off, admin API, sign-in, getClaims
 npx tsx scripts/pg-snapshot-size.ts    # the editor's snapshot per workspace against Vercel's 4.5 MB
