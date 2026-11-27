@@ -1048,3 +1048,57 @@ working context keeps a 24 px target there.
       or a baseline's Compare…, or the entity's "Delete from model…": the buttons, fields and drop-downs as everywhere else.
    5. **Dark mode** (the person's menu › Dark): the same screens; the fields' edges and the drop-downs' text readable, the
       selected tab's underline and the focus ring visible, the canvas's cards as before.
+
+**Łukasz's acceptance (27 November 2026):** slice 37 accepted on `dev:pg` with the demo accounts: the side-by-side page;
+the canvas with the inspector; the workspace home and its tabs, People, Baselines' Compare, Settings; InfoDocumenter's
+editor; dark mode. `dev:pg` is stopped. His two notes:
+1. **The left panel's tabs** stand at the left at their natural width and do not spread when the panel widens. He keeps
+   them as they are for now and decides later; my recommendation for then: spread over the panel's width, text centred,
+   never narrower than its text, the pages' tabs staying at the left. His open point in `docs/ideas.md`; no change in
+   this slice.
+2. **A defect, fixed in step 10:** in InfoDocumenter's options panel (e.g. "Mappings included") the segmented control's
+   grey track spanned the panel's width while its buttons kept their text's width at the left, so the track stuck out
+   on the right and the buttons did not grow with the panel.
+
+## Step 10: the closing (27 November 2026)
+
+**The fix (Łukasz's note 2).** `SEGMENTED_BUTTON` (`src/ui/components/segmented.tsx`) gets `flex-1 min-w-fit
+text-center`: a track wider than its buttons (stretched by its parent, as a panel's column does with a flex item) is
+shared by them equally, text centred, as the prototype's `.dseg`; never narrower than its text (one line); a track that
+is not wider hugs its buttons (`inline-flex`). In two columns (`columns={2}`) the grid shares it as before. Every use:
+- **`Segmented` / `Seg`** (20 uses): InfoMapper's frame, mapping (kind, status), note, relationship (two) and
+  requirement (severity, status, priority) panels; InfoCube's mapping panel (kind, status) and sections (fact type,
+  dimension kind, history in two columns, additivity); InfoDocumenter's editor (mappings, model state's neighbours),
+  section options and style panel. Where the track stood in a column it now fills it with equal buttons; where it hugged
+  its buttons it still does.
+- **The toolbox's and the canvas look's tracks** (`toolbox.tsx`, `look.tsx`) built from the constants already had
+  `flex-1`: unchanged.
+- **The top bar's switches** (`LayerSwitch`, `NotationSwitch`) use `SEGMENTED_BAR_*`, which the fix does not touch:
+  their widths stay (S6A-10, S16-08).
+- **The unit test** (`tests/ui-components.test.ts`): the button's classes share a wider track (`flex-1`, `min-w-fit`,
+  `text-center`, one line) and the bar's buttons have no flex rule.
+
+**Checks:**
+- `npm run lint`, `npm run typecheck` and `npm test` pass (217 files, 2,620 tests, 14 skipped).
+- **The specs** (one local run, nothing beside it): every spec that reads a segmented control (`seg-…`, the canvas
+  look's grid, `segment(…)`; 47 files, the measuring and screenshot specs left out) with S28-07, S6A-10, S6A-11 and
+  S16-08: 50 files, **100 tests passed** (20.2 min).
+- **The check script on the screens with segmented controls** (`.data/ui-check/step10-20261127-1201/`: the mapping,
+  requirement and note panels, the toolbox, InfoCube's mapping, fact and dimension panels, the editor, its section and
+  its dialogs; 77 views): against step 8's after run on the same views, the same counts (28 overlaps, all at 390 px;
+  no text out of its control, no words run together, no failing target, no cut text, no page wider), and no finding at
+  1,280 px or wider. "Mappings included" fills the options panel with three equal buttons; InfoCube's fact type, whose
+  track is not stretched, hugs its buttons as before.
+
+**The docs:** `decisions.md` (D-89 with its note of the calls Łukasz accepted, D-85's note, AD-20's note), CLAUDE.md
+(slice 37 in "What this is"; "UI components": the components, the tokens, the guard, the check script, the documents'
+compare), `inventory-prototype-vs-app.md` (the look done, the layout to slice 38, the deliberate differences),
+`known-limitations.md` (the contrast entry mostly closed, the BK tag still open; the working context's name at
+1,201–1,250 px, step 8), `ideas.md` (shortcuts and the "?" sheet, a drawn check box, the BK chip's contrast, Łukasz's
+open point on the left panel's tabs), `README.md` (`npm run ui:check`).
+
+**Deviations from the PRD, all accepted by Łukasz:** A1 to A8 (section 1), F9 and F10; the small button's 12 px text
+and `Seg` kept until step 3 (step 2); the top bar's tools 7 px apart from 1,201 to 1,300 px, against "no control moves"
+(step 4); S16-08's new rule, the working context's label inside its button with 40 px only from 1,300 px up, until
+slice 38 (step 8); Segmented's buttons sharing a wider track (step 9's finding, here).
+

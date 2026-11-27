@@ -1,4 +1,4 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 36's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 37's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
@@ -35,6 +35,7 @@ docs (some are repeated below where they explain an item).
 | Labels and notes | rich text in notes | known limitation |
 | Projects and workspace | workspace export, export and delete, duplicate, transfer | – |
 | Settings and roles | inviting people by e-mail (slice 8 adds them at once instead) | database (AD-04) |
+| The look and the layout (slice 37) | the layout: the canvas toolbar, the slim top bar, InfoDocumenter's bar in one row, the homes in two columns, list rows, the phone's top bar | slice 38; the look **done** (slice 37, D-89) |
 | InfoDocumenter | logos, versions, links | idea (slice D); documents from a baseline and changes since a baseline **done** (slice 36, D-88) |
 
 ## Canvas
@@ -602,6 +603,33 @@ mark"; the list's "created {time}" and its order are the app's (Łukasz's B5.1);
   its size on its own, and the star's size as wide as its row; "Nothing by default" as the header's right placeholder
   (the prototype: "empty"); hints under an option that is ticked while nothing in the document uses it (Source-to-target's
   Note, Source tables' table note and classifications, the dictionary's concept frames, the style's List of figures).
+
+## The look and the layout (slice 37, D-89)
+
+Slice 37 takes the prototype's look of 26 November 2026 (the design system's tokens, controls and targets) and none of
+its layout. **Done:** white pages, panels, navigation row and the canvas tabs' strip; `--ink-3`, `--map`, `--warn`,
+`--line` and `--line-control` at the prototype's values (the canvas's cards keep their own edge, `--im-card-line`, A1);
+controls with radius 8, fields 32 px on pages and in the inspector and 28 px in toolbars, icon buttons 28 px in panels and
+24 px in dense rows, `.btn.sm` 28 px; the left panel's tabs at natural width; the status bar's check, the path's
+buttons, folds, swatches and `.flag` at their sizes; InfoDocumenter's section actions on hover, on the selected section
+and on focus, 28 px, dimmed at 30 %, and the `dseg` look (a wider track shared by its buttons).
+
+**Not built, slice 38's (the layout):**
+- the canvas toolbar (`#ctb`) with "Names ▾", and the path's room above the canvas;
+- the slim top bar and the phone's top bar (at 390 px the app's page does not scroll sideways, A7, but its top bar and
+  navigation row do not fit);
+- InfoDocumenter's bar in one 48 px row (`.de-top`);
+- the homes without side panels, in two columns, 1,320 px wide; list rows where the name wins;
+- the working context's label at 40 px at every width (from 1,201 to 1,250 px it is cut to its icon, the name in its
+  title; `docs/known-limitations.md`).
+
+**Not built, later:** "All apps" (`#tApps`), the "Proposals" tab and InfoCatalog (InfoCatalog's slices); a canvas in a
+second window.
+
+**Deliberate differences:** the dark values are written under Tailwind's `@variant dark`, not under
+`@media (prefers-color-scheme)` (D-85); the small button's text is 12 px, not 13 px (its width kept, S33-05, S6A-10);
+native selects and check boxes (F9); titles without shortcuts (A4, `docs/ideas.md`); the top bar's tools 7 px apart from
+1,201 to 1,300 px (was 11 px) so the working context keeps a 24 px target.
 
 ## The app ahead of the prototype (slice 22)
 

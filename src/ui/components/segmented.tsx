@@ -8,8 +8,13 @@
 import { cn } from "@/ui/lib/utils"
 
 export const SEGMENTED_TRACK = "rounded-md bg-im-hover p-0.5 gap-0.5"
+/**
+ * Step 10 (Łukasz's step 9 finding, the prototype's .dseg): a track wider than its buttons (stretched by its parent, a
+ * panel's column) is shared by them equally, their text centred (`flex-1`: a basis of 0, never narrower than its text,
+ * which stays on one line); a track that is not hugs its buttons (`inline-flex`). In two columns the grid shares it.
+ */
 export const SEGMENTED_BUTTON =
-  "min-h-6 whitespace-nowrap rounded-[6px] px-2.5 text-[12.5px] font-medium text-im-ink-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-im-logical enabled:hover:text-im-ink disabled:cursor-not-allowed aria-pressed:bg-im-surface aria-pressed:text-im-ink aria-pressed:shadow-[0_1px_2px_rgba(22,32,48,0.12),0_0_0_1px_var(--im-line)]"
+  "min-w-fit flex-1 text-center min-h-6 whitespace-nowrap rounded-[6px] px-2.5 text-[12.5px] font-medium text-im-ink-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-im-logical enabled:hover:text-im-ink disabled:cursor-not-allowed aria-pressed:bg-im-surface aria-pressed:text-im-ink aria-pressed:shadow-[0_1px_2px_rgba(22,32,48,0.12),0_0_0_1px_var(--im-line)]"
 
 /**
  * The top bar's segmented switches (the layer, the notation; step 4, F15): the track without the gap and buttons 26 px in

@@ -80,6 +80,11 @@ describe("Segmented, Tabs, Chip, Card", () => {
     has(SEGMENTED_TRACK, "bg-im-hover", "rounded-md");
     has(SEGMENTED_BUTTON, "min-h-6", "aria-pressed:bg-im-surface", "aria-pressed:text-im-ink");
   });
+  it("Segmented: a wider track is shared by its buttons equally, text centred, never narrower than its text; the bar's keep their widths", async () => {
+    has(SEGMENTED_BUTTON, "flex-1", "min-w-fit", "text-center", "whitespace-nowrap");
+    const { SEGMENTED_BAR_BUTTON } = await import("@/ui/components/segmented");
+    lacks(SEGMENTED_BAR_BUTTON, /^flex-/, /^grow/, /^basis-/);
+  });
   it("Tabs: natural width, room between them, the selected one underlined in the accent", () => {
     has(tabsListVariants(), "gap-5", "overflow-x-auto");
     has(tabsListVariants({ density: "panel" }), "gap-3.5");

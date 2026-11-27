@@ -679,6 +679,11 @@ stops at Requirements and the working context (`src/app/_panels/status-bar.tsx`)
 
 ### Grey text and two tags are below WCAG AA on a plain card
 
+**Mostly closed in slice 37** (D-89, [acceptance](prd/slice-37-acceptance.md)): `--im-ink-3` is #667383, 4.8:1 on white
+(dark #8a96a6, 5.1:1 on `im-surface`), and the PII tag (`--im-warn` #b33c0b on `--im-warn-soft`) 5.0:1. **Still open:**
+the BK tag, `--im-physical` on `--im-physical-soft`, 4.07:1 (an idea in `docs/ideas.md`, with the physical colours). The
+text below is kept as it was written.
+
 Found while checking the text under slice 4b-1's coverage colours (step 6). On a plain white card, three texts are
 below WCAG AA's 4.5:1 for normal text, with or without any tint:
 

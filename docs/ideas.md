@@ -1198,3 +1198,19 @@ decide.
   spanning the source's columns), a visible change of the PDF. **Done in fix/pdf-s2t-not-mapped** (D-80's note): the
   PDF, the preview and the quick sheet keep the type with "Not mapped" under Source column, as the Markdown; the prototype
   did not span the word either (only its older baseline document does); `alignedCells` is gone.
+
+## Slice 37's follow-ups (27 November 2026)
+
+- **Shortcuts in icon buttons' tooltips, with a "?" sheet** (F7, A4): slice 37 keeps every title word for word (98
+  assertions read one). Later: the shortcut in the tooltip ("Undo (Ctrl+Z)") and a "?" sheet listing the app's keys,
+  each spec that reads such a title changed with it.
+- **A drawn check box** (F9): slice 37 keeps the native one with `accent-color`, its edge at least 3:1. If that is ever
+  not enough, a drawn box in `line-control` (a Radix checkbox), keeping the `input` the specs read.
+- **The BK chip's contrast:** `--im-physical` on `--im-physical-soft` is 4.07:1, under WCAG AA's 4.5:1
+  (`docs/known-limitations.md`). Its fix changes the physical colours (cards, chips, lines), so it goes with a decision
+  on them.
+- **The left panel's tabs: for Łukasz to decide** (his open point at slice 37's acceptance, 27 November 2026): they stand
+  at the left at their natural width and do not spread when the panel widens. Claude's recommendation for then: spread
+  them over the panel's width, text centred, never narrower than its text; the pages' tabs (the workspace home's) stay at
+  the left.
+

@@ -116,6 +116,10 @@ its footer and draft mark name the baseline; the section "Changes since a baseli
 the older state first, the document's scope on either side, compared on the server); the sign-off preset; "New document
 from it" and "Make a document" on the Baselines tab; Markdown's front matter names the baseline; a gone baseline's
 documents stay and say so; the Documentation list says "created {time}", the same name newest first.
+Slice 37 (D-89) is the design system's foundation, the look and not the layout: the tokens (light and dark), one radius
+scale, targets of at least 24 px, white pages, and every control of InfoMapper and both modules drawn by the shared
+components in `src/ui/components`; nothing moves, the canvas's cards keep their geometry and the generated documents
+are byte for byte as before; a guard refuses control styles outside `src/ui`, and `npm run ui:check` checks the screens.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -494,6 +498,40 @@ list up to date in each sub-slice):
 
 **UI (AD-20).** Tailwind and shadcn/ui; Tiptap for rich text. Match the prototype’s layout, wording and behaviour;
 visual polish may improve, behaviour may not change without a decision.
+
+**UI components (slice 37, D-89, AD-20's note).**
+- **The components** are `src/ui/components`: `Button` and `buttonVariants` (primary, secondary, quiet, danger; `md` 32,
+  `sm` 28, `bar` 30 px; a `<Link>` that looks like a button takes the variants), `IconButton` (28, `xs` 24 in dense rows;
+  `label` becomes `aria-label`, `title` passed unchanged), `Input`, `Textarea`, `QUIET_FIELD` and `QUIET_TEXT` (the zoom,
+  the project heading), `Select` (a styled native `<select>`, sizes `md`, `sm`, `bar`; `className` for layout only),
+  `Segmented` (`fields.tsx`' `Seg` is its alias; a group with `aria-pressed`; a wider track shared by its buttons
+  equally; `SEGMENTED_BAR_*` for the top bar's switches, which keep their widths), `Check` and `CHECK_LABEL` (a native
+  check box, a 24 px row), `Field` (label, hint, ids), `tabsListVariants` and `tabVariants` (`density: "panel"` for the
+  left panel), `chipVariants`, `cardVariants` and `ADD_TILE`, `menu.ts` (`MENU_CONTENT`, `MENU_ITEM`, …, shared by the
+  Radix menus and `canvas-menu.tsx`), `DISCLOSURE_HEADER`, `toolButtonVariants` (the top bar's 30 px tools, no edge).
+  `cn` is `@/ui/lib/utils` (tailwind-merge knows the scales). **The tokens** are in `globals.css`: `h-control-md`,
+  `-sm`, `-bar`, `min-h-target`/`size-target` (24 px), `text-title`, `-section`, `-body`, `-small`, `-label`, `-code`,
+  `rounded-sm`/`-md`/`-lg` (4, 8, 12 px), `shadow-pop`, `border-im-line-control`, `--im-card-line` (the canvas's own
+  edge), `--im-on-accent`. InfoMapper's `TextField` and `TextArea` keep D-66's draft and draw with `Input` and `Textarea`.
+- **The guard** (`tests/control-style-guard.test.ts`, rules in `tests/lib/control-style.ts`): an AST check of every
+  `.tsx` file outside `src/ui`. On `<button>`, a field `<input>`, `<select>` and `<textarea>` it refuses an edge, an
+  arbitrary radius or px height, a radius with a height or size, from a literal, a template, `cn`'s arguments or a
+  constant of the file or of another under `src/`, and every native `<select>` but `Select`'s. `…Variants` calls and
+  constants exported by `src/ui` are the shared look; `min-h-target` is allowed. Its one exception is named in it (the
+  canvas tabs, slice 38); its "to convert" list is empty. **A new control** takes a component or its variants; a look
+  that does not exist yet goes into `src/ui/components` (layout classes, width and margin, stay at the call).
+- **The check script** `npm run ui:check -- --label <name>` (`scripts/ui-check.ts`, pure rules in
+  `scripts/lib/ui-check-rules.ts`, `tests/ui-check-rules.test.ts`): its own dev server on 127.0.0.1:3400
+  (`.next-ui-check`) and its own data file, `.data/ui-check-db.json`, reset from the demo with long names on every run
+  (never the development or the demo file); every screen of its list at 1280, 1440 and 1920 px light and dark and at
+  390 px light: overlaps, controls past the edge, text out of its control, words run together, targets under 24 px
+  (WCAG 2.5.8's spacing), cut text, pages wider than the screen, and the kinds of control, into
+  `.data/ui-check/<label>-<time>/` (`report.md`, `report.json`, screenshots). `--only a,b` (screens by prefix),
+  `--widths`, `--themes`, `--url` (a running server). `--compare <before> <after>` writes
+  `.data/ui-check/slice-37-before-and-after.html`. React Flow's attribution link is a named exception. Not part of the
+  e2e run or CI; never against Postgres.
+- **The generated documents** are compared with `npx tsx scripts/document-texts.ts <label>` and `diff -r` against
+  `.data/ui-check/documents-before` (18 files: six documents' Markdown, HTML and CSS): a UI change leaves them unchanged.
 
 **The theme (slice 32, D-85).** The cookie `im-theme` (`light` or `dark`; System deletes it; per browser, not per person)
 is read by the root layout (`src/app/layout.tsx`), which renders `data-theme` on `<html>`; the rules are
