@@ -17,11 +17,25 @@ import type { ApplyOptions, ApplyResult, DataStore } from "../ports";
 import { newestImportFirst, oldestChangeFirst } from "../order";
 import { assertNotProduction, readBaselineContent, readDbCached, readDbStamped, writeDb } from "./file";
 import { shapedBaselineContent } from "../baselines";
+import { catalogReadOf } from "../catalog";
+import { CATALOG_WORKSPACE_TABLES } from "@/domain/catalog/read";
+import { catalogReadable } from "@/domain/permissions";
 import { snapshotWriteRefusal } from "@/domain/baseline/content";
 import { newestBaselineFirst } from "@/domain/baseline/names";
 import { CORE_SCHEMA, findViolation, keyOf, readRows, rowsOf, upgradeRows, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
 
 const live = <R extends { deleted_at: string | null }>(rows: R[]): R[] => rows.filter((r) => r.deleted_at === null);
+
+/** What `catalogReadable` reads, from the file: every row of the five tables (the rule picks the person's). */
+const catalogRightsOf = (db: DevDb, userId: Uuid, unlocked: ReadonlySet<Uuid>) => ({
+  userId,
+  unlocked,
+  organizations: db.organization,
+  memberships: db.organization_member,
+  licences: db.organization_licence,
+  workspaces: db.workspace,
+  workspaceMembers: db.workspace_member,
+});
 
 // Writes are serialised per file within this process.
 const queues = new Map<string, Promise<unknown>>();
@@ -114,6 +128,20 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
         if (!row) return null;
         const stored = await readBaselineContent(file, baselineId);
         return stored === null ? null : shapedBaselineContent(stored, row.snapshot_schema, schema);
+      },
+    },
+
+    // slice 39 (C1): the rights by the domain's rule over the file's rows, then the shared read
+    catalog: {
+      readable: async (userId, unlocked) => catalogReadable(catalogRightsOf(await load(), userId, unlocked)),
+      read: async (userId, unlocked, scope, tables) => {
+        for (const table of tables) if (!schema.rules[table]) throw new Error(`The store does not know the table ${table}.`);
+        const db = await load();
+        const rows: Record<string, readonly unknown[]> = { workspace: db.workspace, organization: db.organization, app_user: db.app_user };
+        for (const table of CATALOG_WORKSPACE_TABLES) rows[table] = (db as unknown as Record<string, unknown[]>)[table] ?? [];
+        const modules: Partial<Record<ModuleTable, unknown[]>> = {};
+        for (const table of tables) modules[table] = readRows(db, table as StoreTable, schema);
+        return catalogReadOf(rows as never, catalogReadable(catalogRightsOf(db, userId, unlocked)), scope, modules as never);
       },
     },
 

@@ -11,6 +11,8 @@ import type { HistoryChange, UndoState, UndoStep } from "@/domain/model/undo-his
 import type { MappingLog } from "@/domain/model/mapping-rules";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type { BaselineContent } from "@/domain/baseline/content";
+import type { CatalogRead, CatalogScope } from "@/domain/catalog/read";
+import type { CatalogOrganization } from "@/domain/permissions";
 import type {
   AppUser,
   Baseline,
@@ -143,6 +145,22 @@ export interface CanvasRepository {
   listLinksOfCanvas(workspaceId: Uuid, canvasId: Uuid): Promise<ProjectCanvas[]>;
 }
 
+/**
+ * InfoCatalog's catalog index (slice 39, A1.2 guardrail 1, C1): who reads what, checked inside the adapter by the
+ * domain's `catalogReadable`, and the readable workspaces' rows in one consistent read, one statement per table on
+ * Postgres whatever the number of workspaces. A workspace the person may not read is never read.
+ */
+export interface CatalogRepository {
+  /** The licensed organizations whose catalog the person reads, each with its readable workspaces. */
+  readable(userId: Uuid, unlocked: ReadonlySet<Uuid>): Promise<CatalogOrganization[]>;
+  /**
+   * A snapshot of each readable workspace in scope (an organization's, or one workspace) with the named module tables'
+   * live rows; frames, labels and change events are left out. Null when the person may not read the scope: "not found",
+   * never another answer that would say it exists. A table the store does not know throws.
+   */
+  read<T extends ModuleTable>(userId: Uuid, unlocked: ReadonlySet<Uuid>, scope: CatalogScope, tables: readonly T[]): Promise<CatalogRead<T> | null>;
+}
+
 export interface ModelRepository {
   /** Every live model row of the workspace, from concepts to mapping inputs. */
   load(workspaceId: Uuid): Promise<WorkspaceModel>;
@@ -273,6 +291,8 @@ export interface DataStore {
   undoHistory: UndoHistoryRepository;
   modules: ModuleRowRepository;
   baselines: BaselineRepository;
+  /** Slice 39: InfoCatalog's read (`CatalogRepository`). */
+  catalog: CatalogRepository;
   /**
    * One consistent read of a live workspace (slice 25, F1): its model, requirements, projects and cards, people and the
    * named module tables' live rows, all from one state of the data. Null when the workspace is not live. A table the
