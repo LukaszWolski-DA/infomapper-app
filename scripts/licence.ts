@@ -1,5 +1,6 @@
 // Grants an organization a module's licence in a local data file (slice 15a, C-7, Q6 as changed on 4 November 2026):
-//   npx tsx scripts/licence.ts grant "<organization name>" infocube|infodoc [--file <db>]   (infodoc: slice 25)
+//   npx tsx scripts/licence.ts grant "<organization name>" infocube|infodoc|infocatalog [--file <db>]   (infodoc: slice 25,
+//   infocatalog: slice 39; in infomapper-dev: npm run pg:licence, scripts/pg-licence.ts)
 // Development only (the local adapter, AD-29); the database slice replaces it with whatever sells the licence. It only
 // grants: ending a licence has no command yet (docs/known-limitations.md). It writes no change event, as the seed's
 // rows have none, and changes nothing else in the file; a workspace is turned on in its settings by an owner or admin.
