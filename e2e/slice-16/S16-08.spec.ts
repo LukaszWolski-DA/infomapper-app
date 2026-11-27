@@ -2,6 +2,9 @@
 // platform: at 1,201 px too (S6A-10's case, docs/known-limitations.md "The top bar overflows by 1 px at 1,201 px on
 // Linux"). The working context's label is the bar's flexible item, truncated by the browser, with its name in the
 // button's title. S6A-10 still checks that nothing is cut off at slice 6a's widths.
+// Slice 37 (step 8, Łukasz's choice until slice 38): the label stays inside its button at every width, cut by the
+// browser, with the context's name in the title; it keeps 40 px at least from 1,300 px up, and at 1,201–1,250 px it may
+// be cut to the icon alone (docs/known-limitations.md). Slice 38 gives it 40 px again at every width.
 
 import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, contextOn, openCanvas, signInAs, WHOLE_CO } from "./helpers";
@@ -10,14 +13,16 @@ const WIDTHS = [2560, 2100, 1880, 1600, 1536, 1300, 1250, 1201, 1200, 1101, 1100
 const TITLE = "Working on CR-23. Everything you create or change in the model gets this label.";
 
 const scrollOf = (page: Page) => page.getByTestId("bar-top").evaluate((bar) => bar.scrollWidth - bar.clientWidth);
-/** The label's shown width and whether the browser truncates it. */
+/** The label's shown width, whether the browser truncates it and how far it runs past its button's right edge. */
 const labelOf = (page: Page) =>
   page.getByTestId("button-context").evaluate((b) => {
     const span = [...b.querySelectorAll("span")].find((s) => s.textContent?.startsWith("Working on"))!;
-    return { width: Math.round(span.getBoundingClientRect().width), cut: span.scrollWidth > span.clientWidth };
+    const r = span.getBoundingClientRect();
+    const past = Math.max(0, Math.round((r.right - b.getBoundingClientRect().right) * 10) / 10);
+    return { width: Math.round(r.width), cut: span.scrollWidth > span.clientWidth, past };
   });
 
-test("S16-08: the top bar never scrolls from 2,560 to 800 px; the working context's label gives way, its name in the title", async ({ page }) => {
+test("S16-08: the top bar never scrolls from 2,560 to 800 px; the working context's label gives way inside its button, its name in the title", async ({ page }) => {
   test.setTimeout(120_000);
   await signInAs(page, "Łukasz");
   await contextOn(page, "CR-23");
@@ -34,7 +39,9 @@ test("S16-08: the top bar never scrolls from 2,560 to 800 px; the working contex
     const scroll = await scrollOf(page);
     table[width] = { scroll, label };
     expect(scroll, `${width}: the bar scrolls`).toBe(0);
-    expect(label.width, `${width}: the label keeps 40 px at least`).toBeGreaterThanOrEqual(40);
+    expect(label.past, `${width}: the label runs past its button`).toBe(0);
+    await expect(page.getByTestId("button-context"), `${width}: the title names the context`).toHaveAttribute("title", TITLE);
+    if (width >= 1300) expect(label.width, `${width}: the label keeps 40 px at least`).toBeGreaterThanOrEqual(40);
   }
   console.log(`S16-08: ${JSON.stringify(table)}`);
   // at 1,201 px the label is truncated by the browser, and its name stays in the title

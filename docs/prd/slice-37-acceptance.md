@@ -268,6 +268,12 @@ document (`.dt`, `.ddr`, `.dtoc`, …). Neither is touched. `toHaveClass` reads 
 - `e2e/slice-29/S32-smoke-theme.spec.ts`: `LIGHT_BODY`, the same reason;
 - `S32-01`, `S32-02` and `S32-04` read `BODY_BG` through the helpers and change with them. `S32-01` compares the
   inspector's background between themes only, which holds.
+- `e2e/slice-16/S16-08.spec.ts` (added in step 8, Łukasz's choice after the full run): the working context's label no
+  longer keeps 40 px at every width. Step 4 keeps it inside its button (Łukasz's step 4 finding: it ran 21 px out of a
+  19 px button at 1,201 px), cut by the browser. The spec now checks at its 13 widths that the bar never scrolls, the
+  label never runs past its button and the title names the context; 40 px at least only from 1,300 px up; at 1,201 px
+  the label is still truncated. A temporary state until slice 38, which gives the label 40 px again at every width once
+  the canvas's controls leave the top bar (`docs/known-limitations.md`, "The working context's name at 1,201–1,250 px").
 
 No assertion changes, only the expected token values the decision changes.
 
@@ -993,6 +999,9 @@ working context keeps a 24 px target there.
     button has 30 px, the label 0. Before the slice the label kept 40 px by running 21 px out of a 19 px button. Not a
     flake: a behaviour step 4 changed that a spec of slice 16 reads, and S16-08 is not on this slice's list of earlier
     specs that change (section 6). Step 4's local specs did not include it. **Stopped for Łukasz's decision.**
+  - **Łukasz's answer:** his option 1, until slice 38: the label stays inside its button, cut by the browser, with the
+    context's name in the title; at 1,201–1,250 px it may be cut to the icon alone. S16-08 is changed to that rule and is
+    on the list of earlier specs that change (section 6); the limitation is in `docs/known-limitations.md`.
 
 ## Step 9: Łukasz's acceptance, what to open and where to look
 

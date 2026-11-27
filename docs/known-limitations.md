@@ -655,6 +655,16 @@ and undoes with Ctrl+Z. Idea in `docs/ideas.md` (“A top bar that fits narrow w
 
 - **Found** in slice 5a, step 2; left for a later slice. **Later:** not planned yet.
 
+### The working context's name at 1,201–1,250 px (slice 37)
+
+With the working context on, from 1,201 to 1,250 px the top bar leaves the context's button about 30 px: its label
+("Working on CR-23") is cut by the browser to the icon alone, and the context's name shows only in the button's tooltip
+(its title). From 1,300 px up the label keeps at least 40 px. Before slice 37 the label kept 40 px by running out of its
+button; slice 37 keeps it inside (step 4) and S16-08 checks that (step 8, Łukasz's choice).
+
+- **Found** in slice 37, step 8 (the full run's S16-08). **Later:** slice 38 gives the label at least 40 px again at
+  every width, once the canvas's controls leave the top bar.
+
 ### The status bar has no “Open notes on canvas {n}”
 
 **Closed in slice 6a** ([PRD](prd/slice-06a-view-state-bar.md), [acceptance](prd/slice-06a-acceptance.md)): the status bar follows Requirements with “Open notes on canvas {n}”, counting open
