@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { canvasUrl, cardOf, entityBox, FULL, headerOf, idsOf, loadModel, openCanvas, setEntityAlias, setWidth, signInAs } from "./helpers";
+import { canvasUrl, cardOf, entityBox, FULL, headerOf, idsOf, loadModel, openCanvas, setEntityAlias, setWidth, signInAs, clickBox } from "./helpers";
 import { updateEntity } from "../../src/domain/commands/entity";
 import { asLukasz } from "../slice-01b/helpers";
 
@@ -19,7 +19,7 @@ test("S11-07: a long alias in a 200 px card is truncated like a name of the same
   const named = (await idsOf(LONG)).itemId;
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), FULL);
-  await entityBox(page).click();
+  await clickBox(page, entityBox(page));
   await expect(headerOf(page, customer)).toHaveText(LONG);
 
   const fit = (itemId: string) =>

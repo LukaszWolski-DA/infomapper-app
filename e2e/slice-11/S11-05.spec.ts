@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { attributeBox, canvasRow, canvasUrl, entityBox, exceptionsOf, expectBox, HALF, headerOf, idsOf, openCanvas, setEntityAlias, setException, signInAs, tintOf, undo } from "./helpers";
+import { attributeBox, canvasRow, canvasUrl, entityBox, exceptionsOf, expectBox, HALF, headerOf, idsOf, openCanvas, setEntityAlias, setException, signInAs, tintOf, undo, clickBox } from "./helpers";
 
 // Mixed (items 8, P5): with one card's entity exception the check box is indeterminate; a click shows aliases on every
 // card and clears the exception; one undo restores the canvas's mode and the exception with its tint; the attribute
@@ -19,7 +19,7 @@ test("S11-05: an exception makes “Entity aliases” indeterminate; a click sho
   await expect(headerOf(page, customer)).toHaveText("Customer");
   expect(await tintOf(page, order)).toEqual({ header: true, rows: false });
 
-  await entityBox(page).click();
+  await clickBox(page, entityBox(page));
   await expect(headerOf(page, customer)).toHaveText("Klient");
   await expect(headerOf(page, order)).toHaveText("Zamówienie");
   await expect.poll(() => tintOf(page, order)).toEqual({ header: false, rows: false });

@@ -11,9 +11,9 @@ import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { offencesIn } from "./lib/control-style";
 
-const EXCEPTIONS: Readonly<Record<string, string>> = {
-  "src/app/w/[workspaceId]/p/[projectId]/_components/canvas-tabs.tsx": "the canvas tabs with their menus and the rename field are slice 38's layout (F8)",
-};
+// slice 38 (B8): empty since the canvas tabs are drawn with the shared tab variants (`tabsListVariants` "canvas",
+// `CANVAS_TAB`) and their buttons and rename field with the shared components
+const EXCEPTIONS: Readonly<Record<string, string>> = {};
 
 /** Slice 37, step 2: every file that styled a control on its own after `fields.tsx`' constants became the shared look.
  * Step 3a converted the inspector's panels and InfoCube's sections (15 files); step 3b the left panel, the toolbox and

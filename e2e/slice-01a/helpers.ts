@@ -30,14 +30,23 @@ export async function loadRequirementCards(ws: string = RETAIL, canvasId: string
 export const store = () => createLocalDataStore(E2E_DB);
 
 /**
+ * The canvas toolbar's bottom, in px below the canvas's top (slice 38: 12 px from the top, 38 px high). The canvas
+ * area a spec's view was written for starts there now.
+ */
+export const TOOLBAR_BOTTOM = 50;
+/** A spec's view as `openCanvas` stores it: the same view, `TOOLBAR_BOTTOM` lower, so nothing it shows is under the toolbar. */
+export const belowToolbar = (view: { x: number; y: number; zoom: number }) => ({ ...view, y: view.y + TOOLBAR_BOTTOM });
+
+/**
  * Opens a canvas. With a view, it is stored as the canvas's remembered view first (data model section 12), so the
- * canvas opens exactly there.
+ * canvas opens there. Since slice 38 the view is stored `TOOLBAR_BOTTOM` px lower (`belowToolbar`): the specs' views
+ * were written for a canvas whose top was free, and the canvas toolbar now covers its top 50 px.
  */
 export async function openCanvas(page: Page, url = canvasUrl(), view?: { x: number; y: number; zoom: number }) {
   if (view) {
     const canvasId = url.split("/c/")[1]!;
     await page.goto("/sign-in"); // any page of the app, to reach its localStorage
-    await page.evaluate(([k, v]) => localStorage.setItem(k, v), [`infomapper:view:${canvasId}`, JSON.stringify(view)] as const);
+    await page.evaluate(([k, v]) => localStorage.setItem(k, v), [`infomapper:view:${canvasId}`, JSON.stringify(belowToolbar(view))] as const);
   }
   await page.goto(url);
   await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-ready", "true");

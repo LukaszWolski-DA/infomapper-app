@@ -47,6 +47,8 @@ import { buildNotes } from "@/canvas/note-data";
 import { NoteToolButton } from "@/canvas/NoteToolButton";
 import { MoreTools } from "@/canvas/MoreTools";
 import { MORE_FOCUS, MORE_NAMES, MORE_TOOLS } from "@/canvas/more-breakpoints";
+import { CanvasToolbar, ToolbarSeparator } from "@/canvas/CanvasToolbar";
+import { NamesMenu } from "@/canvas/NamesMenu";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
 import { EntityToolButton } from "@/canvas/EntityToolButton";
 import { HandToolButton } from "@/canvas/HandToolButton";
@@ -54,7 +56,6 @@ import { FocusButton } from "@/canvas/Focus";
 import { ChangesButton } from "@/canvas/Changes";
 import { changesImport } from "@/canvas/changes-import";
 import { LayerSwitch } from "@/canvas/LayerSwitch";
-import { NamesSwitch } from "@/canvas/NamesSwitch";
 import { CanvasLookProvider } from "@/canvas/look";
 import { ModelCanvas } from "@/canvas/ModelCanvas";
 import { SelectionHistory } from "@/canvas/SelectionHistory";
@@ -240,7 +241,8 @@ export default async function CanvasPage({
               view,
               currentCanvasId: canvasId,
               renameOnOpen,
-              tools: <CanvasTools editable={editable} canNote={canNote} />,
+              tools: <TopBarTools />,
+              canvasTools: <CanvasTools editable={editable} canNote={canNote} />,
               left: <LeftPanel workspaceId={ws} canvasId={canvasId} tree={tree} editable={editable} conceptFrames={conceptFrames} importData={importData} />,
               right: (
                 <Inspector
@@ -426,32 +428,46 @@ function checkArrivalOf(
   return null;
 }
 
-// On a narrow window the names' check boxes (slice 11), then Focus and the notation, then the four tools, leave the bar for “More” (slice 6a): each wrapper is
-// the tool's own element in the bar (`display: contents` until its breakpoint).
-const CanvasTools = ({ editable, canNote }: { editable: boolean; canNote: boolean }) => (
+// The top bar's tools on a canvas page (slice 38, DS3.1): the working context and Undo and Redo; the canvas's own
+// controls are in its toolbar.
+const TopBarTools = () => (
   <>
+    <WorkingContextButton />
+    <UndoButtons />
+  </>
+);
+
+// The canvas toolbar (slice 38, S38-01): what is shown | Focus, Changes | the tools | the notation | “Names ▾” | zoom |
+// “More”. On a narrow canvas the names, then Focus, Changes and the notation, then the four tools leave for “More”
+// (slice 6a's order, `more-breakpoints.ts`): each wrapper is the group's own element in the toolbar (`display:
+// contents` while it fits), with the hairline before it.
+const CanvasTools = ({ editable, canNote }: { editable: boolean; canNote: boolean }) => (
+  <CanvasToolbar>
     <LayerSwitch />
-    <span className={`contents ${MORE_NAMES.inBar}`}>
-      <NamesSwitch />
-    </span>
     <span className={`contents ${MORE_FOCUS.inBar}`}>
+      <ToolbarSeparator />
       <FocusButton />
       <ChangesButton />
     </span>
     <span className={`contents ${MORE_TOOLS.inBar}`}>
-      {editable && <EntityToolButton />}
-      {editable && <FrameToolButton />}
-      {canNote && <NoteToolButton />}
+      <ToolbarSeparator />
       <HandToolButton />
+      {editable && <EntityToolButton />}
+      {canNote && <NoteToolButton />}
+      {editable && <FrameToolButton />}
     </span>
     <span className={`contents ${MORE_FOCUS.inBar}`}>
+      <ToolbarSeparator />
       <NotationSwitch />
     </span>
-    <WorkingContextButton />
-    <UndoButtons />
+    <span className={`contents ${MORE_NAMES.inBar}`}>
+      <ToolbarSeparator />
+      <NamesMenu />
+    </span>
+    <ToolbarSeparator />
     <ZoomControls />
     <MoreTools editable={editable} canNote={canNote} />
-  </>
+  </CanvasToolbar>
 );
 
 /** The modules' lines beside InfoMapper's (slice 15c): absent when there are none, so nothing more is drawn. */

@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { canvasRow, canvasUrl, entityBox, expectBox, headerOf, idsOf, liveUrl, openCanvas, openLiveFor, setEntityAlias, signInAs, undo } from "./helpers";
+import { canvasRow, canvasUrl, entityBox, expectBox, headerOf, idsOf, liveUrl, openCanvas, openLiveFor, setEntityAlias, signInAs, undo, clickBox } from "./helpers";
 
 // Entity aliases on a canvas (items 8, 10): “Entity aliases” shows Customer's alias, names where there is none; one
 // undo step; kept after a reload; another canvas with Customer still shows its name.
@@ -14,7 +14,7 @@ test("S11-02: checking “Entity aliases” shows “Klient” in Customer's hea
   await expect(entityBox(page)).toBeEnabled();
   await expect(headerOf(page, customer)).toHaveText("Customer");
 
-  await entityBox(page).click();
+  await clickBox(page, entityBox(page));
   await expect(headerOf(page, customer)).toHaveText("Klient");
   await expect(headerOf(page, customer)).toHaveAttribute("title", "Klient");
   await expect(headerOf(page, order)).toHaveText("Sales Order");
@@ -26,7 +26,7 @@ test("S11-02: checking “Entity aliases” shows “Klient” in Customer's hea
   await expect(headerOf(page, customer)).toHaveText("Customer");
   await expectBox(entityBox(page), "name");
 
-  await entityBox(page).click();
+  await clickBox(page, entityBox(page));
   await expect.poll(async () => (await canvasRow()).entity_names).toBe("alias");
   await page.reload();
   await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-ready", "true");
@@ -40,7 +40,7 @@ test("S11-02: another canvas with Customer still shows “Customer”", async ({
   const live = await openLiveFor("CR-23");
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
-  await entityBox(page).click();
+  await clickBox(page, entityBox(page));
   await expect.poll(async () => (await canvasRow()).entity_names).toBe("alias");
 
   await openCanvas(page, liveUrl(live));

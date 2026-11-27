@@ -5,6 +5,7 @@
 // “Add the N missing to this canvas”, B-08), relationships,
 // “Remove from this canvas” and “Delete from model…” with the impact dialog (D-47).
 
+import { ROW_NAME_WINS, ROW_PHYSICAL } from "@/ui/components/list-row";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { addAttributeAction, updateEntityAction } from "@/app/_actions/model";
 import type { UpdateEntityInput } from "@/domain/commands/entity";
@@ -183,7 +184,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
               const meta = fed ? <span className="font-mono text-xs">{fed}</span> : <span className="italic">{feed?.none ?? "unmapped"}</span>;
               if (!p.editable) {
                 return (
-                  <Li key={a.id} onClick={() => p.goAttribute(a.id)} meta={meta}>
+                  <Li key={a.id} onClick={() => p.goAttribute(a.id)} meta={meta} physical={fed}>
                     {a.name}
                   </Li>
                 );
@@ -225,8 +226,11 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
                   <span className="w-3 flex-none text-[11px] tracking-[-2px] text-im-ink-3" aria-hidden>
                     ⋮⋮
                   </span>
-                  <span className="min-w-0 flex-1 truncate">{a.name}</span>
-                  <span className="whitespace-nowrap text-[11.5px] text-im-ink-3">{meta}</span>
+                  {/* slice 38 (S38-05): the name wins, the physical names shorten, their full text in the title */}
+                  <span className={ROW_NAME_WINS}>{a.name}</span>
+                  <span className={ROW_PHYSICAL} title={fed || undefined}>
+                    {meta}
+                  </span>
                 </div>
               );
             }}

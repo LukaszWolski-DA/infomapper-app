@@ -22,6 +22,13 @@ describe("overlaps", () => {
     const underPanel = control({ x: 0, y: 0, w: 60, h: 24 }, { coveredBy: "other" });
     expect(overlaps([a, touching, child, hidden, card, underPanel])).toEqual([]);
   });
+  it("a control under a panel is not judged for its size or its text's neighbours either (slice 38)", () => {
+    const tiny = control({ x: 0, y: 0, w: 4, h: 4 }, { coveredBy: "other" });
+    const field = control({ x: 6, y: 0, w: 100, h: 24 }, { textBox: { x: 6, y: 4, w: 90, h: 16 } });
+    const word = control({ x: 0, y: 0, w: 4, h: 4 }, { coveredBy: "other", textBox: { x: 0, y: 4, w: 5.5, h: 16 } });
+    expect(smallTargets([tiny, field])).toEqual([]);
+    expect(crowdedTexts([word, field])).toEqual([]);
+  });
   it("a pop-over over the page hides what it covers; two controls in it, or two below it, still collide", () => {
     const row = control({ x: 0, y: 0, w: 200, h: 24 });
     const item = control({ x: 10, y: 4, w: 200, h: 28 }, { floating: true });

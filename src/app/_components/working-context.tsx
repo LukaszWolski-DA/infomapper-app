@@ -113,9 +113,9 @@ export function WorkingContextProvider({
   return <WorkingContextCtx.Provider value={api}>{children}</WorkingContextCtx.Provider>;
 }
 
-// the bar's flexible item (slice 16): it shrinks, but never below a 24 px target (slice 37, step 4: 19 px at 1,201 px
-// before; the tools' gap gives up 1 px each from 1,201 to 1,300 px for it; 4 px padding up to 1,000 px), and its
-// label is cut inside it rather than running out of it
+// the bar's flexible item (slice 16): it shrinks once the switchers are at their minimum, its label cut inside it
+// rather than running out of it, and never below 40 px (slice 38, S38-02: the canvas's controls left the bar, which
+// closes slice 37's limitation at 1,201–1,250 px); 4 px padding up to 1,000 px
 const btn = cn(toolButtonVariants(), "min-w-target max-w-full flex-initial px-2 max-[1001px]:px-1 aria-pressed:text-im-ink");
 
 /** The top bar's switch left of Undo, and its menu (PRD item 1). */
@@ -178,7 +178,7 @@ export function WorkingContextButton() {
         {active ? (
           <>
             <span className="size-2 flex-none rounded-full bg-im-logical" aria-hidden />
-            <span className="min-w-0 max-w-[180px] truncate max-[1301px]:max-w-[90px] max-[1201px]:max-w-[56px] max-[1001px]:max-w-[40px]">Working on {active.name}</span>
+            <span className="min-w-10 max-w-[180px] truncate max-[1301px]:max-w-[120px] max-[1001px]:max-w-[90px]">Working on {active.name}</span>
           </>
         ) : (
           <>

@@ -5,7 +5,7 @@
 // opens exactly as stored.
 
 import { expect, test, type Page } from "./fixtures";
-import { canvasUrl, CO, cardAt, expectCardAt, grip, openCanvas, panelWidth, signInAs, togglePanel, viewStored, viewportTransform, WHOLE_CO } from "./helpers";
+import { belowToolbar, canvasUrl, CO, cardAt, expectCardAt, grip, openCanvas, panelWidth, signInAs, togglePanel, viewStored, viewportTransform, WHOLE_CO } from "./helpers";
 
 const stored = (page: Page) => page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? "null") as { x: number; y: number; zoom: number; left?: number } | null, `infomapper:view:${CO}`);
 
@@ -16,8 +16,9 @@ test("S6A-11: an old view opens as stored; a view saved with the left panel show
   await page.setViewportSize({ width: 1600, height: 900 });
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), WHOLE_CO);
-  // the old format: exactly the stored transform; saved again at once with the left edge
-  expect(await viewportTransform(page)).toEqual(WHOLE_CO);
+  // the old format: exactly the stored transform (`openCanvas` stores it under the toolbar, slice 38); saved again at
+  // once with the left edge
+  expect(await viewportTransform(page)).toEqual(belowToolbar(WHOLE_CO));
   await savedWithLeft(page, 264);
   const at = await cardAt(page, "Customer");
   const saved = (await stored(page))!;

@@ -657,6 +657,11 @@ and undoes with Ctrl+Z. Idea in `docs/ideas.md` (“A top bar that fits narrow w
 
 ### The working context's name at 1,201–1,250 px (slice 37)
 
+**Closed in slice 38** ([PRD](prd/slice-38-design-system-layout.md), [acceptance](prd/slice-38-acceptance.md), step 3):
+the canvas's controls left the top bar for the canvas toolbar, and the context's label keeps 40 px at least at every one
+of S16-08's 13 widths from 800 to 2,560 px, inside its button, its name in the title. What follows is kept as it was
+written.
+
 With the working context on, from 1,201 to 1,250 px the top bar leaves the context's button about 30 px: its label
 ("Working on CR-23") is cut by the browser to the icon alone, and the context's name shows only in the button's tooltip
 (its title). From 1,300 px up the label keeps at least 40 px. Before slice 37 the label kept 40 px by running out of its
@@ -1569,7 +1574,8 @@ the app adds none.
 - **Reviewers and readers see a canvas's names as saved** (F6); unlike the layer mode they cannot switch them in their
   own browser (`docs/ideas.md`).
 - **Up to 1,300 px wide the check boxes are in "More"** (step 4, S6A-10): with the working context on and both panels
-  shown they do not fit the top bar there.
+  shown they do not fit the top bar there. **Changed in slice 38** (D-90): they are in the canvas toolbar's "Names ▾",
+  and in its "More" only below 635 px of the toolbar's room (at 1,280 px with both panels they stay in the toolbar).
 
 ### Relationships between source tables on the demo canvas (slice 10b, D-62)
 

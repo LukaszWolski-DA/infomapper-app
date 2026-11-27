@@ -82,9 +82,18 @@ export async function idsOf(entityName: string, attributeName?: string, canvasId
   return { itemId: i.id, attributeId: a?.id ?? "" };
 }
 
-/** The top bar's check boxes. */
+/**
+ * The canvas toolbar's check boxes, under “Names ▾” since slice 38 (B1): they stay in the page while it is shut, so
+ * their states, `disabled` and titles are read as before; a click opens “Names ▾” first (`clickBox`).
+ */
 export const entityBox = (page: Page): Locator => page.getByTestId("check-entity-aliases");
 export const attributeBox = (page: Page): Locator => page.getByTestId("check-attribute-aliases");
+/** Opens “Names ▾” if it is shut, then clicks the check box (slice 38). */
+export async function clickBox(page: Page, box: Locator): Promise<void> {
+  const button = page.getByTestId("button-names");
+  if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+  await box.click();
+}
 /** A check box's state: `name`, `alias` or `mixed` (its `data-state`), checked against the DOM's own properties. */
 export async function expectBox(box: Locator, state: "name" | "alias" | "mixed"): Promise<void> {
   await expect(box).toHaveAttribute("data-state", state);

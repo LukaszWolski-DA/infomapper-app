@@ -8,7 +8,7 @@
 //     minimum zoom beyond the content): at 10 %, each corner of the content at the opposite corner of the pane.
 
 import { expect, test, type Page } from "./fixtures";
-import { AROUND, box, canvasUrl, card, collapse, fade, fadeTables, holeAt, ids, makeFrame, nodeRect, openCanvas, signInAs, veilHoles, WHOLE } from "./helpers";
+import { AROUND, box, canvasUrl, TOOLBAR_BOTTOM, card, collapse, fade, fadeTables, holeAt, ids, makeFrame, nodeRect, openCanvas, signInAs, veilHoles, WHOLE } from "./helpers";
 
 const holed = async (page: Page, name: string) => holeAt(await veilHoles(page), await nodeRect(card(page, name)));
 
@@ -129,7 +129,8 @@ test("S4B1-07: the veil's edge never shows while any of the content is in view, 
     { x: pane.w - content.x0 * z, y: -content.y1 * z }, // its bottom left at the top right
   ];
   for (const [i, c] of corners.entries()) {
-    await openCanvas(page, canvasUrl(), { ...c, zoom: z });
+    // exactly at the pane's corner: `openCanvas` puts a view 50 px lower, under the canvas toolbar (slice 38)
+    await openCanvas(page, canvasUrl(), { ...c, y: c.y - TOOLBAR_BOTTOM, zoom: z });
     await page.waitForTimeout(500);
     await fade(page, { focus: customer.id });
     await expect(page.getByTestId("layer-fade")).toHaveCount(1);

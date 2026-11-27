@@ -1,10 +1,13 @@
 "use client";
 
 // The top bar as in the prototype: brand, Organization ▾ / Workspace ▾ / Project ▾ switchers and the user indicator.
-// Narrow windows (slice 6a): the prototype's steps at 2,100 (short labels, narrower switchers) and 1,300 px (no brand, no
-// path separators), each a class on the element itself (AD-24 rule 4: nothing on the page or its grid).
-// Canvas pages add their tools (slice 1a: zoom and fit) before the user indicator. Pages with side panels get the
-// buttons that show and hide them at the bar's two ends (slice 5a, prototype #tLeft, #tRight).
+// Slice 38 (S38-02, DS3.1): the canvas's controls are in its toolbar; the bar keeps the path, the working context and
+// Undo and Redo (`tools`), the save pair, the panels' toggles and the account. With that room the switchers are up to
+// 280 px wide (240 px up to 1,500 px, the prototype's `.bar .projbtn`), so no name in the path is cut to a few letters
+// at 1,280 and 1,440 px; a long name ends with an ellipsis, the full name in the menu. The window steps left are the
+// brand (up to 1,600 px), the user's role (up to 1,500 px) and the narrow one (up to 1,000 px), each a class on the
+// element itself (AD-24 rule 4: nothing on the page or its grid). Pages with side panels get the buttons that show and
+// hide them at the bar's two ends (slice 5a, prototype #tLeft, #tRight).
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -59,25 +62,31 @@ export function TopBar({ shell, tools, panelToggles = false, savePair = true }: 
       <PathSep />
       <ProjectSwitcher shell={shell} />
       <div className="flex-1" />
-      {/* the switchers' names shorten first, and the tools that do not fit move into “More” at fixed widths (slice 6a),
-          so nothing is cut off from 800 to 2,560 px; what is still missing comes out of the working context's label, the
-          only tool that shrinks (slice 16, item 5): the tools' tiny shrink weight lets the switchers reach their minimum first */}
-      {tools && <div data-testid="bar-tools" className="flex min-w-0 shrink-[0.001] items-center gap-2.5 max-[2101px]:gap-2 max-[1301px]:gap-[7px] max-[1001px]:gap-1">{tools}</div>}
-      {savePair && <SavePair server={shell.server} />}
+      {/* the switchers' names shorten first, so nothing is cut off from 800 to 2,560 px; what is still missing comes out of
+          the working context's label down to its 40 px (slice 16, item 5; slice 38): the tools' tiny shrink weight lets the
+          switchers reach their minimum first */}
+      {/* the phone (slice 38, S38-06): up to 600 px the bar keeps the toggles, the path and the account */}
+      {tools && <div data-testid="bar-tools" className="flex min-w-0 shrink-[0.001] items-center gap-2 max-[1001px]:gap-1 max-[601px]:hidden">{tools}</div>}
+      {savePair && (
+        <span className="contents max-[601px]:hidden">
+          <SavePair server={shell.server} />
+        </span>
+      )}
       {panelToggles && <PanelToggle side="right" />}
       <UserIndicator shell={shell} />
     </header>
   );
 }
 
-const PathSep = () => <span className="-mx-0.5 text-im-ink-3 max-[1301px]:hidden">/</span>;
+const PathSep = () => <span className="-mx-0.5 text-im-ink-3 max-[1001px]:hidden">/</span>;
 
+/** A switcher: its name cut with an ellipsis when long; the full name starts its title (slice 38). */
 function SwitcherButton({ testId, title, children }: { testId: string; title: string; children: ReactNode }) {
   return (
     <DropdownMenuTrigger
       data-testid={testId}
       title={title}
-      className={cn(toolButtonVariants(), "min-w-[56px] max-w-[260px] flex-initial px-2 font-medium max-[2101px]:max-w-[150px] max-[2101px]:px-1.5 max-[1501px]:max-w-[128px] max-[1501px]:px-[5px] max-[1301px]:max-w-[110px] max-[1001px]:min-w-[44px]")}
+      className={cn(toolButtonVariants(), "min-w-[56px] max-w-[280px] flex-initial px-2 font-medium max-[1501px]:max-w-[240px] max-[1501px]:px-1.5 max-[1001px]:min-w-[44px]")}
     >
       <span className="min-w-0 truncate">{children}</span>
       <svg viewBox="0 0 16 16" className="size-3 flex-none fill-none stroke-current stroke-[1.6]" aria-hidden>
@@ -131,7 +140,7 @@ function OrganizationSwitcher({ shell }: { shell: ShellData }) {
   return (
     <>
       <DropdownMenu>
-        <SwitcherButton testId="switcher-organization" title="Switch organization">
+        <SwitcherButton testId="switcher-organization" title={`${shell.organization.name}: switch organization`}>
           {shell.organization.name}
         </SwitcherButton>
         <DropdownMenuContent align="start" className={menuClass}>
@@ -171,7 +180,7 @@ function WorkspaceSwitcher({ shell }: { shell: ShellData }) {
     <DropdownMenu>
       <SwitcherButton
         testId="switcher-workspace"
-        title="Switch workspace, open the workspace home or create a workspace"
+        title={`${shell.workspace.name}: switch workspace, open the workspace home or create a workspace`}
       >
         {shell.workspace.name}
       </SwitcherButton>
@@ -202,7 +211,7 @@ function ProjectSwitcher({ shell }: { shell: ShellData }) {
   const { workspace, project, projects } = shell;
   return (
     <DropdownMenu>
-      <SwitcherButton testId="switcher-project" title="Switch project, open the project home or create a project">
+      <SwitcherButton testId="switcher-project" title={`${project?.name ?? "Project"}: switch project, open the project home or create a project`}>
         {project?.name ?? "Project"}
       </SwitcherButton>
       <DropdownMenuContent align="start" className={menuClass}>

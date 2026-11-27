@@ -1,6 +1,6 @@
 import type { Page, Route } from "@playwright/test";
 import { expect, test } from "../slice-11/fixtures";
-import { canvasRow, canvasUrl, entityBox, FULL, hydrated, openCanvas, signInAs } from "../slice-11/helpers";
+import { canvasRow, canvasUrl, entityBox, FULL, hydrated, openCanvas, signInAs, clickBox } from "../slice-11/helpers";
 import { resetDevData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";
 import { settleSaves } from "../settle";
@@ -35,7 +35,7 @@ async function switchHeld(page: Page) {
   await openCanvas(page, canvasUrl(), FULL);
   await hydrated(page);
   const hold = await holdNamesSwitch(page);
-  await entityBox(page).click();
+  await clickBox(page, entityBox(page));
   await expect.poll(() => hold.held()).toBe(true);
   return hold;
 }

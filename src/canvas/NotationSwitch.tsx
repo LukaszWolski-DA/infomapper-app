@@ -1,12 +1,12 @@
 "use client";
 
-// Crow's foot / UML in the top bar (prototype data-not buttons): one setting for every canvas (D-22). Short labels up to
-// 2,100 px; up to 1,200 px it is in “More” (slice 6a, `MoreTools`).
+// Crow's foot / UML in the canvas toolbar (prototype data-not buttons): one setting for every canvas (D-22). Slice 38:
+// the short labels IE / UML at every width; on a narrow canvas it is in “More” (`more-breakpoints.ts`).
 
 import { useContext } from "react";
 import { CanvasUiCtx, type Notation } from "./context";
 import { cn } from "@/ui/lib/utils";
-import { SEGMENTED_BAR_BUTTON, SEGMENTED_BAR_TRACK } from "@/ui/components/segmented";
+import { SEGMENTED_BUTTON, SEGMENTED_TRACK } from "@/ui/components/segmented";
 
 const OPTIONS: { value: Notation; label: string; short: string; title: string }[] = [
   { value: "ie", label: "Crow's foot", short: "IE", title: "Crow's foot (Information Engineering)" },
@@ -16,7 +16,7 @@ const OPTIONS: { value: Notation; label: string; short: string; title: string }[
 export function NotationSwitch() {
   const ui = useContext(CanvasUiCtx);
   return (
-    <div role="group" aria-label="Relationship notation" data-testid="switch-notation" className={cn("inline-flex flex-none", SEGMENTED_BAR_TRACK)}>
+    <div role="group" aria-label="Relationship notation" data-testid="switch-notation" className={cn("inline-flex flex-none", SEGMENTED_TRACK)}>
       {OPTIONS.map((o) => (
         <button
           key={o.value}
@@ -25,10 +25,9 @@ export function NotationSwitch() {
           aria-pressed={ui.notation === o.value}
           data-notation={o.value}
           onClick={() => ui.setNotation(o.value)}
-          className={SEGMENTED_BAR_BUTTON}
+          className={cn(SEGMENTED_BUTTON, "px-2")}
         >
-          <span className="hidden min-[2101px]:inline">{o.label}</span>
-          <span className="min-[2101px]:hidden">{o.short}</span>
+          {o.short}
         </button>
       ))}
     </div>

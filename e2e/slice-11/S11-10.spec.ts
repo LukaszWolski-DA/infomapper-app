@@ -15,6 +15,7 @@ import {
   signInAs,
   toasts,
   cardOf,
+  clickBox,
 } from "./helpers";
 
 // Rights and the save chain (items 8, 9, F6): the check boxes and the segments are for editors; a reviewer sees the
@@ -45,8 +46,8 @@ test("S11-10: two quick clicks on a check box store both changes with no false c
   await recordToasts(page);
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
-  await entityBox(page).click();
-  await entityBox(page).click();
+  await clickBox(page, entityBox(page));
+  await clickBox(page, entityBox(page));
   await expect.poll(async () => (await groupsOf(CO)).filter((g) => g.after && "entity_names" in g.after).map((g) => g.after!.entity_names)).toEqual(["alias", null]);
   expect((await canvasRow()).entity_names).toBeNull();
   await expectBox(entityBox(page), "name");

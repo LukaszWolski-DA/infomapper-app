@@ -4,6 +4,10 @@
 // rename, ⋯ for options) and "New canvas". The rename keeps what was typed until its answer (slice 14b, D-66): after a
 // refusal the field stays with slice 13's line on one row inside the tab (F4).
 
+import { CANVAS_TAB, CANVAS_TAB_ON, tabsListVariants } from "@/ui/components/tabs";
+import { iconButtonVariants } from "@/ui/components/icon-button";
+import { BUTTON_LAYOUT, buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type KeyboardEvent } from "react";
@@ -27,9 +31,9 @@ const HomeIcon = () => (
   </svg>
 );
 
-const tabClass =
-  "relative flex h-[31px] cursor-pointer select-none items-center gap-[7px] whitespace-nowrap rounded-t-[7px] text-im-ink-2 hover:bg-im-hover";
-const onClass = "bg-im-canvas font-medium text-im-ink shadow-[inset_1px_1px_0_var(--im-line),inset_-1px_0_0_var(--im-line)] hover:bg-im-canvas";
+// slice 38 (B8): the shared tab look and its strip with the fade at its end on a narrow screen
+const tabClass = CANVAS_TAB;
+const onClass = CANVAS_TAB_ON;
 
 export function CanvasTabs({
   view,
@@ -62,7 +66,7 @@ export function CanvasTabs({
       role="tablist"
       aria-label="Canvases"
       data-testid="tabs-canvases"
-      className="flex h-[38px] flex-none items-end gap-0.5 overflow-x-auto overflow-y-hidden bg-im-surface px-2 [background:linear-gradient(var(--im-line),var(--im-line))_bottom/100%_1px_no-repeat,var(--im-surface)] [scrollbar-width:none]"
+      className={tabsListVariants({ density: "canvas" })}
     >
       <Link
         role="tab"
@@ -126,7 +130,7 @@ export function CanvasTabs({
                     data-testid="button-canvas-menu"
                     onClick={(e) => e.stopPropagation()}
                     className={cn(
-                      "grid size-6 place-items-center rounded text-im-ink-2 hover:bg-im-hover hover:text-im-ink",
+                      iconButtonVariants({ size: "xs" }),
                       on ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100",
                     )}
                   >
@@ -148,7 +152,7 @@ export function CanvasTabs({
           data-testid="button-new-canvas"
           disabled={pending}
           onClick={() => void create()}
-          className="mb-[3px] inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-md px-[9px] text-im-ink-2 hover:bg-im-hover hover:text-im-ink"
+          className={cn(buttonVariants({ variant: "quiet", size: "sm" }), BUTTON_LAYOUT, "mb-[3px] text-body")}
         >
           <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.5]" aria-hidden>
             <path d="M8 3.5v9M3.5 8h9" strokeLinecap="round" />
@@ -211,7 +215,7 @@ function TabRename({ view, canvas, onLeave, onClose }: { view: ProjectView; canv
         onClick={(e) => e.stopPropagation()}
         onKeyDown={keyDown}
         onBlur={(e) => leave(e.currentTarget)}
-        className="h-6 w-[180px] rounded border border-im-logical bg-im-surface px-1.5 font-medium read-only:border-im-line"
+        className={cn(inputVariants({ size: "sm" }), "w-[180px] font-medium")}
       />
       <DraftLine
         inline

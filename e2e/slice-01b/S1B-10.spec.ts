@@ -67,7 +67,7 @@ test("S1B-10: hovering a row highlights its lines and far-end rows within 100 ms
     const rows = [...document.querySelectorAll<HTMLElement>(".row[data-row]")]
       .filter((r) => {
         const b = r.getBoundingClientRect();
-        return b.top > p.top + 10 && b.bottom < p.bottom - 10 && b.left > p.left && b.right < p.right && r.querySelector(".st.ok, .st.warn");
+        return b.top > p.top + 60 && b.bottom < p.bottom - 10 && b.left > p.left && b.right < p.right && r.querySelector(".st.ok, .st.warn");
       })
       .slice(0, 40);
     if (!rows.length) return { error: "no mapped rows in view" };

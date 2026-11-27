@@ -428,7 +428,7 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 .im-canvas .overview-svg .mb { fill-opacity: .35; stroke: none }
 
 /* The drop's concept question (slice 2b; prototype #ask) */
-.im-canvas .concept-ask { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 8px;
+.im-canvas .concept-ask { position: absolute; top: 58px; /* under the canvas toolbar (slice 38) */  left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 8px;
   width: max-content; max-width: min(680px, 94%); background: var(--im-surface); border-radius: 10px; padding: 10px 10px 10px 14px;
   box-shadow: 0 0 0 1px var(--im-card-line), 0 12px 30px -12px var(--im-shadow) }
 .im-canvas .concept-ask span { flex: 1; font-size: 12.5px }

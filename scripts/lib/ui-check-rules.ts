@@ -103,7 +103,8 @@ export interface Crowded {
 
 /** Two controls side by side on one line whose texts are less than `WORD_GAP_PX` apart. */
 export function crowdedTexts(controls: readonly Control[], min = WORD_GAP_PX): Crowded[] {
-  const cs = checked(controls).filter((c) => c.textBox !== null && c.kind !== "field" && c.kind !== "select");
+  // slice 38: a control under a panel or a dialog is not seen, as for overlaps
+  const cs = checked(controls).filter((c) => c.textBox !== null && c.kind !== "field" && c.kind !== "select" && c.coveredBy !== "other");
   const out: Crowded[] = [];
   for (let i = 0; i < cs.length; i++) {
     for (let j = i + 1; j < cs.length; j++) {
@@ -136,7 +137,8 @@ const distanceTo = (p: { x: number; y: number }, b: Box) => Math.hypot(Math.max(
 /** Targets smaller than 24 × 24 px (S37-03), each with WCAG's spacing exception decided. */
 export function smallTargets(controls: readonly Control[]): SmallTarget[] {
   const targets = checked(controls).filter(isTarget);
-  const small = targets.filter((c) => c.rect.w < TARGET_PX - 0.5 || c.rect.h < TARGET_PX - 0.5);
+  // slice 38: a target under a panel or a dialog is not seen, so it is not judged (its neighbours still are, by it)
+  const small = targets.filter((c) => c.coveredBy !== "other" && (c.rect.w < TARGET_PX - 0.5 || c.rect.h < TARGET_PX - 0.5));
   return small.map((control) => {
     const p = centre(control.rect);
     const spaced = targets.every((t) => {

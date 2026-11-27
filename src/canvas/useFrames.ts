@@ -25,7 +25,8 @@
 //   note joins the frame it lands in, with the frames as they are after the change).
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
-import { applyNodeChanges, useReactFlow, type NodeChange } from "@xyflow/react";
+import { applyNodeChanges, useReactFlow, useStoreApi, type NodeChange } from "@xyflow/react";
+import { showBounds } from "./show-bounds";
 import type { Uuid } from "@/domain/ids";
 import {
   conceptQuestions,
@@ -200,6 +201,7 @@ const boxOf = (f: FrameData, counts: ReadonlyMap<Uuid, number>): FrameBox => ({
 
 export function useFrames(o: Options) {
   const rf = useReactFlow();
+  const storeApi = useStoreApi();
   const toast = useToast();
   const { editable, setNodes, patchCard, enqueueGroup, versions, pending, select, selectionNow, selectMade, deselectDeleted, undo, writes, spaceDown, notes: noteMover, reqs: reqMover } = o;
   /** The frames as saved (and as an editor changes them). */
@@ -817,9 +819,9 @@ export function useFrames(o: Options) {
       // a collapsed frame: its block (slice 2c); else room for the label above it (prototype: 30 px)
       const [b] = boxes([f]);
       const r = shapeOf(b!);
-      void rf.fitBounds(f.collapsed ? r : { x: r.x, y: r.y - 30, width: r.width, height: r.height + 30 }, { duration: 250, padding: 0.08 });
+      showBounds(rf, storeApi.getState(), f.collapsed ? r : { x: r.x, y: r.y - 30, width: r.width, height: r.height + 30 }, 0.08);
     },
-    [rf, boxes],
+    [rf, storeApi, boxes],
   );
 
   const collapseToast = useCallback(

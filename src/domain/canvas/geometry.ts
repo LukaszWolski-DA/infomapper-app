@@ -58,17 +58,46 @@ export function contentBounds(cards: readonly Pick<CardData, "x" | "y" | "width"
 }
 
 /**
- * The view that shows a box (prototype fitRect): 40 px padding, and on wide screens the bottom-right overview panel
- * is kept clear. An empty canvas gets 100 % at (40, 40).
+ * The room the canvas toolbar takes at the canvas's top (slice 38, F10): it stands 12 px from the top, 38 px high (4 px
+ * padding, 28 px controls, its edge), so its bottom is at 50 px; a fit and a placement leave 20 px more below it. A
+ * constant, so nothing measures the toolbar (no layout read).
  */
-export function fitViewport(bounds: Rect | null, screen: { width: number; height: number }, overviewOpen: boolean): Viewport {
-  if (!bounds) return { x: 40, y: 40, zoom: 1 };
+export const TOOLBAR_TOP_ROOM = 70;
+
+/**
+ * The view that shows a box (prototype fitRect): 40 px padding, and on wide screens the bottom-right overview panel
+ * is kept clear. `top` is the room kept at the top (40 px, or the toolbar's, slice 38). An empty canvas gets 100 % at
+ * (40, `top`).
+ */
+export function fitViewport(bounds: Rect | null, screen: { width: number; height: number }, overviewOpen: boolean, top = 40): Viewport {
+  if (!bounds) return { x: 40, y: top, zoom: 1 };
   const pad = 40;
   const padRight = overviewOpen && screen.width > 700 ? 250 : pad;
   const aw = Math.max(1, screen.width - pad - padRight);
-  const ah = Math.max(1, screen.height - pad * 2);
+  const ah = Math.max(1, screen.height - top - pad);
   const zoom = clamp(Math.min(aw / Math.max(1, bounds.w), ah / Math.max(1, bounds.h)), MIN_ZOOM, FIT_MAX_ZOOM);
-  return { zoom, x: pad + (aw - bounds.w * zoom) / 2 - bounds.x * zoom, y: pad + (ah - bounds.h * zoom) / 2 - bounds.y * zoom };
+  return { zoom, x: pad + (aw - bounds.w * zoom) / 2 - bounds.x * zoom, y: top + (ah - bounds.h * zoom) / 2 - bounds.y * zoom };
+}
+
+/**
+ * React Flow's `fitBounds` with the toolbar's room at the top (slice 38, F10): the box centred in the screen below
+ * `top`, with `padding` as React Flow's (a share of the box), the zoom within `minZoom`–`maxZoom`. Zoom to frame and
+ * bringing new tables into view use it, so they never put what they show under the toolbar.
+ */
+export function boundsViewport(
+  bounds: Rect,
+  screen: { width: number; height: number },
+  { padding = 0, top = 0, minZoom = MIN_ZOOM, maxZoom = MAX_ZOOM }: { padding?: number; top?: number; minZoom?: number; maxZoom?: number } = {},
+): Viewport {
+  const h = Math.max(1, screen.height - top);
+  const zoom = clamp(Math.min(screen.width / (Math.max(1, bounds.w) * (1 + padding)), h / (Math.max(1, bounds.h) * (1 + padding))), minZoom, maxZoom);
+  return { zoom, x: screen.width / 2 - (bounds.x + bounds.w / 2) * zoom, y: top + h / 2 - (bounds.y + bounds.h / 2) * zoom };
+}
+
+/** The part of a view below the toolbar's room, in canvas coordinates: where placements put new cards (slice 38, F10). */
+export function belowToolbar(view: Rect, zoom: number): Rect {
+  const dy = TOOLBAR_TOP_ROOM / zoom;
+  return { x: view.x, y: view.y + dy, w: view.w, h: Math.max(1, view.h - dy) };
 }
 
 /** Zooming by a factor around the middle of the screen (prototype zoomBy), within 10–300 %. */

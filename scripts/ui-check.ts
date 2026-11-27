@@ -11,7 +11,7 @@
 //   npm run ui:check -- --label before            # .data/ui-check/before-<yyyymmdd-hhmm>/
 //   npm run ui:check -- --label after --only canvas,editor --widths 1440 --themes light
 //   npm run ui:check -- --url http://127.0.0.1:3001 --label demo    # against a running server (its data, not ours)
-//   npm run ui:check -- --compare <before folder> <after folder>    # slice-37-before-and-after.html: the summary, the findings
+//   npm run ui:check -- --compare <before folder> <after folder> [--slice 38]   # slice-<n>-before-and-after.html: the summary, the findings
 //                                                                    left with their slice, each screen before and after
 //
 // Its data (A8, Łukasz 26 November 2026) is a file of its own, .data/ui-check-db.json, reset from the demo data on
@@ -25,6 +25,7 @@ import path from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { addSeedDemoData } from "../src/compose/seed";
 import { resetDevData } from "../src/data/local/dev-data";
+import { SEED_IDS } from "../src/data/local/seed";
 import type { DevDb } from "../src/data/local/schema";
 import { GROUPS, describe, isCutWithoutEllipsis, kinds, overlaps, pastTheEdge, smallTargets, spilling, crowdedTexts, type Control, type KindCount, type TextBox } from "./lib/ui-check-rules";
 
@@ -59,6 +60,8 @@ interface Ids {
   project: string;
   canvas: string;
   starProject: string;
+  /** “Order lines & products” (its long name, A8), in the star's project: the narrow canvas (slice 38). */
+  narrow: string;
   star: string;
   entity: string;
   attribute: string;
@@ -96,6 +99,7 @@ function idsOf(db: DevDb): Ids {
   const project = named(db, "project", "Customer 360", ws).id;
   const canvas = named(db, "canvas", "Customer & orders", ws).id;
   const star = named(db, "canvas", "Sales star", ws).id;
+  const narrow = named(db, "canvas", "Order lines, products and their price history per sales channel", ws).id;
   const link = rows(db, "project_canvas").find((l) => l.canvas_id === star);
   const entity = named(db, "entity", "Customer", ws).id;
   const items = rows(db, "canvas_item").filter((i) => i.canvas_id === canvas);
@@ -108,6 +112,7 @@ function idsOf(db: DevDb): Ids {
     project,
     canvas,
     starProject: (link?.project_id as string) ?? project,
+    narrow,
     star,
     entity,
     attribute: (mapping?.attribute_id as string) ?? rows(db, "attribute").find((a) => a.entity_id === entity)!.id,
@@ -290,6 +295,37 @@ function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[
         }
       },
     },
+    // slice 38: “Names ▾” open; “More” on a narrow canvas (the right panel at its 640 px, a cookie on that canvas's path
+    // only, so no other screen of the run sees it)
+    {
+      id: "canvas-names-menu",
+      path: canvas,
+      ready: NODE,
+      then: async (page: Page) => {
+        const names = page.getByTestId("button-names");
+        if (await names.isVisible()) {
+          await names.click();
+          await page.getByTestId("menu-names").waitFor();
+        }
+      },
+    },
+    {
+      id: "canvas-narrow-more",
+      path: `${w}/p/${ids.starProject}/c/${ids.narrow}`,
+      ready: NODE,
+      minWidth: 1001,
+      then: async (page: Page) => {
+        const u = new URL(page.url());
+        await page.context().addCookies([{ name: `im-panels.${SEED_IDS.userLukasz}`, value: "l1.r1.264.640", domain: u.hostname, path: u.pathname }]);
+        await page.reload();
+        await page.locator(NODE).first().waitFor();
+        const more = page.getByTestId("button-more-tools");
+        if (await more.isVisible()) {
+          await more.click();
+          await page.getByRole("menu").waitFor();
+        }
+      },
+    },
     { id: "star", path: star, ready: NODE },
     {
       id: "star-picker",
@@ -415,7 +451,9 @@ const COLLECT = String.raw`(() => {
       // the text as shown: a name cut with an ellipsis inside its control ends at the control's edge (step 4: the
       // switchers' clipped text was read as running into the next switcher); text out of its box is "spill" instead
       textBox: (() => { const g = document.createRange(); g.selectNodeContents(e); const b = g.getBoundingClientRect(); if (!(e.innerText || "").trim() || b.width <= 0) return null; const x = Math.max(b.left, r.left), rt = Math.min(b.right, r.right); return rt > x ? { x, y: b.top, w: rt - x, h: b.height } : null; })(),
-      coveredBy: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!h || h === e || e.contains(h)) return null; for (let n = h; n; n = n.parentElement) if (ids.has(n)) return n.contains(e) ? null : ids.get(n); return e.contains(h) ? null : "other"; })(),
+      // slice 38 (S38-06): a side panel open over the canvas on a narrow screen (data-overlay) covers what lies under it,
+      // as a dialog does: a control below it is not seen
+      coveredBy: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!h || h === e || e.contains(h)) return null; const over = h.closest('aside[data-overlay="true"]'); if (over && !over.contains(e)) return "other"; for (let n = h; n; n = n.parentElement) if (ids.has(n)) return n.contains(e) ? null : ids.get(n); return e.contains(h) ? null : "other"; })(),
       look: { height: r.height, fontSize: parseFloat(s.fontSize), radius: parseFloat(s.borderTopLeftRadius) || 0, borderWidth: bw, borderColor: bw > 0 ? s.borderTopColor : "" },
     });
   }
@@ -605,14 +643,33 @@ function findingsOf(r: Stored): Finding[] {
   return out;
 }
 
-/** Who owns a finding left after slice 37: the phone's width is slice 38's layout (A7); anything else is open. */
-const ownerOf = (f: Finding) => (f.view.startsWith("390") ? "Slice 38: the phone's layout (the top bar, the navigation row, a panel over the canvas)" : "Open in slice 37");
+/**
+ * The side-by-side page's words per slice (`--slice`, 37 by default; slice 38 step 7): its name, the runs it compares and
+ * who owns a finding left after it. Slice 37 left the phone's width to slice 38's layout (A7).
+ */
+const SLICE_PAGES: Record<string, { name: string; before: string; after: string; ownerOf: (f: Finding) => string }> = {
+  "37": {
+    name: "the design system's foundation",
+    before: "step 2a, before any change of the slice",
+    after: "step 8",
+    ownerOf: (f) => (f.view.startsWith("390") ? "Slice 38: the phone's layout (the top bar, the navigation row, a panel over the canvas)" : "Open in slice 37"),
+  },
+  "38": { name: "the design system's layout", before: "step 2, dev's look before any change of the slice", after: "step 7", ownerOf: () => "Open after slice 38" },
+};
+const slicePage = () => {
+  const n = arg("slice") ?? "37";
+  const p = SLICE_PAGES[n];
+  if (!p) throw new Error(`--slice takes ${Object.keys(SLICE_PAGES).join(" or ")}.`);
+  return { n, ...p };
+};
 
 /** Łukasz's side-by-side page: the summary, the findings left with their owner, each screen before and after. */
 function compare(a: string, b: string): void {
   const rel = (d: string) => path.relative(OUT_ROOT, d).replace(/\\/g, "/");
   const load = (d: string) => JSON.parse(readFileSync(path.join(d, "report.json"), "utf8")) as { results: Stored[] };
   const ra = load(a), rb = load(b);
+  const sp = slicePage();
+  const ownerOf = sp.ownerOf;
   const key = (r: Stored) => `${r.screen}|${r.view.width}|${r.view.theme}`;
   const before = new Map(ra.results.map((r) => [key(r), r]));
   const sum = (rs: Stored[]) => {
@@ -688,17 +745,17 @@ function compare(a: string, b: string): void {
         .join("")}`;
     })
     .join("\n");
-  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Slice 37: before and after</title>
+  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Slice ${sp.n}: before and after</title>
 <style>body{font:14px/1.5 system-ui,sans-serif;margin:0 auto;max-width:1500px;padding:16px 24px 64px;background:#fff;color:#18212c}
 h1{font-size:22px;margin:8px 0}h2{font-size:17px;margin:32px 0 8px}h3{font-size:14px;margin:22px 0 6px}p{max-width:90ch;color:#4a5563}
 table{border-collapse:collapse;margin:6px 0 12px}td,th{padding:3px 14px 3px 0;border-bottom:1px solid #e2e6eb;text-align:left;vertical-align:top}td.n{text-align:right;font-variant-numeric:tabular-nums}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.pair.phone{grid-template-columns:repeat(2,minmax(0,280px))}.pair img{width:100%;border:1px solid #d6dbe1;border-radius:6px}
 .lab{font-size:12px;color:#5b6573;margin:10px 0 2px}.none{display:grid;place-items:center;min-height:120px;border:1px dashed #c3cad2;border-radius:6px;color:#8a95a3;font-size:12px}
 nav a{margin-right:10px;white-space:nowrap}code{font-size:12px}</style>
-<h1>Slice 37, the design system's foundation: before and after</h1>
-<p>Before: <code>${rel(a)}</code> (step 2a, before any change of the slice). After: <code>${rel(b)}</code> (step 8). Each screen shows 1,440 px light and dark and the phone (390 px, light), before on the left; every width (1,280, 1,440 and 1,920 px, light and dark, and 390 px) is in the two folders next to this page. Click a picture to open it full size.</p>
+<h1>Slice ${sp.n}, ${sp.name}: before and after</h1>
+<p>Before: <code>${rel(a)}</code> (${sp.before}). After: <code>${rel(b)}</code> (${sp.after}). Each screen shows 1,440 px light and dark and the phone (390 px, light), before on the left; every width (1,280, 1,440 and 1,920 px, light and dark, and 390 px) is in the two folders next to this page. Click a picture to open it full size.</p>
 <h2>Summary</h2>
-<p>Counts over the ${sb.views} views both runs have (the screens step 2a knew). The screens added since (the toolbox, the menus, the dialogs, the editor's lists) are after only: ${sAll.views - sb.views} views more, with ${sAll.overlaps - sb.overlaps} overlaps, ${sAll.small - sb.small} targets failing WCAG and ${sAll.crowded - sb.crowded} words run together. Before, "words run together" also counted a switcher's whole name, the part its ellipsis hides included (the script measured clipped text until step 4).</p>
+<p>Counts over the ${sb.views} views both runs have (the screens the before run knew). The screens added since are after only: ${sAll.views - sb.views} views more, with ${sAll.overlaps - sb.overlaps} overlaps, ${sAll.small - sb.small} targets failing WCAG and ${sAll.crowded - sb.crowded} words run together.${sp.n === "37" ? ` Before, "words run together" also counted a switcher's whole name, the part its ellipsis hides included (the script measured clipped text until step 4).` : ""}</p>
 <table><tr><th></th><th>Before</th><th>After</th></tr>${rows.map(([t, x, y]) => `<tr><td>${t}</td><td class="n">${x}</td><td class="n">${y}</td></tr>`).join("")}</table>
 <h2>Findings left after the slice</h2>
 ${left.size ? findings : "<p>None.</p>"}
@@ -706,7 +763,7 @@ ${left.size ? findings : "<p>None.</p>"}
 <nav>${screens.map((s) => `<a href="#${s}">${s}</a>`).join(" ")}</nav>
 ${pictures}
 </html>`;
-  const file = path.join(OUT_ROOT, "slice-37-before-and-after.html");
+  const file = path.join(OUT_ROOT, `slice-${sp.n}-before-and-after.html`);
   writeFileSync(file, html);
   console.log(`Written ${path.resolve(file)} (${screens.length} screens, ${left.size} findings left).`);
 }
