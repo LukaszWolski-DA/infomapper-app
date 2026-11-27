@@ -556,3 +556,66 @@ spread. The absolute bars the summaries mark "not met" (≥ 50 fps at 100 % in t
 1.5 s) are slice 1a's, missed by `slice-37` alike on this laptop (as in every sitting since slice 2p). S20's mark write
 and its undo, measured in the same sitting, are slice 20's figures, unchanged in their medians (18 against 18 ms, 20
 against 19 ms; their p95 move within 10 settled samples).
+
+## Step 3: the top bar (27 November 2026)
+
+**What changed** (`src/app/_components/top-bar.tsx`, `working-context.tsx`):
+- **The bar holds** the left toggle, the path (organization / workspace / project), the working context, Undo and Redo
+  (`bar-tools`), the save pair (the indicator and "Local"), the right toggle and the account; the canvas's controls are
+  in its toolbar since step 2.
+- **The switchers** are at most 280 px (the prototype's `.bar .projbtn`), 240 px up to 1,500 px; at least 56 px, 44 px up
+  to 1,000 px. A long name ends with an ellipsis, and **each switcher's title starts with its full name**
+  ("{name}: switch workspace, open the workspace home or create a workspace"; no spec read the old titles).
+- **The working context's label** has `min-width: 40px` at every width; its maximum 180 px, 120 px up to 1,300 px, 90 px up
+  to 1,000 px. The switchers still shrink first (the tools' shrink weight), so the label gives way only once they are at
+  their minimum.
+- **The window steps the bar no longer needs are gone:** slice 37's 7 px tools gap from 1,001 to 1,300 px, the tools'
+  gaps at 2,100 px, the switchers' steps at 2,100 and 1,300 px, the label's step at 1,200 px; the path's separators now
+  show above 1,000 px (were above 1,300 px). Kept: the brand above 1,600 px and the user's role above 1,500 px (D-84,
+  S30-09-room), the narrow step at 1,000 px and "No working context" in words above 1,880 px.
+- **`docs/known-limitations.md`:** "The working context's name at 1,201–1,250 px (slice 37)" closed.
+
+**The widths** (S38-02: the demo with long names, "InfoMate Data Consulting Group", "Retail Co – Data warehouse for every
+sales channel", "Customer 360 and loyalty across every sales channel"; both panels, the working context on, "Working on
+CR-23"):
+
+| Window | Organization (name shown) | Workspace (name shown) | Project (name shown) | Context label | Bar scrolls |
+| --- | --- | --- | --- | --- | --- |
+| 1,280 px | 221 px (191, whole) | 240 px (210, cut) | 240 px (210, cut) | 106 px (whole) | no |
+| 1,440 px | 221 px (191, whole) | 240 px (210, cut) | 240 px (210, cut) | 106 px (whole) | no |
+| 1,920 px | 225 px (191, whole) | 280 px (246, cut) | 280 px (246, cut) | 106 px (whole) | no |
+
+A cut name shows about 30 characters ("Retail Co – Data warehouse for…"). The context's button is 136 px wide from 1,100 px
+up (S6A-10, the seed's names).
+
+**S16-08's label widths** (the seed's names, both panels, "Working on CR-23"; the bar never scrolls, the label never runs
+past its button, the title names the context):
+
+| Window | 2,560 | 2,100 | 1,880 | 1,600 | 1,536 | 1,300 | 1,250 | 1,201 | 1,200 | 1,101 | 1,100 | 1,000 | 800 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Label | 106 | 106 | 106 | 106 | 106 | 106 | 106 | 106 | 106 | 106 | 106 | 90 (cut) | 90 (cut) |
+
+**The earlier specs changed, with their reasons:**
+
+| Spec | Why |
+| --- | --- |
+| S16-08 | the label keeps 40 px at every one of the 13 widths (was from 1,300 px up); the check that it is cut at 1,201 px goes (it now has room) |
+| S6A-10 | each switcher keeps at least its minimum (56 px, 44 px up to 1,000 px) at every width; its comment names the separators' new step |
+| S6A-11 | unchanged in this step: it reads the canvas's place around the panels, not the bar (its view under the toolbar is step 2's) |
+
+New: **S38-02** (the bar's contents, "Local", the switchers' titles, long names at 1,280, 1,440 and 1,920 px).
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test` (217 files, 2,627 tests).
+- **The specs of the screens touched,** locally, one run with nothing beside it: S16-08, S6A-10, S6A-11, S38-01, S38-02,
+  S30-09-room, S30-09, S30-09-editor, S12A-01, S5A-06, S8-07, S0-04: 23 passed.
+- **The check script on the canvas screens and the homes** (`.data/ui-check/step3-20261127-1726/`: the canvas and star
+  screens, the workspace home with every tab, the project home): **at 1,280 px and wider nothing.** At 390 px the homes
+  have no overlap, the canvas screens the same 29 as after step 2 (the details panel's overlay over the toolbar, the
+  breadcrumbs, a note's ✓, the Overview's toggle) and `canvas-focus` cannot reach “More” under the open details panel:
+  step 6's.
+- **The full run** on `8d55de8`, [run 46033597542](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46033597542):
+  16 min 34 s wall-clock (14 min 0 s of tests); **917 passed, 0 failed, 16 skipped**, no expected failures. Parts (time
+  from `part.json`, the server's heap peak against its 6,431 MB restart threshold, no restarts): 1 9.5 min 1,406 MB;
+  2 9.1 min 1,429; 3 13.6 min 1,262; 4 10.9 min 1,067; 5 6.8 min 1,666; 6 9.5 min 1,856; 7 9.7 min 1,266; 8 9.6 min
+  1,590; 9 3.7 min 1,453; 10 3.9 min 1,498; 11 12.0 min 1,474.
