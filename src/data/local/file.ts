@@ -59,6 +59,8 @@ export async function readDb(file: string): Promise<DevDb> {
   const db = JSON.parse(text) as DevDb;
   // slice 35 (F7): a file without baselines has none; no format step, so an older file is not written back for it
   (db as Partial<DevDb>).baseline ??= [];
+  // slice 39: a workspace without InfoCatalog's switch has it off; no format step, so an older file is not written back for it
+  for (const w of db.workspace ?? []) (w as Partial<typeof w>).catalog_shown ??= false;
   // slice 35: a content written into the data file itself (a test's file, a hand-made one) goes to its own file first;
   // the rows never carry it, and the next write of the data file leaves it out
   if (db.baseline.some((b) => (b as { snapshot?: unknown }).snapshot !== undefined)) db.baseline = (await writeBaselineContents(file, db)).baseline;

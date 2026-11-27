@@ -5,7 +5,7 @@
 import type { LicensedModule } from "../types";
 
 /** A module's name in InfoMapper's texts. */
-export const MODULE_NAMES: Readonly<Record<LicensedModule, string>> = { infocube: "InfoCube", infodoc: "InfoDocumenter" };
+export const MODULE_NAMES: Readonly<Record<LicensedModule, string>> = { infocube: "InfoCube", infodoc: "InfoDocumenter", infocatalog: "InfoCatalog" };
 
 /** "{organization} has no {module} licence." (AD-35). */
 export const licenceMissingMessage = (module: LicensedModule, organization: string): string => `${organization} has no ${MODULE_NAMES[module]} licence.`;
