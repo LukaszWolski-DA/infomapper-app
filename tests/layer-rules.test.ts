@@ -106,3 +106,37 @@ describe("two modules (slice 25, step 1's F8)", () => {
     expect(await lintFile(at, 'import "../data/tables";\n')).toEqual(expect.arrayContaining(["no-restricted-imports", "boundaries/dependencies"]));
   });
 }, 120_000);
+
+describe("the third module, InfoCatalog (slice 39, S39-06)", () => {
+  const CATALOG_IMPORT = 'import { ALL_TAB } from "@/modules/infocatalog/domain/search";\nexport const z = ALL_TAB;\n';
+  const OTHERS = {
+    infocube: 'import { CUBE_ROLES } from "@/modules/infocube/domain/types";\nexport const y = CUBE_ROLES;\n',
+    infodocumenter: 'import { DOCUMENT_PRESETS } from "@/modules/infodocumenter/domain/types";\nexport const x = DOCUMENT_PRESETS;\n',
+  };
+  const PARTS = ["domain", "data", "ui", "canvas", "app"];
+
+  it("refuses InfoCatalog in each of InfoMapper's layers", async () => {
+    for (const layer of PARTS) expect(await lintFile(`src/${layer}/__module_probe__.ts`, CATALOG_IMPORT), layer).toContain("boundaries/dependencies");
+  });
+
+  it("refuses an import between InfoCatalog and each other module, both ways, in every part", async () => {
+    for (const part of PARTS) {
+      for (const [other, code] of Object.entries(OTHERS)) {
+        expect(await lintFile(`src/modules/infocatalog/${part}/__probe__.ts`, code), `infocatalog ${part} → ${other}`).toContain("boundaries/dependencies");
+        expect(await lintFile(`src/modules/${other}/${part}/__probe__.ts`, CATALOG_IMPORT), `${other} ${part} → infocatalog`).toContain("boundaries/dependencies");
+      }
+    }
+  });
+
+  it("lets its domain part read InfoMapper's catalog rules, and the composition root all three modules", async () => {
+    expect(await lintFile("src/modules/infocatalog/domain/__probe__.ts", 'import { CORE_TABS } from "@/domain/catalog/items";\nexport const x = CORE_TABS;\n')).toEqual([]);
+    expect(await lintFile("src/compose/__probe__.ts", CATALOG_IMPORT + OTHERS.infocube + OTHERS.infodocumenter)).toEqual([]);
+  });
+
+  it("keeps its domain part pure and out of the data layer and the composition root", async () => {
+    const at = "src/modules/infocatalog/domain/__probe__.ts";
+    expect(await lintFile(at, 'import "react";\n')).toContain("no-restricted-imports");
+    expect(await lintFile(at, 'import "@/data/ports";\n')).toContain("boundaries/dependencies");
+    expect(await lintFile(at, 'import "@/compose/catalog";\n')).toContain("boundaries/dependencies");
+  });
+}, 120_000);
