@@ -628,8 +628,8 @@ second window.
 
 **Deliberate differences:** the dark values are written under Tailwind's `@variant dark`, not under
 `@media (prefers-color-scheme)` (D-85); the small button's text is 12 px, not 13 px (its width kept, S33-05, S6A-10);
-native selects and check boxes (F9); titles without shortcuts (A4, `docs/ideas.md`); the top bar's tools 7 px apart from
-1,201 to 1,300 px (was 11 px) so the working context keeps a 24 px target.
+native selects and check boxes (F9); titles without shortcuts (A4, `docs/ideas.md`); from 1,001 to 1,300 px the top bar's
+tools are 7 px apart (was 8 px; they move by up to 11 px there), so the working context keeps a 24 px target.
 
 ## The app ahead of the prototype (slice 22)
 

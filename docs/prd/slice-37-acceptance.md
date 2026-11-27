@@ -819,9 +819,9 @@ before any rerun, then it is run again alone and both are reported.
   (`sm`); the user indicator 30 px as before, a pill. The theme's choice and the names' check boxes: radius 6 (before 5).
 - **The working context** (the finding: 16 × 30 px at 390 px, its icon running out of it): a target of at least 24 px
   (`min-w-target` on the button and its wrapper), 4 px padding up to 1,000 px (8 before), the label `min-w-0` so it is
-  cut inside the button. At 1,201 px it had 19 px (every other control at its width): the tools' gap is 7 px from 1,201
-  to 1,300 px (8 before), which gives it 30 px. **This is my call** (F15 keeps the controls' widths; the gap is the
-  only room): the tools move by up to 11 px at those widths, and the flexible switchers gain 2 to 8 px from 1,101 to
+  cut inside the button. At 1,201 px it had 19 px (every other control at its width): from 1,001 to 1,300 px the top bar's
+  tools are 7 px apart (was 8 px; they move by up to 11 px there), which gives it 30 px at 1,201 px. **This is my call** (F15
+  keeps the controls' widths; the gap is the only room), and the flexible switchers gain 2 to 8 px from 1,101 to
   1,300 px. S6A-10's widths, before and after, are the same for every other control; the context's: 1,000 px 70 → 62
   (the padding), 1,201 px 19 → 30, 1,300 px 118 → 120.
 - **The navigation row:** the path's links 24 px (`py-1 leading-4`, before 20); Back and Forward the 24 px icon button.
@@ -856,9 +856,10 @@ before any rerun, then it is run again alone and both are reported.
   S6B-09, S7B-14, S8-08, S11-02, S12A-01, S14B-07, S20-05, S20-06, S32-01, S32-02.
 - No full run in this step (Łukasz's instruction).
 
-**Łukasz's answer (26 November 2026):** step 4 accepted, the tools' 7 px gap from 1,201 to 1,300 px included. **For the
-closing:** a deviation from "no control moves" (F15): the top bar's tools move by up to 11 px at those widths only, so the
-working context keeps a 24 px target there.
+**Łukasz's answer (26 November 2026):** step 4 accepted, the tools' 7 px gap included. **For the closing:** a deviation from
+"no control moves" (F15): from 1,001 to 1,300 px the top bar's tools are 7 px apart (was 8 px; they move by up to 11 px there), so
+the working context keeps a 24 px target. (Corrected at the closing, 27 November 2026: this answer first said "from
+1,201 to 1,300 px"; the gap applies from 1,001 px, as `top-bar.tsx`' `max-[1301px]:gap-[7px]` has it.)
 
 ## Step 5: the homes, settings, people, baselines and dialogs (26 November 2026)
 
@@ -1098,8 +1099,8 @@ compare), `inventory-prototype-vs-app.md` (the look done, the layout to slice 38
 open point on the left panel's tabs), `README.md` (`npm run ui:check`).
 
 **Deviations from the PRD, all accepted by Łukasz:** A1 to A8 (section 1), F9 and F10; the small button's 12 px text
-and `Seg` kept until step 3 (step 2); the top bar's tools 7 px apart from 1,201 to 1,300 px, against "no control moves"
-(step 4); S16-08's new rule, the working context's label inside its button with 40 px only from 1,300 px up, until
+and `Seg` kept until step 3 (step 2); from 1,001 to 1,300 px the top bar's tools 7 px apart (was 8 px; they move by up to 11 px there), against "no
+control moves" (step 4); S16-08's new rule, the working context's label inside its button with 40 px only from 1,300 px up, until
 slice 38 (step 8); Segmented's buttons sharing a wider track (step 9's finding, here).
 
 **The full run** on `d20e6b639cb66ff1cb0796bdc0c47e3c7a73aea0`,
