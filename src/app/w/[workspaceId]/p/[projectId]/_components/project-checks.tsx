@@ -68,7 +68,7 @@ function Group({ group, workspaceId, projectId }: { group: HomeCheckGroup; works
 
 export function ProjectChecks({ checks, workspaceId, projectId }: { checks: HomeChecks; workspaceId: string; projectId: string }) {
   return (
-    <section className="mt-6 max-w-[900px] scroll-mt-4" id="model-checks" data-testid="section-checks">
+    <section className="mt-6 scroll-mt-4" id="model-checks" data-testid="section-checks">
       <h3 className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold text-im-ink-2">
         {CHECK_TEXTS.title}
         {checks.count > 0 && (

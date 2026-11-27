@@ -125,6 +125,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     thumbnails = thumbnailHrefs(workspaceId, shown, { items, frames, notes }, { model, requirements, labels, labelLinks, rowFeeds });
   }
 
+  // slice 38 (B3): the organization's other workspaces this person has, as the workspace switcher lists them
+  const otherWorkspaces = shell.workspaces.filter((w) => w.id !== workspace.id);
   // Undo and Redo, buttons and keys, on the person's history of the workspace (slice 12a, D-65)
   return (
     <UndoProvider workspaceId={workspaceId} state={history}>
@@ -133,7 +135,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
       {/* slice 25 (step 4b): a module's page the person can no longer open sent them back here */}
       {typeof query.gone === "string" && HOME_GONE[query.gone] && <GoneNotice message={HOME_GONE[query.gone]!} />}
       <div data-testid="page-workspace-home" className="min-h-full bg-im-surface px-[clamp(16px,4vw,48px)] pb-12 pt-6">
-        <div className="mx-auto max-w-[1180px]">
+        {/* slice 38 (S38-03): up to 1,320 px, centred, the prototype's gutters */}
+        <div className="mx-auto max-w-[1320px]">
           <div className="mb-1 text-xs text-im-ink-3">{shell.organization.name} · workspace</div>
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="m-0 text-2xl font-semibold">{workspace.name}</h1>
@@ -221,7 +224,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               )}
 
               <H3>Projects</H3>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4" data-testid="tiles-projects">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4" data-testid="tiles-projects">
                 {projects.map((p) => {
                   const n = counts.get(p.id) ?? 0;
                   return (
@@ -248,7 +251,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               {isAdmin && (
                 <>
                   <H3>Workspace lifecycle</H3>
-                  <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-5">
+                  {/* slice 38 (B5): the prototype's four in a row when there is room; today's one card */}
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
                     <ArchiveBox
                       workspaceId={workspace.id}
                       workspaceName={workspace.name}
@@ -258,6 +262,26 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                     />
                   </div>
                 </>
+              )}
+
+              {/* slice 38 (B3): what the prototype's right panel said, at the Overview's end; not shown without another */}
+              {otherWorkspaces.length > 0 && (
+                <section data-testid="section-other-workspaces">
+                  <H3>Other workspaces in {shell.organization.name}</H3>
+                  <div className="flex max-w-[560px] flex-col">
+                    {otherWorkspaces.map((w) => (
+                      <Link
+                        key={w.id}
+                        href={workspaceHref(w.id)}
+                        data-testid="item-other-workspace"
+                        className="flex min-h-target items-baseline gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-im-hover"
+                      >
+                        <span className="min-w-0 flex-1 truncate">{w.name}</span>
+                        {w.archived && <span className="flex-none text-[11.5px] text-im-ink-3">archived</span>}
+                      </Link>
+                    ))}
+                  </div>
+                </section>
               )}
             </>
           )}

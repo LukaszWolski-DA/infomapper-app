@@ -40,7 +40,7 @@ export function CanvasTiles({
   const { run } = useAction();
 
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4" data-testid="tiles-canvases">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4" data-testid="tiles-canvases">
       {view.canvases.map((canvas) => {
         const href = canvasHref(view.workspaceId, view.project.id, canvas.id);
         const also = view.projects.filter((p) => p.id !== view.project.id && canvas.projectIds.includes(p.id));

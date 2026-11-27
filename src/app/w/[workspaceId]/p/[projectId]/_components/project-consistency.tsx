@@ -24,7 +24,7 @@ export function ProjectConsistency({ consistency: c, href }: { consistency: Cons
   const ok = c.count === 0 && c.requirements.length === 0;
   const lineHref = (l: ConsistencyLine) => href(l.canvasId, `${l.open.t}=${l.open.id}`);
   return (
-    <section className="mt-6 max-w-[900px]" data-testid="section-consistency">
+    <section className="mt-6" data-testid="section-consistency">
       <h3 className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold text-im-ink-2">
         {CONSISTENCY_TEXT.title}
         {!ok && (

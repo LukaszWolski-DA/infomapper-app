@@ -605,6 +605,10 @@ past its button, the title names the context):
 
 New: **S38-02** (the bar's contents, "Local", the switchers' titles, long names at 1,280, 1,440 and 1,920 px).
 
+**Łukasz's answer (27 November 2026):** step 3 accepted. **For the closing:** the switchers' titles now start with the
+full name ("{name}: switch …"), a deviation from S38-07's "every control keeps its title", needed for the ellipsis.
+**Every later full run reports part 6's heap peak** (1,856 MB in this run).
+
 **Checks:**
 - `npm run lint`, `npm run typecheck`, `npm test` (217 files, 2,627 tests).
 - **The specs of the screens touched,** locally, one run with nothing beside it: S16-08, S6A-10, S6A-11, S38-01, S38-02,
@@ -619,3 +623,60 @@ New: **S38-02** (the bar's contents, "Local", the switchers' titles, long names 
   from `part.json`, the server's heap peak against its 6,431 MB restart threshold, no restarts): 1 9.5 min 1,406 MB;
   2 9.1 min 1,429; 3 13.6 min 1,262; 4 10.9 min 1,067; 5 6.8 min 1,666; 6 9.5 min 1,856; 7 9.7 min 1,266; 8 9.6 min
   1,590; 9 3.7 min 1,453; 10 3.9 min 1,498; 11 12.0 min 1,474.
+
+## Step 4: the homes as pages (27 November 2026)
+
+**What changed:**
+- **The project home is a page** (B4): `AppShell`'s project frame takes `page: true` (`app-shell.tsx`): the canvas tabs
+  and the navigation row as before, no `SidePanelsGrid`, no panels' toggles in the top bar, and the panels' cookie is
+  neither read nor written there (no `SidePanelsProvider`). The workspace home was a page already; its frame is unchanged.
+  The two placeholders "Open a canvas to work with the model, sources and requirements." and "Open a canvas to see the
+  details of what you select." are no longer shown on any page.
+- **Both homes:** content up to 1,320 px (was 1,180), centred, the gutters `clamp(16px,4vw,48px)` as before; tiles
+  `minmax(240px,1fr)` (were 220 px) on both homes.
+- **The project home in two columns** above 1,100 px (`minmax(0,1fr) 420px`, 48 px apart): left, model consistency, model
+  checks and Canvases at the column's width (their 900 px caps gone); right, Requirements, Labels in this project, Open
+  notes, Other projects; the delete section below both, at the content's width. At 1,100 px and less one column, in the
+  same order.
+- **Requirements' rows** (`project-requirements.tsx`): the kind's icon and the key, the name wrapping (was cut to one
+  line), the coverage bar and "covered/total, status"; the kind's name is gone; the list takes its column's width (was at
+  most 620 px).
+- **The workspace's lifecycle grid** `repeat(auto-fit,minmax(260px,1fr))` (was 320 px), with today's one card (Archive):
+  with one card `auto-fit` gives it the row's width, as before.
+- **Leaving a home for a canvas:** nothing to change. The canvas opens its remembered view corrected by its left edge
+  (D-54), and no home changes the panels any more; S38-03 checks it.
+
+**The new texts on the pages, word for word** (for Łukasz's approval):
+- Project home, right column, after Open notes, only when the workspace has another project:
+  - heading: **Other projects**
+  - hint: **The model is shared by all {n} projects: an entity changed here is changed everywhere.** ({n} counts every
+    project of the workspace, this one included, as the prototype's)
+  - one row per other project, a link to its home: **{project name}**, and at the right **1 canvas** or **{n} canvases**
+- Workspace home, Overview, after Workspace lifecycle, only when the organization has another workspace this person has:
+  - heading: **Other workspaces in {organization name}**
+  - one row per other workspace, a link to its home: **{workspace name}**, and at the right **archived** when it is
+    archived (nothing otherwise: the prototype shows the client there, which the shell does not read; adding it would
+    be a new read).
+
+**The earlier specs changed, with their reasons:**
+
+| Spec | Why |
+| --- | --- |
+| S5A-02, "hidden panels are remembered across a reload, another canvas and the project home" | the project home has no panels and no toggles (B4): it checks that they are absent, that the cookie passes through the home unchanged, and that the canvas after it shows the layout (was: the home's toggles hide and show its panels) |
+| S5A-02, "the widths are remembered across a reload, another canvas and the project home, also while hidden" | the same: the widths pass through the home unchanged and the canvas after it shows them; the "hidden keeps its width" part now toggles on a canvas and opens another canvas |
+
+New: **S38-03** (the project home without panels, its two columns at 1,280 px and one at 1,100 px, the right column's
+420 px, the requirement row without the kind's name, "Other projects" and its absence with one project, the delete
+section below; the workspace home at 1,320 px with 240 px tiles, "Other workspaces in InfoMate" with the archived Bank X,
+its absence on another tab and for the only workspace of an organization; the canvas's view after both homes).
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test` (217 files, 2,627 tests).
+- **The specs of the screens touched,** locally, one run with nothing beside it: every spec that opens either home (65
+  files): 100 passed, 1 failed, S38-03's own expectation (the seed's Bank X is archived, so its row reads "Bank X – Risk
+  DWH archived"); fixed, then S38-03 alone: 3 passed.
+- **The check script on both homes at every width** (`.data/ui-check/step4-20261127-1829/`: the workspace home with
+  every tab, the project home and the homes' dialogs, at 1,280, 1,440 and 1,920 px light and dark and at 390 px):
+  83 views, **nothing found** (no overlap, no text out of its control, no words run together, nothing past the edge, no
+  failing target, nothing cut, no page wider than the screen).
+- No full run in this step (Łukasz's instruction).

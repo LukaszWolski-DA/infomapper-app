@@ -4,7 +4,8 @@ import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { loadProjectView } from "@/app/_lib/project-view";
 import { loadShell } from "@/app/_lib/shell";
 import { projectOpenNotes, projectRequirements, projectStats } from "@/app/_panels/stats";
-import { canvasHref } from "@/app/_lib/paths";
+import Link from "next/link";
+import { canvasHref, projectHref } from "@/app/_lib/paths";
 import { thumbnailHrefs } from "@/app/_lib/thumbnails";
 import { getDataStore } from "@/data";
 import { moduleHomeData } from "@/compose";
@@ -109,11 +110,15 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   const thumbnails = Object.fromEntries(view.canvases.map((c) => [c.id, <CanvasThumbnail key={c.id} href={hrefs.get(c.id) ?? null} />]));
   const frameCounts = Object.fromEntries(view.canvases.map((c) => [c.id, frames.filter((f) => f.canvas_id === c.id).length]));
 
+  // slice 38 (B3): the workspace's other projects, as the project switcher lists them
+  const otherProjects = shell.projects.filter((p) => p.id !== view.project.id);
   return (
     <UndoProvider workspaceId={ws} state={history}>
-    <AppShell shell={shell} project={{ view, currentCanvasId: null, tools: <UndoButtons /> }}>
+    {/* slice 38 (S38-03, B4): a page, as the workspace home: no side panels, no panels' toggles, no panels' cookie */}
+    <AppShell shell={shell} project={{ view, currentCanvasId: null, tools: <UndoButtons />, page: true }}>
       <div data-testid="page-project-home" className="min-h-full bg-im-surface px-[clamp(16px,4vw,48px)] pb-12 pt-7">
-        <div className="mx-auto max-w-[1180px]">
+        {/* up to 1,320 px, centred, the prototype's gutters */}
+        <div className="mx-auto max-w-[1320px]">
           <div className="mb-1 text-xs text-im-ink-3">Project</div>
           <ProjectHeading workspaceId={ws} project={view.project} editable={view.canEditProject} />
           <div className="mb-1 mt-3.5 flex flex-wrap gap-2 [&>span]:rounded-[14px] [&>span]:bg-im-surface [&>span]:px-[11px] [&>span]:py-[3px] [&>span]:text-xs [&>span]:text-im-ink-2 [&>span]:shadow-[0_0_0_1px_var(--im-line)] [&_b]:font-semibold [&_b]:text-im-ink">
@@ -137,20 +142,52 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
             </span>
             <ChecksStat count={checks.count} high={checks.high} />
           </div>
-          <ProjectConsistency consistency={consistency} href={consistencyHref} />
-          <ProjectChecks checks={checks} workspaceId={ws} projectId={view.project.id} />
-          <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Canvases</h3>
-          <CanvasTiles view={view} thumbnails={thumbnails} frames={frameCounts} />
-          <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Requirements</h3>
-          <ProjectRequirements
-            projectId={view.project.id}
-            requirements={projectReqs}
-            canvases={view.canvases.map((c) => ({ id: c.id, href: canvasHref(ws, view.project.id, c.id) }))}
-          />
-          <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Labels in this project</h3>
-          <ProjectLabels workspaceId={ws} projectId={view.project.id} labels={projectLabelRows} editable={shell.standing === "full"} />
-          <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Open notes</h3>
-          <ProjectNotes notes={openNotes} />
+          {/* slice 38 (S38-03): two columns above 1,100 px (the prototype's .pg-cols): the work on the left, the lists on the
+              right; one column at 1,100 px and less, in the same order */}
+          <div data-testid="columns-project-home" className="grid grid-cols-1 items-start gap-x-12 min-[1101px]:grid-cols-[minmax(0,1fr)_420px]">
+            <div data-testid="column-project-work" className="min-w-0">
+              <ProjectConsistency consistency={consistency} href={consistencyHref} />
+              <ProjectChecks checks={checks} workspaceId={ws} projectId={view.project.id} />
+              <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Canvases</h3>
+              <CanvasTiles view={view} thumbnails={thumbnails} frames={frameCounts} />
+            </div>
+            <div data-testid="column-project-lists" className="min-w-0">
+              <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Requirements</h3>
+              <ProjectRequirements
+                projectId={view.project.id}
+                requirements={projectReqs}
+                canvases={view.canvases.map((c) => ({ id: c.id, href: canvasHref(ws, view.project.id, c.id) }))}
+              />
+              <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Labels in this project</h3>
+              <ProjectLabels workspaceId={ws} projectId={view.project.id} labels={projectLabelRows} editable={shell.standing === "full"} />
+              <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Open notes</h3>
+              <ProjectNotes notes={openNotes} />
+              {/* slice 38 (B3): what the prototype's right panel said; not shown with one project */}
+              {otherProjects.length > 0 && (
+                <section data-testid="section-other-projects">
+                  <h3 className="mb-1.5 mt-7 text-[13px] font-semibold text-im-ink-2">Other projects</h3>
+                  <p className="mb-2.5 text-[12.5px] text-im-ink-3">
+                    The model is shared by all {shell.projects.length} projects: an entity changed here is changed everywhere.
+                  </p>
+                  <div className="flex flex-col">
+                    {otherProjects.map((p) => (
+                      <Link
+                        key={p.id}
+                        href={projectHref(ws, p.id)}
+                        data-testid="item-other-project"
+                        className="flex min-h-target items-baseline gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-im-hover"
+                      >
+                        <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                        <span className="flex-none text-[11.5px] text-im-ink-3">
+                          {p.canvasCount} canvas{p.canvasCount === 1 ? "" : "es"}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
           {view.canDeleteProject && (
             <ProjectDelete
               workspaceId={ws}
