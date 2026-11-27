@@ -9,6 +9,7 @@ import { derivationIndex, type DerivationIndex } from "@/domain/model/derivation
 import { suggestsBusinessKey } from "@/domain/model/mapping-rules";
 import { checkMappingTypes, formatAttributeType, formatColumnType, type MappingTypeCheck } from "@/domain/model/type-check";
 import type { Attribute, Entity, Mapping, MappingInput, SourceColumn, SourceRelationship, SourceTable, WorkspaceModel } from "@/domain/types";
+import { tableLocation } from "@/domain/catalog/physical";
 
 export interface ModelIndex {
   model: WorkspaceModel;
@@ -80,7 +81,7 @@ export function attributeLabel(ix: ModelIndex, attributeId: Uuid): string {
 
 /** `CRM / crmprod.dbo` */
 export function tablePath(ix: ModelIndex, t: SourceTable): string {
-  return `${ix.systemName.get(t.source_system_id) ?? "?"} / ${t.database_name}.${t.schema_name}`;
+  return tableLocation(ix.systemName.get(t.source_system_id), t);
 }
 
 export const inputColumns = (ix: ModelIndex, mappingId: Uuid): SourceColumn[] =>
