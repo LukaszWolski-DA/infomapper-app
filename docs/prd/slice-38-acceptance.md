@@ -940,3 +940,11 @@ bar; section 11's corrections (F9, F10, F12, F13, F14, F15, F17); "Generate vers
 1,280 × 770 px and `openCanvas`' 50 px (step 2); the measuring sitting's figures (step 2); the switchers' titles starting
 with the full name, a deviation from S38-07 (step 3); the homes' new texts and the client left out (step 4); the check
 script's overlay rule (step 6); S32-03 known, fixed on its own branch (step 7).
+
+**The full run** on `b76b63d6b688bea0d9dc62a929dcdfcea7f789d9` (the closing's docs commit, `dev`'s head `15f6ba0`
+contained), [run 46067629605](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46067629605): 15 min 23 s
+wall-clock (13 min 2 s of tests); **926 passed, 0 failed, 0 flaky**, 16 skipped, no expected failures. Parts (time from
+`part.json`, the server's heap peak against its 6,431 MB restart threshold, no restarts): 1 9.7 min 1,272 MB;
+2 8.2 min 1,481; 3 9.1 min 1,575; 4 7.7 min 1,366; 5 6.6 min 1,656; **6 12.6 min 1,155**; 7 9.8 min 1,207;
+8 12.3 min 1,142; 9 4.9 min 1,267; 10 5.5 min 1,146; 11 9.7 min 1,595. S32-03 passed. The commit after it changes only
+this file (`git diff --stat b76b63d..HEAD`), so the run counts for it ("Test runs").
