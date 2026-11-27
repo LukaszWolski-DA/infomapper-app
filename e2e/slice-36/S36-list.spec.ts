@@ -40,7 +40,8 @@ test("S36 list: the same name newest first, each with the time it was made; the 
   await page.reload();
   const both = page.getByTestId("list-private-documents").locator(`[data-testid="row-document"][data-name="${NAME}"]`);
   await expect(both).toHaveCount(2);
-  expect(await both.getByTestId("text-document-created").allTextContents()).toEqual([minute(NEWER), minute(OLDER)]);
+  // the times are drawn in the browser after hydration (`LocalMinute`): a retrying read, never allTextContents()
+  await expect(both.getByTestId("text-document-created")).toHaveText([minute(NEWER), minute(OLDER)]);
   expect(await both.getByTestId("link-document-name").evaluateAll((a) => a.map((x) => x.getAttribute("href")))).toEqual([
     expect.stringContaining(newer),
     expect.stringContaining(older),
