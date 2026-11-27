@@ -807,3 +807,101 @@ fade, no page wider than the screen): 4 passed.
 **Łukasz's answer (27 November 2026):** step 6 accepted, with the check script's rule for side panels over the canvas:
 a panel open over the canvas, marked `data-overlay` (and only that), covers what lies under it. **For the closing:**
 D-89's check script names it.
+
+## Step 7: the after run, the side-by-side page, the documents and the full run (27 November 2026)
+
+**The after run** of the check script (`.data/ui-check/after-20261127-2003/`): every screen it knows, 1,280, 1,440 and
+1,920 px light and dark and 390 px, 284 views: **nothing found** (no overlap, no text out of its control, no words run
+together, nothing past the edge, no failing target, nothing cut, no page wider than the screen), no screen failed.
+
+**The side-by-side page:** `C:\Users\Lukas\Desktop\Lukasz\infomapper-app\.data\ui-check\slice-38-before-and-after.html`
+(`npm run ui:check -- --compare <before> <after> --slice 38`; the script's `--slice` names the page, its runs and the
+findings' owner; slice 37's page is written as before without it). Before: step 2's run on `dev`'s look
+(`before-20261127-1327`); after: this step's. 42 screens, each at 1,440 px light and dark and at 390 px, before on the
+left. The summary over the 271 views both runs have:
+
+| | Before | After |
+| --- | --- | --- |
+| Overlaps | 50 | **0** |
+| Text out of its control | 0 | 0 |
+| Words run together | 0 | 0 |
+| Past the screen's edge | 0 | 0 |
+| Targets under 24 px, failing WCAG | 0 | 0 |
+| Targets under 24 px, passing by spacing | 1,004 | 833 |
+| Text cut without an ellipsis | 0 | 0 |
+| Pages wider than the screen | 0 | 0 |
+| Kinds of button / field / drop-down / check box / link (light views) | 60 / 12 / 4 / 4 / 10 | 61 / 12 / 4 / 3 / 12 |
+
+The 13 views added since (`canvas-names-menu`, `canvas-narrow-more`) are after only: 0 overlaps, 0 failing targets,
+0 words run together. **Findings left: none.** The kinds: one button kind more (the toolbar's 28 px icon buttons and
+"Names ▾"), one check box kind fewer (the names' boxes in their pop-over's 28 px rows), two link kinds more (the homes'
+"Other projects" and "Other workspaces" rows, and the canvas tabs' links on the shared tab look).
+
+**The generated documents:** `npx tsx scripts/document-texts.ts s38-after` and `diff -r` against slice 37's
+`.data/ui-check/documents-before` (18 files): **no difference.**
+
+**The full run** on `8496b34`, [run 46055221229](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46055221229):
+15 min 50 s wall-clock (13 min 24 s of tests); 925 passed, **1 failed**, 16 skipped, no expected failures. Parts (time
+from `part.json`, the server's heap peak against its 6,431 MB restart threshold, no restarts): 1 12.9 min 1,288 MB;
+2 10.9 min 1,304; 3 13.1 min 1,198; 4 7.2 min 1,483; 5 6.4 min 1,711; **6 8.3 min 1,580** (1,856 in step 3's run);
+7 9.7 min 1,293; 8 8.5 min 1,641; 9 4.6 min 1,211; 10 4.1 min 1,483; 11 9.4 min 1,576.
+- **The failure: `S32-03`** (part 11), "a thumbnail takes the chosen theme against the system, and follows a switch at
+  once": the person's menu did not open for the second choice (`indicator-user` stayed `aria-expanded="false"` for
+  15 s). The trace was copied first (`.data/ci-46055221229/s32-03-trace-copy/`): Light was chosen and checked, Escape
+  closed the menu, and the next click on the account button was swallowed while the closing menu was still in the page
+  (Radix keeps the page's pointer events off until its closing animation ends; the helper's comment names the same race
+  for a click on an item). **Alone,** the single-file check
+  [run 46057245561](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46057245561), 3 rounds side by side:
+  **3 of 3 passed** in each round. A flake of slice 32's helper `openUserMenu` (it clicks without waiting for the closing
+  menu to go), not of this slice: **reported, not fixed here** (a fix waits for the menu to be gone before the click; on
+  its own `fix/` branch or here, as Łukasz decides).
+
+## Step 8: Łukasz's acceptance, what to open and where to look
+
+1. **The side-by-side page first:** open
+   `C:\Users\Lukas\Desktop\Lukasz\infomapper-app\.data\ui-check\slice-38-before-and-after.html` in a browser (a
+   double-click opens it; no server needed). At its top: the summary (overlaps, text out of its control, words run
+   together, controls past the edge, small targets, cut text, pages wider than the screen, before and after) and the
+   findings left. Below: each screen before (left, `dev`'s look) and after (right), at 1,440 px light and dark and on a
+   phone (390 px). A click opens a picture full size; every width (1,280, 1,440 and 1,920 px) is in the two folders next to
+   the page.
+2. **The app on Postgres** (environment 2, `infomapper-dev`, the demo accounts only; KB is not opened): on the branch
+   `slice/38-design-system-layout`, in a terminal in the repository:
+
+   ```powershell
+   npm run dev:pg
+   ```
+
+   Then open http://localhost:3000 and sign in as the demo's owner **`lukasz@infomate.pl`** with the demo password
+   (`INFOMAPPER_DEMO_PASSWORD` in `.env.postgres.local`). Stop the server with Ctrl+C when done. For long names, rename a
+   project on its home (e.g. "Customer 360 and loyalty across every sales channel") and put it back with Undo.
+3. **The screens and what to look at:**
+   1. **A canvas with both panels at 1,280 px** (Retail Co – DWH › Customer 360 › Customer & orders; a window about
+      1,280 px wide): the toolbar floating at the canvas's top, centred: All · Maps · Rels | Focus, Changes | Hand,
+      Entity, Note, Frame | IE · UML | "Names ▾" | zoom, every control in it, no "More". Open **"Names ▾"**: the two check
+      boxes, as before. Press **F** or the Fit button: the highest card stands below the toolbar, never under it. If the
+      canvas has a frame, its menu (a right click inside it) › Zoom to frame: the frame below the toolbar too. Turn **Changes** on: its bar under the
+      toolbar. Tooltips: every control's title as before.
+   2. **The same canvas narrower:** widen the right panel by its edge (or make the window about 1,100 px): first "Names ▾",
+      then Focus, Changes and IE · UML, then the four tools go into **"More"** (⋯ at the toolbar's right end), each
+      working from there (e.g. More › UML).
+   3. **The top bar's path:** the organization, workspace and project switchers with room (up to 240 px at 1,280 and
+      1,440 px, 280 px wider); a long name ends with an ellipsis, its full name starting the switcher's tooltip. With a
+      working context on ("Working on …"), its label never shrinks below about 40 px; the bar never scrolls. The top bar
+      no longer holds the canvas's controls.
+   4. **Both homes:** the project home (Home tab): no side panels and no panel buttons; up to 1,320 px wide, centred; two
+      columns above 1,100 px (model consistency, model checks and Canvases on the left; Requirements without the kind's
+      name, Labels, Open notes and **Other projects** on the right), the delete section below; one column when narrower.
+      The workspace home: up to 1,320 px, tiles at least 240 px, **Other workspaces in InfoMate** at the Overview's end
+      (Bank X – Risk DWH, archived). Back to a canvas: it opens where it was left.
+   5. **InfoDocumenter's bar with a long name** (Documentation › a document; rename it to a long name): the app's top bar
+      above it as everywhere; under it one row of 48 px at 1,280 px: the panels' buttons, ← Documentation, the name (an
+      ellipsis while not edited, its full name in the tooltip; click to see it whole), Shared / Private, the page count,
+      Auto, Fit width, Print / PDF, Markdown, the save state and "Online · dev"; read only (a reviewer on the shared
+      document) the same row and the banner under it.
+   6. **A phone-width window** (about 390 px; the browser's device toolbar or a narrow window): the top bar with only the
+      panels' buttons, the path and your initials; the canvas toolbar with the layer switch, zoom and "More"; open the
+      details panel (the right button): it slides in below the tabs, the navigation row and the toolbar, and "More" still
+      opens; the canvas tabs and the workspace home's tabs scroll sideways with a fade at their end; no page scrolls
+      sideways. In the entity panel's "Attributes and their sources": the attribute's name whole, its source columns cut
+      with an ellipsis, their full text in the tooltip.
