@@ -318,3 +318,38 @@ describe("updateWorkspaceSettings: InfoDocumenter on and off (slice 25, AD-35's 
     expect(r.ok && r.writeSet.events).toEqual([expect.objectContaining({ object_type: "workspace", operation: "update" })]);
   });
 });
+
+describe("updateWorkspaceSettings: shown in InfoCatalog (slice 39, S39-02, A2.3)", () => {
+  const licensed = { licensed: true, organizationName: "InfoMate" };
+  const turn = (catalogShown: boolean) => ({ workspaceId: ids.ws, expectedVersion: 3, catalogShown });
+
+  it("is off by default; an owner or an admin turns it on with the licence and off at any time", () => {
+    expect(access("owner").workspace.catalog_shown).toBe(false);
+    for (const role of ["owner", "admin"] as const) {
+      const r = updateWorkspaceSettings(makeCtx(), access(role), turn(true), undefined, undefined, licensed);
+      expect(r.ok && r.value.workspace).toMatchObject({ catalog_shown: true, infocube: false, infodoc: false, version: 4 });
+      const off = updateWorkspaceSettings(makeCtx(), access(role, { catalog_shown: true }), turn(false), undefined, undefined, { ...licensed, licensed: false });
+      expect(off.ok && off.value.workspace.catalog_shown).toBe(false);
+    }
+  });
+
+  it("refuses it without the licence, to a modeler, a reviewer and a reader, in an archived workspace and without the state", () => {
+    expect(updateWorkspaceSettings(makeCtx(), access("owner"), turn(true), undefined, undefined, { ...licensed, licensed: false })).toMatchObject({
+      ok: false,
+      error: { code: "forbidden", message: "InfoMate has no InfoCatalog licence." },
+    });
+    for (const role of ["modeler", "reviewer", "reader"] as const) {
+      expect(updateWorkspaceSettings(makeCtx(), access(role), turn(true), undefined, undefined, licensed)).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    }
+    expect(updateWorkspaceSettings(makeCtx(), access("owner", archived), turn(true), undefined, undefined, licensed)).toMatchObject({ ok: false, error: { code: "archived" } });
+    expect(updateWorkspaceSettings(makeCtx(), access("owner"), turn(true))).toMatchObject({ ok: false, error: { code: "invalid" } });
+    // the same value again writes the rest of the input without the state
+    const same = updateWorkspaceSettings(makeCtx(), access("owner"), { ...turn(false), name: "Retail DWH" });
+    expect(same.ok && same.value.workspace).toMatchObject({ catalog_shown: false, name: "Retail DWH" });
+  });
+
+  it("is outside undo: one change event of the workspace row", () => {
+    const r = updateWorkspaceSettings(makeCtx(), access("owner"), turn(true), undefined, undefined, licensed);
+    expect(r.ok && r.writeSet.events).toEqual([expect.objectContaining({ object_type: "workspace", operation: "update" })]);
+  });
+});

@@ -1,9 +1,10 @@
 // The modules' boxes in the workspace settings (slice 15a, E4, O2): InfoCube's, then InfoDocumenter's below it
-// (slice 25, F11), always shown.
+// (slice 25, F11), always shown; then InfoCatalog's (slice 39, S39-02), only while the organization holds its licence.
 
 import { getDataStore, type DataStore } from "@/data";
 import { can, type WorkspaceAccess } from "@/domain/permissions";
 import { InfoCubeBox } from "@/modules/infocube/app/infocube-box";
+import { InfoCatalogBox } from "@/modules/infocatalog/app/settings-box";
 import { InfoDocumenterBox } from "@/modules/infodocumenter/app/settings-box";
 import { STORE_SCHEMA } from "./tables";
 
@@ -37,6 +38,16 @@ export async function settingsBoxes(store: DataStore, access: WorkspaceAccess) {
         canSwitch={canSwitch}
         documents={documents.length}
       />
+      {licences.some((l) => l.module === "infocatalog") && (
+        <InfoCatalogBox
+          workspaceId={workspace.id}
+          workspaceName={workspace.name}
+          version={workspace.version}
+          on={workspace.catalog_shown}
+          organizationName={organizationName}
+          canSwitch={canSwitch}
+        />
+      )}
     </>
   );
 }
