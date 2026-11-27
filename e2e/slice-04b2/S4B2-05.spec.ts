@@ -12,7 +12,8 @@ const viewRect = (page: Page) =>
     const m = /translate\((-?[\d.]+)px, (-?[\d.]+)px\) scale\(([\d.]+)\)/.exec((document.querySelector(".react-flow__viewport") as HTMLElement).style.transform)!;
     const [tx, ty, z] = [Number(m[1]), Number(m[2]), Number(m[3])];
     const pane = document.querySelector(".react-flow__pane")!.getBoundingClientRect();
-    return { x: -tx / z, y: -ty / z, w: pane.width / z, h: pane.height / z };
+    // where placements put cards: below the canvas toolbar's 70 px (slice 38, F10)
+    return { x: -tx / z, y: (70 - ty) / z, w: pane.width / z, h: (pane.height - 70) / z };
   });
 
 test("S4B2-05: “Add to this canvas” on an entity and a table panel without a card; hidden when the card is here", async ({ page }) => {

@@ -1,10 +1,11 @@
 import { expect, test } from "./fixtures";
-import { canvasUrl, card, closeToolbox, emptySpot, ids, loadItems, loadModel, openCanvas, pointOnLine, rowNamed, signInAs, toolboxAt, pickConcept } from "./helpers";
+import { canvasUrl, card, closeToolbox, TOOLBAR_BOTTOM, emptySpot, ids, loadItems, loadModel, openCanvas, pointOnLine, rowNamed, signInAs, toolboxAt, pickConcept } from "./helpers";
 
 test("S1B-07: the Entity tool and “New entity here” create an entity at the clicked spot with the name ready to type; the toolbox offers the actions listed for each kind of item", async ({ page }) => {
   const { model, attribute } = await ids();
   await signInAs(page, "Łukasz");
-  // at 100%, scrolled down to an empty part of the canvas: a point in the view is (x, y + 900) on the canvas
+  // at 100%, scrolled down to an empty part of the canvas: a point in the view is (x, y + 900) on the canvas, less the
+  // canvas toolbar's 50 px since slice 38 (`openCanvas` puts the view under it)
   await openCanvas(page, canvasUrl(), { x: 0, y: -900, zoom: 1 });
   const nameField = page.getByTestId("input-entity-name");
   const area = (await page.locator(".react-flow__pane").boundingBox())!; // the canvas itself, where (0, 0) of the view is
@@ -22,7 +23,7 @@ test("S1B-07: the Entity tool and “New entity here” create an entity at the 
   const loyalty = (await loadModel()).entities.find((e) => e.name === "Loyalty Card")!;
   const placed = (await loadItems()).find((i) => i.entity_id === loyalty.id)!;
   expect(Math.abs(placed.x - (300 - 24))).toBeLessThanOrEqual(8); // the click and the card both snap to 8 px
-  expect(Math.abs(placed.y - (1100 - 20))).toBeLessThanOrEqual(8);
+  expect(Math.abs(placed.y - (1100 - TOOLBAR_BOTTOM - 20))).toBeLessThanOrEqual(8);
 
   // the empty canvas: search, “New entity here”, “Fit everything on screen”
   const onCanvas = await toolboxAt(page, await emptySpot(page));

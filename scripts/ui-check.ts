@@ -25,6 +25,7 @@ import path from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { addSeedDemoData } from "../src/compose/seed";
 import { resetDevData } from "../src/data/local/dev-data";
+import { SEED_IDS } from "../src/data/local/seed";
 import type { DevDb } from "../src/data/local/schema";
 import { GROUPS, describe, isCutWithoutEllipsis, kinds, overlaps, pastTheEdge, smallTargets, spilling, crowdedTexts, type Control, type KindCount, type TextBox } from "./lib/ui-check-rules";
 
@@ -59,6 +60,8 @@ interface Ids {
   project: string;
   canvas: string;
   starProject: string;
+  /** “Order lines & products” (its long name, A8), in the star's project: the narrow canvas (slice 38). */
+  narrow: string;
   star: string;
   entity: string;
   attribute: string;
@@ -96,6 +99,7 @@ function idsOf(db: DevDb): Ids {
   const project = named(db, "project", "Customer 360", ws).id;
   const canvas = named(db, "canvas", "Customer & orders", ws).id;
   const star = named(db, "canvas", "Sales star", ws).id;
+  const narrow = named(db, "canvas", "Order lines, products and their price history per sales channel", ws).id;
   const link = rows(db, "project_canvas").find((l) => l.canvas_id === star);
   const entity = named(db, "entity", "Customer", ws).id;
   const items = rows(db, "canvas_item").filter((i) => i.canvas_id === canvas);
@@ -108,6 +112,7 @@ function idsOf(db: DevDb): Ids {
     project,
     canvas,
     starProject: (link?.project_id as string) ?? project,
+    narrow,
     star,
     entity,
     attribute: (mapping?.attribute_id as string) ?? rows(db, "attribute").find((a) => a.entity_id === entity)!.id,
@@ -283,6 +288,37 @@ function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[
       path: canvas,
       ready: NODE,
       then: async (page: Page) => {
+        const more = page.getByTestId("button-more-tools");
+        if (await more.isVisible()) {
+          await more.click();
+          await page.getByRole("menu").waitFor();
+        }
+      },
+    },
+    // slice 38: “Names ▾” open; “More” on a narrow canvas (the right panel at its 640 px, a cookie on that canvas's path
+    // only, so no other screen of the run sees it)
+    {
+      id: "canvas-names-menu",
+      path: canvas,
+      ready: NODE,
+      then: async (page: Page) => {
+        const names = page.getByTestId("button-names");
+        if (await names.isVisible()) {
+          await names.click();
+          await page.getByTestId("menu-names").waitFor();
+        }
+      },
+    },
+    {
+      id: "canvas-narrow-more",
+      path: `${w}/p/${ids.starProject}/c/${ids.narrow}`,
+      ready: NODE,
+      minWidth: 1001,
+      then: async (page: Page) => {
+        const u = new URL(page.url());
+        await page.context().addCookies([{ name: `im-panels.${SEED_IDS.userLukasz}`, value: "l1.r1.264.640", domain: u.hostname, path: u.pathname }]);
+        await page.reload();
+        await page.locator(NODE).first().waitFor();
         const more = page.getByTestId("button-more-tools");
         if (await more.isVisible()) {
           await more.click();
