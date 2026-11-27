@@ -506,8 +506,11 @@ S16-10, S2B-13 in the first local run). Storing every spec's view 50 px lower (`
 toolbar, but then content near the canvas's bottom met the Overview and the toasts, which are anchored to the bottom
 (S2B-13's `order_line` under the Overview). A window 50 px taller moves the bottom-anchored things down by the same
 50 px: each spec's canvas area shows what it showed before, in the same places against the Overview, the toasts and the
-status bar. Specs that set their own window size keep it (none failed). This is a test-infrastructure choice of this
-step; Łukasz may prefer another.
+status bar. Specs that set their own window size keep it (none failed).
+
+**Łukasz's answer (27 November 2026):** accepted as a technical call: the e2e window is 1280 × 770 (was Desktop Chrome's
+1280 × 720) and `openCanvas` stores each spec's view 50 px lower, both because of the canvas toolbar's height. **For the
+closing:** it goes into CLAUDE.md's "Testing".
 
 **The prototype and the app** (section 13): the toolbar is the prototype's `#ctb`; its CSS `top:82px` counts the
 prototype's tabs and navigation row, the app's 12 px count from the canvas's `<main>`; “Names ▾” and “More” are not in the
@@ -516,3 +519,40 @@ prototype (B1, B2); the separators are 2 px apart (the prototype's 4 px), so eve
 **Stopped for Łukasz:** the pan-and-zoom sitting (B6's gate: within 3 % of `slice-37` at 30 % and 100 %) needs a quiet
 laptop. Once Łukasz has closed or paused Spotify, Webex and the other programs, I run it on the builds already made: one
 warm-up round, then `npm run measure:canvas -- --to-screen --only pan --rounds 2 --no-build --against slice-37`.
+
+### Step 2: the pan-and-zoom sitting (27 November 2026, B6's gate)
+
+Łukasz closed Spotify and Webex and paused iCloud. Both sittings ran on the builds already made (this branch at
+`69a7541`, `slice-37` at `ed5e934`, the production measurement build, traced to the screen, the laptop on mains), each
+with one warm-up round first and then two counted rounds, each side first once; no round was dropped.
+
+**At 30 % and 100 %** (`--only s20`: S20-sitting, Performance test around src:57, 10 s of pan and zoom; sitting
+`.data/measure/2026-11-27-15-11/`). Presented fps to the screen (traced), the untraced rAF fps beside it:
+
+| Zoom | Round | slice-37 presented (rAF) | slice 38 presented (rAF) |
+| --- | --- | --- | --- |
+| 100 % | 1 | 44.0 (45.0) | 45.8 (47.2) |
+| 100 % | 2 | 45.1 (46.9) | 45.0 (45.1) |
+| 30 % | 1 | 50.2 (52.9) | 52.2 (52.9) |
+| 30 % | 2 | 50.1 (50.2) | 51.6 (51.8) |
+| **100 %, median** | | **44.5** (46.0) | **45.4** (46.2): **+1.9 %** (+0.4 %) |
+| **30 %, median** | | **50.2** (51.5) | **51.9** (52.3): **+3.5 %** (+1.6 %) |
+
+**At the overview (10–13 %) and 100 %** (`--only pan`: S1A-14; sitting `.data/measure/2026-11-27-14-54/`):
+
+| View | Round | slice-37 presented (rAF) | slice 38 presented (rAF) |
+| --- | --- | --- | --- |
+| Overview | 1 | 52.8 (57.3) | 56.7 (57.4) |
+| Overview | 2 | 56.0 (56.8) | 54.0 (57.2) |
+| 100 %, dense | 1 | 42.0 (43.9) | 41.9 (46.0) |
+| 100 %, dense | 2 | 42.1 (45.0) | 43.3 (46.1) |
+| **Overview, median** | | **54.4** (57.0) | **55.4** (57.3): **+1.7 %** (+0.4 %) |
+| **100 %, median** | | **42.0** (44.5) | **42.6** (46.0): **+1.3 %** (+3.6 %) |
+
+The initial render (C-08, median of 5): 1,711 ms on `slice-37`, 1,720 ms here (+0.5 %).
+
+**B6 met:** pan and zoom are nowhere slower than `slice-37`; every median is equal or faster, within the rounds' own
+spread. The absolute bars the summaries mark "not met" (≥ 50 fps at 100 % in the dense area, no frame over 50 ms, C-08 ≤
+1.5 s) are slice 1a's, missed by `slice-37` alike on this laptop (as in every sitting since slice 2p). S20's mark write
+and its undo, measured in the same sitting, are slice 20's figures, unchanged in their medians (18 against 18 ms, 20
+against 19 ms; their p95 move within 10 settled samples).
