@@ -5,7 +5,7 @@
 // double-click or its keyboard.
 
 import { expect, test } from "./fixtures";
-import { SEED_IDS, box, canvasArea, cardNodes, commitCounters, dragGrip, expectCanvasWidth, grip, openCanvas, panelWidth, signInAs, togglePanel, viewStored, viewportTransform } from "./helpers";
+import { SEED_IDS, belowToolbar, box, canvasArea, cardNodes, commitCounters, dragGrip, expectCanvasWidth, grip, openCanvas, panelWidth, signInAs, togglePanel, viewStored, viewportTransform } from "./helpers";
 
 test("S5A-07: hiding and showing either panel add no canvas commit and no miniature commit", async ({ page }) => {
   await signInAs(page, "Łukasz");
@@ -33,9 +33,9 @@ test("S5A-07: the first view after a load is placed for the canvas's real size, 
   await openCanvas(page);
   await togglePanel(page, "left");
 
-  // a remembered view: exactly as stored
-  const view = { x: 120, y: 45, zoom: 0.7 };
-  await openCanvas(page, undefined, view);
+  // a remembered view: exactly as stored (`openCanvas` stores it under the toolbar, slice 38)
+  const view = belowToolbar({ x: 120, y: 45, zoom: 0.7 });
+  await openCanvas(page, undefined, { x: 120, y: 45, zoom: 0.7 });
   const t = await viewportTransform(page);
   expect(t.x).toBeCloseTo(view.x, 0);
   expect(t.y).toBeCloseTo(view.y, 0);

@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { attributeBox, canvasRow, canvasUrl, exceptionsOf, expectBox, HALF, idsOf, openCanvas, setException, signInAs, tintOf, undo } from "./helpers";
+import { attributeBox, canvasRow, canvasUrl, exceptionsOf, expectBox, HALF, idsOf, openCanvas, setException, signInAs, tintOf, undo, clickBox } from "./helpers";
 
 // Undo of the canvas's control after card exceptions (P8): three cards with attribute exceptions; checking “Attribute
 // aliases” clears all three; one undo restores them and their tints; redo clears them again.
@@ -16,7 +16,7 @@ test("S11-11: “Attribute aliases” clears three exceptions; one undo restores
   await expectBox(attributeBox(page), "mixed");
   expect(await tints()).toEqual([true, true, true]);
 
-  await attributeBox(page).click();
+  await clickBox(page, attributeBox(page));
   await expect.poll(exceptions).toEqual([null, null, null]);
   await expect.poll(tints).toEqual([false, false, false]);
   await expectBox(attributeBox(page), "alias");

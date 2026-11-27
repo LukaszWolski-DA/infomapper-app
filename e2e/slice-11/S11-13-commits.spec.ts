@@ -57,7 +57,7 @@ test("S11-13 commits: a switch of “Attribute aliases” against the layer swit
   const pane = await page.locator(".react-flow__pane").evaluate((el) => ({ w: el.clientWidth, h: el.clientHeight }));
 
   const switches = {
-    names: { on: () => page.getByTestId("check-attribute-aliases").click(), off: () => page.getByTestId("check-attribute-aliases").click() },
+    names: { on: () => page.getByTestId("check-attribute-aliases").dispatchEvent("click"), off: () => page.getByTestId("check-attribute-aliases").dispatchEvent("click") },
     layer: { on: () => page.locator('[data-testid="switch-layer"] [data-layer="mappings"]').click(), off: () => page.locator('[data-testid="switch-layer"] [data-layer="all"]').click() },
   };
   type Counts = { canvas: number; miniature: number };

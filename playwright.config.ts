@@ -37,7 +37,7 @@ export default defineConfig({
   // in the measurement build
   // and the S4P-04 screenshots (slice 4p) run only when asked with SCREENS=1
   testIgnore: [
-    ...(E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts", "**/S4P-fading.spec.ts", "**/S4P-10-c08.spec.ts", "**/S4P-11-index.spec.ts", "**/S4B1-09.spec.ts", "**/S4B2-1[0-3].spec.ts", "**/S4B2-15-layers.spec.ts", "**/S5A-08.spec.ts", "**/S6A-09*.spec.ts", "**/S6B-10.spec.ts", "**/S7A-14-review.spec.ts", "**/S7B-16-*.spec.ts", "**/S10A-12*.spec.ts", "**/S10B-10*.spec.ts", "**/S11-13.spec.ts", "**/S12B-10*.spec.ts", "**/S12B-bytes.spec.ts", "**/S14A-13-layers.spec.ts", "**/S15-layers.spec.ts", "**/S15B-layers.spec.ts", "**/S15C-layers.spec.ts", "**/S15-18.spec.ts", "**/S16-11.spec.ts", "**/S20-sitting.spec.ts", "**/S20-layers.spec.ts"]),
+    ...(E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts", "**/S4P-fading.spec.ts", "**/S4P-10-c08.spec.ts", "**/S4P-11-index.spec.ts", "**/S4B1-09.spec.ts", "**/S4B2-1[0-3].spec.ts", "**/S4B2-15-layers.spec.ts", "**/S5A-08.spec.ts", "**/S6A-09*.spec.ts", "**/S6B-10.spec.ts", "**/S7A-14-review.spec.ts", "**/S7B-16-*.spec.ts", "**/S10A-12*.spec.ts", "**/S10B-10*.spec.ts", "**/S11-13.spec.ts", "**/S12B-10*.spec.ts", "**/S12B-bytes.spec.ts", "**/S14A-13-layers.spec.ts", "**/S15-layers.spec.ts", "**/S15B-layers.spec.ts", "**/S15C-layers.spec.ts", "**/S15-18.spec.ts", "**/S16-11.spec.ts", "**/S20-sitting.spec.ts", "**/S20-layers.spec.ts", "**/S38-layers.spec.ts"]),
     ...(process.env.SCREENS ? [] : ["**/*-screens.spec.ts"]),
     // slice 29: the smoke set runs against Postgres only (playwright.pg.config.ts), never on the local adapter
     "**/slice-29/**",
@@ -59,7 +59,10 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // slice 38: 50 px taller than Desktop Chrome's 1280 × 720, the canvas toolbar's height: `openCanvas` puts a spec's
+    // view 50 px lower, under the toolbar (e2e/slice-01a/helpers.ts), and the canvas area keeps what it showed before,
+    // with the Overview, the toasts and the status bar where they stood against it
+    { name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 770 } } },
     // BROWSERS=1: the smoke specs (`*-browsers.spec.ts`) in Firefox and WebKit too
     ...(process.env.BROWSERS
       ? [

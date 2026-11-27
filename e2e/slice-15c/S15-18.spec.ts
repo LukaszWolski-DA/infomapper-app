@@ -102,7 +102,7 @@ const dragLoop = (page: Page, n: number, pause = PAUSE_MS) =>
       const pane = document.querySelector(".react-flow__pane")!.getBoundingClientRect();
       const rows = [...document.querySelectorAll<HTMLElement>(".card.ent:not(.dimn) .row[data-row]")].filter((r) => {
         const b = r.getBoundingClientRect();
-        return b.top > pane.top + 10 && b.bottom < pane.bottom - 10 && b.left > pane.left && b.right < pane.right;
+        return b.top > pane.top + 60 && b.bottom < pane.bottom - 10 && b.left > pane.left && b.right < pane.right;
       });
       if (!rows.length) return { error: "no logical rows in view" };
       const nextFrame = () => new Promise((res) => requestAnimationFrame(() => setTimeout(res, 0)));

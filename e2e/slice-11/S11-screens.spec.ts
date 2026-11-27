@@ -27,6 +27,7 @@ import {
   setException,
   setWidth,
   signInAs,
+  clickBox,
 } from "./helpers";
 
 const OUT = path.resolve("docs", "prd", "slice-11-screens", process.env.SCREENS === "1" ? "latest" : (process.env.SCREENS ?? "latest"));
@@ -58,8 +59,8 @@ test("S11 screens: names and aliases, mixed, exceptions, truncation, search, men
   await openCanvas(page, canvasUrl(), HALF);
   await page.mouse.move(2, 400);
   await shot(page, "1-canvas-names");
-  await entityBox(page).click();
-  await attributeBox(page).click();
+  await clickBox(page, entityBox(page));
+  await clickBox(page, attributeBox(page));
   await expect(headerOf(page, customer)).toHaveText("Klient");
   await page.waitForTimeout(1500);
   await shot(page, "2-canvas-aliases");
@@ -117,11 +118,11 @@ test("S11 screens: names and aliases, mixed, exceptions, truncation, search, men
   await page.mouse.move(2, 400);
   await page.getByTestId("panel-entity").screenshot({ path: path.join(OUT, "9-alias-field-entity.png") });
 
-  // up to 1,300 px the check boxes are in "More" with Focus
+  // on a narrow canvas the check boxes are in "More" with Focus (slice 38: by the canvas toolbar's room)
   await page.setViewportSize({ width: 1150, height: 800 });
-  await expect(page.getByTestId("switch-names")).toBeHidden();
+  await expect(page.getByTestId("button-names")).toBeHidden();
   await page.getByTestId("button-more-tools").click();
   await expect(page.getByTestId("more-entity-aliases")).toBeVisible();
   await page.waitForTimeout(300);
-  await page.screenshot({ path: path.join(OUT, "10-more-below-1300.png"), clip: { x: 550, y: 0, width: 600, height: 320 } });
+  await page.screenshot({ path: path.join(OUT, "10-more-on-a-narrow-canvas.png"), clip: { x: 264, y: 60, width: 546, height: 320 } });
 });

@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { attributeBox, canvasRow, canvasUrl, entityBox, headerOf, idsOf, liveUrl, loadModel, openCanvas, openLiveFor, setAttributeAlias, setCard, setEntityAlias, setNamesAs, signInAs, labelItem } from "./helpers";
+import { attributeBox, canvasRow, canvasUrl, entityBox, headerOf, idsOf, liveUrl, loadModel, openCanvas, openLiveFor, setAttributeAlias, setCard, setEntityAlias, setNamesAs, signInAs, labelItem, clickBox } from "./helpers";
 
 // Other cards (item 10): a collapsed card shows its entity alias by the entity mode; a live canvas's context card
 // follows the same rules; table and requirement cards are unchanged under both modes.
@@ -17,9 +17,9 @@ test("S11-06: a collapsed card shows the entity alias by the entity mode", async
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
   await expect(headerOf(page, customer)).toHaveText("Customer");
-  await entityBox(page).click();
+  await clickBox(page, entityBox(page));
   await expect(headerOf(page, customer)).toHaveText("Klient");
-  await attributeBox(page).click();
+  await clickBox(page, attributeBox(page));
   await expect(headerOf(page, customer)).toHaveText("Klient");
   await bothStored();
 });
@@ -32,8 +32,8 @@ test("S11-06: table and requirement cards are unchanged under both modes", async
   const requirements = await texts(page, "card-requirement");
   expect(tables.length).toBeGreaterThan(0);
   expect(requirements.length).toBeGreaterThan(0);
-  await entityBox(page).click();
-  await attributeBox(page).click();
+  await clickBox(page, entityBox(page));
+  await clickBox(page, attributeBox(page));
   await expect.poll(() => texts(page, "card-entity")).toEqual(expect.arrayContaining(["Customer alias"]));
   expect(await texts(page, "card-source")).toEqual(tables);
   expect(await texts(page, "card-requirement")).toEqual(requirements);
@@ -55,7 +55,7 @@ test("S11-06: a live canvas's context card follows the same rules", async ({ pag
   await openCanvas(page, liveUrl(live), { x: 0, y: 0, zoom: 1 });
   await expect(page.locator(`[data-card="${itemId}"]`)).toHaveAttribute("data-live", "context");
   await expect(headerOf(page, itemId)).toHaveText("Pozycja");
-  await attributeBox(page).click();
+  await clickBox(page, attributeBox(page));
   await expect(page.locator(`[data-card="${itemId}"] [data-row="${attributeId}"] .nm`)).toHaveText("Atrybut");
   await expect.poll(async () => (await canvasRow(live)).attribute_names).toBe("alias");
 });

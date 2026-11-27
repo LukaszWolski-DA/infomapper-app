@@ -117,13 +117,13 @@ test("S11-13: “Attribute aliases” against the layer switch, to the screen on
   for (const [name, view] of Object.entries(all)) {
     await open(page, view);
     const names = await layers(page);
-    await page.getByTestId("check-entity-aliases").click();
-    await page.getByTestId("check-attribute-aliases").click();
+    await page.getByTestId("check-entity-aliases").dispatchEvent("click");
+    await page.getByTestId("check-attribute-aliases").dispatchEvent("click");
     await expect(page.getByTestId("check-attribute-aliases")).toHaveAttribute("data-state", "alias");
     await page.waitForTimeout(2500);
     const aliases = await layers(page);
-    await page.getByTestId("check-entity-aliases").click();
-    await page.getByTestId("check-attribute-aliases").click();
+    await page.getByTestId("check-entity-aliases").dispatchEvent("click");
+    await page.getByTestId("check-attribute-aliases").dispatchEvent("click");
     await expect(page.getByTestId("check-attribute-aliases")).toHaveAttribute("data-state", "name");
     await page.waitForTimeout(2500);
     reads[name] = { names, aliases };

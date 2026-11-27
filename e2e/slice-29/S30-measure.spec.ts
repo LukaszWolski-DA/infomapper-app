@@ -154,7 +154,7 @@ async function cardInView(page: Page): Promise<{ itemId: string; x: number; y: n
       const head = node.querySelector<HTMLElement>('[data-testid="card-entity"] .c-head');
       if (!head) continue;
       const r = head.getBoundingClientRect();
-      if (r.left >= area.left + 8 && r.right <= area.right - 8 && r.top >= area.top + 8 && r.bottom <= area.bottom - 60) {
+      if (r.left >= area.left + 8 && r.right <= area.right - 8 && r.top >= area.top + 58 && r.bottom <= area.bottom - 60) {
         return { itemId: node.dataset.id ?? "", x: r.left + Math.min(r.width / 2, 60), y: r.top + r.height / 2 };
       }
     }
