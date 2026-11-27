@@ -803,3 +803,7 @@ fade, no page wider than the screen): 4 passed.
 - **Line ends:** Python edits in steps 2 to 6 wrote the working copies of 43 files with CRLF; git stored them as LF in
   every commit (`.gitattributes`), so the pushed code and both full runs had LF. `tests/theme-css.test.ts` read the working
   copy of `globals.css` and failed once; the working copies are LF again and it passes.
+
+**Łukasz's answer (27 November 2026):** step 6 accepted, with the check script's rule for side panels over the canvas:
+a panel open over the canvas, marked `data-overlay` (and only that), covers what lies under it. **For the closing:**
+D-89's check script names it.
