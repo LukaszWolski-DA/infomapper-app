@@ -18,17 +18,9 @@ const EXCEPTIONS: Readonly<Record<string, string>> = {
 /** Slice 37, step 2: every file that styled a control on its own after `fields.tsx`' constants became the shared look.
  * Step 3a converted the inspector's panels and InfoCube's sections (15 files); step 3b the left panel, the toolbox and
  * the import wizard (6); step 4 the top bar, the navigation row and the canvas's switches (16);
- * step 5 the homes, settings, people, baselines and dialogs (12); steps 6 and 7 InfoDocumenter and InfoCube (10). */
-const TO_CONVERT: readonly string[] = [
-  // step 8: sign-in, links, errors
-  "src/app/_components/canvas-error-boundary.tsx",
-  "src/app/_components/change-password.tsx",
-  "src/app/_components/link-page.tsx",
-  "src/app/error.tsx",
-  "src/app/global-error.tsx",
-  "src/app/page.tsx",
-  "src/app/sign-in/start-forms.tsx",
-];
+ * step 5 the homes, settings, people, baselines and dialogs (12); steps 6 and 7 InfoDocumenter and InfoCube (10);
+ * step 8 sign-in, the links' pages and the error pages (7): the list is empty. */
+const TO_CONVERT: readonly string[] = [];
 
 const files = () =>
   execFileSync("git", ["ls-files", "src/**/*.tsx"], { encoding: "utf8" })

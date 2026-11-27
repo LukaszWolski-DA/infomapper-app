@@ -11,7 +11,9 @@
 import { useMemo, useState } from "react";
 import { addStereotypeAction, removeStereotypeAction, renameStereotypeAction, setStereotypeDefinitionAction } from "@/app/_actions/stereotype";
 import { useAction } from "@/app/_components/use-action";
-import { buttonClass, dangerClass, DraftLine, fieldKey, inputClass, smallButtonClass, TextArea, useDraft } from "@/app/_panels/fields";
+import { DraftLine, fieldKey, TextArea, useDraft } from "@/app/_panels/fields";
+import { buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
 import {
   STEREOTYPE_ADDED,
   STEREOTYPE_DEFINITION_CLEARED,
@@ -145,7 +147,7 @@ function Row({ s, onRemove, ...p }: StereotypesBoxProps & { s: Stereotype; onRem
                 if (e.key === "Enter") e.currentTarget.blur();
                 keyDown(e);
               }}
-              className={`${inputClass} h-7 min-w-[140px] max-w-[240px]`}
+              className={`${inputVariants()} h-7 min-w-[140px] max-w-[240px]`}
               data-testid="input-stereotype-name"
             />
           ) : (
@@ -193,7 +195,7 @@ function Row({ s, onRemove, ...p }: StereotypesBoxProps & { s: Stereotype; onRem
       </td>
       <td className="border-b border-im-line py-1.5 text-right">
         {p.editable && own && (
-          <button type="button" className={`${smallButtonClass} text-im-warn`} onClick={onRemove} data-testid="button-remove-stereotype">
+          <button type="button" className={`${buttonVariants({ size: "sm" })} text-im-warn`} onClick={onRemove} data-testid="button-remove-stereotype">
             Remove
           </button>
         )}
@@ -245,7 +247,7 @@ function AddRow(p: StereotypesBoxProps) {
           placeholder="New stereotype, e.g. Event"
           aria-label="New stereotype"
           aria-invalid={!!nameError}
-          className={inputClass}
+          className={inputVariants()}
           data-testid="input-new-stereotype"
         />
         <input
@@ -260,10 +262,10 @@ function AddRow(p: StereotypesBoxProps) {
           placeholder="Code, e.g. event"
           aria-label="Code"
           aria-invalid={!!codeError}
-          className={`${inputClass} font-mono text-xs`}
+          className={`${inputVariants()} font-mono text-xs`}
           data-testid="input-new-stereotype-code"
         />
-        <button type="button" className={smallButtonClass + " h-8"} onClick={() => void add()} data-testid="button-add-stereotype">
+        <button type="button" className={buttonVariants({ size: "sm" }) + " h-8"} onClick={() => void add()} data-testid="button-add-stereotype">
           Add
         </button>
       </div>
@@ -306,10 +308,10 @@ function RemoveDialog({ s, n, others, pending, onCancel, onRemove }: { s: Stereo
         </div>
         <p className="mt-2 text-[12px] text-im-ink-3">{STEREOTYPE_MOVE_NOTE}</p>
         <DialogFooter className="mt-4">
-          <button type="button" className={buttonClass} onClick={onCancel} data-testid="button-cancel-remove-stereotype">
+          <button type="button" className={buttonVariants()} onClick={onCancel} data-testid="button-cancel-remove-stereotype">
             Cancel
           </button>
-          <button type="button" className={dangerClass} disabled={pending || !to} onClick={() => onRemove(to)} data-testid="button-confirm-remove-stereotype">
+          <button type="button" className={buttonVariants({ variant: "danger" })} disabled={pending || !to} onClick={() => onRemove(to)} data-testid="button-confirm-remove-stereotype">
             {removeButton(n)}
           </button>
         </DialogFooter>

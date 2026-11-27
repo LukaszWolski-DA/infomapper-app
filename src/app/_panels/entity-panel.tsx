@@ -18,7 +18,8 @@ import { stereotypeIndex } from "@/domain/model/stereotypes";
 import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, Hint, Li, LongList, smallButtonClass, TextField, useChoice } from "./fields";
+import { Actions, Field, fieldKey, Fold, Hint, Li, LongList, TextField, useChoice } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
@@ -235,7 +236,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         )}
         {p.editable && (
           <div className="mt-2 flex gap-2">
-            <button type="button" className={smallButtonClass} onClick={() => void addAttribute()} data-testid="button-add-attribute">
+            <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => void addAttribute()} data-testid="button-add-attribute">
               Add attribute
             </button>
           </div>
@@ -279,7 +280,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         )}
         {p.editable && cardId && missing.length > 0 && (
           <div className="mt-2 flex gap-2">
-            <button type="button" className={smallButtonClass} onClick={() => ui.placeBeside(missing, cardId, "left")} data-testid="button-feed-all">
+            <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => ui.placeBeside(missing, cardId, "left")} data-testid="button-feed-all">
               {missing.length === feeds.length ? "Add all to this canvas" : `Add the ${missing.length} missing to this canvas`}
             </button>
           </div>
@@ -309,16 +310,16 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
       {p.editable && (
         <Actions>
           {cardId ? (
-            <button type="button" className={buttonClass} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
+            <button type="button" className={buttonVariants()} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
               {p.live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas"}
             </button>
           ) : (
             // slice 4b-2, item 16 (prototype add-card): where “Remove from this canvas” stands when the card is not here
-            <button type="button" className={buttonClass} onClick={() => ui.addToCanvas({ entityId: e.id }, attributes.length)} data-testid="button-add-card">
+            <button type="button" className={buttonVariants()} onClick={() => ui.addToCanvas({ entityId: e.id }, attributes.length)} data-testid="button-add-card">
               Add to this canvas
             </button>
           )}
-          <button type="button" className={dangerClass} onClick={() => setDeleting(true)} data-testid="button-delete-entity">
+          <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => setDeleting(true)} data-testid="button-delete-entity">
             Delete from model…
           </button>
         </Actions>

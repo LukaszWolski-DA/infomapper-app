@@ -19,7 +19,8 @@ import { REQUIREMENT_KINDS, REQUIREMENT_PRIORITIES, REQUIREMENT_STATUSES, type R
 import { NAME_REQUIRED } from "@/domain/validation";
 import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
-import { Actions, buttonClass, dangerClass, Field, Hint, Kind, List, Note, Section, Seg, TextArea, TextField, fieldKey, useChoice } from "./fields";
+import { Actions, Field, Hint, Kind, List, Note, Section, Seg, TextArea, TextField, fieldKey, useChoice } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { attributeLabel, columnLabel, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -265,15 +266,15 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       {p.editable && (
         <Actions>
           {ui.requirementCard(r.id) ? (
-            <button type="button" className={buttonClass} onClick={() => ui.removeRequirementCard(r.id)} data-testid="button-requirement-uncard">
+            <button type="button" className={buttonVariants()} onClick={() => ui.removeRequirementCard(r.id)} data-testid="button-requirement-uncard">
               Remove its card from this canvas
             </button>
           ) : (
-            <button type="button" className={buttonClass} onClick={() => ui.placeRequirementCard(r.id)} data-testid="button-requirement-card">
+            <button type="button" className={buttonVariants()} onClick={() => ui.placeRequirementCard(r.id)} data-testid="button-requirement-card">
               Place its card on this canvas
             </button>
           )}
-          <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-requirement">
+          <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => void remove()} data-testid="button-delete-requirement">
             Delete requirement
           </button>
         </Actions>

@@ -87,7 +87,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString
 // slice 37 (step 5): the shared buttons and fields, each keeping its padding
 const smallBtn = cn(buttonVariants({ size: "sm" }), "px-[9px] text-xs");
 const btn = cn(buttonVariants(), "px-3");
-// the app's primary buttons (`primaryClass`, `src/app/_panels/fields.tsx`) use the logical colour, the prototype's `.pri` the
+// the app's primary buttons (`buttonVariants({ variant: "primary" })`) use the logical colour, the prototype's `.pri` the
 // mapping colour: the app's own, as every primary button of the app
 const priBtn = cn(buttonVariants({ variant: "primary" }), "px-3");
 const smallPriBtn = cn(buttonVariants({ variant: "primary", size: "sm" }), "px-[9px] text-xs");

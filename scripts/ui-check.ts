@@ -11,14 +11,15 @@
 //   npm run ui:check -- --label before            # .data/ui-check/before-<yyyymmdd-hhmm>/
 //   npm run ui:check -- --label after --only canvas,editor --widths 1440 --themes light
 //   npm run ui:check -- --url http://127.0.0.1:3001 --label demo    # against a running server (its data, not ours)
-//   npm run ui:check -- --compare <before folder> <after folder>    # compare.html: the screenshots side by side
+//   npm run ui:check -- --compare <before folder> <after folder>    # slice-37-before-and-after.html: the summary, the findings
+//                                                                    left with their slice, each screen before and after
 //
 // Its data (A8, Łukasz 26 November 2026) is a file of its own, .data/ui-check-db.json, reset from the demo data on
 // every run, with a few long names. It never reads or writes the development file or the demo's file. The server is
 // `next dev` on 127.0.0.1:3400 with its own build folder (.next-ui-check). Not part of the e2e run or of CI.
 
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
@@ -582,20 +583,132 @@ function report(results: readonly Result[], label: string, started: Date): strin
   return lines.join("\n");
 }
 
+/** A finding of a report, as one line, and the slice that owns it (slice 37, step 8: Łukasz's side-by-side page). */
+interface Finding {
+  readonly kind: string;
+  readonly text: string;
+  readonly view: string;
+}
+type Stored = Omit<Result, "controls"> & { controls: number; kinds?: KindCount[] };
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function findingsOf(r: Stored): Finding[] {
+  const view = viewName(r.view);
+  const out: Finding[] = [];
+  for (const o of r.overlaps) out.push({ kind: "overlap", text: `${describe(o.a)} and ${describe(o.b)}`, view });
+  for (const c of r.spills) out.push({ kind: "text out of its control", text: describe(c), view });
+  for (const c of r.crowded) out.push({ kind: "words run together", text: `${describe(c.a)} and ${describe(c.b)}`, view });
+  for (const c of r.past) out.push({ kind: "past the edge", text: describe(c), view });
+  for (const t of r.small) if (!t.spaced) out.push({ kind: "under 24 px, not spaced", text: `${describe(t.control)} ${Math.round(t.control.rect.w)} × ${Math.round(t.control.rect.h)}`, view });
+  for (const c of r.cut) out.push({ kind: "cut text", text: `${c.testId ?? c.tag} "${c.text.slice(0, 40)}"`, view });
+  if (r.pageWider) out.push({ kind: "page wider than the screen", text: `${r.pageWider} px`, view });
+  return out;
+}
+
+/** Who owns a finding left after slice 37: the phone's width is slice 38's layout (A7); anything else is open. */
+const ownerOf = (f: Finding) => (f.view.startsWith("390") ? "Slice 38: the phone's layout (the top bar, the navigation row, a panel over the canvas)" : "Open in slice 37");
+
+/** Łukasz's side-by-side page: the summary, the findings left with their owner, each screen before and after. */
 function compare(a: string, b: string): void {
-  const pngs = readdirSync(a).filter((f) => f.endsWith(".png") && existsSync(path.join(b, f))).sort();
   const rel = (d: string) => path.relative(OUT_ROOT, d).replace(/\\/g, "/");
-  const count = (d: string) => (JSON.parse(readFileSync(path.join(d, "report.json"), "utf8")) as { kinds: Record<string, number> }).kinds;
-  const ka = count(a), kb = count(b);
-  const html = `<!doctype html><meta charset="utf-8"><title>UI check: before and after</title>
-<style>body{font:13px/1.5 system-ui,sans-serif;margin:16px;background:#fff;color:#18212c}h2{font-size:15px;margin:28px 0 6px}
-.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.pair img{width:100%;border:1px solid #e2e6eb}table{border-collapse:collapse}td,th{padding:2px 10px;border-bottom:1px solid #e2e6eb;text-align:left}</style>
-<h1>UI check: ${rel(a)} → ${rel(b)}</h1>
-<table><tr><th>Kinds</th><th>Before</th><th>After</th></tr>${Object.keys({ ...ka, ...kb }).map((k) => `<tr><td>${k}</td><td>${ka[k] ?? 0}</td><td>${kb[k] ?? 0}</td></tr>`).join("")}</table>
-${pngs.map((f) => `<h2>${f.replace(/\.png$/, "").replace("--", " · ")}</h2><div class="pair"><img src="${rel(a)}/${f}" alt="before"><img src="${rel(b)}/${f}" alt="after"></div>`).join("\n")}`;
-  const file = path.join(OUT_ROOT, `compare-${path.basename(a)}--${path.basename(b)}.html`);
+  const load = (d: string) => JSON.parse(readFileSync(path.join(d, "report.json"), "utf8")) as { results: Stored[] };
+  const ra = load(a), rb = load(b);
+  const key = (r: Stored) => `${r.screen}|${r.view.width}|${r.view.theme}`;
+  const before = new Map(ra.results.map((r) => [key(r), r]));
+  const sum = (rs: Stored[]) => {
+    const n = (f: (r: Stored) => number) => rs.reduce((t, r) => t + f(r), 0);
+    return {
+      views: rs.length,
+      overlaps: n((r) => r.overlaps.length),
+      spills: n((r) => r.spills.length),
+      crowded: n((r) => r.crowded.length),
+      past: n((r) => r.past.length),
+      small: n((r) => r.small.filter((s) => !s.spaced).length),
+      spaced: n((r) => r.small.filter((s) => s.spaced).length),
+      cut: n((r) => r.cut.length),
+      wider: n((r) => (r.pageWider ? 1 : 0)),
+    };
+  };
+  // the same views on both sides for the counts: the screens step 2a knew
+  const both = rb.results.filter((r) => before.has(key(r)));
+  const sa = sum(both.map((r) => before.get(key(r))!)), sb = sum(both), sAll = sum(rb.results);
+  // kinds (height, text size, radius, edge) over the same light views on both sides, by group
+  const kindsIn = (rs: Stored[], group: keyof typeof GROUPS) =>
+    new Set(rs.filter((r) => r.view.theme === "light").flatMap((r) => (r.kinds ?? []).filter((k) => GROUPS[group].includes(k.kind)).map((k) => k.key))).size;
+  const kb4 = (g: keyof typeof GROUPS) => kindsIn(both.map((r) => before.get(key(r))!), g);
+  const kaf = (g: keyof typeof GROUPS) => kindsIn(both, g);
+  const rows: [string, number, number][] = [
+    ["Kinds of button (light views)", kb4("buttons"), kaf("buttons")],
+    ["Kinds of field (light views)", kb4("fields"), kaf("fields")],
+    ["Kinds of drop-down (light views)", kb4("drop-downs"), kaf("drop-downs")],
+    ["Kinds of check box (light views)", kb4("check boxes"), kaf("check boxes")],
+    ["Kinds of link (light views)", kb4("links"), kaf("links")],
+    ["Views compared", sa.views, sb.views],
+    ["Overlaps", sa.overlaps, sb.overlaps],
+    ["Text out of its control", sa.spills, sb.spills],
+    ["Words run together", sa.crowded, sb.crowded],
+    ["Past the screen's edge", sa.past, sb.past],
+    ["Targets under 24 px, failing WCAG", sa.small, sb.small],
+    ["Targets under 24 px, passing by spacing", sa.spaced, sb.spaced],
+    ["Text cut without an ellipsis", sa.cut, sb.cut],
+    ["Pages wider than the screen", sa.wider, sb.wider],
+  ];
+  const left = new Map<string, { f: Finding; owner: string; views: Set<string>; screens: Set<string> }>();
+  for (const r of rb.results)
+    for (const f of findingsOf(r)) {
+      const owner = ownerOf(f);
+      const k = `${owner}|${f.kind}|${f.text}`;
+      const e = left.get(k) ?? { f, owner, views: new Set<string>(), screens: new Set<string>() };
+      e.views.add(f.view);
+      e.screens.add(r.screen);
+      left.set(k, e);
+    }
+  const owners = [...new Set([...left.values()].map((e) => e.owner))].sort();
+  const shown = (r: Stored) => r.view.width === 1440 || (r.view.width === 390 && r.view.theme === "light");
+  const screens = [...new Set(rb.results.map((r) => r.screen))];
+  const img = (d: string, f: string, alt: string) => `<a href="${rel(d)}/${f}"><img loading="lazy" src="${rel(d)}/${f}" alt="${alt}"></a>`;
+  const findings = owners
+    .map(
+      (o) =>
+        `<h3>${esc(o)}</h3><table><tr><th>Kind</th><th>What</th><th>Where</th></tr>${[...left.values()]
+          .filter((e) => e.owner === o)
+          .map((e) => `<tr><td>${esc(e.f.kind)}</td><td>${esc(e.f.text)}</td><td>${esc([...e.screens].join(", "))} at ${esc([...e.views].join(", "))}</td></tr>`)
+          .join("")}</table>`,
+    )
+    .join("");
+  const pictures = screens
+    .map((s) => {
+      const vs = rb.results.filter((r) => r.screen === s && shown(r));
+      return `<h3 id="${s}">${s}</h3>${vs
+        .map((r) => {
+          const bf = before.get(key(r));
+          const pair = `${bf?.file ? img(a, bf.file, "before") : `<div class="none">a screen added after step 2a: no before</div>`}${r.file ? img(b, r.file, "after") : `<div class="none">no screenshot</div>`}`;
+          return `<p class="lab">${viewName(r.view)}: before | after</p><div class="pair${r.view.width === 390 ? " phone" : ""}">${pair}</div>`;
+        })
+        .join("")}`;
+    })
+    .join("\n");
+  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Slice 37: before and after</title>
+<style>body{font:14px/1.5 system-ui,sans-serif;margin:0 auto;max-width:1500px;padding:16px 24px 64px;background:#fff;color:#18212c}
+h1{font-size:22px;margin:8px 0}h2{font-size:17px;margin:32px 0 8px}h3{font-size:14px;margin:22px 0 6px}p{max-width:90ch;color:#4a5563}
+table{border-collapse:collapse;margin:6px 0 12px}td,th{padding:3px 14px 3px 0;border-bottom:1px solid #e2e6eb;text-align:left;vertical-align:top}td.n{text-align:right;font-variant-numeric:tabular-nums}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.pair.phone{grid-template-columns:repeat(2,minmax(0,280px))}.pair img{width:100%;border:1px solid #d6dbe1;border-radius:6px}
+.lab{font-size:12px;color:#5b6573;margin:10px 0 2px}.none{display:grid;place-items:center;min-height:120px;border:1px dashed #c3cad2;border-radius:6px;color:#8a95a3;font-size:12px}
+nav a{margin-right:10px;white-space:nowrap}code{font-size:12px}</style>
+<h1>Slice 37, the design system's foundation: before and after</h1>
+<p>Before: <code>${rel(a)}</code> (step 2a, before any change of the slice). After: <code>${rel(b)}</code> (step 8). Each screen shows 1,440 px light and dark and the phone (390 px, light), before on the left; every width (1,280, 1,440 and 1,920 px, light and dark, and 390 px) is in the two folders next to this page. Click a picture to open it full size.</p>
+<h2>Summary</h2>
+<p>Counts over the ${sb.views} views both runs have (the screens step 2a knew). The screens added since (the toolbox, the menus, the dialogs, the editor's lists) are after only: ${sAll.views - sb.views} views more, with ${sAll.overlaps - sb.overlaps} overlaps, ${sAll.small - sb.small} targets failing WCAG and ${sAll.crowded - sb.crowded} words run together. Before, "words run together" also counted a switcher's whole name, the part its ellipsis hides included (the script measured clipped text until step 4).</p>
+<table><tr><th></th><th>Before</th><th>After</th></tr>${rows.map(([t, x, y]) => `<tr><td>${t}</td><td class="n">${x}</td><td class="n">${y}</td></tr>`).join("")}</table>
+<h2>Findings left after the slice</h2>
+${left.size ? findings : "<p>None.</p>"}
+<h2>Screens</h2>
+<nav>${screens.map((s) => `<a href="#${s}">${s}</a>`).join(" ")}</nav>
+${pictures}
+</html>`;
+  const file = path.join(OUT_ROOT, "slice-37-before-and-after.html");
   writeFileSync(file, html);
-  console.log(`Written ${path.relative(process.cwd(), file)} (${pngs.length} pairs).`);
+  console.log(`Written ${path.resolve(file)} (${screens.length} screens, ${left.size} findings left).`);
 }
 
 // ---------- main ----------

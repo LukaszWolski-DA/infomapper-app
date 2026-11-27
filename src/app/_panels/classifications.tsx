@@ -20,7 +20,8 @@ import { dataVaultReading, READING_EMPTY, READING_FOOTER, readingText, type Read
 import type { Classification, ClassificationScope, SourceTable } from "@/domain/types";
 import { NOTE_REMOVED, NOTE_SAVED } from "@/domain/commands/source";
 import { DialogFooter } from "@/ui/components/dialog";
-import { buttonClass, dangerClass, Field, fieldKey, Fold, Hint, LongList, Li, TextArea } from "./fields";
+import { Field, fieldKey, Fold, Hint, LongList, Li, TextArea } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { filterChipVariants } from "@/ui/components/chip";
 
@@ -208,10 +209,10 @@ export function RemoveClassificationForm({ classification: c, impact, pending, o
       )}
       <p className="mt-2 text-[12px] text-im-ink-3">You can undo it right after.</p>
       <DialogFooter className="mt-4">
-        <button type="button" className={buttonClass} onClick={onCancel} data-testid="button-cancel-remove-classification">
+        <button type="button" className={buttonVariants()} onClick={onCancel} data-testid="button-cancel-remove-classification">
           Cancel
         </button>
-        <button type="button" className={dangerClass} disabled={pending} onClick={onRemove} data-testid="button-confirm-remove-classification">
+        <button type="button" className={buttonVariants({ variant: "danger" })} disabled={pending} onClick={onRemove} data-testid="button-confirm-remove-classification">
           Remove
         </button>
       </DialogFooter>

@@ -13,7 +13,8 @@
 import { useContext, useEffect, useMemo } from "react";
 import { useAction } from "@/app/_components/use-action";
 import { useModules } from "@/app/_components/modules";
-import { Actions, dangerClass, Field, fieldKey, Fold, GroupedSelect, Kind, List, Note, Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
+import { Actions, Field, fieldKey, Fold, GroupedSelect, Kind, List, Note, Seg, TextArea, TextField, useChoice } from "@/app/_panels/fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel, type PanelContext } from "@/app/_panels/inspector";
 import { CanvasUiCtx } from "@/canvas/context";
 import { useValue } from "@/canvas/value-store";
@@ -279,7 +280,7 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
         <Actions>
           <button
             type="button"
-            className={dangerClass}
+            className={buttonVariants({ variant: "danger" })}
             data-testid="button-delete-cube-mapping"
             onClick={() =>
               void remove(m.id).then((deleted) => ui.deselectDeleted(deleted))

@@ -19,7 +19,8 @@ import type { Uuid } from "@/domain/ids";
 import { calculationGaps, derivationIndex } from "@/domain/model/derivations";
 import type { Attribute } from "@/domain/types";
 import { openPick } from "@/ui/pick-popover";
-import { Actions, Field, fieldKey, Fold, Hint, List, Note, smallButtonClass, TextArea } from "./fields";
+import { Actions, Field, fieldKey, Fold, Hint, List, Note, TextArea } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { iconButtonVariants } from "@/ui/components/icon-button";
 import { cn } from "@/ui/lib/utils";
@@ -123,7 +124,7 @@ export function CalculationSection({ attribute: a }: { attribute: Attribute }) {
         {p.editable && <Hint>Not calculated. Mark it when its value is computed from other attributes of {entity?.name ?? "its entity"}.</Hint>}
         {p.editable && (
           <Actions>
-            <button type="button" data-pop="" className={smallButtonClass} onClick={(e) => pick(e.currentTarget, true)} data-testid="button-calculate">
+            <button type="button" data-pop="" className={buttonVariants({ size: "sm" })} onClick={(e) => pick(e.currentTarget, true)} data-testid="button-calculate">
               Calculate from attributes…
             </button>
           </Actions>
@@ -166,7 +167,7 @@ export function CalculationSection({ attribute: a }: { attribute: Attribute }) {
       )}
       {p.editable && (
         <div className="mt-1.5">
-          <button type="button" data-pop="" className={smallButtonClass} onClick={(e) => pick(e.currentTarget, false)} data-testid="button-calc-add">
+          <button type="button" data-pop="" className={buttonVariants({ size: "sm" })} onClick={(e) => pick(e.currentTarget, false)} data-testid="button-calc-add">
             Add inputs…
           </button>
         </div>
@@ -206,7 +207,7 @@ export function CalculationSection({ attribute: a }: { attribute: Attribute }) {
       )}
       {p.editable && (
         <Actions>
-          <button type="button" className={smallButtonClass} onClick={() => void stop()} data-testid="button-calc-stop">
+          <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => void stop()} data-testid="button-calc-stop">
             Stop calculating
           </button>
         </Actions>

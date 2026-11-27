@@ -28,7 +28,8 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, GroupedSelect, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot, useDraft, DraftLine } from "./fields";
+import { Actions, Field, fieldKey, Fold, GroupedSelect, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot, useDraft, DraftLine } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { RequirementsSection } from "./requirements-section";
 import { ItemLabels } from "./item-labels";
@@ -351,10 +352,10 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
         <Note warn testId="note-rule-needed">
           A mapping with more than one input needs a transformation rule. Write it, then save.
           <div className="mt-2 flex gap-2">
-            <button type="button" className={buttonClass} onClick={() => void savePending()} data-testid="button-save-input">
+            <button type="button" className={buttonVariants()} onClick={() => void savePending()} data-testid="button-save-input">
               Save
             </button>
-            <button type="button" className={buttonClass} onClick={() => setPending(null)}>
+            <button type="button" className={buttonVariants()} onClick={() => setPending(null)}>
               Cancel
             </button>
           </div>
@@ -445,10 +446,10 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
           </Field>
           <Note warn>The merged mapping is a transformation and goes to review; it needs a rule.</Note>
           <div className="mt-2 flex gap-2">
-            <button type="button" className={buttonClass} disabled={!merging.size} onClick={() => void merge()} data-testid="button-merge">
+            <button type="button" className={buttonVariants()} disabled={!merging.size} onClick={() => void merge()} data-testid="button-merge">
               Merge
             </button>
-            <button type="button" className={buttonClass} onClick={() => setMerging(null)}>
+            <button type="button" className={buttonVariants()} onClick={() => setMerging(null)}>
               Cancel
             </button>
           </div>
@@ -458,16 +459,16 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
       {p.editable && (
         <Actions>
           {inputs.length > 1 && (
-            <button type="button" className={buttonClass} onClick={() => void split()} data-testid="button-split-mapping">
+            <button type="button" className={buttonVariants()} onClick={() => void split()} data-testid="button-split-mapping">
               Split into separate mappings
             </button>
           )}
           {others.length > 0 && !merging && (
-            <button type="button" className={buttonClass} onClick={() => setMerging(new Set())} data-testid="button-merge-mappings">
+            <button type="button" className={buttonVariants()} onClick={() => setMerging(new Set())} data-testid="button-merge-mappings">
               Merge mappings…
             </button>
           )}
-          <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-mapping">
+          <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => void remove()} data-testid="button-delete-mapping">
             Delete mapping
           </button>
         </Actions>

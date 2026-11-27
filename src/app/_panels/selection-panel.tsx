@@ -12,7 +12,8 @@
 import { useContext } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import { isCardKey, isFrameKey, isNoteKey, isReqKey, type SelectionKey } from "@/canvas/selection";
-import { Actions, buttonClass, dangerClass, Hint, Kind, Li, List, Section } from "./fields";
+import { Actions, Hint, Kind, Li, List, Section } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { NoteRow } from "./note-row";
 import { feedingSourceCards } from "./model-index";
@@ -54,7 +55,7 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
         {p.editable && cardKeys.length > 0 && (
           <button
             type="button"
-            className={buttonClass}
+            className={buttonVariants()}
             data-testid="button-selection-put-in-frame"
             onClick={() => ui.putInNewFrame(cardKeys.map((k) => p.cardOf(idOf(k))).filter((id): id is string => !!id), false)}
           >
@@ -62,17 +63,17 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
           </button>
         )}
         {p.editable && !p.live && entities.length > 0 && (
-          <button type="button" className={buttonClass} data-testid="button-selection-sources" onClick={() => ui.placeSourcesOfSelection((id) => feedingSourceCards(p.ix, id))}>
+          <button type="button" className={buttonVariants()} data-testid="button-selection-sources" onClick={() => ui.placeSourcesOfSelection((id) => feedingSourceCards(p.ix, id))}>
             Add sources of selected entities
           </button>
         )}
         {/* a live canvas removes one card at a time, each with its question (PRD item 12) */}
         {p.editable && !p.live && cardKeys.length + reqs.length > 0 && (
-          <button type="button" className={dangerClass} data-testid="button-selection-remove" onClick={() => ui.removeSelection()}>
+          <button type="button" className={buttonVariants({ variant: "danger" })} data-testid="button-selection-remove" onClick={() => ui.removeSelection()}>
             Remove from this canvas
           </button>
         )}
-        <button type="button" className={buttonClass} data-testid="button-selection-clear" onClick={() => ui.select(null)}>
+        <button type="button" className={buttonVariants()} data-testid="button-selection-clear" onClick={() => ui.select(null)}>
           Clear selection
         </button>
       </Actions>

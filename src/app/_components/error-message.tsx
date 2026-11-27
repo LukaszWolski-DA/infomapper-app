@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
 
 // The message shown in place of something that failed (slice 4p, item 8): the error pages and the canvas's boundary.
 // The error itself is never shown or logged here (no personal data or rich text in messages or logs).
@@ -15,5 +17,6 @@ export function ErrorMessage({ testId, heading, text, children }: { testId: stri
   );
 }
 
-export const primaryButton = "h-8 rounded-md bg-im-logical px-3 text-[12.5px] font-medium text-white hover:opacity-90";
+// slice 37 (step 8): the primary button, its padding and text kept
+export const primaryButton = cn(buttonVariants({ variant: "primary" }), "px-3 text-[12.5px]");
 export const quietLink = "text-[12.5px] text-im-logical underline-offset-2 hover:underline";

@@ -20,7 +20,8 @@ import { marks } from "@/domain/model/labels";
 import type { TraceTarget } from "@/domain/model/requirements";
 import type { Requirement } from "@/domain/types";
 import { openPick } from "@/ui/pick-popover";
-import { Fold, Hint, List, smallButtonClass } from "./fields";
+import { Fold, Hint, List } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { usePanels } from "./panels-context";
 import { KindIcon } from "./requirement-ui";
@@ -149,7 +150,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
       )}
       {p.editable && missing.length > 0 && (
         <div className="mt-1.5">
-          <button type="button" className={smallButtonClass} onClick={() => ui.placeRequirementCardsBeside(missing.map((r) => r.id), target)} data-testid="button-requirements-add-all">
+          <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => ui.placeRequirementCardsBeside(missing.map((r) => r.id), target)} data-testid="button-requirements-add-all">
             {missing.length === listed.length ? "Add all to this canvas" : `Add the ${missing.length} missing to this canvas`}
           </button>
         </div>
@@ -160,7 +161,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
             type="button"
             id={`f-req-${target.kind}`}
             data-pop=""
-            className={smallButtonClass}
+            className={buttonVariants({ size: "sm" })}
             data-testid="button-link-requirements"
             onClick={(e) => openPicker(e.currentTarget, false)}
           >
@@ -169,7 +170,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
           {target.kind === "entity" && attributes.length > 0 && (
             <button
               type="button"
-              className={smallButtonClass}
+              className={buttonVariants({ size: "sm" })}
               title="Link chosen requirements to each attribute of this entity"
               data-testid="button-link-all-attributes"
               onClick={(e) => openPicker(e.currentTarget, true)}

@@ -23,30 +23,9 @@ import { checkMappingTypes } from "@/domain/model/type-check";
 import { LOGICAL_TYPES, type Attribute, type LogicalType } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
-import {
-  Actions,
-  attributeDeleteParts,
-  ConfirmDelete,
-  dangerClass,
-  Field,
-  Flag,
-  GroupedSelect,
-  Hint,
-  fieldKey,
-  inputClass,
-  Kind,
-  Li,
-  Note,
-  Fold,
-  LongList,
-  smallButtonClass,
-  TextField,
-  TypeDot,
-  useChoice,
-  useDraft,
-  DraftLine,
-  type FieldSave,
-} from "./fields";
+import { Actions, attributeDeleteParts, ConfirmDelete, Field, Flag, GroupedSelect, Hint, fieldKey, Kind, Li, Note, Fold, LongList, TextField, TypeDot, useChoice, useDraft, DraftLine, type FieldSave } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { useMoveAttribute } from "./move-attribute";
@@ -213,7 +192,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
           )}
           {p.editable && (
             <div className="mt-2">
-              <button type="button" className={smallButtonClass} onClick={() => void save({ stopFollowing: true })} data-testid="button-stop-following">
+              <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => void save({ stopFollowing: true })} data-testid="button-stop-following">
                 Stop following
               </button>
             </div>
@@ -280,7 +259,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
           source. Is {a.name} a business key too?
           {p.editable && (
             <div className="mt-2">
-              <button type="button" className={smallButtonClass} onClick={() => void save({ isBusinessKey: true })} data-testid="button-accept-bk">
+              <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => void save({ isBusinessKey: true })} data-testid="button-accept-bk">
                 Mark as business key
               </button>
             </div>
@@ -375,7 +354,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
               testId="button-delete-attribute"
             />
           ) : (
-            <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-attribute">
+            <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => void remove()} data-testid="button-delete-attribute">
               Delete attribute
             </button>
           )}
@@ -423,7 +402,7 @@ function ParamField({
       disabled={disabled}
       data-testid={testId}
       // 84 px, not the input's usual full width (which made the type's parameters run out of the panel)
-      className={`${inputClass.replace("w-full", "w-[84px]")} flex-none`}
+      className={`${inputVariants().replace("w-full", "w-[84px]")} flex-none`}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
         keyDown(e);

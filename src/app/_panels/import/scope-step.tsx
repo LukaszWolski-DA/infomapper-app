@@ -9,7 +9,7 @@ import { useEffect, useRef } from "react";
 import type { ImportPlan } from "@/domain/import/plan";
 import { tableKey, type StandardTable } from "@/domain/import/standard";
 import type { WorkspaceModel } from "@/domain/types";
-import { smallButtonClass } from "../fields";
+import { buttonVariants } from "@/ui/components/button";
 import { plural, type WizardState } from "./wizard-model";
 
 /** A checkbox that can be half on (`indeterminate` is a property, set after the commit, never read). */
@@ -132,7 +132,7 @@ export function ScopeStep({
           If the file holds only part of the system, compare only the tables in the file.
           {s.compare === "schemas" && (
             <p className="mt-2">
-              <button type="button" className={smallButtonClass} onClick={() => set({ compare: "tables" })} data-testid="button-narrow">
+              <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => set({ compare: "tables" })} data-testid="button-narrow">
                 Compare only the tables in the file
               </button>
             </p>

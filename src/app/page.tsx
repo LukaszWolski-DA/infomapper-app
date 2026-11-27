@@ -5,6 +5,8 @@ import { signOut } from "./_actions/session";
 import { workspaceHref } from "./_lib/paths";
 import { LAST_WORKSPACE_COOKIE } from "./_lib/preferences";
 import { getSession } from "./_lib/session";
+import { cn } from "@/ui/lib/utils";
+import { buttonVariants } from "@/ui/components/button";
 
 // After sign-in: the last used workspace, else the first one (AD-07), among the organizations this session has
 // unlocked (slice 8, F13); with none unlocked, the first organization's password.
@@ -24,7 +26,7 @@ export default async function Landing() {
       <h1 className="text-lg font-semibold">No workspace yet</h1>
       <p className="text-im-ink-2">{user.display_name}, you are not a member of any workspace.</p>
       <form action={signOut}>
-        <button type="submit" data-testid="button-sign-out" className="rounded-md border px-3 py-1.5 hover:bg-im-hover">
+        <button type="submit" data-testid="button-sign-out" className={cn(buttonVariants(), "px-3")}>
           Sign out
         </button>
       </form>

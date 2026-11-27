@@ -934,3 +934,86 @@ working context keeps a 24 px target there.
   S36-03 and S28-07 among them**. The specs: S15-11, S15-16, S25-01, S26-01 to S26-09, S27-03, S27-04, S28-01 to S28-07,
   S34-01, S34-02, S36-01 to S36-05, fixes/late-selection-create-dimension.
 - No full run in this step (Łukasz's instruction).
+
+**Łukasz's answer (26 November 2026):** steps 6 and 7 accepted.
+
+## Step 8: sign-in, the links' pages, the errors; the after run (27 November 2026)
+
+**What changed:**
+- **Sign-in** (`start-forms.tsx`: the e-mail, the organization's link, Create organization with its language `Select`,
+  the account's form), **the links' pages** (`link-page.tsx`: invitation and reset), **Change password**, `error`,
+  `global-error`, the canvas's error boundary (`error-message.tsx`' primary button) and the start page's Sign out: the
+  shared field (32 px, before 30) and buttons (secondary and primary, 32 px), each keeping its padding; the panels
+  radius 12.
+- **`fields.tsx`' re-exports removed** (`buttonClass`, `smallButtonClass`, `dangerClass`, `primaryClass`, `inputClass`):
+  their 30 files take `buttonVariants(…)` and `inputVariants()` themselves, the same classes (nothing drawn differently);
+  `tests/ui-components.test.ts` checks they are gone.
+- **The guard's "to convert" list is empty**: only the canvas tabs' exception is left (slice 38's layout, F8).
+- **The check script's side-by-side page** (`--compare`, `slice-37-before-and-after.html`): the summary (kinds per group
+  over the same light views, the findings' counts over the same views, the screens added since counted apart), every
+  finding left with the slice that owns it (390 px: slice 38's layout), each screen before and after at 1,440 px light and
+  dark and 390 px.
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`, `npm test` (216 files, 2,619 tests).
+- **The specs of the screens touched** (19 specs, 33 tests, one local run with nothing beside it): 33 passed. The specs:
+  S0-01, S4P-09, S8-01 to S8-13, S33-02 to S33-04, fixes/session-change-full-load.
+- **The after run** (`.data/ui-check/after-20261127-0732/`, every screen the script knows, 40 screens, 271 views, 1,280,
+  1,440 and 1,920 px light and dark and 390 px; no screen failed). Against step 2a's before
+  (`.data/ui-check/before-20261126-1349/`), over the 177 views both have:
+
+  | | Before | After |
+  | --- | --- | --- |
+  | Kinds of button (light views) | 58 | 49 |
+  | Kinds of field | 14 | 9 |
+  | Kinds of drop-down | 5 | 3 |
+  | Kinds of check box | 3 | 3 |
+  | Kinds of link | 8 | 8 |
+  | Overlaps | 54 | 43 |
+  | Text out of its control | 18 | 0 |
+  | Words run together | 156 | 0 |
+  | Targets under 24 px, failing WCAG | 43 | 0 |
+  | Targets under 24 px, passing by spacing | 2,135 | 749 |
+  | Text cut without an ellipsis, past the edge, pages wider | 0 | 0 |
+
+  A kind is a height, text size, radius and edge together, so a button's 24, 28, 30 and 32 px and its four roles count
+  apart. "Words run together" before also counted the switchers' clipped names (the script's rule until step 4). The 94
+  views added since (the toolbox, menus, dialogs, the editor's lists) have 7 overlaps, no failing target and no words run
+  together. **Every finding left is at 390 px** (14: the top bar that does not fit, the navigation row over the canvas's
+  cards, a panel field over a note's ✓): slice 38's layout.
+- **The generated documents:** `npx tsx scripts/document-texts.ts after`, `diff -r` against `documents-before`: no
+  difference in the 18 files.
+
+## Step 9: Łukasz's acceptance, what to open and where to look
+
+1. **The side-by-side page first:** open `C:\Users\Lukas\Desktop\Lukasz\infomapper-app\.data\ui-check\slice-37-before-and-after.html`
+   in a browser (a double-click opens it; no server needed). At its top: the summary (kinds of button, field and
+   drop-down, overlaps, cut text, small targets, words run together, before and after) and every finding left, with the
+   slice it belongs to. Below: each screen before (left) and after (right), at 1,440 px light and dark and on a phone
+   (390 px). A click opens a picture full size; every width is in the two folders next to the page.
+2. **The app on Postgres** (environment 2, `infomapper-dev`, the demo accounts only; KB is not opened): on the branch
+   `slice/37-design-system-foundation`, in a terminal in the repository:
+
+   ```powershell
+   npm run dev:pg
+   ```
+
+   Then open http://localhost:3000 and sign in as the demo's owner **`lukasz@infomate.pl`** with the demo password
+   (`INFOMAPPER_DEMO_PASSWORD` in `.env.postgres.local`). Stop the server with Ctrl+C when done.
+3. **Five screens to click through:**
+   1. **The canvas with the inspector** (Retail Co – DWH › Customer 360 › Customer & orders): click Customer, then one of
+      its attributes, then a mapping line. Look at: the fields (32 px, a darker edge, the blue ring when focused), the
+      drop-downs (one look), the ×, ↑ and ↓ buttons (no edge until hovered), the folds' headers (28 px), the classification
+      chips; the left panel's tabs ("Model Sources Requirements" with room between them, the blue underline); the top bar
+      (every tool where it was; Focus, Changes and the switchers as before); the status bar's "Model checks" (24 px).
+   2. **The workspace home's tabs** (Workspace home): the page white, the tabs at their natural width with the blue
+      underline; People (the role drop-downs, Remove and the invitation box; the columns as before), Baselines (Compare…,
+      Rename, Delete), Metadata conventions, Settings (the concepts' colour swatches 24 px).
+   3. **InfoDocumenter's editor** (Documentation › a document): the bar's controls 28 px (Auto, Fit width, Print / PDF,
+      Markdown; the drop-downs now with a focus ring); the section list: ↑ ↓ ✕ appear on hover, on the selected section and
+      with Tab, the name using the row's width while they are hidden; the options' labels (12 px, darker), check boxes and
+      drop-downs.
+   4. **A dialog:** "Import sources…" on the left panel's Sources tab (the steps as pills, the drop-down, the code boxes),
+      or a baseline's Compare…, or the entity's "Delete from model…": the buttons, fields and drop-downs as everywhere else.
+   5. **Dark mode** (the person's menu › Dark): the same screens; the fields' edges and the drop-downs' text readable, the
+      selected tab's underline and the focus ring visible, the canvas's cards as before.

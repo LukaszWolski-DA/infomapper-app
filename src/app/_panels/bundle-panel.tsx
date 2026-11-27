@@ -10,7 +10,8 @@ import { CanvasUiCtx } from "@/canvas/context";
 import { multText } from "@/canvas/geometry";
 import type { Bundle, BundleEnd } from "@/canvas/line-geometry";
 import type { Mapping } from "@/domain/types";
-import { Actions, buttonClass, Kind, Li, List, TypeDot } from "./fields";
+import { Actions, Kind, Li, List, TypeDot } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { attributeLabel, columnLabel, inputsLabel, typeCheckOf } from "./model-index";
 
@@ -36,7 +37,7 @@ export function BundlePanel({ bundle: b, entityName }: { bundle: Bundle; entityN
   const expand = (
     <Actions>
       {collapsedEnds.map((e) => (
-        <button key={e.frameId} type="button" className={buttonClass} onClick={() => ui.setFrameCollapsed(e.frameId, false)} data-testid="button-bundle-expand">
+        <button key={e.frameId} type="button" className={buttonVariants()} onClick={() => ui.setFrameCollapsed(e.frameId, false)} data-testid="button-bundle-expand">
           Expand {frameName(e.frameId)}
         </button>
       ))}

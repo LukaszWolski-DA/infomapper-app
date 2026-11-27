@@ -13,7 +13,7 @@ import { FIELD_LOOK, inputVariants, textareaVariants } from "@/ui/components/inp
 import { SEGMENTED_BUTTON, SEGMENTED_TRACK } from "@/ui/components/segmented";
 import { selectVariants } from "@/ui/components/select";
 import { tabsListVariants, tabVariants } from "@/ui/components/tabs";
-import { buttonClass, dangerClass, inputClass, primaryClass, smallButtonClass } from "@/app/_panels/fields";
+import * as fields from "@/app/_panels/fields";
 
 const has = (classes: string, ...expected: string[]) => {
   const set = new Set(classes.split(/\s+/));
@@ -120,13 +120,9 @@ describe("cn knows the design system's scales", () => {
   });
 });
 
-describe("fields.tsx' constants re-export the components' look", () => {
-  it("buttons and fields", () => {
-    expect(buttonClass).toBe(buttonVariants({ variant: "secondary", size: "md" }));
-    expect(smallButtonClass).toBe(buttonVariants({ variant: "secondary", size: "sm" }));
-    expect(dangerClass).toBe(buttonVariants({ variant: "danger", size: "md" }));
-    expect(primaryClass).toBe(buttonVariants({ variant: "primary", size: "md" }));
-    expect(inputClass).toBe(inputVariants({ size: "md" }));
+describe("fields.tsx no longer re-exports the look (step 8)", () => {
+  it("the panels take the components' variants themselves", () => {
+    for (const name of ["buttonClass", "smallButtonClass", "dangerClass", "primaryClass", "inputClass"]) expect(fields).not.toHaveProperty(name);
   });
 });
 

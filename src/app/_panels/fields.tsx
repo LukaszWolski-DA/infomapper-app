@@ -38,9 +38,6 @@ export function Field({ label, children, htmlFor }: { label: string; children: R
   );
 }
 
-/** Slice 37 (S37-02): the fields' shared look (src/ui/components/input.tsx), 32 px, for inputs, selects and text areas. */
-export const inputClass = inputVariants({ size: "md" });
-
 /**
  * The key of a panel field that shows the field `field` of the object `id`: stable while the object lives, so a save's
  * answer, an undo or another person's write never mounts it anew (slice 13; keyed by the stored value, text typed
@@ -393,14 +390,14 @@ export function DraftLine({ mark, onUse, onKeep, mono, inline }: { mark: DraftMa
         <div data-testid="draft-other">Cleared meanwhile.</div>
       )}
       <div className="mt-1.5 flex flex-wrap gap-1.5">
-        <button type="button" className={smallButtonClass} onClick={onUse} data-testid="button-use-this">
+        <button type="button" className={buttonVariants({ size: "sm" })} onClick={onUse} data-testid="button-use-this">
           Use this
         </button>
-        <button type="button" className={smallButtonClass} onClick={onKeep} data-testid="button-keep-mine">
+        <button type="button" className={buttonVariants({ size: "sm" })} onClick={onKeep} data-testid="button-keep-mine">
           Keep mine
         </button>
         {long && (
-          <button type="button" className={smallButtonClass} onClick={() => setMore((m) => !m)} data-testid="button-draft-more">
+          <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => setMore((m) => !m)} data-testid="button-draft-more">
             {more ? "Show less" : "Show more"}
           </button>
         )}
@@ -530,7 +527,7 @@ export function TextField({
         autoComplete="off"
         aria-invalid={invalid ? true : undefined}
         title={invalid || undefined}
-        className={cn(inputClass, mono && "font-mono text-xs")}
+        className={cn(inputVariants(), mono && "font-mono text-xs")}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
           keyDown(e);
@@ -656,14 +653,6 @@ export const TypeDot = ({ ok }: { ok: boolean }) => <span className={`size-2.5 f
 
 export const Actions = ({ children }: { children: ReactNode }) => <div className="mt-5 flex flex-wrap gap-2">{children}</div>;
 
-// Slice 37 (S37-02, F1): the shared look of src/ui/components, re-exported under the names every panel imports, until
-// steps 3 to 8 move the panels onto the components themselves. The look alone: a button keeps laying out its content as
-// before.
-export const buttonClass = buttonVariants({ variant: "secondary", size: "md" });
-export const smallButtonClass = buttonVariants({ variant: "secondary", size: "sm" });
-export const dangerClass = buttonVariants({ variant: "danger", size: "md" });
-export const primaryClass = buttonVariants({ variant: "primary", size: "md" });
-
 /** A select with option groups (columns by table). */
 export function GroupedSelect({
   id,
@@ -752,7 +741,7 @@ export function ConfirmDelete({
     <button
       type="button"
       // armed, the text may name an attribute's copies (slice 10c, F7): the button grows to hold it
-      className={armed ? cn(dangerClass, "h-auto min-h-control-md whitespace-normal border-im-warn bg-im-warn-soft py-1.5 text-left") : dangerClass}
+      className={armed ? cn(buttonVariants({ variant: "danger" }), "h-auto min-h-control-md whitespace-normal border-im-warn bg-im-warn-soft py-1.5 text-left") : buttonVariants({ variant: "danger" })}
       data-testid={testId}
       data-armed={armed || undefined}
       onBlur={() => setArmed(false)}
@@ -892,7 +881,7 @@ export function LongList<T>({
       )}
       <List testId={testId}>{shown.map(render)}</List>
       {long && !all && !query && hits.length > 20 && (
-        <button type="button" className={`${smallButtonClass} mt-1`} onClick={() => setAll(true)} data-testid="button-show-all">
+        <button type="button" className={`${buttonVariants({ size: "sm" })} mt-1`} onClick={() => setAll(true)} data-testid="button-show-all">
           Show all ({hits.length})
         </button>
       )}

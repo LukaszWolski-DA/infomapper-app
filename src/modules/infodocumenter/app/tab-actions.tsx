@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAction } from "@/app/_components/use-action";
-import { buttonClass, dangerClass, primaryClass, smallButtonClass } from "@/app/_panels/fields";
+import { buttonVariants } from "@/ui/components/button";
 import { documentHref } from "@/app/_lib/paths";
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/ui/components/dialog";
 import { DOCUMENT_TEXTS } from "../domain/commands";
@@ -29,7 +29,7 @@ export function NewDocumentButton({ workspaceId, presets }: { workspaceId: strin
   };
   return (
     <>
-      <button type="button" className={primaryClass} data-testid="button-new-document" onClick={() => setOpen(true)}>
+      <button type="button" className={buttonVariants({ variant: "primary" })} data-testid="button-new-document" onClick={() => setOpen(true)}>
         New document
       </button>
       {open && (
@@ -60,7 +60,7 @@ export function NewDocumentButton({ workspaceId, presets }: { workspaceId: strin
               ))}
             </div>
             <DialogFooter className="mt-4">
-              <button type="button" className={buttonClass} onClick={() => setOpen(false)} data-testid="button-cancel-new-document">
+              <button type="button" className={buttonVariants()} onClick={() => setOpen(false)} data-testid="button-cancel-new-document">
                 Cancel
               </button>
             </DialogFooter>
@@ -89,16 +89,16 @@ export function RowActions({
   };
   return (
     <div className="flex flex-wrap gap-1.5">
-      <Link href={documentHref(workspaceId, d.id)} className={`${smallButtonClass} inline-flex items-center`} data-testid="button-document-open">
+      <Link href={documentHref(workspaceId, d.id)} className={`${buttonVariants({ size: "sm" })} inline-flex items-center`} data-testid="button-document-open">
         {rights.edit ? "Edit" : "Open"}
       </Link>
       {rights.duplicate && (
-        <button type="button" className={smallButtonClass} disabled={pending} onClick={() => void duplicate()} data-testid="button-document-duplicate">
+        <button type="button" className={buttonVariants({ size: "sm" })} disabled={pending} onClick={() => void duplicate()} data-testid="button-document-duplicate">
           Duplicate
         </button>
       )}
       {rights.delete && (
-        <button type="button" className={`${smallButtonClass} text-im-warn`} onClick={() => setAsking(true)} data-testid="button-document-delete">
+        <button type="button" className={`${buttonVariants({ size: "sm" })} text-im-warn`} onClick={() => setAsking(true)} data-testid="button-document-delete">
           Delete
         </button>
       )}
@@ -110,10 +110,10 @@ export function RowActions({
               Delete <b>{d.name}</b>? It cannot be brought back.
             </p>
             <DialogFooter className="mt-4">
-              <button type="button" className={buttonClass} onClick={() => setAsking(false)} data-testid="button-cancel-delete-document">
+              <button type="button" className={buttonVariants()} onClick={() => setAsking(false)} data-testid="button-cancel-delete-document">
                 Cancel
               </button>
-              <button type="button" className={dangerClass} disabled={pending} onClick={() => void remove()} data-testid="button-confirm-delete-document">
+              <button type="button" className={buttonVariants({ variant: "danger" })} disabled={pending} onClick={() => void remove()} data-testid="button-confirm-delete-document">
                 Delete
               </button>
             </DialogFooter>

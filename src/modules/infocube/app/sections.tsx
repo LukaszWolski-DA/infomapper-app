@@ -13,7 +13,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { useAction } from "@/app/_components/use-action";
 import { useModules } from "@/app/_components/modules";
-import { Field, fieldKey, Flag, Fold, Hint, Li, Note, Seg, smallButtonClass, TextField, useChoice } from "@/app/_panels/fields";
+import { Field, fieldKey, Flag, Fold, Hint, Li, Note, Seg, TextField, useChoice } from "@/app/_panels/fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "@/app/_panels/inspector";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
@@ -279,7 +280,7 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
                   {!k.key && p.editable && (
                     <button
                       type="button"
-                      className={`${smallButtonClass} disabled:opacity-50`}
+                      className={`${buttonVariants({ size: "sm" })} disabled:opacity-50`}
                       disabled={!k.pk}
                       title={k.pk ? undefined : `${cube.nameOf(k.dimensionId)} has no primary key yet.`}
                       onClick={() => void addKey(k.relationshipId, entity.id)}
@@ -663,7 +664,7 @@ function KeySection({ r, fact, dimension, cube }: { r: Relationship; fact: Uuid;
         </Field>
         {!key && p.editable && (
           <div className="mt-2">
-            <button type="button" className={`${smallButtonClass} disabled:opacity-50`} disabled={!pk} onClick={() => void addKey(r.id, fact)} data-testid="button-cube-add-key">
+            <button type="button" className={`${buttonVariants({ size: "sm" })} disabled:opacity-50`} disabled={!pk} onClick={() => void addKey(r.id, fact)} data-testid="button-cube-add-key">
               Add key
             </button>
           </div>

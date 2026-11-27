@@ -12,7 +12,8 @@ import { noteDate } from "@/canvas/note-data";
 import { useNoteDraft } from "@/canvas/note-drafts";
 import type { Uuid } from "@/domain/ids";
 import { NOTE_COLORS } from "@/domain/types";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, Kind, Li, List, Section, Seg, smallButtonClass, TextArea } from "./fields";
+import { Actions, Field, fieldKey, Kind, Li, List, Section, Seg, TextArea } from "./fields";
+import { buttonVariants } from "@/ui/components/button";
 import { usePanel } from "./inspector";
 import { Select } from "@/ui/components/select";
 
@@ -106,7 +107,7 @@ export function NotePanel({ noteId }: { noteId: Uuid }) {
           </List>
           {can && (
             <div className="mt-1.5">
-              <button type="button" className={smallButtonClass} onClick={() => ui.unpinNote(n.id)} data-testid="button-note-unpin">
+              <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => ui.unpinNote(n.id)} data-testid="button-note-unpin">
                 Unpin (make it a free note)
               </button>
             </div>
@@ -144,10 +145,10 @@ export function NotePanel({ noteId }: { noteId: Uuid }) {
       </p>
       {can && (
         <Actions>
-          <button type="button" className={buttonClass} onClick={() => ui.editNote(n.id)} data-testid="button-note-edit">
+          <button type="button" className={buttonVariants()} onClick={() => ui.editNote(n.id)} data-testid="button-note-edit">
             Edit on the canvas
           </button>
-          <button type="button" className={dangerClass} onClick={() => ui.deleteNote(n.id)} data-testid="button-note-delete">
+          <button type="button" className={buttonVariants({ variant: "danger" })} onClick={() => ui.deleteNote(n.id)} data-testid="button-note-delete">
             Delete note
           </button>
         </Actions>

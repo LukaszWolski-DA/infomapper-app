@@ -9,7 +9,8 @@
 
 import { deleteProjectAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
-import { ConfirmDelete, dangerClass } from "@/app/_panels/fields";
+import { ConfirmDelete } from "@/app/_panels/fields";
+import { buttonVariants } from "@/ui/components/button";
 
 export const ONLY_PROJECT_TEXT = "This is the only project.";
 export const DELETE_PROJECT_TEXT = "The model is untouched. Canvases shared with other projects stay there; canvases only in this project are deleted with it.";
@@ -46,7 +47,7 @@ export function ProjectDelete({
   return (
     <div className="mt-10 border-t border-im-line pt-4" data-testid="section-project-delete">
       {only ? (
-        <button type="button" className={dangerClass} disabled data-testid="button-delete-project">
+        <button type="button" className={buttonVariants({ variant: "danger" })} disabled data-testid="button-delete-project">
           Delete this project
         </button>
       ) : (

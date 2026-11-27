@@ -50,7 +50,7 @@ import {
 } from "@/domain/source-changes/texts";
 import type { SourceChange, Workspace } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
-import { Hint, smallButtonClass } from "./fields";
+import { Hint } from "./fields";
 import { impactIndex, plural } from "./import/wizard-model";
 import { usePanel } from "./inspector";
 import { attributeLabel, attributeOptions, mappingsOfColumn } from "./model-index";
@@ -268,7 +268,7 @@ function ChangeCard({ change: c, keys }: { change: SourceChange; keys: ReadonlyM
             <button
               key={a}
               type="button"
-              className={`${smallButtonClass} disabled:opacity-50`}
+              className={`${buttonVariants({ size: "sm" })} disabled:opacity-50`}
               disabled={pending || (a === "approve" && blocked)}
               onClick={() => act(a)}
               data-testid={`change-action-${a}`}
@@ -292,7 +292,7 @@ const FormButtons = ({ label, onGo, onCancel, disabled, danger, testId }: { labe
     <button type="button" className={danger ? dangerSmall : primarySmall} disabled={disabled} onClick={onGo} data-testid={testId}>
       {label}
     </button>
-    <button type="button" className={smallButtonClass} onClick={onCancel} data-testid="button-form-cancel">
+    <button type="button" className={buttonVariants({ size: "sm" })} onClick={onCancel} data-testid="button-form-cancel">
       Cancel
     </button>
   </div>
@@ -497,7 +497,7 @@ export function ApproveAgainAll({ importId }: { importId: Uuid }) {
   if (!total || !p.canSetStatus) return null;
   if (!open) {
     return (
-      <button type="button" className={`${smallButtonClass} mt-1 block`} onClick={() => setOpen(true)} data-testid="button-approve-all">
+      <button type="button" className={`${buttonVariants({ size: "sm" })} mt-1 block`} onClick={() => setOpen(true)} data-testid="button-approve-all">
         {REVIEW_SENT_BACK(total)}
       </button>
     );

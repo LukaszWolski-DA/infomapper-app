@@ -23,7 +23,7 @@ import { cn } from "@/ui/lib/utils";
 import { useToast } from "@/ui/components/toast";
 import { gzipJson, MAX_UPLOAD_BYTES, TOO_LARGE, UPLOAD_TYPE } from "@/ui/import-upload";
 import { reportSave } from "@/ui/save-state";
-import { buttonClass, primaryClass } from "../fields";
+
 import { ReviewStep } from "./review-step";
 import { ScopeStep } from "./scope-step";
 import { SourceStep } from "./source-step";
@@ -217,20 +217,20 @@ export function ImportWizard({
             {footNote(s, model)}
           </span>
           {s.step > 1 ? (
-            <button type="button" className={buttonClass} onClick={() => set({ step: (s.step - 1) as Step })} data-testid="button-wizard-back">
+            <button type="button" className={buttonVariants()} onClick={() => set({ step: (s.step - 1) as Step })} data-testid="button-wizard-back">
               Back
             </button>
           ) : (
-            <button type="button" className={buttonClass} onClick={onClose} data-testid="button-wizard-cancel">
+            <button type="button" className={buttonVariants()} onClick={onClose} data-testid="button-wizard-cancel">
               Cancel
             </button>
           )}
           {s.step < 3 ? (
-            <button type="button" className={primaryClass} disabled={!canGo((s.step + 1) as Step, s, model, plan)} onClick={() => go((s.step + 1) as Step)} data-testid="button-wizard-next">
+            <button type="button" className={buttonVariants({ variant: "primary" })} disabled={!canGo((s.step + 1) as Step, s, model, plan)} onClick={() => go((s.step + 1) as Step)} data-testid="button-wizard-next">
               Next
             </button>
           ) : (
-            <button type="button" className={primaryClass} disabled={!canGo(3, s, model, plan) || !plan || sending} onClick={() => void importNow()} data-testid="button-wizard-import">
+            <button type="button" className={buttonVariants({ variant: "primary" })} disabled={!canGo(3, s, model, plan) || !plan || sending} onClick={() => void importNow()} data-testid="button-wizard-import">
               Import into {name}
             </button>
           )}

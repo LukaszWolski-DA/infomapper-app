@@ -8,10 +8,14 @@ import { changePasswordAction } from "@/app/_actions/people";
 import { useAction } from "@/app/_components/use-action";
 import { PASSWORD_HINT } from "@/app/_lib/password-texts";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui/components/dialog";
+import { cn } from "@/ui/lib/utils";
+import { inputVariants } from "@/ui/components/input";
+import { buttonVariants } from "@/ui/components/button";
 
-const input = "h-[30px] w-full rounded-md border border-im-line bg-im-surface px-2 text-[13px]";
-const button = "rounded-md border border-im-line bg-im-surface px-3 py-1.5 text-[13px] hover:bg-im-hover disabled:opacity-50";
-const primary = "rounded-md bg-im-logical px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50";
+// slice 37 (step 8): the shared field and buttons (32 px), each keeping its padding
+const input = cn(inputVariants(), "px-2");
+const button = cn(buttonVariants(), "px-3");
+const primary = cn(buttonVariants({ variant: "primary" }), "px-3");
 
 export function ChangePasswordDialog({ email, onClose }: { email: string; onClose: () => void }) {
   const { run, pending } = useAction();

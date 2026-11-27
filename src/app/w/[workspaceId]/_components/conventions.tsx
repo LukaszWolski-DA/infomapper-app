@@ -25,7 +25,9 @@ import {
 } from "@/app/_actions/classification";
 import { setNamingConventionsAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
-import { DraftLine, fieldKey, inputClass, smallButtonClass, TextArea, useDraft } from "@/app/_panels/fields";
+import { DraftLine, fieldKey, TextArea, useDraft } from "@/app/_panels/fields";
+import { buttonVariants } from "@/ui/components/button";
+import { inputVariants } from "@/ui/components/input";
 import { RemoveClassificationForm } from "@/app/_panels/classifications";
 import { DEFINITION_CLEARED, DEFINITION_SAVED, type ClassificationImpact } from "@/domain/commands/classification";
 import { NAMING_CLEARED, NAMING_SAVED } from "@/domain/commands/workspace";
@@ -180,7 +182,7 @@ function ScopeTable({ scope, onRemove, ...p }: ConventionsProps & { scope: Class
             <span key={c.id} className="inline-flex items-center gap-1.5" data-testid="removed-classification">
               {c.name} <span className="font-mono text-xs">{c.code}</span>
               {p.editable && (
-                <button type="button" className={smallButtonClass} onClick={() => restore(c)} data-testid="button-restore-classification">
+                <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => restore(c)} data-testid="button-restore-classification">
                   Restore
                 </button>
               )}
@@ -228,7 +230,7 @@ function Row({ c, onRemove, ...p }: ConventionsProps & { c: Classification; onRe
                 if (e.key === "Enter") e.currentTarget.blur();
                 keyDown(e);
               }}
-              className={`${inputClass} h-7 min-w-[140px] max-w-[240px]`}
+              className={`${inputVariants()} h-7 min-w-[140px] max-w-[240px]`}
               data-testid="input-classification-name"
             />
           ) : (
@@ -287,7 +289,7 @@ function Row({ c, onRemove, ...p }: ConventionsProps & { c: Classification; onRe
       </td>
       <td className="border-b border-im-line py-1.5 text-right">
         {p.editable && (
-          <button type="button" className={`${smallButtonClass} text-im-warn`} onClick={onRemove} data-testid="button-remove-classification">
+          <button type="button" className={`${buttonVariants({ size: "sm" })} text-im-warn`} onClick={onRemove} data-testid="button-remove-classification">
             Remove
           </button>
         )}
@@ -334,7 +336,7 @@ function AddRow({ scope, ...p }: ConventionsProps & { scope: ClassificationScope
           placeholder={scope === "column" ? "New column classification, e.g. Hash candidate" : "New table classification, e.g. Golden source"}
           aria-label={scope === "column" ? "New column classification" : "New table classification"}
           aria-invalid={!!nameError}
-          className={inputClass}
+          className={inputVariants()}
           data-testid={`input-new-${scope}-classification`}
         />
         <input
@@ -348,10 +350,10 @@ function AddRow({ scope, ...p }: ConventionsProps & { scope: ClassificationScope
           placeholder={scope === "column" ? "Code (optional), e.g. HASH" : "Code (optional), e.g. GOLD"}
           aria-label="Code"
           aria-invalid={!!codeError}
-          className={`${inputClass} font-mono text-xs`}
+          className={`${inputVariants()} font-mono text-xs`}
           data-testid={`input-new-${scope}-code`}
         />
-        <button type="button" className={smallButtonClass + " h-8"} onClick={() => void add()} data-testid={`button-add-${scope}-classification`}>
+        <button type="button" className={buttonVariants({ size: "sm" }) + " h-8"} onClick={() => void add()} data-testid={`button-add-${scope}-classification`}>
           Add
         </button>
       </div>

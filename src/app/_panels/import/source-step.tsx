@@ -13,7 +13,7 @@ import { buttonVariants } from "@/ui/components/button";
 import { textareaVariants } from "@/ui/components/input";
 import { Select } from "@/ui/components/select";
 import { cn } from "@/ui/lib/utils";
-import { inputClass, smallButtonClass } from "../fields";
+import { inputVariants } from "@/ui/components/input";
 import { VENDORS, type Vendor } from "./catalog-queries";
 import { day, plural, type Channel, type WizardState } from "./wizard-model";
 
@@ -55,7 +55,7 @@ function CopyButton({ text, testId, label = "Copy" }: { text: string; testId: st
   return (
     <button
       type="button"
-      className={smallButtonClass}
+      className={buttonVariants({ size: "sm" })}
       data-testid={testId}
       onClick={() => {
         void navigator.clipboard?.writeText(text).then(
@@ -137,7 +137,7 @@ function ReadState({ s, onClear }: { s: WizardState; onClear: () => void }) {
           {r.warnings.length ? `, ${plural(r.warnings.length, "warning")} (shown in the review)` : ""}
         </span>
       </span>
-      <button type="button" className={smallButtonClass} onClick={onClear} data-testid="button-choose-another">
+      <button type="button" className={buttonVariants({ size: "sm" })} onClick={onClear} data-testid="button-choose-another">
         Choose another
       </button>
     </div>
@@ -183,7 +183,7 @@ export function SourceStep({
       {s.mode === "existing" ? (
         <div className="max-w-[560px]">
           {systems.length > 5 && (
-            <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a system" aria-label="Find a system" className={`${inputClass} mb-1.5`} data-testid="input-find-system" />
+            <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a system" aria-label="Find a system" className={`${inputVariants()} mb-1.5`} data-testid="input-find-system" />
           )}
           <div className="max-h-[220px] overflow-auto rounded-md border border-im-line" role="radiogroup" aria-label="Source system">
             {!systems.length && <p className="px-3 py-2 text-im-ink-3">No systems yet. Choose “A new system”.</p>}
@@ -205,7 +205,7 @@ export function SourceStep({
       ) : (
         <label className="block max-w-[560px]">
           <span className="mb-1 block text-[11.5px] text-im-ink-3">Name of the new system</span>
-          <input type="text" value={s.newName} onChange={(e) => set({ newName: e.target.value })} placeholder="e.g. HR or Salesforce EMEA production" className={inputClass} data-testid="input-new-system-name" autoFocus />
+          <input type="text" value={s.newName} onChange={(e) => set({ newName: e.target.value })} placeholder="e.g. HR or Salesforce EMEA production" className={inputVariants()} data-testid="input-new-system-name" autoFocus />
           <span className={hintClass}>Everything in the file will be new.</span>
         </label>
       )}
@@ -285,7 +285,7 @@ export function SourceStep({
                 <>
                   <span className="text-im-ink-3">Paste the result with its header row</span>
                   <span className="flex-1" />
-                  <button type="button" className={smallButtonClass} onClick={() => paste.trim() && takeText(paste, "pasted query result")} data-testid="button-read-paste">
+                  <button type="button" className={buttonVariants({ size: "sm" })} onClick={() => paste.trim() && takeText(paste, "pasted query result")} data-testid="button-read-paste">
                     Read it
                   </button>
                 </>
@@ -378,7 +378,7 @@ function DdlInput({ s, set, readScript, clear }: { s: WizardState; set: (patch: 
               {ddlSummaryText(d.name || "DDL script", r.summary)}
               {r.warnings.length ? `, ${plural(r.warnings.length, "warning")} (shown in the review)` : ""}
             </span>
-            <button type="button" className={smallButtonClass} onClick={clear} data-testid="button-choose-another">
+            <button type="button" className={buttonVariants({ size: "sm" })} onClick={clear} data-testid="button-choose-another">
               Choose another
             </button>
           </div>
@@ -436,12 +436,12 @@ function DdlInput({ s, set, readScript, clear }: { s: WizardState; set: (patch: 
       <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-[11.5px] text-im-ink-3">Database</span>
-          <input type="text" value={d.database} onChange={(e) => setDdl({ database: e.target.value })} placeholder="From USE, or the file name" className={inputClass} data-testid="input-ddl-database" />
+          <input type="text" value={d.database} onChange={(e) => setDdl({ database: e.target.value })} placeholder="From USE, or the file name" className={inputVariants()} data-testid="input-ddl-database" />
           <span className={hintClass}>For a script without USE or three-part names.</span>
         </label>
         <label className="block">
           <span className="mb-1 block text-[11.5px] text-im-ink-3">Schema for unqualified names</span>
-          <input type="text" value={d.schema} onChange={(e) => setDdl({ schema: e.target.value })} placeholder="Guessed: dbo or public" className={inputClass} data-testid="input-ddl-schema" />
+          <input type="text" value={d.schema} onChange={(e) => setDdl({ schema: e.target.value })} placeholder="Guessed: dbo or public" className={inputVariants()} data-testid="input-ddl-schema" />
           <span className={hintClass}>For tables named without a schema.</span>
         </label>
       </div>
