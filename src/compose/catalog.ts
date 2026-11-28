@@ -10,7 +10,11 @@ import type { ModuleTable } from "@/domain/types";
 import { catalogIndex, searchCatalog, type CatalogAnswer, type CatalogIndex } from "@/modules/infocatalog/domain/search";
 import { CUBE_CATALOG } from "@/modules/infocube/domain/catalog";
 import { DOCUMENTS_CATALOG } from "@/modules/infodocumenter/domain/catalog";
+import { getDataStore } from "@/data";
+import type { Uuid } from "@/domain/ids";
+import type { CatalogOrganization } from "@/domain/permissions";
 import { documentStateFor } from "./documents";
+import { STORE_SCHEMA } from "./tables";
 
 export const CATALOG_CONTRIBUTIONS: readonly CatalogContribution[] = [CUBE_CATALOG, DOCUMENTS_CATALOG];
 
@@ -41,3 +45,12 @@ export function catalogDocuments(snapshot: WorkspaceSnapshot<ModuleTable>, item:
   const state = documentStateFor(snapshot);
   return givers.flatMap((c) => c.documentsIncluding!(state, item, viewer));
 }
+
+/** The licensed organizations whose catalog the person reads (none: no landing zone, no catalog, no "All apps"). */
+export const catalogReadableFor = (userId: Uuid, unlocked: ReadonlySet<Uuid>): Promise<CatalogOrganization[]> => getDataStore(STORE_SCHEMA).catalog.readable(userId, unlocked);
+
+const SHOWN_KINDS = new Set(CATALOG_TABS.flatMap((t) => t.kinds));
+
+/** How many items a read holds (the kinds the tabs show), for the landing tile's count. */
+export const catalogItemCount = (read: CatalogRead<ModuleTable> | null): number =>
+  read ? read.snapshots.reduce((n, s) => n + workspaceCatalogItems(s).filter((i) => SHOWN_KINDS.has(i.kind)).length, 0) : 0;
