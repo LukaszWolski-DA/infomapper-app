@@ -808,4 +808,13 @@ closing.
 **Checks:** lint and typecheck clean; `npm test` 227 files passed and 2 skipped, 2,688 tests passed and 18 skipped; `e2e/slice-39` and the
 earlier specs this step touched (S1B-06 and RP-04, RP-14: the relationship's sentences; S7B-13, S7B-14 and S38-03: the
 project home's `?req=` and lines) as single files: 54 passed. **A full run** (the step touched the canvas's arrival and
-the shell's navigation row, not the local adapter): see below.
+the shell's navigation row, not the local adapter):
+- run [46145963757](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46145963757) on `48f9667`: S4A-13
+  failed (part 3) because every `?req=` then centred the requirement's card; fixed in `4f34b1d` (deviation 8), S4A-13 and
+  S39-05 passed on their own;
+- run [46147574548](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46147574548) on `4f34b1d`, 19 min 45 s:
+  **964 passed, 1 failed, 16 skipped, 0 expected failures**. The failure is S8-06 (part 5, a click timing out), the flake
+  of step 4 left for its own `fix/` branch; the single-file check
+  [46149275415](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46149275415) passed it in 3 of 3 rounds.
+  Parts' times 11:28, 11:01, 14:59, 12:28, 9:52, 13:25, 11:10, 13:31, 7:17, 5:28, 18:14; heap peaks 1,315, 1,410, 1,168,
+  1,121, 1,231, **1,198 (part 6)**, 1,406, 1,194, 1,187, 1,456, 1,442 MB of 8,039 MB.
