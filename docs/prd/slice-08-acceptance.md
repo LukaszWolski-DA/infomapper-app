@@ -1435,3 +1435,14 @@ element guard of step 4 (viewport equal; page total +1 script, accepted).
 
 Your manual acceptance (the checklist and the Definition of done above). Merge only on your command, then the tag
 `slice-08`.
+
+## After the slice: fix/s8-06-switcher-ready (28 November 2026)
+
+- **What raced:** S8-06's organization switcher right after a sign-in form's redirect. The spec waited for the
+  address (`/w/{Sales analytics}`), which is the new page's before React has hydrated it; a click on
+  `switcher-organization` in that moment focused the button and opened nothing, so `menu-item-organization` never came
+  and the test timed out (the page snapshot: "Retail Co" active, no menu). Seen in slice 39's step 4 and step 6 full runs
+  (run 46147574548, part 5); it passed alone (run 46149275415, 3 of 3).
+- **The fix (test only, no application code):** both tests of `e2e/slice-08/S8-06.spec.ts` wait for slice 9's
+  `hydrated` (Back enabled, which only the running page sets) before they click the switcher, as the earlier race fixes
+  waited for a state the person can see (PR 98, PR 100).
