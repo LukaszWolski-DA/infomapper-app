@@ -360,6 +360,21 @@ function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[
     { id: "catalog-search", path: `/catalog?org=${SEED_IDS.orgInfoMate}&q=customer`, ready: '[data-testid="row-catalog-result"]' },
     { id: "catalog-long", path: `/catalog?org=${SEED_IDS.orgInfoMate}&q=e`, ready: '[data-testid="row-catalog-result"]' },
     { id: "catalog-workspace", path: `/catalog?org=${SEED_IDS.orgInfoMate}&q=customer&scope=${ids.ws}`, ready: '[data-testid="row-catalog-result"]' },
+    // slice 39, step 6: the details drawer over the results (an entity with its context; a source table's facts)
+    ...(["entity", "source_table"] as const).map((kind) => ({
+      id: `catalog-drawer-${kind === "entity" ? "entity" : "table"}`,
+      path: `/catalog?org=${SEED_IDS.orgInfoMate}&q=customer&scope=${ids.ws}`,
+      ready: '[data-testid="row-catalog-result"]',
+      then: async (page: Page) => {
+        await page.locator(`[data-testid="row-catalog-result"][data-kind="${kind}"]`).first().click();
+        await page.locator('[data-testid="details-catalog-item"]:not([aria-busy])').waitFor();
+        // slid in: its right edge at the window's
+        await page.waitForFunction(() => {
+          const d = document.querySelector('[data-testid="drawer-catalog"]');
+          return !!d && Math.round(d.getBoundingClientRect().right) === window.innerWidth;
+        });
+      },
+    })),
     // slice 37, step 6: the Markdown dialog and the list of section types
     {
       id: "editor-markdown",
