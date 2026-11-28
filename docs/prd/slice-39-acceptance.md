@@ -867,3 +867,133 @@ Step 5's figures within their spread; the drawer's item is one workspace's read 
 1,571, 1,214, 983, 1,414, 1,444 MB (limits 7,898 to 8,041 MB). Part 11 (with `e2e/slice-39`) is the longest; the recut
 rule is checked at the closing on the last three full runs.
 
+## Step 7a: Łukasz's migration and licence (28 November 2026)
+
+Run by Łukasz, one command at a time:
+- `pg:backup` with the checkout on `dev`: `kb-20261128-1523.json`, 4,894 rows.
+- On this branch, `pg:migrate -- --dry-run` listed only `20261127120000_infocatalog.sql`; `pg:migrate` applied it (26
+  applied before).
+- `pg:backup` again: `kb-20261128-1525.json`, 4,894 rows. All 38 tables have equal counts; the file is 22 bytes larger,
+  the one workspace's `catalog_shown` false.
+- `pg:licence -- grant "InfoMate" infocatalog`: "The organization holds the infocatalog licence now." KB's organization
+  has no licence.
+
+## Step 7b: the timing on `dev:pg` (28 November 2026)
+
+**How:** the timing record (AD-37, step 1's choice): the landing zone and `/catalog` render `<TimingRecord />` last (the
+landing zone's through `LandingPage`'s `timing` slot, after its read); `catalogSearchAction` and `catalogItemAction` log
+one line of numbers each (`withTiming`, routes `catalog-search` and `catalog-item`). The measuring spec
+`e2e/slice-29/S39-measure.spec.ts` (MEASURE=1 only, the Postgres folder, never in the full run) ran against `npm run
+dev:pg` with `INFOMAPPER_TIMING=1` (launch configuration `infomapper-pg-timing`) on `infomapper-dev`, with the demo
+accounts only (`lukasz@infomate.pl`, `anna.nowak@infomate.pl`): 2 tries discarded, then 7 counted. "Shown" is the
+browser's time from the action (the last keystroke, which includes the 150 ms wait, or the click) until the answer is on
+the screen. Nothing was written and no switch changed. `dev:pg` was stopped afterwards; nothing of the measurement is
+running.
+
+| What | Shown, median (fastest–slowest) | The action's request | The server's record |
+| --- | --- | --- | --- |
+| Łukasz: the landing zone | 4,309 ms (3,620–4,876) | | 4,018 ms read, 48 statements |
+| Łukasz: the first search page | 3,840 ms (3,357–4,169) | | 3,503 ms read, 47 statements |
+| Łukasz: "customer" as typed | **3,998 ms** (3,976–4,039) | 3,403 ms | 47 statements, about 3.3 s of them |
+| Łukasz: "a" as typed | **4,072 ms** (3,977–6,573) | 3,588 ms | 47 statements |
+| Łukasz: "customer number" as typed | **3,952 ms** (3,920–4,456) | 3,501 ms | 47 statements |
+| Łukasz: an item in the drawer | 3,152 ms (2,993–4,047) | 2,607 ms | 47 statements, about 2.4 s of them |
+| Łukasz: Open in InfoMapper (the canvas page) | 5,774 ms (5,584–7,566) | | 4,023 ms read, 126 statements |
+| Anna: "customer" as typed | **2,940 ms** (2,903–3,402) | 2,598 ms | 47 statements, about 2.4 s of them |
+| Anna: "a" as typed | **3,098 ms** (2,970–4,004) | 2,685 ms | 47 statements |
+| Anna: "customer number" as typed | **2,925 ms** (2,907–3,454) | 2,647 ms | 47 statements |
+| Anna: an item in the drawer | 3,168 ms (3,143–3,717) | 2,865 ms | 47 statements |
+
+**The 1 s bar (S39-03) is missed on `dev:pg`:** a search shows 2.9 to 4.1 s after the last keystroke.
+
+**What dominates:** the database's round trips from the laptop. Every search and every item makes 47 statements one
+after another (the session and the rights, then the catalog's read of 38 statements). The statements are 95 to 97 % of
+the server's time (`statementMs` 2.4 to 3.6 s of `totalMs` 2.5 to 3.8 s); the index, the search and the answer take the
+rest, as in the bench (25 to 40 ms). A bare `select 1` from the laptop to `infomapper-dev` takes 48 ms (median of 25,
+38–65 ms), and 47 × 48 ms is 2.3 s, nearly all of Anna's 2.45 s. Łukasz's further 0.9 s is the larger rows his read
+carries ("Performance test", where Anna has no role). The bench, on a Postgres on the laptop where a round trip costs
+almost nothing, answers the same search in 0.11 s at KB's size.
+
+**Not measured, an assumption:** on the preview (Vercel `fra1`, beside Supabase's Frankfurt) a round trip is a few
+milliseconds, so a search would answer well within the bar. Only `dev` deploys there, so it can be measured only after
+the merge. Per the slice cycle (6) nothing was optimised; Łukasz decides.
+
+**Options for Łukasz** (none taken):
+- **(a)** Accept `dev:pg`'s figures as the laptop's distance to Frankfurt, and measure on `dev`'s preview right after the
+  merge (the same spec with `PG_BASE_URL=<dev's preview>`), with the bar there; if the preview misses it, (b).
+- **(b)** Fewer round trips: the catalog's read as one statement (each table's rows as JSON in one query) or the tables
+  read in parallel on more than one connection, and the session's and the rights' reads joined. It changes both adapters'
+  shared read path (a contract test exists) and C1's one statement per table.
+- **(c)** A short-lived cache of a scope's read per person: within the bar after the first search, but stale for that
+  time (guardrail 5's live updates), and more to get right.
+
+**Found while measuring:** now that InfoMate holds the licence on `infomapper-dev`, the Postgres smoke set's `signIn`
+(`e2e/slice-29/helpers.ts`, `landed`, which waits for InfoMapper's top bar) stops at the landing zone for Łukasz and
+Anna when run against `dev:pg` or the preview. CI's smoke job is not affected (its local stack has no licence). To fix in
+the closing: `landed` accepts the landing zone, or the smoke specs open `/?to=workspace`.
+
+## Step 8: Łukasz's acceptance (the list)
+
+On `npm run dev:pg` with the checkout on `slice/39-infocatalog-entry-and-search`, at http://localhost:3000, with the
+demo accounts and the demo password; never KB's account. Expect each search to take about 3 s on `dev:pg` (step 7b).
+
+**As Łukasz** (`lukasz@infomate.pl`):
+1. Sign in. You see the landing zone, white: "InfoLabs apps" in the bar, the greeting with "Łukasz", the lead line, and
+   two tiles. InfoMapper says "Model and map" and "{n} workspaces you belong to · last: …". InfoCatalog says "Find and
+   describe", NEW, its third bullet "Where each item is used, on canvases and in documents", and "{n} items in {m}
+   workspaces of InfoMate".
+2. Click "Open InfoMapper". A workspace opens; the top bar has "All apps" (four squares) before the organization's name.
+3. Make the workspace without Anna (C9): click the workspace's name in the top bar. In the menu's last row, type
+   "Lighthouse Źródło programme" in "New workspace, press Enter", pick "Polski" in the select beside it, and press Enter.
+   The new workspace opens, with you as its only member (its owner).
+4. In it, open the tab "Settings". The box "InfoCatalog" has "Shown in InfoCatalog to everyone in the organization",
+   unticked. Leave it off.
+5. Click "All apps", then "Open InfoCatalog". The search page is white. The scope's select has "Whole organization (n
+   workspaces)" and, among the others, "Workspace: Lighthouse Źródło programme" (you have a role there).
+6. Type "customer". The entity Customer is first, the word highlighted; the tabs show counts, "All" first, a tab with 0
+   disabled; InfoCube's tabs (Facts, Dimensions, Measures, Keys, Dimensional mappings) come after InfoMapper's.
+7. Type "zrodlo rekordu". The classification "Źródło rekordu" of Lighthouse Źródło programme is found, "Źródło" and
+   "rekordu" highlighted as written, and the Workspace column names the workspace.
+8. Type "a". 200 rows, then "{n} more: narrow the search". Click the tab "Source columns": only columns.
+9. Pick "Workspace: Retail Co – DWH" in the scope: the Workspace column goes. Reload the page: the same search, tab and
+   scope.
+10. Clear the field: "What are you looking for?", six example searches, and "Browse all …" with counts. Click "Browse
+    all mappings": every mapping with its status.
+11. Search "customer" again and click the row Customer (entity). The drawer opens from the right; the results move left
+    and stay clickable. It shows "Entity", "Customer", its path, "Retail Co – DWH · From InfoMapper · read only", "Open in
+    InfoMapper", the Definition, Characteristics, Attributes, Relationships, Requirements, and Context: "Canvases that show
+    it" and "Documents that include it" (the shared dictionary and your own S2T, never Anna's working dictionary). There is
+    no Lineage or Impact section.
+12. Press ↓ and ↑ (or j and k): the drawer follows the rows. Press Esc: it closes.
+13. Open Customer again, click the attribute "email", then its first mapping, then "← Back" twice: you are back on
+    Customer.
+14. Copy the address and open it in a new tab: the same drawer opens.
+15. In the drawer, click "Open in InfoMapper". "Customer & orders" opens with Customer selected and in view, and the
+    navigation row shows "← Back to InfoCatalog". Click it: the same search, tab, scope and item.
+16. Search "REQ-101", open it and click "Open in InfoMapper": the workspace's home says "REQ-101 Single view of the
+    customer is not on any canvas." "← Back to InfoCatalog" returns.
+17. Make the window narrower than 1,100 px and open an item: a light scrim covers the results, and a click on it closes
+    the drawer.
+
+**As Anna** (`anna.nowak@infomate.pl`; sign out from the account menu first):
+18. You see the landing zone; open InfoCatalog. The scope has Retail Co – DWH and "Bank X – Risk DWH · Archived", not
+    Lighthouse Źródło programme. "zrodlo rekordu" finds nothing of it.
+19. Search "customer" and open Customer: the documents are the shared dictionary and her own working dictionary, never
+    Łukasz's S2T.
+
+**The switch on:**
+20. Sign out and sign in as Łukasz. In Lighthouse Źródło programme, "Settings", tick "Shown in InfoCatalog to everyone in
+    the organization": the toast says it is shown to everyone in InfoMate.
+21. Sign in as Anna again. The scope now has "Workspace: Lighthouse Źródło programme", and "zrodlo rekordu" finds its
+    classification. Its drawer has no "Open in InfoMapper" but "You have no role in Lighthouse Źródło programme. Ask its
+    owner for access: Łukasz.", and no documents. Its address opened in a new tab works too.
+
+**The switch off:**
+22. As Łukasz, untick the switch. As Anna, the workspace is gone from the scope and the results, and its item's address
+    answers "not found".
+
+**As Kasia** (`k.zielinska@retailco.com`, a guest in InfoMate):
+23. Sign in: InfoMapper as before, no landing zone, no "All apps". `/catalog` answers "not found".
+
+**As Marek** (`m.lis@retailco.com`, Retail Co, which has no licence):
+24. Sign in: InfoMapper exactly as before, with no "All apps". `/catalog` answers "not found".
