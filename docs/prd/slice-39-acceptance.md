@@ -589,3 +589,9 @@ changed here: a race in an earlier spec is fixed on its own `fix/` branch (The s
 `S39-01` and `S39-01-room` (8 passed), `S39-02-switch` (4 passed), S0-01, S0-06, S8-01, S8-04, S8-05, S8-06,
 `fixes/session-change-full-load`, S38-02, S6A-10, S16-08, S38-06, S30-09-room and S4P-09 (all passed, S8-06 after the
 flake above, 3 of 3).
+
+**Step 4's full run:** [run 46127222726](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46127222726)
+on `f192bef`: success, 938 passed (step 3's 930 and S39-01's 8), 16 skipped, 0 failed, 0 flaky (S8-06 included);
+wall clock 15.5 min (08:44:41 to 09:00:10 UTC); the longest parts 1 (14.1 min), 3 (13.5 min) and 11 (13.4 min); part 6's
+heap peak 1,193 MB of 8,039 MB (step 3's run: 1,843 MB), no restart. Part 11 is not the longest in this run, so the recut
+rule asks nothing yet.
