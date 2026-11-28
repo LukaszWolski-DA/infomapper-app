@@ -358,8 +358,10 @@ Each step ends with lint, typecheck, `npm test`, the touched specs as single fil
    run (C10).
 3. **The licence and the switch.** Migration `20261127…_infocatalog.sql` (the CHECK, `workspace.catalog_shown`), format
    19 with its upgrade test, `LICENSED_MODULES`, `MODULE_NAMES`, `updateWorkspaceSettings`' field, the settings' box,
-   `scripts/licence.ts` for `infocatalog`, `pg:licence`. Full run. **Stop for Łukasz's migration** on `infomapper-dev`
-   (`pg:backup`, `pg:migrate -- --dry-run`, `pg:migrate`, `pg:backup`, counts compared) and `pg:licence` for InfoMate.
+   `scripts/licence.ts` for `infocatalog`, `pg:licence`. Full run. ~~Stop for Łukasz's migration~~ **Postponed**
+   (Łukasz, 28 November 2026): the migration on `infomapper-dev` and InfoMate's licence move to just before step 8 (7a
+   below); nothing in steps 4 to 6 needs them, and the migration file may still change until then. **Until then
+   `dev:pg` is not run against `infomapper-dev` from this branch.**
 4. **The landing zone and "All apps".** `/` with the licence, `/?to=workspace`, the password sign-in's target, the button
    in the top bar, `/catalog`'s `notFound()`, S39-01's and S39-02's specs (the tile's counts, the guest). Full run.
 5. **Search.** `/catalog`, its header, the field, the scope, the kind tabs, the rows, the highlight, the empty state,
@@ -370,6 +372,9 @@ Each step ends with lint, typecheck, `npm test`, the touched specs as single fil
 7. **The after checks.** `npm run ui:check` on the landing zone, the catalog and the drawer (1,280, 1,440 and 1,920 px
    light and dark, 390 px), the bench, the timing on `dev:pg` with the demo and "Performance test" (never KB from a
    spec), a full run.
+7a. **Łukasz's migration and licence** (moved from step 3), one command at a time: `pg:backup` from `dev`;
+   `pg:migrate -- --dry-run`, `pg:migrate`, `pg:backup` again and the counts compared (`scripts/kb-counts.ts` on both
+   backups) from this branch; then `pg:licence -- grant "InfoMate" infocatalog` from this branch.
 8. **Łukasz's acceptance** on `dev:pg` with the demo accounts (PRD § 6), with a workspace he makes without Anna and
    Piotr (C9). **Stop.**
 9. **Close.** D-91 and AD-41 and the notes (AD-05, AD-33, AD-35, D-58, D-89, D-90) quoted in full; CLAUDE.md (the third
@@ -514,7 +519,7 @@ the longest parts 6 and 8 (13.7 min each); part 6's heap peak 1,181 MB of 8,039 
 without `INFOMAPPER_CONTRACT_DB`); `tests/contract/licence.test.ts` on a local Postgres 18.3 (3 passed); the touched
 specs as single files: `S39-02-switch.spec.ts` (4 passed), `S15-03`, `S25-01`, `S0-07` (6 passed).
 
-**Łukasz's migration** (the stop after this step): `pg:backup` from `dev`; `pg:migrate -- --dry-run` and `pg:migrate`
+**Łukasz's migration** (postponed to step 7a, Łukasz, 28 November 2026): `pg:backup` from `dev`; `pg:migrate -- --dry-run` and `pg:migrate`
 from this branch; `pg:backup` again from this branch; the two backups' counts compared with `scripts/kb-counts.ts`. Then,
 for the acceptance, InfoMate's licence with `pg:licence` from this branch.
 
@@ -524,3 +529,63 @@ on `43f7b0b`: success, 930 passed (step 2's 926 and S39-02-switch's 4), 16 skipp
 heap peak 1,843 MB of 8,039 MB (step 2's run: 1,181 MB), no restart. Part 6's peak is near the "about 2 GB" of the
 heap rule, which counts garbage not yet collected; part 11 is now the longest by more than a minute in this run, so the
 recut rule (the median of the last three full runs) is checked again at steps 4 and 7.
+
+**Łukasz's answers (28 November 2026):** step 3's deviations 1 to 4 are accepted, as Claude's technical calls, quoted
+at the closing. The migration on `infomapper-dev` and InfoMate's licence are postponed to just before step 8 (§ 12, 7a).
+
+## Step 4: the landing zone and "All apps" (28 November 2026)
+
+**Built:**
+- **`/`** (`src/app/page.tsx`): for a person who reads the InfoCatalog of at least one of the unlocked organizations
+  (`store.catalog.readable`), the landing zone (`src/compose/catalog-pages.tsx` → `src/modules/infocatalog/app/landing.tsx`,
+  words in `landing-words.ts`): the bar "InfoMate apps" (`src/app/_components/platform-bar.tsx`: the apps button, the
+  title, the account with the theme, "Change password…" online and "Sign out"), the greeting by the browser's hour
+  (`greeting.tsx`, hidden until the page runs, so the server's hour is never shown), the lead line and the two tiles with
+  the PRD's texts, bullets (InfoCatalog's third: "Where each item is used, on canvases and in documents") and counts.
+  "Open InfoMapper" is `/?to=workspace` (today's redirect); "Open InfoCatalog" is `/catalog?org={organization}`. Without
+  a readable catalog `/` redirects exactly as before.
+- **The organization-password sign-in** (`signInWithPasswordAction`): without a `next`, `/` when the person reads a
+  catalog with the organizations unlocked now; otherwise as before.
+- **"All apps"** in the top bar (`AllApps` in `top-bar.tsx`, a 28 px link on `iconButtonVariants`), directly before the
+  organization switcher, on the phone too, while the person reads the shown organization's catalog (`ShellData.allApps`,
+  `opensCatalog` in `permissions.ts`: one more read per page, the organization's licences).
+- **`/catalog`** (`src/app/catalog/page.tsx`): `notFound()` (the app's not-found page) without a readable catalog, and for
+  an `?org=` the person does not read; every other address under it has no route and is not found too. With the licence
+  it shows its bar ("InfoCatalog", the organization, the account); step 5 adds the search.
+- **Specs:** `S39-01.spec.ts` (five tests: without the licence; the landing zone, its texts and counts, "All apps" both
+  ways; the password sign-in; a guest; several organizations) and `S39-01-room.spec.ts` (S6A-10's twelve widths, S38-02's
+  long names at 1,280, 1,440 and 1,920 px, and S38-06's 390 px, all with the licence). `S39-02-switch.spec.ts` signs in
+  with the step's helper, which waits for the landing zone or a workspace (`signInTo`). Unit tests: `opensCatalog`, the
+  greeting's hours and the count lines (`tests/catalog-landing.test.ts`).
+
+**The widths with "All apps"** (S39-01-room's print): from 2,560 to 800 px nothing past the bar, no overlap, no scroll;
+the switchers 80–88 px at their smallest (800 to 1,300 px, above their 56 and 44 px); the working context's label 106 px
+at 1,280, 1,440 and 1,920 px; with S38-02's long names a cut name keeps 183 px (the organization at 1,280 px, against
+180), 210 px (workspace and project at 1,280 and 1,440 px); at 390 px the organization switcher 54 px, the workspace's
+79 px, the project's 72 px, no page scroll.
+
+**Deviations (for Łukasz):**
+1. **The landing zone shows when the person reads a catalog** (a licensed organization they are a member of), not on a
+   licence alone: a person who is only a guest in licensed organizations gets no landing zone and goes straight to
+   InfoMapper, since the guest rule leaves their landing zone without the InfoCatalog tile.
+2. **"All apps" follows the same rule for the shown organization** (its licence and the person its member), so a guest
+   in a licensed organization's workspace has none.
+3. **The InfoCatalog tile's count comes from one catalog read** of the organization (its items in the tabs' kinds), not
+   from a count per table (§ 11 proposed counts); one read per landing, measured at 9 ms (local) to 86 ms (local
+   Postgres) at KB's size in step 2.
+4. **The landing zone and the catalog have their own bar** (`bar-platform`, the prototype's `bar()`), not InfoMapper's
+   top bar; its account menu has no workspace role and no workspace links, which these pages have none of. Its title is
+   the prototype's "InfoMate apps".
+5. **`/catalog` with the licence holds its bar only** until step 5.
+6. "last: {name}" names the last used workspace (the cookie) among the unlocked ones, else the first.
+
+**A flake in an earlier spec:** `S8-06` (the first test) failed once in the batch of the touched specs: its click on the
+organization switcher came right after the full page load that the organization-link form causes, before the page was
+hydrated, so the menu never opened (the spec waits for the address only, not for `hydrated`). It passed three times of
+three on its own (the single-file check), and nothing of this step runs on that path (no licence in that spec). Not
+changed here: a race in an earlier spec is fixed on its own `fix/` branch (The slice cycle, 4); I propose one.
+
+**Checks:** lint and typecheck clean; `npm test` 224 files, 2,672 passed, 18 skipped; the touched specs as single files:
+`S39-01` and `S39-01-room` (8 passed), `S39-02-switch` (4 passed), S0-01, S0-06, S8-01, S8-04, S8-05, S8-06,
+`fixes/session-change-full-load`, S38-02, S6A-10, S16-08, S38-06, S30-09-room and S4P-09 (all passed, S8-06 after the
+flake above, 3 of 3).
