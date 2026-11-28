@@ -1,6 +1,6 @@
 // The landing zone's words (slice 39, S39-01: the PRD's texts; InfoCatalog's third bullet as agreed on 27 November 2026).
 
-export const LANDING_TITLE = "InfoMate apps";
+export const LANDING_TITLE = "InfoLabs apps";
 export const LANDING_LEAD =
   "Two apps on one metadata repository: the model is built in InfoMapper and found, read and described in InfoCatalog. A change in one is seen in the other at once.";
 export const MAPPER_TILE = {

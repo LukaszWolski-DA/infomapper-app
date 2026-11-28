@@ -20,7 +20,7 @@ export interface LandingProps {
 
 export function CatalogLanding({ user, firstName, mapper, catalog }: LandingProps) {
   return (
-    <div className="flex min-h-dvh flex-col bg-im-canvas">
+    <div className="flex min-h-dvh flex-col bg-im-surface">
       <PlatformBar title={LANDING_TITLE} user={user} />
       <main data-testid="page-landing" className="mx-auto w-full max-w-[1040px] px-4 pb-12 pt-9">
         <Greeting firstName={firstName} />

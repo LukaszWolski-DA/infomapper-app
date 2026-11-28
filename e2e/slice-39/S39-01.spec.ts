@@ -40,7 +40,7 @@ test("S39-01: with the licence the landing zone greets, explains and offers both
   await signInTo(page, "Łukasz");
   await expect(landing(page)).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByTestId("text-platform-title")).toHaveText("InfoMate apps");
+  await expect(page.getByTestId("text-platform-title")).toHaveText("InfoLabs apps");
   await expect(page.getByTestId("text-greeting")).toHaveText(/^Good (morning|afternoon|evening), Łukasz$/);
   await expect(page.getByTestId("text-greeting")).toBeVisible();
   await expect(page.getByTestId("text-landing-lead")).toHaveText(LEAD);

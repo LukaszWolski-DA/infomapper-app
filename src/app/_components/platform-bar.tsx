@@ -1,6 +1,6 @@
 "use client";
 
-// The bar of the platform's pages outside a workspace (slice 39, S39-01): the landing zone ("InfoMate apps") and
+// The bar of the platform's pages outside a workspace (slice 39, S39-01): the landing zone ("InfoLabs apps") and
 // InfoCatalog. The prototype's `bar()`: the apps button, the title, the page's own controls, the account. The account's
 // menu is InfoMapper's (the name and e-mail, the theme, "Change password…" online, "Sign out"), without a workspace's
 // role, which these pages have none of.
