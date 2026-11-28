@@ -322,8 +322,8 @@ joins the last part (part 11, from `slice-27`), by the recut rule. **Its time (a
 - **The prototype's rights are not the PRD's.** It lists only member workspaces and falls back to "Reader" (L11362-11366):
   the no-role reader, the switch and the no-role line are the PRD's alone.
 - **"Open in a window", Lineage, Impact, Display, Markdown, ✦ Ask, Catalog editors, the filters row:** out (PRD § 2).
-  The landing's bar title "InfoMate apps" (L11507) and the sign-in card "One account for InfoMapper and InfoCatalog"
-  (L11495-11503) are not in the PRD; I propose the title "InfoMate apps" on the landing's bar (it names nothing new) and
+  The landing's bar title "InfoLabs apps" (L11507) and the sign-in card "One account for InfoMapper and InfoCatalog"
+  (L11495-11503) are not in the PRD; I propose the title "InfoLabs apps" on the landing's bar (it names nothing new) and
   no change to the sign-in page.
 - **The drawer is a new shared component** (`src/ui/components/drawer.tsx`, from shadcn's Sheet on the tokens, D-89 gets
   a note). The PRD's "added to the guard's list" is wrong: the guard has no list of components, it refuses a styled
@@ -538,7 +538,7 @@ at the closing. The migration on `infomapper-dev` and InfoMate's licence are pos
 **Built:**
 - **`/`** (`src/app/page.tsx`): for a person who reads the InfoCatalog of at least one of the unlocked organizations
   (`store.catalog.readable`), the landing zone (`src/compose/catalog-pages.tsx` → `src/modules/infocatalog/app/landing.tsx`,
-  words in `landing-words.ts`): the bar "InfoMate apps" (`src/app/_components/platform-bar.tsx`: the apps button, the
+  words in `landing-words.ts`): the bar "InfoLabs apps" (`src/app/_components/platform-bar.tsx`: the apps button, the
   title, the account with the theme, "Change password…" online and "Sign out"), the greeting by the browser's hour
   (`greeting.tsx`, hidden until the page runs, so the server's hour is never shown), the lead line and the two tiles with
   the PRD's texts, bullets (InfoCatalog's third: "Where each item is used, on canvases and in documents") and counts.
@@ -575,7 +575,7 @@ at 1,280, 1,440 and 1,920 px; with S38-02's long names a cut name keeps 183 px (
    Postgres) at KB's size in step 2.
 4. **The landing zone and the catalog have their own bar** (`bar-platform`, the prototype's `bar()`), not InfoMapper's
    top bar; its account menu has no workspace role and no workspace links, which these pages have none of. Its title is
-   the prototype's "InfoMate apps".
+   the prototype's "InfoLabs apps".
 5. **`/catalog` with the licence holds its bar only** until step 5.
 6. "last: {name}" names the last used workspace (the cookie) among the unlocked ones, else the first.
 
@@ -695,3 +695,117 @@ touched the local adapter, the undo, the save chain or the canvas.
 then in another terminal `npx tsx scripts/licence.ts grant "InfoMate" infocatalog --file .data/demo-db.json`; sign in as
 Łukasz: the landing zone, then "Open InfoCatalog". `npm run demo -- --reset` starts the demo afresh (the licence again
 after it).
+
+**Łukasz (28 November 2026):** step 5's deviations 1 to 9 are accepted; they are Claude's technical calls, quoted at the
+closing.
+
+## Step 6: the drawer and Open in InfoMapper (28 November 2026)
+
+**Łukasz's two corrections within the step:**
+1. **The platform is InfoLabs, not InfoMate.** The landing zone's bar says "InfoLabs apps" (`landing-words.ts`,
+   `platform-bar.tsx`'s comment, `S39-01.spec.ts`, this document: step 1's § 11 and step 4's notes now read "InfoLabs
+   apps"); the catalog's bar says "InfoCatalog" and the organization, as before. The demo organization "InfoMate" and the
+   demo e-mail addresses stay: they are test data. The design system's artifact is now "InfoLabs Design System"; no doc
+   in the repository names it for the current state (slice 37's PRD names it historically and stays, as do the
+   prototype's comments).
+2. **The catalog's pages are white.** The landing zone and `/catalog` have the surface background (`bg-im-surface`, in
+   place of `bg-im-canvas`), as the prototype's layout B shows and the design system's first principle says ("white
+   first, only the canvas grey"); the tiles keep their hairline border, as the cards on InfoMapper's homes do; dark mode
+   follows the same tokens. Checked with `ui:check` at 1,280 px light and dark (below).
+
+**Built:**
+- **InfoMapper's domain first** (guardrail 4):
+  - `src/domain/model/relationship-sentences.ts`: the relationship read as two sentences (`relationshipSentences`,
+    `cardinalityPhrase`, `asRole`), moved out of the relationship panel, which now uses it (the same words);
+  - `src/domain/catalog/canvases.ts`: `canvasesShowing` (step 2's postponed chooser, Q9): the canvases whose cards show
+    the item (its entities', source tables' and, new, requirements' cards: `CatalogItem.anchors.requirements`), every
+    project's, a canvas showing every anchor first (a mapping's both ends, a relationship's both entities), then one
+    showing some ("in part"); the projects in the order made, each in tab order; a canvas in two projects under each;
+    each with the arrival parameters that select the item (`CatalogItem.open`: `?entity=`, `?row=` for an attribute, a
+    column, a measure or a key, `?map=`, `?rel=`, `?card=source:` for a table, `?req=`, `?ext=cube_mapping:`; a concept
+    through its first entity's card);
+  - `src/domain/catalog/details.ts`: `coreCatalogDetails` per kind (§ 7's table): characteristics (a label and its text,
+    links or a time), texts (definition, rule, comment, note) and the items one step away in groups (the first 50,
+    `GROUP_LIMIT`, then "and {n} more"); every link names an item the catalog has, so every link opens. A table's
+    characteristics name its system's last import. A requirement's owner says "from InfoMapper" (A3.4).
+- **InfoCube's kinds' details** through its contribution (`CatalogContribution.details`, `cubeCatalogDetails`): a fact's
+  type, factless, grain, aggregate of, its measures, keys and dimensional mappings; a dimension's kind, history and
+  unknown member; a measure's fact and additivity; a key's fact, dimension and role; a dimensional mapping's inputs,
+  target, kind, lookup, status and approver.
+- **The read** (`src/compose/catalog.ts`, `catalogItemView`): the item's workspace read with its own scope through
+  `store.catalog.read` (the rights inside the port), the item found among the workspace's catalog items, its details,
+  `canvasesShowing`, the documents through `documentsIncluding` (C4: a shared one or the reader's own, never another's
+  private one, none without a role), the workspace's owners by name; for a table one more read, its system's last import
+  (`store.model.listImports`), after the rights. Null, the page's "not found", for an item of a workspace the person may
+  not read, one that does not exist, or a reference that is not one; never another answer.
+- **The item's address** (C7): `/catalog?…&item={kind}:{workspaceId}:{id}` (`src/modules/infocatalog/domain/item.ts`,
+  `parseItemRef`; `CatalogState.item`). The page renders it from the server, so a link opens the drawer in a new page;
+  the browser asks for another item with `catalogItemAction`.
+- **The drawer** (`src/ui/components/drawer.tsx`, a new shared component: `Drawer`, `DRAWER_ROOM`, `DRAWER_HEADING`,
+  `DRAWER_LINK`, `DRAWER_INLINE_LINK`): 560 px from the right under the 48 px bar, the screen's width on a phone; from
+  1,100 px the page's column moves left and keeps clear of it (the results stay clickable), narrower a light scrim covers
+  the page and a click on it closes the drawer. Mounted only while open; it slides in.
+- **The page** (`catalog-page.tsx`, `item-drawer.tsx`): a result's row opens on a click or Enter (the row is focusable,
+  `aria-current` while open); ↑ ↓ or j k move through the results and the drawer follows, outside a text field; Esc
+  closes it; the address follows (`replaceState`). The drawer: "↑ ↓ next item · Esc closes", "← Back" after a connected
+  item, close; the kind, the name (it wraps), the path, the workspace with "(archived)", "From InfoMapper · read only",
+  the marks; "Open in InfoMapper" or, without a role, "You have no role in {workspace}. Ask its owner for access:
+  {owners}."; the texts; "Characteristics from InfoMapper"; the connected groups; "Context": "Canvases that show it"
+  (each opens its canvas with the item selected; "in part" where it shows only some of the item) and "Documents that
+  include it" ("Shared" or "Private, yours"). No Lineage or Impact section.
+- **Open in InfoMapper** (`openHref`): the first canvas of the Context list with its arrival parameters and `from=catalog`;
+  a classification or a stereotype the workspace home's Metadata conventions tab; an item on no canvas the workspace's
+  home with `?gone=off-canvas&item={kind}:{id}`, whose toast "{name} is not on any canvas." reads the name on the server
+  (`offCanvasNotice`; the name never travels in the address; `GoneNotice`'s new `drop` removes `item` with `gone`).
+- **The arrival:** `?req=` with `from=catalog` centres the requirement's card when the canvas has one (`ModelCanvas.tsx`,
+  the requirement's arrival effect, `centerRequirement`); the other parameters are unchanged.
+- **"← Back to InfoCatalog"** (`src/app/_components/catalog-back.tsx` in the navigation row after Back and Forward;
+  `src/ui/catalog-return.ts`): "Open in InfoMapper", a Context canvas or a document keeps the catalog's address and the
+  workspace in the tab's `sessionStorage` (`im-catalog-return`, read back through `safeCatalogPath`: only `/catalog`
+  and its query); the row shows the way back while the page is of that workspace; the catalog opening again, or a page
+  of another workspace, ends it.
+- **Specs:** `S39-04.spec.ts` (eleven tests: the drawer at 1,280 px with the column moved and another result clicked; the
+  scrim at 900 px; Enter, ↓ ↑, j k and Esc; a connected item and "← Back" twice; an item's address in a new page and
+  "not found" for an item without the right, one that does not exist and a reference that is not one; a table's last
+  import and declared key; long names at 1,280 and 390 px; Anna's documents (the shared one and her own, never Łukasz's
+  private S2T), Łukasz's (his own, never Anna's); a reader without a role; a search typed with the drawer open) and
+  `S39-05.spec.ts` (five: an entity on its first canvas, selected and in view, "← Back to InfoCatalog" from another page
+  of the workspace back to the search, tab and item, and gone once the catalog opened again; a mapping and a relationship
+  selected; a column on its table's card and REQ-104 on its card; an item on no canvas; each Context canvas, and a
+  classification's Metadata conventions tab). The fixtures have `seed` "docs" (InfoDocumenter's demo). Unit tests:
+  `tests/catalog-drawer.test.ts` (the chooser and every kind's details on the full demo, every link an item),
+  `src/ui/catalog-return.test.ts` (the way back's address), `view.test.ts` (the item's address).
+
+**Deviations (for Łukasz):**
+1. **"Not found" is the app's not-found page** for an item's address the person may not read, one that does not exist or
+   an odd reference, the same answer as an unreadable `scope` (step 1's § 5 proposed a toast and asked; the page keeps
+   the rule one). In the page, an item that went away meanwhile closes the drawer with "That item is not in
+   InfoCatalog.".
+2. **A classification or a stereotype opens the workspace home's Metadata conventions tab**, where they are listed and
+   edited; they are on no canvas, and "{name} is not on any canvas" would say nothing useful.
+3. **A concept opens on the first canvas that shows one of its entities, that entity's card selected** (a concept has
+   no card or panel of its own on a canvas).
+4. **The connected items** follow § 7 and the PRD, and add each traced kind's "Requirements" (an entity's, an
+   attribute's, a mapping's, a table's, a column's) as the reverse of a requirement's "Traced to"; an empty group is not
+   drawn.
+5. **The item's address replaces the current history entry** (as the search's state does); "← Back" in the drawer is the
+   drawer's own list, lost on a reload.
+6. **The Context's canvases** are links only for a person with a role (a reader without one sees their names); a
+   canvas that shows only part of the item says "in part".
+7. **The relationship panel's sentences moved into the domain** (guardrail 4); the panel's words are unchanged.
+8. **`?req=` centres the requirement's card** when the canvas has one, **only on an arrival from the catalog**
+   (`from=catalog`, `ModelCanvas`'s `centerRequirement`): the project home's requirements keep opening the canvas at its
+   stored view (slice 4a). The first full run (46145963757, `48f9667`) failed S4A-13 when every `?req=` centred: the
+   spec clicks a Customer row at the stored view.
+
+**`ui:check`:**
+- the drawer (`--only catalog-drawer --widths 1280,1920,390`: two new screens, an entity with its context and a source
+  table, at 1,280 and 1,920 px light and dark and at 390 px light, 10 views): **no finding** (report
+  `.data/ui-check/s39-step6-drawer-20261128-1339/`);
+- the landing zone and the search page white (`--only landing,catalog-empty,catalog-search --widths 1280`, light and
+  dark, 6 views): **no finding** (`.data/ui-check/s39-step6-white-20261128-1341/`).
+
+**Checks:** lint and typecheck clean; `npm test` 227 files passed and 2 skipped, 2,688 tests passed and 18 skipped; `e2e/slice-39` and the
+earlier specs this step touched (S1B-06 and RP-04, RP-14: the relationship's sentences; S7B-13, S7B-14 and S38-03: the
+project home's `?req=` and lines) as single files: 54 passed. **A full run** (the step touched the canvas's arrival and
+the shell's navigation row, not the local adapter): see below.
