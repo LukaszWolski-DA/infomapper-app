@@ -165,3 +165,58 @@ export async function searchFor(page: Page, text: string) {
   await expect(page.getByTestId("page-catalog")).toHaveAttribute("data-query", text);
   await expect(resultRows(page).first().or(page.getByTestId("box-catalog-nothing"))).toBeVisible();
 }
+
+// ---- step 6: the drawer (S39-04) and Open in InfoMapper (S39-05) ----
+
+export const drawer = (page: Page) => page.getByTestId("drawer-catalog");
+export const drawerName = (page: Page) => page.getByTestId("text-drawer-name");
+export const drawerLink = (page: Page, name: string) => drawer(page).getByTestId("button-drawer-link").filter({ hasText: name });
+export const factOf = (page: Page, label: string) => drawer(page).locator(`[data-testid="text-drawer-fact"][data-label="${label}"]`);
+
+/** An item's reference as the address holds it (`{kind}:{workspaceId}:{id}`). */
+export const itemRef = (kind: string, id: string, ws: string = RETAIL) => `${kind}:${ws}:${id}`;
+
+/** Waits until the drawer has slid in: its right edge at the window's. */
+export async function drawerIn(page: Page) {
+  const width = page.viewportSize()!.width;
+  await expect.poll(async () => {
+    const b = await drawer(page).boundingBox();
+    return b ? Math.round(b.x + b.width) : null;
+  }).toBe(width);
+  return (await drawer(page).boundingBox())!;
+}
+
+/** The result row of an item by its kind and name (the first such row). */
+export const rowNamed = (page: Page, kind: string, name: string) =>
+  resultRows(page).and(page.locator(`[data-kind="${kind}"]`)).filter({ has: page.getByTestId("text-result-name").getByText(name, { exact: true }) }).first();
+
+/** Waits until the drawer shows this item's answer (its reference and name). */
+export async function expectDrawerAt(page: Page, ref: string, name?: string) {
+  await expect(drawer(page).getByTestId("details-catalog-item")).toHaveAttribute("data-item", ref);
+  await expect(drawer(page).getByTestId("details-catalog-item")).not.toHaveAttribute("aria-busy", "true");
+  if (name !== undefined) await expect(drawerName(page)).toHaveText(name);
+}
+
+/** Opens a result's drawer with a click on its row. */
+export async function openRow(page: Page, kind: string, name: string) {
+  const row = rowNamed(page, kind, name);
+  const ref = itemRef(kind, (await row.getAttribute("data-id"))!, (await row.getAttribute("data-workspace"))!);
+  await row.click();
+  await expectDrawerAt(page, ref, undefined);
+  return ref;
+}
+
+/** The demo's live rows by name (Retail Co – DWH). */
+export async function demoId(kind: "entity" | "attribute" | "source_table" | "source_column" | "requirement", name: string, owner?: string): Promise<string> {
+  const db = await readDb(E2E_DB);
+  const live = <T extends { workspace_id: string; deleted_at: string | null }>(xs: T[]) => xs.filter((x) => x.workspace_id === RETAIL && x.deleted_at === null);
+  if (kind === "entity") return live(db.entity).find((e) => e.name === name)!.id;
+  if (kind === "source_table") return live(db.source_table).find((t) => t.name === name)!.id;
+  if (kind === "requirement") return live(db.requirement).find((r) => r.key === name)!.id;
+  if (kind === "attribute") {
+    const entity = live(db.entity).find((e) => e.name === owner)!.id;
+    return live(db.attribute).find((a) => a.entity_id === entity && a.name === name)!.id;
+  }
+  const table = live(db.source_table).find((t) => t.name === owner)!.id;
+  return live(db.source_column).find((c) => c.source_table_id === table && c.name === name)!.id;
+}
