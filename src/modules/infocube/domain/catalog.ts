@@ -58,6 +58,7 @@ export function cubeCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
     const fact = c.role === "fact";
     add({
       kind: fact ? "fact" : "dimension",
+      kindLabel: fact ? "Fact" : "Dimension",
       id: e.id,
       name: e.name,
       path: present(concepts.get(e.concept_id), fact ? (c.fact_type ? FACT_TYPE_NAMES[c.fact_type] : null) : historyLabel(c)).join(" · "),
@@ -74,6 +75,7 @@ export function cubeCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
     if (x.deleted_at !== null || !a || !owner) continue;
     add({
       kind: "measure",
+      kindLabel: "Measure",
       id: x.id,
       name: a.name,
       path: `${owner.name} · ${ADDITIVITY[x.additivity] ?? x.additivity}`,
@@ -94,6 +96,7 @@ export function cubeCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
     const to = entities.get(otherId)?.name ?? "?";
     add({
       kind: "key",
+      kindLabel: "Key",
       id: k.id,
       name: `${a.name} (${from} → ${to})`,
       path: `${from} → ${to}`,
@@ -115,6 +118,7 @@ export function cubeCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
     const inputEntities = inputs.map((id) => attributes.get(id)?.entity_id).filter((id): id is Uuid => !!id);
     add({
       kind: "cube_mapping",
+      kindLabel: "Dimensional mapping",
       id: x.id,
       name: `${inputs.map(attrName).join(", ") || "?"} → ${attrName(a.id)}`,
       path: x.kind === "lookup" ? "Lookup" : x.kind === "transform" ? "Transform" : "Direct",
@@ -131,5 +135,6 @@ export const CUBE_CATALOG: CatalogContribution = {
   module: "infocube",
   tables: CUBE_CATALOG_TABLES,
   tabs: CUBE_CATALOG_TABS,
+  on: (w) => w.infocube,
   items: cubeCatalogItems,
 };

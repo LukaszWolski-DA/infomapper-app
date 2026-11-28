@@ -7,12 +7,13 @@ import { CORE_TABS, coreCatalogItems, type CatalogItem, type CatalogTab } from "
 import type { CatalogRead } from "@/domain/catalog/read";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type { ModuleTable } from "@/domain/types";
-import { catalogIndex, searchCatalog, type CatalogAnswer, type CatalogIndex } from "@/modules/infocatalog/domain/search";
+import { ALL_TAB, catalogIndex, searchCatalog, type CatalogAnswer, type CatalogIndex } from "@/modules/infocatalog/domain/search";
+import { catalogView, shownTabs, type CatalogState, type CatalogView } from "@/modules/infocatalog/domain/view";
 import { CUBE_CATALOG } from "@/modules/infocube/domain/catalog";
 import { DOCUMENTS_CATALOG } from "@/modules/infodocumenter/domain/catalog";
 import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
-import type { CatalogOrganization } from "@/domain/permissions";
+import type { CatalogOrganization, CatalogWorkspace } from "@/domain/permissions";
 import { documentStateFor } from "./documents";
 import { STORE_SCHEMA } from "./tables";
 
@@ -54,3 +55,33 @@ const SHOWN_KINDS = new Set(CATALOG_TABS.flatMap((t) => t.kinds));
 /** How many items a read holds (the kinds the tabs show), for the landing tile's count. */
 export const catalogItemCount = (read: CatalogRead<ModuleTable> | null): number =>
   read ? read.snapshots.reduce((n, s) => n + workspaceCatalogItems(s).filter((i) => SHOWN_KINDS.has(i.kind)).length, 0) : 0;
+
+/** Every tab with where it shows: InfoMapper's always, a module's where it is on (its contribution's `on`). */
+const TAB_SOURCES: readonly (CatalogTab & { on?: (w: CatalogWorkspace) => boolean })[] = [
+  ...CORE_TABS,
+  ...CATALOG_CONTRIBUTIONS.flatMap((c) => (c.tabs ?? []).map((t) => ({ ...t, on: c.on }))),
+];
+
+/**
+ * A search page's view of a state (S39-03, C1): the organization and the scope as the person reads them, the tabs shown
+ * there, one catalog read and the search; null when the person may not read the organization or the workspace (the page
+ * answers "not found"). A tab that is not shown in the scope reads as "All".
+ */
+export async function catalogSearchView(userId: Uuid, unlocked: ReadonlySet<Uuid>, readable: readonly CatalogOrganization[], asked: CatalogState): Promise<CatalogView | null> {
+  const organization = readable.find((o) => o.id === asked.org);
+  if (!organization) return null;
+  const scope = asked.scope ? organization.workspaces.filter((w) => w.id === asked.scope) : organization.workspaces;
+  if (asked.scope && !scope.length) return null;
+  const tabs = shownTabs(TAB_SOURCES, scope);
+  const state: CatalogState = { ...asked, kind: asked.kind === ALL_TAB || tabs.some((t) => t.key === asked.kind) ? asked.kind : ALL_TAB };
+  const read = scope.length
+    ? await getDataStore(STORE_SCHEMA).catalog.read(userId, unlocked, { organizationId: organization.id, workspaceId: asked.scope }, CATALOG_TABLES)
+    : { organization, snapshots: [] };
+  if (!read) return null;
+  const index = catalogIndex(read.snapshots.flatMap(workspaceCatalogItems), tabs, read.snapshots.map((s) => s.workspace.id));
+  return catalogView(state, searchCatalog(index, state.q, state.kind), tabs, scope);
+}
+
+// slice 39: what `src/app`'s catalog route reads of InfoCatalog (the address and the view), through the composition root
+export { addressOf, stateOf } from "@/modules/infocatalog/domain/address";
+export type { CatalogState, CatalogView };

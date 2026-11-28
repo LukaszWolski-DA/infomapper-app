@@ -6,6 +6,7 @@
 import type { DocumentState } from "../document/state";
 import type { Uuid } from "../ids";
 import type { WorkspaceSnapshot } from "../model/workspace-model";
+import type { CatalogWorkspace } from "../permissions";
 import type { ModuleTable, WorkspaceMember } from "../types";
 import type { CatalogItem, CatalogTab } from "./items";
 
@@ -29,6 +30,8 @@ export interface CatalogContribution {
   readonly tables: readonly ModuleTable[];
   /** Its kinds' tabs, after InfoMapper's, in this order. */
   readonly tabs?: readonly CatalogTab[];
+  /** Where the module is on: its tabs show only when a workspace in scope has it on (none: always). */
+  readonly on?: (workspace: CatalogWorkspace) => boolean;
   /** Its items of one workspace (none where the module is off), each kind in its model order. */
   readonly items?: (snapshot: WorkspaceSnapshot<ModuleTable>) => CatalogItem[];
   /** The documents that include the item, only those the viewer sees in InfoMapper (none without a role). */

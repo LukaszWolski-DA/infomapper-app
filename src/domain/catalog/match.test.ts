@@ -4,6 +4,7 @@ import { catalogQuery, definitionLine, highlightRanges, indexCatalogItem, matchT
 
 const item = (name: string, fields: Partial<CatalogItem["fields"]> = {}): CatalogItem => ({
   kind: "entity",
+  kindLabel: "Entity",
   id: "01a0f9e9-0000-7000-8000-000000000001",
   workspaceId: "01a0f9e9-0000-7000-8000-000000000002",
   name,

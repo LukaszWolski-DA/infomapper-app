@@ -25,6 +25,8 @@ export interface CatalogFields {
 
 export interface CatalogItem {
   readonly kind: string;
+  /** The kind in a result's Kind column ("Entity", "View", "Dimensional mapping"). */
+  readonly kindLabel: string;
   readonly id: Uuid;
   readonly workspaceId: Uuid;
   /** The name shown (derived where the row has none: a relationship, a mapping, a key). */
@@ -106,12 +108,14 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
   const gone = (x: { missing_since: string | null; retired_since: string | null }): CatalogMark[] =>
     x.retired_since ? [{ t: "retired" }] : x.missing_since ? [{ t: "missing" }] : [];
 
-  for (const c of m.concepts) add({ kind: "concept", id: c.id, name: c.name, path: "", definition: c.description_text, fields: { alias: [], definition: present(c.description_text), other: [] }, marks: [], anchors: { entities: logical.filter((e) => e.concept_id === c.id).map((e) => e.id), tables: [] } });
+  for (const c of m.concepts) add({ kind: "concept",
+      kindLabel: "Concept", id: c.id, name: c.name, path: "", definition: c.description_text, fields: { alias: [], definition: present(c.description_text), other: [] }, marks: [], anchors: { entities: logical.filter((e) => e.concept_id === c.id).map((e) => e.id), tables: [] } });
 
   for (const e of logical) {
     const stereotype = stereotypes.name(e.stereotype);
     add({
       kind: "entity",
+      kindLabel: "Entity",
       id: e.id,
       name: e.name,
       path: present(concepts.get(e.concept_id)?.name, stereotype).join(" · "),
@@ -126,6 +130,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
     if (a.deleted_at !== null || !isLogical(a.entity_id)) continue;
     add({
       kind: "attribute",
+      kindLabel: "Attribute",
       id: a.id,
       name: a.name,
       path: `${entityById.get(a.entity_id)!.name} · ${formatAttributeType(a)}`,
@@ -142,6 +147,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
     const to = entityById.get(r.to_entity_id)!.name;
     add({
       kind: "relationship",
+      kindLabel: "Relationship",
       id: r.id,
       name: relationshipName(r, from, to),
       path: `${from} ${cardinality(r.from_min, r.from_max)} — ${cardinality(r.to_min, r.to_max)} ${to}`,
@@ -156,6 +162,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
     const system = systems.get(t.source_system_id);
     add({
       kind: "source_table",
+      kindLabel: t.object_type === "view" ? "View" : t.object_type === "file" ? "File" : "Source table",
       id: t.id,
       name: t.name,
       path: tableLocation(system, t),
@@ -173,6 +180,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
     const pii = piiColumns.has(c.id);
     add({
       kind: "source_column",
+      kindLabel: "Source column",
       id: c.id,
       name: c.name,
       path: `${physicalName(system, t)} · ${formatColumnType(c)}`,
@@ -193,6 +201,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
     const source = inputs.map((c) => `${tables.get(c.source_table_id)?.name ?? "?"}.${c.name}`).join(", ") || "?";
     add({
       kind: "mapping",
+      kindLabel: "Mapping",
       id: x.id,
       name: `${source} → ${entityById.get(a.entity_id)!.name}.${a.name}`,
       path: x.kind === "transform" ? "Transform" : "Direct",
@@ -206,6 +215,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
   for (const r of snapshot.requirements) {
     add({
       kind: "requirement",
+      kindLabel: "Requirement",
       id: r.id,
       name: `${r.key} ${r.name}`,
       path: r.kind,
@@ -219,6 +229,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
   for (const c of liveClasses) {
     add({
       kind: "classification",
+      kindLabel: "Classification",
       id: c.id,
       name: c.name,
       path: `${c.scope === "table" ? "Tables" : "Columns"} · ${carriers.get(c.id) ?? 0}`,
@@ -232,6 +243,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
   for (const s of stereotypes.live) {
     add({
       kind: "stereotype",
+      kindLabel: "Stereotype",
       id: s.id,
       name: s.name,
       path: `${logical.filter((e) => e.stereotype === s.code).length}`,
