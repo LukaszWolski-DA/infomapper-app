@@ -7,6 +7,11 @@ import { CATALOG_TABLES, catalogItemCount } from "../../src/compose/catalog";
 import { DEMO_PASSWORD } from "../../src/data/local/demo-password";
 import { readDb, writeDb } from "../../src/data/local/file";
 import { createLocalDataStore } from "../../src/data/local/store";
+import { addLargeWorkspace } from "../../src/data/local/seed-large";
+import type { CommandContext, CommandResult } from "../../src/domain/changes";
+import { createEntity } from "../../src/domain/commands/entity";
+import { createWorkspace, updateWorkspaceSettings } from "../../src/domain/commands/workspace";
+import type { WorkspaceAccess } from "../../src/domain/permissions";
 import type { SeedUserName } from "../slice-00/helpers";
 import { SEED_IDS } from "../../src/data/local/seed";
 import { uuidv7 } from "../../src/domain/ids";
@@ -80,3 +85,83 @@ export async function itemsOf(userId: string, organizationId: string) {
 export const landing = (page: Page) => page.getByTestId("page-landing");
 export const allApps = (page: Page) => page.getByTestId("button-all-apps");
 export const notFoundPage = (page: Page) => page.getByTestId("page-not-found");
+
+const domainStore = () => createLocalDataStore(E2E_DB, STORE_SCHEMA);
+
+/** Runs a domain command as a person in a workspace and applies it to the e2e file (test data through the domain, C9). */
+export async function inWorkspace<T>(userId: string, ws: string, command: (ctx: CommandContext, access: WorkspaceAccess) => CommandResult<T>): Promise<T> {
+  const s = domainStore();
+  const workspace = (await s.workspaces.get(ws))!;
+  const access = { workspace, member: await s.workspaces.getMember(ws, userId) };
+  const result = command({ actorId: userId, now: new Date().toISOString(), newId: () => uuidv7() }, access);
+  if (!result.ok) throw new Error(result.error.message);
+  const applied = await s.apply(result.writeSet);
+  if (!applied.ok) throw new Error(applied.error.message);
+  return result.value;
+}
+
+/** Test data: a new InfoMate workspace made by Łukasz (its owner; nobody else has a role in it), with one entity. */
+export async function workspaceWithoutAnna(name: string, entity: string): Promise<string> {
+  const s = domainStore();
+  const organization = await s.organizations.get(SEED_IDS.orgInfoMate);
+  const organizationMember = await s.organizations.getMember(SEED_IDS.orgInfoMate, SEED_IDS.userLukasz);
+  const ctx = { actorId: SEED_IDS.userLukasz, now: new Date().toISOString(), newId: () => uuidv7() };
+  const made = createWorkspace(ctx, { organization, organizationMember }, { organizationId: SEED_IDS.orgInfoMate, name });
+  if (!made.ok) throw new Error(made.error.message);
+  const applied = await s.apply(made.writeSet);
+  if (!applied.ok) throw new Error(applied.error.message);
+  await addEntity(made.value.workspaceId, entity, "Harbour");
+  return made.value.workspaceId;
+}
+
+/** Test data: an entity in a workspace, in a new concept of its own, made by Łukasz. */
+export async function addEntity(ws: string, name: string, concept = `${name} concept`) {
+  const model = await domainStore().model.load(ws);
+  return inWorkspace(SEED_IDS.userLukasz, ws, (ctx, access) => createEntity(ctx, access, { concept: null, concepts: model.concepts, entities: model.entities, canvas: null }, { name, newConcept: { name: concept } }));
+}
+
+/** Test data: the workspace's switch "Shown in InfoCatalog" set by Łukasz through the domain (InfoMate licensed). */
+export async function showInCatalog(ws: string, on: boolean) {
+  const workspace = await storedWorkspace(ws);
+  return inWorkspace(SEED_IDS.userLukasz, ws, (ctx, access) =>
+    updateWorkspaceSettings(ctx, access, { workspaceId: ws, expectedVersion: workspace.version, catalogShown: on }, undefined, undefined, { licensed: true, organizationName: "InfoMate" }),
+  );
+}
+
+/** Test data: an entity's name and definition (the e2e file's row), for Polish letters and long names. */
+export async function renameEntity(from: string, name: string, definition?: string, ws: string = RETAIL) {
+  const db = await readDb(E2E_DB);
+  const e = db.entity.find((x) => x.workspace_id === ws && x.name === from && x.deleted_at === null);
+  if (!e) throw new Error(`No entity ${from}`);
+  e.name = name;
+  if (definition !== undefined) {
+    e.definition_text = definition;
+    e.definition_html = `<p>${definition}</p>`;
+  }
+  await writeDb(E2E_DB, db);
+  return e.id;
+}
+
+/** Test data: "Performance test" (Łukasz's InfoMate workspace with 2,713 items), for more than 200 results. */
+export async function addPerformanceTest() {
+  const db = await readDb(E2E_DB);
+  addLargeWorkspace(db, new Date().toISOString(), STORE_SCHEMA);
+  await writeDb(E2E_DB, db);
+}
+
+export const catalogUrl = (params: Record<string, string> = {}) => `/catalog?${new URLSearchParams({ org: SEED_IDS.orgInfoMate, ...params }).toString()}`;
+export const searchField = (page: Page) => page.getByTestId("input-catalog-search");
+export const resultRows = (page: Page) => page.getByTestId("row-catalog-result");
+export const resultNames = (page: Page) => page.getByTestId("text-result-name").allTextContents();
+export const kindTab = (page: Page, key: string) => page.locator(`[data-testid="tab-catalog-kind"][data-kind="${key}"]`);
+export const scopeSelect = (page: Page) => page.getByTestId("select-catalog-scope");
+
+/** Types a search and waits for its answer: the address holds the words and the rows (or the empty box) show. */
+export async function searchFor(page: Page, text: string) {
+  await searchField(page).fill(text);
+  const q = new URLSearchParams({ q: text }).toString().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  await expect(page).toHaveURL(new RegExp(`[?&]${q}(&|$)`));
+  // the rows shown are this search's answer, not the one before it
+  await expect(page.getByTestId("page-catalog")).toHaveAttribute("data-query", text);
+  await expect(resultRows(page).first().or(page.getByTestId("box-catalog-nothing"))).toBeVisible();
+}
