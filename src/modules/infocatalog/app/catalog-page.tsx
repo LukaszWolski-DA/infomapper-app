@@ -125,12 +125,6 @@ export function CatalogPage({ user, organization, organizations, view: first, se
             autoComplete="off"
             value={q}
             onChange={(e) => type(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && q) {
-                e.preventDefault();
-                type("");
-              }
-            }}
           />
         </div>
         <div className="flex min-h-[30px] flex-wrap items-center gap-2.5 pt-3">
