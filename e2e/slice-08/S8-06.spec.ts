@@ -1,4 +1,5 @@
 import { callActionDirectly, captureActionId, createFromSwitcher } from "../slice-00/helpers";
+import { hydrated } from "../slice-09/helpers";
 import { expect, test } from "./fixtures";
 import { addPerson, createOrganization, SEED_IDS, signInWithPassword, signOutViaMenu } from "./helpers";
 
@@ -15,7 +16,9 @@ test("S8-06: silos: another organization asks for its password once and returns 
   await form.getByTestId("button-sign-in").click();
   await expect(page).toHaveURL(new RegExp(`/w/${SEED_IDS.wsSales}$`));
 
-  // now both switch without asking
+  // now both switch without asking; the address is the new page's before it runs, and a click on the switcher before it
+  // is hydrated opens nothing (fix/s8-06-switcher-ready): wait until the page is ready
+  await hydrated(page);
   await page.getByTestId("switcher-organization").click();
   await expect(page.getByTestId("icon-locked")).toHaveCount(0);
   await page.getByTestId("menu-item-organization").filter({ hasText: "InfoMate" }).click();
@@ -38,6 +41,7 @@ test("S8-06: P4: Retail Co's owner adds InfoMate's Anna, signs in as her with Re
   await signInWithPassword(page, "anna.nowak@infomate.pl", "Retail Co");
   await expect(page).toHaveURL(new RegExp(`/w/${SEED_IDS.wsSales}$`));
 
+  await hydrated(page);
   await page.getByTestId("switcher-organization").click();
   const infomate = page.getByTestId("menu-item-organization").filter({ hasText: "InfoMate" });
   await expect(infomate.getByTestId("icon-locked")).toHaveAttribute("title", "Asks for the password once");
