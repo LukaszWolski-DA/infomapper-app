@@ -17,6 +17,6 @@ describe("the landing zone's words", () => {
     expect(mapperCount(3, "Retail Co – DWH")).toBe("3 workspaces you belong to · last: Retail Co – DWH");
     expect(mapperCount(1, null)).toBe("1 workspace you belong to");
     expect(catalogCount(4871, 2, "InfoMate")).toBe("4,871 items in 2 workspaces of InfoMate");
-    expect(catalogCount(1, 1, "KB")).toBe("1 item in 1 workspace of KB");
+    expect(catalogCount(1, 1, "Acme")).toBe("1 item in 1 workspace of Acme");
   });
 });

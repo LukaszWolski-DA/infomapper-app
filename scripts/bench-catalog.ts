@@ -1,5 +1,5 @@
 // Benchmark (slice 39, step 2; C1: reference figures only, no bar; not part of `npm test`): InfoCatalog's read and search
-// on the real code, at KB's size and four times that. The model: the seed with "Performance test" (2,713 catalog
+// on the real code, at the size of Łukasz's test model (4,871 rows) and four times that. The model: the seed with "Performance test" (2,713 catalog
 // items), its workspace cloned with every id remapped into more workspaces of InfoMate, which holds the `infocatalog`
 // licence in the copy; Łukasz reads them all. Timed: `store.catalog.read` (the timing record, AD-37), the index
 // (`catalogIndexOf`: the items, folded once) and a search (`searchCatalog`). One warm-up, then 9 rounds; median, fastest,
@@ -12,7 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
-import { CATALOG_TABLES, catalogIndexOf } from "../src/compose/catalog";
+import { CATALOG_TABLES, catalogIndexOf, catalogSearchView } from "../src/compose/catalog";
 import { STORE_SCHEMA } from "../src/compose/tables";
 import type { DevDb } from "../src/data/local/schema";
 import { SEED_IDS } from "../src/data/local/seed";
@@ -29,7 +29,8 @@ import { seedRows } from "./lib/seed-rows";
 type Row = Record<string, unknown> & { id?: string; workspace_id?: string };
 const ROUNDS = 9;
 const ms = (v: number) => `${v.toFixed(1)} ms`;
-const KB_ITEMS = 4_871;
+/** The size of Łukasz's test model (rows, slice 31's copy); its catalog items are fewer. */
+const MODEL_ITEMS = 4_871;
 const QUERIES = ["customer", "cust id", "zrodlo", "a", "qqqq", "order date key"];
 
 async function time(label: string, run: () => unknown): Promise<number> {
@@ -96,6 +97,13 @@ async function measure(side: string, raw: DataStore): Promise<void> {
     await time(`search "${q}"`, () => (n = searchCatalog(index, q).counts.all!));
     console.log(`      ${n.toLocaleString("en")} results`);
   }
+  // slice 39, step 5: what one request of the page runs (catalogSearchAction less the session): the rights, the read, the
+  // index, the search and the view, through the store the composition root makes
+  const readable = await store.catalog.readable(SEED_IDS.userLukasz, unlocked);
+  if (process.env.INFOMAPPER_DATA !== "postgres" && !process.env.INFOMAPPER_DEV_DB?.includes("im-bench-catalog-")) throw new Error("The bench's store must be its temporary copy.");
+  for (const q of ["customer", "a"]) {
+    await time(`the page's search "${q}" (catalogSearchView)`, () => catalogSearchView(SEED_IDS.userLukasz, unlocked, readable, { org: SEED_IDS.orgInfoMate, q, scope: null, kind: "all" }));
+  }
 }
 
 async function main() {
@@ -103,7 +111,7 @@ async function main() {
   const pg = process.env.BENCH_PG;
   if (pg) assertLocalDatabase(pg);
   const perf = 2_713;
-  for (const [label, items] of [["KB's size", KB_ITEMS], ["four times KB", 4 * KB_ITEMS]] as const) {
+  for (const [label, items] of [["4,871 items", MODEL_ITEMS], ["four times that", 4 * MODEL_ITEMS]] as const) {
     const n = Math.ceil(items / perf);
     console.log(`\n== ${label}: ${n} workspaces like "Performance test", with the demo's`);
     const db = model(n);
@@ -111,10 +119,14 @@ async function main() {
     try {
       const file = path.join(tmp, "db.json");
       fs.writeFileSync(file, JSON.stringify(db));
+      // the composition root's store (`getDataStore`) on the temporary copy only, never .data/dev-db.json
+      process.env.INFOMAPPER_DEV_DB = file;
+      delete process.env.INFOMAPPER_DATA;
       await measure("local adapter", createLocalDataStore(file, STORE_SCHEMA));
       if (pg) {
         await preparePostgres(pg, db);
         process.env.INFOMAPPER_DATABASE_URL = pg;
+        process.env.INFOMAPPER_DATA = "postgres";
         const { createPostgresDataStore } = await import("../src/data/postgres/store");
         const { getPool } = await import("../src/data/postgres/pool");
         await measure("Postgres", createPostgresDataStore(STORE_SCHEMA));
@@ -122,6 +134,8 @@ async function main() {
         delete (globalThis as { __infomapperPgPool?: unknown }).__infomapperPgPool;
       }
     } finally {
+      delete process.env.INFOMAPPER_DATA;
+      delete process.env.INFOMAPPER_DEV_DB;
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   }
