@@ -8,6 +8,7 @@ import type { Uuid } from "../ids";
 import type { WorkspaceSnapshot } from "../model/workspace-model";
 import type { CatalogWorkspace } from "../permissions";
 import type { ModuleTable, WorkspaceMember } from "../types";
+import type { CatalogDetails, DetailsInput } from "./details";
 import type { CatalogItem, CatalogTab } from "./items";
 
 /** Who reads: the person, and their role in the item's workspace (null: they read it without a role). */
@@ -34,6 +35,8 @@ export interface CatalogContribution {
   readonly on?: (workspace: CatalogWorkspace) => boolean;
   /** Its items of one workspace (none where the module is off), each kind in its model order. */
   readonly items?: (snapshot: WorkspaceSnapshot<ModuleTable>) => CatalogItem[];
+  /** Its kinds' details in the drawer (S39-04); null for a kind that is not its own. */
+  readonly details?: (snapshot: WorkspaceSnapshot<ModuleTable>, item: CatalogItem, input: DetailsInput) => CatalogDetails | null;
   /** The documents that include the item, only those the viewer sees in InfoMapper (none without a role). */
   readonly documentsIncluding?: (state: DocumentState<ModuleTable>, item: CatalogItem, viewer: CatalogViewer) => CatalogDocument[];
 }

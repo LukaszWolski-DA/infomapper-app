@@ -102,7 +102,7 @@ async function measure(side: string, raw: DataStore): Promise<void> {
   const readable = await store.catalog.readable(SEED_IDS.userLukasz, unlocked);
   if (process.env.INFOMAPPER_DATA !== "postgres" && !process.env.INFOMAPPER_DEV_DB?.includes("im-bench-catalog-")) throw new Error("The bench's store must be its temporary copy.");
   for (const q of ["customer", "a"]) {
-    await time(`the page's search "${q}" (catalogSearchView)`, () => catalogSearchView(SEED_IDS.userLukasz, unlocked, readable, { org: SEED_IDS.orgInfoMate, q, scope: null, kind: "all" }));
+    await time(`the page's search "${q}" (catalogSearchView)`, () => catalogSearchView(SEED_IDS.userLukasz, unlocked, readable, { org: SEED_IDS.orgInfoMate, q, scope: null, kind: "all", item: null }));
   }
 }
 

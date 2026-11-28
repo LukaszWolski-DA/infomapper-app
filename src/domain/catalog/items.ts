@@ -39,9 +39,17 @@ export interface CatalogItem {
   readonly marks: readonly CatalogMark[];
   /** Its place in its kind's model order in its workspace (the ranking's last tie-break). */
   readonly order: number;
-  /** The entities and source tables it lives on (canvases, documents' scope). */
-  readonly anchors: { readonly entities: readonly Uuid[]; readonly tables: readonly Uuid[] };
+  /** The entities, source tables and requirements whose cards show it (canvases, documents' scope). */
+  readonly anchors: { readonly entities: readonly Uuid[]; readonly tables: readonly Uuid[]; readonly requirements?: readonly Uuid[] };
+  /**
+   * How "Open in InfoMapper" shows it (slice 39, S39-05): the canvas's arrival parameter and its value, or a tab of the
+   * workspace's home; none: the first of its entities' cards on the canvas (a concept).
+   */
+  readonly open?: CatalogOpen;
 }
+
+/** A canvas's arrival parameter (`?entity=`, `?row=`, …, Q9), or a workspace home's tab. */
+export type CatalogOpen = { readonly param: "entity" | "row" | "map" | "rel" | "card" | "req" | "ext"; readonly value: string } | { readonly tab: string };
 
 /** A kind tab: its key in the address, its label, the kinds it holds. */
 export interface CatalogTab {
@@ -63,7 +71,7 @@ export const CORE_TABS: readonly CatalogTab[] = [
   { key: "classes", label: "Classifications and stereotypes", kinds: ["classification", "stereotype"] },
 ];
 
-const cardinality = (min: 0 | 1, max: "1" | "n") => `${min}..${max === "n" ? "*" : "1"}`;
+export const cardinality = (min: 0 | 1, max: "1" | "n") => `${min}..${max === "n" ? "*" : "1"}`;
 const present = (...xs: (string | null | undefined)[]): string[] => xs.filter((x): x is string => !!x && x.trim() !== "");
 const none = { entities: [], tables: [] } as const;
 
@@ -123,6 +131,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
       fields: { alias: present(e.alias), definition: present(e.definition_text), other: [] },
       marks: [],
       anchors: { entities: [e.id], tables: [] },
+      open: { param: "entity", value: e.id },
     });
   }
 
@@ -138,6 +147,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
       fields: { alias: present(a.alias), definition: present(a.definition_text), other: present(a.calc_rule) },
       marks: a.is_pii ? [{ t: "pii" }] : [],
       anchors: { entities: [a.entity_id], tables: [] },
+      open: { param: "row", value: a.id },
     });
   }
 
@@ -155,6 +165,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
       fields: { alias: present(r.from_role, r.to_role), definition: present(r.description), other: [] },
       marks: [],
       anchors: { entities: [...new Set([r.from_entity_id, r.to_entity_id])], tables: [] },
+      open: { param: "rel", value: r.id },
     });
   }
 
@@ -170,6 +181,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
       fields: { alias: [], definition: present(t.comment, t.note_text), other: [physicalName(system, t), ...(classesOf.get(t.id) ?? [])] },
       marks: gone(t),
       anchors: { entities: [], tables: [t.id] },
+      open: { param: "card", value: `source:${t.id}` },
     });
   }
 
@@ -188,6 +200,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
       fields: { alias: [], definition: present(c.comment, c.note_text), other: [physicalName(system, t, c), ...(classesOf.get(c.id) ?? [])] },
       marks: [...(pii ? [{ t: "pii" } as const] : []), ...gone(c)],
       anchors: { entities: [], tables: [t.id] },
+      open: { param: "row", value: c.id },
     });
   }
 
@@ -209,6 +222,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
       fields: { alias: [], definition: present(x.note_text), other: present(x.rule_expression) },
       marks: [{ t: "status", status: x.status }],
       anchors: { entities: [a.entity_id], tables: inputTables },
+      open: { param: "map", value: x.id },
     });
   }
 
@@ -222,7 +236,8 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
       definition: r.description_text,
       fields: { alias: [r.key], definition: present(r.description_text), other: present(r.expression, r.external_ref, r.owner_name) },
       marks: [{ t: "status", status: r.status }],
-      anchors: none,
+      anchors: { entities: [], tables: [], requirements: [r.id] },
+      open: { param: "req", value: r.id },
     });
   }
 
@@ -237,6 +252,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
       fields: { alias: present(c.code), definition: present(c.definition), other: [] },
       marks: [],
       anchors: none,
+      open: { tab: "conventions" },
     });
   }
 
@@ -251,6 +267,7 @@ export function coreCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): Cata
       fields: { alias: present(s.code), definition: present(s.definition), other: [] },
       marks: [],
       anchors: none,
+      open: { tab: "conventions" },
     });
   }
   return out;

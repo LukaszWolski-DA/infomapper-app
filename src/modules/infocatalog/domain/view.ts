@@ -13,6 +13,8 @@ export interface CatalogState {
   readonly q: string;
   readonly scope: Uuid | null;
   readonly kind: string;
+  /** The item open in the drawer (`{kind}:{workspaceId}:{id}`), or none. */
+  readonly item: string | null;
 }
 
 export interface CatalogRowView {

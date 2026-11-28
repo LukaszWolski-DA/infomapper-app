@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogOrganization, CatalogWorkspace } from "@/domain/permissions";
+import { parseItemRef } from "./item";
 import { addressOf, stateOf } from "./address";
 import { ALL_TAB } from "./search";
 import { markText, scopeOptions, shownTabs } from "./view";
@@ -30,11 +31,18 @@ describe("InfoCatalog's search page rules (slice 39, S39-03)", () => {
   });
 
   it("reads the state from the address leniently and writes only what differs", () => {
-    expect(stateOf({}, "o")).toEqual({ org: "o", q: "", scope: null, kind: ALL_TAB });
-    expect(stateOf({ q: "źródło", scope: A, kind: "attributes" }, "o")).toEqual({ org: "o", q: "źródło", scope: A, kind: "attributes" });
-    expect(stateOf({ q: ["a", "b"], scope: "not-an-id", kind: "<script>" }, "o")).toEqual({ org: "o", q: "", scope: null, kind: ALL_TAB });
+    expect(stateOf({}, "o")).toEqual({ org: "o", q: "", scope: null, kind: ALL_TAB, item: null });
+    expect(stateOf({ q: "źródło", scope: A, kind: "attributes" }, "o")).toEqual({ org: "o", q: "źródło", scope: A, kind: "attributes", item: null });
+    expect(stateOf({ q: ["a", "b"], scope: "not-an-id", kind: "<script>" }, "o")).toEqual({ org: "o", q: "", scope: null, kind: ALL_TAB, item: null });
     expect(stateOf({ q: "x".repeat(300) }, "o").q).toHaveLength(200);
-    expect(addressOf({ org: "o", q: "", scope: null, kind: ALL_TAB })).toBe("/catalog?org=o");
-    expect(addressOf({ org: "o", q: "customer address", scope: A, kind: "attributes" })).toBe(`/catalog?org=o&q=customer+address&scope=${A}&kind=attributes`);
+    expect(addressOf({ org: "o", q: "", scope: null, kind: ALL_TAB, item: null })).toBe("/catalog?org=o");
+    expect(addressOf({ org: "o", q: "customer address", scope: A, kind: "attributes", item: null })).toBe(`/catalog?org=o&q=customer+address&scope=${A}&kind=attributes`);
+    // slice 39, step 6: an item's own address (C7); an odd reference is kept, so the page answers "not found"
+    const item = `source_column:${A}:${A}`;
+    expect(stateOf({ item }, "o").item).toBe(item);
+    expect(addressOf({ org: "o", q: "", scope: null, kind: ALL_TAB, item })).toBe(`/catalog?org=o&item=${encodeURIComponent(item)}`);
+    expect(stateOf({ item: "nonsense" }, "o").item).toBe("nonsense");
+    expect(parseItemRef("nonsense")).toBeNull();
+    expect(parseItemRef(item)).toEqual({ kind: "source_column", workspaceId: A, id: A });
   });
 });

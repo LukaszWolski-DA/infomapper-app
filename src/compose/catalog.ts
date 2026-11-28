@@ -2,13 +2,16 @@
 // (`CatalogContribution`), joined here and applied after the port's read (`store.catalog.read`), so neither the data
 // layer nor InfoCatalog names a module. InfoCube gives its kinds; InfoDocumenter the documents that include an item.
 
+import { canvasesShowing } from "@/domain/catalog/canvases";
 import type { CatalogContribution, CatalogDocument, CatalogViewer } from "@/domain/catalog/contribution";
+import { coreCatalogDetails, type CatalogDetails, type DetailsInput } from "@/domain/catalog/details";
 import { CORE_TABS, coreCatalogItems, type CatalogItem, type CatalogTab } from "@/domain/catalog/items";
 import type { CatalogRead } from "@/domain/catalog/read";
 import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
 import type { ModuleTable } from "@/domain/types";
 import { ALL_TAB, catalogIndex, searchCatalog, type CatalogAnswer, type CatalogIndex } from "@/modules/infocatalog/domain/search";
-import { catalogView, shownTabs, type CatalogState, type CatalogView } from "@/modules/infocatalog/domain/view";
+import { catalogView, markText, shownTabs, type CatalogState, type CatalogView } from "@/modules/infocatalog/domain/view";
+import { OFF_CANVAS, offCanvasText, parseItemRef, type CatalogItemView } from "@/modules/infocatalog/domain/item";
 import { CUBE_CATALOG } from "@/modules/infocube/domain/catalog";
 import { DOCUMENTS_CATALOG } from "@/modules/infodocumenter/domain/catalog";
 import { getDataStore } from "@/data";
@@ -82,6 +85,70 @@ export async function catalogSearchView(userId: Uuid, unlocked: ReadonlySet<Uuid
   return catalogView(state, searchCatalog(index, state.q, state.kind), tabs, scope);
 }
 
+/** An item's details: InfoMapper's kinds, else the module whose kind it is. */
+function detailsOf(snapshot: WorkspaceSnapshot<ModuleTable>, item: CatalogItem, input: DetailsInput): CatalogDetails | null {
+  return coreCatalogDetails(snapshot, item, input) ?? CATALOG_CONTRIBUTIONS.map((c) => c.details?.(snapshot, item, input) ?? null).find((d) => d !== null) ?? null;
+}
+
+/**
+ * One item's drawer (S39-04, S39-05): read with its workspace's scope (the rights inside the port), its details, where
+ * it is shown, the documents that include it as the reader sees them (C4), the owners. Null, the page's "not found",
+ * for an item the person may not read or that does not exist; never another answer that would say it exists.
+ */
+export async function catalogItemView(userId: Uuid, unlocked: ReadonlySet<Uuid>, readable: readonly CatalogOrganization[], org: Uuid, refText: string): Promise<CatalogItemView | null> {
+  const ref = parseItemRef(refText);
+  const organization = readable.find((o) => o.id === org);
+  const workspace = ref && organization?.workspaces.find((w) => w.id === ref.workspaceId);
+  if (!ref || !organization || !workspace) return null;
+  const store = getDataStore(STORE_SCHEMA);
+  const read = await store.catalog.read(userId, unlocked, { organizationId: organization.id, workspaceId: workspace.id }, CATALOG_TABLES);
+  const snapshot = read?.snapshots[0];
+  if (!snapshot) return null;
+  const items = new Map(workspaceCatalogItems(snapshot).filter((i) => SHOWN_KINDS.has(i.kind)).map((i) => [`${i.kind}:${i.id}`, i]));
+  const item = items.get(`${ref.kind}:${ref.id}`);
+  if (!item) return null;
+  // a table's details name its system's last import (step 1, § 7): one more read, after the rights
+  const lastImports: Record<Uuid, string> = {};
+  if (item.kind === "source_table") {
+    const table = snapshot.model.sourceTables.find((t) => t.id === item.id);
+    const last = table ? (await store.model.listImports(workspace.id, table.source_system_id))[0] : undefined;
+    if (last && table) lastImports[table.source_system_id] = last.created_at;
+  }
+  const details = detailsOf(snapshot, item, { item: (kind, id) => items.get(`${kind}:${id}`), lastImports });
+  if (!details) return null;
+  const member = snapshot.members.find((m) => m.user_id === userId) ?? null;
+  const names = new Map(snapshot.people.map((p) => [p.id, p.display_name]));
+  return {
+    ref: refText,
+    kind: item.kind,
+    kindLabel: item.kindLabel,
+    id: item.id,
+    workspaceId: workspace.id,
+    name: item.name,
+    path: item.path,
+    workspace: { name: workspace.name, archived: workspace.archived, hasRole: workspace.hasRole },
+    marks: [...item.marks.map(markText), ...(workspace.archived ? [{ text: "Archived", tone: "plain" as const }] : [])],
+    details,
+    canvases: canvasesShowing(snapshot, item),
+    documents: catalogDocuments(snapshot, item, { userId, member }),
+    owners: snapshot.members.filter((m) => m.role === "owner").map((m) => names.get(m.user_id) ?? "someone").sort((a, b) => a.localeCompare(b, "en")),
+    homeTab: item.open && "tab" in item.open ? item.open.tab : null,
+  };
+}
+
+/**
+ * What a workspace's home says when "Open in InfoMapper" found the item on no canvas (S39-05, Q9: `?gone=off-canvas&item=
+ * {kind}:{id}`, the name read here, never carried in the address); null when the item is not there.
+ */
+export async function offCanvasNotice(workspaceId: Uuid, ref: string): Promise<string | null> {
+  const at = ref.indexOf(":");
+  if (at < 1) return null;
+  const snapshot = await getDataStore(STORE_SCHEMA).snapshot(workspaceId, CATALOG_TABLES);
+  const item = snapshot && workspaceCatalogItems(snapshot).find((i) => i.kind === ref.slice(0, at) && i.id === ref.slice(at + 1));
+  return item ? offCanvasText(item.name) : null;
+}
+
 // slice 39: what `src/app`'s catalog route reads of InfoCatalog (the address and the view), through the composition root
 export { addressOf, stateOf } from "@/modules/infocatalog/domain/address";
-export type { CatalogState, CatalogView };
+export { OFF_CANVAS };
+export type { CatalogItemView, CatalogState, CatalogView };
