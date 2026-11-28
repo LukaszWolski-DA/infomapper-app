@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { archived, ids, member, organization, organizationMember, T0, workspace } from "./__fixtures__/domain";
-import { catalogReadable, type CatalogRightsInput } from "./permissions";
+import { catalogReadable, opensCatalog, type CatalogRightsInput } from "./permissions";
 import type { OrganizationLicence } from "./types";
 
 const WS2 = "01900000-0000-7000-8000-000000000011";
@@ -87,5 +87,16 @@ describe("catalogReadable", () => {
     expect(out.map((o) => o.name)).toEqual(["InfoMate", "Retail Co"]);
     expect(out[0]!.workspaces[0]).toEqual({ id: ids.ws, organizationId: ids.org, name: "Retail Co – DWH", archived: false, infocube: true, hasRole: true });
     expect(out[1]!.workspaces[0]!.hasRole).toBe(false);
+  });
+});
+
+describe("opensCatalog (the top bar's All apps, S39-01)", () => {
+  it("needs the organization unlocked, licensed and the person its member; workspaces play no part", () => {
+    expect(opensCatalog(ids.org, base())).toBe(true);
+    expect(opensCatalog(ids.org, base({ workspaces: [], workspaceMembers: [] }))).toBe(true);
+    expect(opensCatalog(ids.org, base({ memberships: [] }))).toBe(false);
+    expect(opensCatalog(ids.org, base({ licences: [] }))).toBe(false);
+    expect(opensCatalog(ids.org, base({ unlocked: new Set() }))).toBe(false);
+    expect(opensCatalog(ids.otherOrg, base())).toBe(false);
   });
 });

@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getDataStore, isPostgresMode } from "@/data";
 import type { Uuid } from "@/domain/ids";
-import { can, checkCreateWorkspace, isArchived, isGuest } from "@/domain/permissions";
+import { can, checkCreateWorkspace, isArchived, isGuest, opensCatalog } from "@/domain/permissions";
 import type { AppUser, Workspace, WorkspaceMember, WorkspaceRole } from "@/domain/types";
 import { goneByMe } from "./gone-project";
 import { missingCanvasWay } from "./missing-canvas";
@@ -38,6 +38,8 @@ export interface ShellData {
   /** Whether "New workspace" (current organization) and "New project" are offered. The server checks again. */
   canCreateWorkspace: boolean;
   canCreateProject: boolean;
+  /** Slice 39 (S39-01): the top bar's "All apps", while the person reads this organization's InfoCatalog. */
+  allApps: boolean;
 }
 
 interface Where {
@@ -87,11 +89,12 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
   }
   const { workspace, member } = access;
 
-  const [organizations, myWorkspaces, myOrgMemberships, projects] = await Promise.all([
+  const [organizations, myWorkspaces, myOrgMemberships, projects, licences] = await Promise.all([
     store.organizations.listForUser(user.id),
     store.workspaces.listForUser(user.id),
     store.organizations.listMembershipsOfUsers([user.id]),
     store.projects.list(workspace.id),
+    store.organizations.listLicences(workspace.organization_id),
   ]);
   const organization = organizations.find((o) => o.id === workspace.organization_id);
   if (!organization) notFound();
@@ -164,6 +167,7 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
     canCreateWorkspace:
       checkCreateWorkspace(organization.id, myOrgMemberships.find((m) => m.organization_id === organization.id) ?? null) === null,
     canCreateProject: can({ workspace, member }, "project.create"),
+    allApps: opensCatalog(organization.id, { userId: user.id, unlocked, memberships: myOrgMemberships, licences }),
   };
 }
 

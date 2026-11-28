@@ -40,6 +40,7 @@ import { Select } from "@/ui/components/select";
 import { inputVariants } from "@/ui/components/input";
 import { MENU_CONTENT, MENU_ITEM, MENU_LABEL, MENU_SEPARATOR } from "@/ui/components/menu";
 import { toolButtonVariants } from "@/ui/components/tool-button";
+import { iconButtonVariants } from "@/ui/components/icon-button";
 
 /**
  * `savePair`: the save indicator and the server badge (slice 30), before the details panel's button, else before the
@@ -56,6 +57,9 @@ export function TopBar({ shell, tools, panelToggles = false, savePair = true }: 
       <div className="mr-1.5 whitespace-nowrap max-[1601px]:hidden">
         <b className="text-sm font-semibold">InfoMapper</b>
       </div>
+      {/* slice 39 (S39-01, C6): back to the landing zone, while the person reads this organization's InfoCatalog; on the
+          phone too. A fixed 28 px: the switchers give the room, down to their minimums */}
+      {shell.allApps && <AllApps />}
       <OrganizationSwitcher shell={shell} />
       <PathSep />
       <WorkspaceSwitcher shell={shell} />
@@ -75,6 +79,20 @@ export function TopBar({ shell, tools, panelToggles = false, savePair = true }: 
       {panelToggles && <PanelToggle side="right" />}
       <UserIndicator shell={shell} />
     </header>
+  );
+}
+
+/** "All apps" (slice 39): the prototype's four squares, a link to the landing zone. */
+export function AllApps() {
+  return (
+    <Link href="/" data-testid="button-all-apps" aria-label="All apps" title="All apps" className={cn(iconButtonVariants(), "flex-none hover:bg-im-hover hover:text-im-ink")}>
+      <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.4]" aria-hidden>
+        <rect x="2" y="2" width="4.5" height="4.5" rx="1" />
+        <rect x="9.5" y="2" width="4.5" height="4.5" rx="1" />
+        <rect x="2" y="9.5" width="4.5" height="4.5" rx="1" />
+        <rect x="9.5" y="9.5" width="4.5" height="4.5" rx="1" />
+      </svg>
+    </Link>
   );
 }
 

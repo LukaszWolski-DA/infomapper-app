@@ -228,14 +228,27 @@ const byName = <T extends { name: string; id: string }>(a: T, b: T) => (a.name <
  * the same rule. Organization owners and admins have no other way in. The organizations by name, each one's workspaces
  * by name; an organization with no readable workspace is listed with none (its tile still counts it).
  */
+/**
+ * Whether the person reads the organization's catalog at all (its workspaces aside): the organization unlocked, holding
+ * the live `infocatalog` licence, the person its member. The top bar's "All apps" shows by it (slice 39, S39-01).
+ */
+export function opensCatalog(
+  organizationId: Uuid,
+  input: Pick<CatalogRightsInput, "userId" | "unlocked" | "memberships" | "licences">,
+): boolean {
+  return (
+    input.unlocked.has(organizationId) &&
+    input.memberships.some((m) => m.organization_id === organizationId && m.user_id === input.userId) &&
+    input.licences.some((l) => l.organization_id === organizationId && l.deleted_at === null && l.module === "infocatalog")
+  );
+}
+
 export function catalogReadable(input: CatalogRightsInput): CatalogOrganization[] {
   const { userId } = input;
-  const member = new Set(input.memberships.filter((m) => m.user_id === userId).map((m) => m.organization_id));
-  const licensed = new Set(input.licences.filter((l) => l.deleted_at === null && l.module === "infocatalog").map((l) => l.organization_id));
   const roles = new Set(input.workspaceMembers.filter((m) => m.user_id === userId).map((m) => m.workspace_id));
   const out: CatalogOrganization[] = [];
   for (const o of [...input.organizations].sort(byName)) {
-    if (o.deleted_at !== null || !member.has(o.id) || !licensed.has(o.id) || !input.unlocked.has(o.id)) continue;
+    if (o.deleted_at !== null || !opensCatalog(o.id, input)) continue;
     const workspaces = input.workspaces
       .filter((w) => w.organization_id === o.id && w.deleted_at === null && (roles.has(w.id) || w.catalog_shown))
       .sort(byName)
