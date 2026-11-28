@@ -369,12 +369,18 @@ Each step ends with lint, typecheck, `npm test`, the touched specs as single fil
 6. **The drawer and Open in InfoMapper.** The drawer component, the keyboard, "← Back", the item's address, the Context
    lines, the documents (C4), Open in InfoMapper and "← Back to InfoCatalog", the no-role line, "not on any canvas";
    S39-04's and S39-05's specs.
-7. **The after checks.** `npm run ui:check` on the landing zone, the catalog and the drawer (1,280, 1,440 and 1,920 px
-   light and dark, 390 px), the bench, the timing on `dev:pg` with the demo and "Performance test" (never KB from a
-   spec), a full run.
+6a. **S8-06's race, fixed before step 7** (Łukasz, 28 November 2026): on its own branch `fix/s8-06-switcher-ready`
+   from `dev` (`b93ebe4`), the spec waits until the page is ready before it clicks the organization switcher, as PR 98
+   and PR 100 did; only the spec, unless the cause is in the app (then stop). S8-06 ten times alone, the file's specs, a
+   pull request into `dev`; Łukasz gives the merge command.
+7. **The after checks, without `dev:pg`.** `npm run ui:check` on the landing zone, the catalog and the drawer (1,280,
+   1,440 and 1,920 px light and dark, 390 px), the bench, a full run. ~~The timing on `dev:pg`~~ moves to 7b (Łukasz,
+   28 November 2026).
 7a. **Łukasz's migration and licence** (moved from step 3), one command at a time: `pg:backup` from `dev`;
    `pg:migrate -- --dry-run`, `pg:migrate`, `pg:backup` again and the counts compared (`scripts/kb-counts.ts` on both
    backups) from this branch; then `pg:licence -- grant "InfoMate" infocatalog` from this branch.
+7b. **The timing on `dev:pg`** (moved from step 7, Łukasz, 28 November 2026), after Łukasz's migration: the demo and
+   "Performance test" with the demo accounts, never KB.
 8. **Łukasz's acceptance** on `dev:pg` with the demo accounts (PRD § 6), with a workspace he makes without Anna and
    Piotr (C9). **Stop.**
 9. **Close.** D-91 and AD-41 and the notes (AD-05, AD-33, AD-35, D-58, D-89, D-90) quoted in full; CLAUDE.md (the third
@@ -818,3 +824,8 @@ the shell's navigation row, not the local adapter):
   [46149275415](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46149275415) passed it in 3 of 3 rounds.
   Parts' times 11:28, 11:01, 14:59, 12:28, 9:52, 13:25, 11:10, 13:31, 7:17, 5:28, 18:14; heap peaks 1,315, 1,410, 1,168,
   1,121, 1,231, **1,198 (part 6)**, 1,406, 1,194, 1,187, 1,456, 1,442 MB of 8,039 MB.
+
+**Łukasz (28 November 2026):** step 6's deviations 1 to 8 are accepted. 2, 3, 4 and 6 are Łukasz's; 1, 5, 7 and 8 are
+Claude's technical calls, quoted at the closing. Two changes to the plan (§ 12): S8-06's race is fixed before step 7 on
+its own branch (6a); the timing on `dev:pg` moves after his migration (7b), so step 7 is ui:check, the bench and a full
+run.
