@@ -7,7 +7,7 @@ import type { Uuid } from "@/domain/ids";
 import type { CatalogOrganization } from "@/domain/permissions";
 import type { Workspace } from "@/domain/types";
 import { CatalogLanding, type LandingProps } from "@/modules/infocatalog/app/landing";
-import { CatalogPage } from "@/modules/infocatalog/app/catalog-page";
+import { CatalogPage, type CatalogPageProps } from "@/modules/infocatalog/app/catalog-page";
 import { CATALOG_TABLES, catalogItemCount } from "./catalog";
 export { catalogReadableFor } from "./catalog";
 import { STORE_SCHEMA } from "./tables";
@@ -43,6 +43,6 @@ export async function LandingPage({ user, unlocked, readable, workspaces, last }
   );
 }
 
-export function CatalogHome({ user, organization }: { user: PlatformUser; organization: CatalogOrganization }) {
-  return <CatalogPage user={user} organization={{ id: organization.id, name: organization.name }} />;
+export function CatalogHome(props: Omit<CatalogPageProps, "organization"> & { organization: CatalogOrganization }) {
+  return <CatalogPage {...props} organization={props.organization} />;
 }
