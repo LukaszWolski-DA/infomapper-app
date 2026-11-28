@@ -590,8 +590,108 @@ changed here: a race in an earlier spec is fixed on its own `fix/` branch (The s
 `fixes/session-change-full-load`, S38-02, S6A-10, S16-08, S38-06, S30-09-room and S4P-09 (all passed, S8-06 after the
 flake above, 3 of 3).
 
+**Łukasz's answers (28 November 2026):** step 4's deviations 1 to 6 are accepted, as Claude's technical calls, quoted
+at the closing. **The S8-06 flake stays for its own `fix/` branch after this slice.** What was found: in its first test,
+after the organization-link form for Retail Co (`panel-organization-link`), the spec waits for the address of Sales
+analytics only (`toHaveURL`) and then clicks `switcher-organization`. The form leaves by a full page load
+(`afterSessionChange`, `window.location.assign`), so the address matches as soon as the new document starts, before React
+has hydrated the top bar; a click in that moment reaches a button with no handler yet, the Radix menu never opens, and
+`menu-item-organization` times out after 60 s (the trace's page snapshot: the switcher focused, no menu). The fix is in
+the spec: wait for the page to be hydrated (slice 9's `hydrated`, or slice 8's `landed` with its enabled Back button)
+before the click. It failed once in a batch of 27 tests run together on the laptop and passed alone three times of
+three and in step 4's full run; no code of this slice is on that path (its seed holds no licence).
+
 **Step 4's full run:** [run 46127222726](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46127222726)
 on `f192bef`: success, 938 passed (step 3's 930 and S39-01's 8), 16 skipped, 0 failed, 0 flaky (S8-06 included);
 wall clock 15.5 min (08:44:41 to 09:00:10 UTC); the longest parts 1 (14.1 min), 3 (13.5 min) and 11 (13.4 min); part 6's
 heap peak 1,193 MB of 8,039 MB (step 3's run: 1,843 MB), no restart. Part 11 is not the longest in this run, so the recut
 rule asks nothing yet.
+
+**Łukasz's answers (28 November 2026):** step 4's deviations 1 to 6 are accepted, as Claude's technical calls, quoted
+at the closing; the S8-06 flake stays for its own `fix/` branch after this slice (what was found: above).
+
+## Step 5: search (28 November 2026)
+
+**Built:**
+- **`/catalog`** (`src/app/catalog/page.tsx`) renders the search's first answer on the server from the address
+  (`/catalog?org=…&q=…&scope=…&kind=…`, C7; `src/modules/infocatalog/domain/address.ts`: `stateOf`, read leniently, the
+  query cut at 200 characters, and `addressOf`); an organization or a workspace the person does not read is not found.
+  The browser asks again through `catalogSearchAction` (`src/app/catalog/actions.ts`) 150 ms after the last keystroke, or
+  at once for the scope and a tab; an older answer is dropped; the address follows with `history.replaceState` (no
+  navigation), so a reload shows the same search. Both run `catalogSearchView` (`src/compose/catalog.ts`): the rights in
+  the catalog index, one read, the index, the search and the page's view (`src/modules/infocatalog/domain/view.ts`).
+- **The page** (`src/modules/infocatalog/app/catalog-page.tsx`, layout B): the platform's bar (the apps button,
+  "InfoCatalog" with the organization, or the organization's select when more than one is licensed, the account); one
+  centred column of at most 1,100 px; the search field (the shared `Input`'s new `search` size, 52 px, radius 12, with a
+  magnifier; "/" puts the cursor in it outside a text field); the scope (`Select`: "Whole
+  organization (n workspaces)", "Workspace: {name}", archived ones "· Archived"); the kind tabs (`tabsListVariants` and
+  `tabVariants` with `TAB_COUNT`): "All" first, then InfoMapper's nine, then a module's where it is on in a workspace in
+  scope (`CatalogContribution.on`; InfoCube's five), a kind with no result disabled, the active tab clicked again back to
+  "All"; the results as a plain table (Item with the one-line definition, Kind, Details, Workspace when more than one is
+  in scope, Marks: "Personal data", a status, "Missing", "Retired", "Archived"), the matches as `<mark>` from the domain's
+  ranges, stacked below 900 px; "{n} results" above, "{n} more: narrow the search" below the first 200; an empty field:
+  "What are you looking for?", the prototype's six example searches and "Browse all {kind}" per tab with its count;
+  nothing found: the prototype's "Nothing found" and its line.
+- **Items** carry their kind's label (`CatalogItem.kindLabel`: "Source table", "View", "File", "Dimensional mapping" …).
+- **`ui:check`** (`scripts/ui-check.ts`): its own data file gives InfoMate the licence, the sign-in waits for the landing
+  zone or the top bar, and five screens: `landing`, `catalog-empty`, `catalog-search`, `catalog-long` and
+  `catalog-workspace`.
+- **Specs:** `S39-03.spec.ts` (eight tests: "/" and a search across the layers with the ranking, the highlight and a
+  reload; every word and nothing found; Polish letters; long names at 1,280 and 390 px; the tabs and InfoCube's; the
+  scope; the marks and the empty field; the first 200 and the rest) and `S39-02.spec.ts` (Anna with a role; a member
+  without a role, the switch off, on and off again, by the results, the scope list, the address and the landing tile's
+  count; Kasia the guest). Unit tests: `src/modules/infocatalog/domain/view.test.ts`.
+
+**Deviations (for Łukasz):**
+1. **The search runs on the server per request through a server action** (`catalogSearchAction`), the address kept with
+   `history.replaceState`: C1 and C7 as built. The page itself renders the first answer, so a reload or a link shows the
+   same search without a request from the browser.
+2. **"{n} results" above the table** (the prototype's summary, without its Markdown button) and **"Nothing found"** with
+   the prototype's line; the PRD names neither.
+3. **A kind with no result is disabled and stays in the row** (as Łukasz's step 5 instruction says); the prototype's
+   layout B hides it.
+4. **The example searches are the prototype's six** whatever the model holds; a search that finds nothing in a model
+   says so.
+5. **The rows are not clickable yet:** the drawer is step 6.
+6. **The organization's select reloads the page** with that organization (a new state: no words, the whole
+   organization, "All").
+7. **The shared `Input` has a new size, `search`** (52 px, radius 12), the look of the prototype's search field; layout
+   classes stay at the call.
+8. **`ui:check`'s own data file now holds InfoMate's licence**, so "All apps" shows on every screen it checks (the
+   landing zone and the catalog need it); its sign-in waits for the landing zone or the top bar.
+9. **For the specs** the page's `<main>` says which answer it shows (`data-query`, `data-kind`, `data-scope`): the
+   address changes before the answer arrives, so a spec waits for the answer, not the address.
+
+**The bench** (`npx tsx scripts/bench-catalog.ts`, with `BENCH_PG` a Postgres 18.3 cluster on 127.0.0.1, medians of
+9; the model of step 1: 5,626 items for 4,871, 21,904 for four times that; "the page's search" is `catalogSearchView`,
+what one request of the page runs less the session):
+
+| | 4,871, local | 4,871, Postgres | 4 ×, local | 4 ×, Postgres |
+| --- | --- | --- | --- | --- |
+| `catalog.read` | 6.7 ms | 88.6 ms (38 statements) | 67.4 ms | 292.6 ms (38 statements) |
+| the index | 32.9 ms | 24.2 ms | 64.4 ms | 63.3 ms |
+| a search ("customer" / "a" / "qqqq") | 4.2 / 3.5 / 0.3 ms | 3.0 / 3.8 / 0.4 ms | 4.6 / 12.8 / 1.6 ms | 5.1 / 12.7 / 1.8 ms |
+| **the page's search** ("customer" / "a") | **34.6 / 32.8 ms** | **111.2 / 120.9 ms** | **130.5 / 137.1 ms** | **379.1 / 388.6 ms** |
+
+Within the 1 s bar with room on a local database at four times the size; online each of the 38 statements is a round
+trip (step 7 measures it on `dev:pg` and the preview).
+
+**`ui:check`** (`npm run ui:check -- --label s39-step5 --only landing,catalog --widths 1280,1920,390`, the five screens at
+1,280 and 1,920 px light and dark and at 390 px light, 25 views): the first run found two spills on `catalog-empty` at
+1,280 and 1,920 px ("Browse all classifications and stereotypes" and "Browse all dimensional mappings" wider than their
+170 px cells; fixed: the label wraps) and a timeout on `catalog-long` (the demo has under 200 attributes; the screen is
+now a search for "e" over every kind). The second run: **no overlap, no spill, no crowded words, nothing past the edge,
+no small target, no cut text** on 24 views; `catalog-workspace` at 390 px stopped once on a navigation abort (no finding)
+and was clean on its own run (`s39-step5-390`). Reports: `.data/ui-check/s39-step5-20261128-1042/` and
+`.data/ui-check/s39-step5-390-20261128-1044/`.
+
+**Checks:** lint and typecheck clean; `npm test` 225 files, 2,676 passed, 18 skipped (the own-model guard caught a test
+that used "KB" as an example name; renamed, and the bench names no organization); `e2e/slice-39` as single files: 23
+passed (S39-01 5, S39-01-room 3, S39-02 3, S39-02-switch 4, S39-03 8). No full run in this step (C10): nothing here
+touched the local adapter, the undo, the save chain or the canvas.
+
+**To see the search locally** (the shared checkout on `slice/39-infocatalog-entry-and-search`; the demo's own file
+`.data/demo-db.json`, never `.data/dev-db.json`): `npm run demo` (it seeds the file if it is missing; http://127.0.0.1:3001),
+then in another terminal `npx tsx scripts/licence.ts grant "InfoMate" infocatalog --file .data/demo-db.json`; sign in as
+Łukasz: the landing zone, then "Open InfoCatalog". `npm run demo -- --reset` starts the demo afresh (the licence again
+after it).
