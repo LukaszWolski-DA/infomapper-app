@@ -6,6 +6,7 @@ import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import type { CatalogOrganization } from "@/domain/permissions";
 import type { Workspace } from "@/domain/types";
+import type { ReactNode } from "react";
 import { CatalogLanding, type LandingProps } from "@/modules/infocatalog/app/landing";
 import { CatalogPage, type CatalogPageProps } from "@/modules/infocatalog/app/catalog-page";
 import { CATALOG_TABLES, catalogItemCount } from "./catalog";
@@ -28,18 +29,23 @@ export interface LandingInput {
   /** The workspaces the person has a role in, in unlocked organizations (InfoMapper's tile). */
   workspaces: readonly Workspace[];
   last: Workspace | undefined;
+  /** Rendered last, after the page's reads (slice 39, step 7b: the app's `<TimingRecord />`, AD-37). */
+  timing?: ReactNode;
 }
 
-export async function LandingPage({ user, unlocked, readable, workspaces, last }: LandingInput) {
+export async function LandingPage({ user, unlocked, readable, workspaces, last, timing }: LandingInput) {
   const organization = catalogOrganization(readable, null, last)!;
   const read = organization.workspaces.length ? await getDataStore(STORE_SCHEMA).catalog.read(user.id, unlocked, { organizationId: organization.id, workspaceId: null }, CATALOG_TABLES) : null;
   return (
-    <CatalogLanding
-      user={user}
-      firstName={user.name.trim().split(/\s+/)[0] ?? user.name}
-      mapper={{ workspaces: workspaces.length, last: last?.name ?? workspaces[0]?.name ?? null }}
-      catalog={{ organization: organization.name, organizationId: organization.id, items: catalogItemCount(read), workspaces: organization.workspaces.length }}
-    />
+    <>
+      <CatalogLanding
+        user={user}
+        firstName={user.name.trim().split(/\s+/)[0] ?? user.name}
+        mapper={{ workspaces: workspaces.length, last: last?.name ?? workspaces[0]?.name ?? null }}
+        catalog={{ organization: organization.name, organizationId: organization.id, items: catalogItemCount(read), workspaces: organization.workspaces.length }}
+      />
+      {timing}
+    </>
   );
 }
 

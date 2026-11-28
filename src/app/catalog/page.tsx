@@ -13,6 +13,7 @@ import { catalogItemView, catalogSearchView, stateOf } from "@/compose/catalog";
 import { getDataStore, isPostgresMode } from "@/data";
 import { LAST_WORKSPACE_COOKIE } from "../_lib/preferences";
 import { getSession } from "../_lib/session";
+import { TimingRecord } from "../_lib/timing";
 import { catalogItemAction, catalogSearchAction } from "./actions";
 
 type Params = Record<string, string | string[] | undefined>;
@@ -36,14 +37,18 @@ export default async function Catalog({ searchParams }: { searchParams: Promise<
   const item = state.item ? await catalogItemView(user.id, session.unlocked, readable, organization.id, state.item) : null;
   if (state.item && !item) notFound();
   return (
-    <CatalogHome
-      user={{ name: user.display_name, email: user.email, online: isPostgresMode() }}
-      organization={organization}
-      organizations={readable.map((o) => ({ id: o.id, name: o.name }))}
-      view={view}
-      search={catalogSearchAction}
-      item={item}
-      openItem={catalogItemAction}
-    />
+    <>
+      <CatalogHome
+        user={{ name: user.display_name, email: user.email, online: isPostgresMode() }}
+        organization={organization}
+        organizations={readable.map((o) => ({ id: o.id, name: o.name }))}
+        view={view}
+        search={catalogSearchAction}
+        item={item}
+        openItem={catalogItemAction}
+      />
+      {/* slice 39, step 7b: the page's timing record, last (AD-37; INFOMAPPER_TIMING=1 only) */}
+      <TimingRecord />
+    </>
   );
 }

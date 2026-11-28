@@ -6,6 +6,7 @@ import { signOut } from "./_actions/session";
 import { workspaceHref } from "./_lib/paths";
 import { LAST_WORKSPACE_COOKIE } from "./_lib/preferences";
 import { getSession } from "./_lib/session";
+import { TimingRecord } from "./_lib/timing";
 import { cn } from "@/ui/lib/utils";
 import { buttonVariants } from "@/ui/components/button";
 
@@ -31,6 +32,7 @@ export default async function Landing({ searchParams }: { searchParams: Promise<
           readable={readable}
           workspaces={workspaces}
           last={workspaces.find((w) => w.id === last)}
+          timing={<TimingRecord />}
         />
       );
     }
