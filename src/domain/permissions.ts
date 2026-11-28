@@ -3,7 +3,7 @@
 
 import { ARCHIVED_MESSAGE, domainError, notFound, type DomainError } from "./errors";
 import type { Uuid } from "./ids";
-import type { Organization, OrganizationMember, Workspace, WorkspaceMember, WorkspaceRole } from "./types";
+import type { Organization, OrganizationLicence, OrganizationMember, Workspace, WorkspaceMember, WorkspaceRole } from "./types";
 
 export const WORKSPACE_ACTIONS = [
   "workspace.view",
@@ -183,6 +183,79 @@ export function isGuest(
   organizationMembers: readonly OrganizationMember[],
 ): boolean {
   return !organizationMembers.some((m) => m.organization_id === workspace.organization_id && m.user_id === userId);
+}
+
+// ---- InfoCatalog (slice 39, A1.2 guardrail 2, A2.1, A2.3, S39-02) ----
+
+/** A workspace a person reads in InfoCatalog: read only, with or without a role in it. */
+export interface CatalogWorkspace {
+  readonly id: Uuid;
+  readonly organizationId: Uuid;
+  readonly name: string;
+  readonly archived: boolean;
+  /** InfoCube's switch: its kinds are searched only where it is on. */
+  readonly infocube: boolean;
+  /** Whether the person has a role (any) in it; without one they read it because its switch is on. */
+  readonly hasRole: boolean;
+}
+
+/** An organization whose catalog a person reads, with the workspaces they may read, by name. */
+export interface CatalogOrganization {
+  readonly id: Uuid;
+  readonly name: string;
+  readonly workspaces: readonly CatalogWorkspace[];
+}
+
+/** What the rule reads: the person's rows and their organizations' (any extra rows are ignored). */
+export interface CatalogRightsInput {
+  readonly userId: Uuid;
+  /** The organizations the session has unlocked (online: every one of the person's, D-58's note). */
+  readonly unlocked: ReadonlySet<Uuid>;
+  readonly organizations: readonly Organization[];
+  readonly memberships: readonly OrganizationMember[];
+  readonly licences: readonly OrganizationLicence[];
+  readonly workspaces: readonly Workspace[];
+  readonly workspaceMembers: readonly WorkspaceMember[];
+}
+
+const byName = <T extends { name: string; id: string }>(a: T, b: T) => (a.name < b.name ? -1 : a.name > b.name ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/**
+ * May read the catalog (one rule, derived from stored rows, nothing stored for it): a person reads a workspace in
+ * InfoCatalog when its organization is live, unlocked in the session and holds the `infocatalog` licence, the person is
+ * a member of the organization (never a guest: a guest's role in a workspace of it gives no catalog), and the workspace
+ * is live and either the person has a role in it or its switch "Shown in InfoCatalog" is on. Archived workspaces follow
+ * the same rule. Organization owners and admins have no other way in. The organizations by name, each one's workspaces
+ * by name; an organization with no readable workspace is listed with none (its tile still counts it).
+ */
+/**
+ * Whether the person reads the organization's catalog at all (its workspaces aside): the organization unlocked, holding
+ * the live `infocatalog` licence, the person its member. The top bar's "All apps" shows by it (slice 39, S39-01).
+ */
+export function opensCatalog(
+  organizationId: Uuid,
+  input: Pick<CatalogRightsInput, "userId" | "unlocked" | "memberships" | "licences">,
+): boolean {
+  return (
+    input.unlocked.has(organizationId) &&
+    input.memberships.some((m) => m.organization_id === organizationId && m.user_id === input.userId) &&
+    input.licences.some((l) => l.organization_id === organizationId && l.deleted_at === null && l.module === "infocatalog")
+  );
+}
+
+export function catalogReadable(input: CatalogRightsInput): CatalogOrganization[] {
+  const { userId } = input;
+  const roles = new Set(input.workspaceMembers.filter((m) => m.user_id === userId).map((m) => m.workspace_id));
+  const out: CatalogOrganization[] = [];
+  for (const o of [...input.organizations].sort(byName)) {
+    if (o.deleted_at !== null || !opensCatalog(o.id, input)) continue;
+    const workspaces = input.workspaces
+      .filter((w) => w.organization_id === o.id && w.deleted_at === null && (roles.has(w.id) || w.catalog_shown))
+      .sort(byName)
+      .map((w) => ({ id: w.id, organizationId: o.id, name: w.name, archived: w.archived_at !== null, infocube: w.infocube, hasRole: roles.has(w.id) }));
+    out.push({ id: o.id, name: o.name, workspaces });
+  }
+  return out;
 }
 
 function roleWithArticle(role: WorkspaceRole): string {

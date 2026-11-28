@@ -9,6 +9,7 @@ import { deleteRelationshipAction, swapRelationshipAction, updateRelationshipAct
 import { useModules } from "@/app/_components/modules";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
+import { relationshipSentences } from "@/domain/model/relationship-sentences";
 import type { CardinalityMax, CardinalityMin, Relationship } from "@/domain/types";
 import { Actions, ConfirmDelete, Field, fieldKey, Kind, Seg, TextField } from "./fields";
 import { buttonVariants } from "@/ui/components/button";
@@ -24,12 +25,6 @@ const CARDS = [
   ["1,n", "1..*"],
 ] as const;
 type Card = (typeof CARDS)[number][0];
-
-const phrase = (min: CardinalityMin, max: CardinalityMax) =>
-  max === "n" ? (min ? "one or more" : "zero or more") : min ? "exactly one" : "zero or one";
-
-/** " as {role}" after the entity a role belongs to (slice 15b, RP-A, R-1); nothing without one. */
-const as = (role: string | null) => (role?.trim() ? ` as ${role.trim()}` : "");
 
 /**
  * The role fields' labels (slice 15b, R2): "Role of {entity}"; on a relationship to itself the cardinality fields' words
@@ -50,6 +45,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
   const to = p.ix.entity.get(r.to_entity_id)?.name ?? "?";
   const ref = (expectedVersion: number) => ({ relationshipId: r.id, expectedVersion });
   const self = r.from_entity_id === r.to_entity_id;
+  const sentences = relationshipSentences(r, from, to);
   const lookups = useModules().relationshipDeletes[r.id]?.then;
 
   const save = (change: Omit<Parameters<typeof updateRelationshipAction>[1], "relationshipId" | "expectedVersion">) =>
@@ -68,14 +64,8 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
         {from} and {to}
       </h2>
       <div className="mt-2.5 rounded-md bg-im-hover px-3 py-2.5 text-[12.5px]" data-testid="relationship-sentences">
-        <p>
-          Each {from} {r.label || "is related to"} {phrase(r.to_min, r.to_max)} {to}
-          {as(r.to_role)}.
-        </p>
-        <p className="mt-1">
-          Each {to} belongs to {phrase(r.from_min, r.from_max)} {from}
-          {as(r.from_role)}.
-        </p>
+        <p>{sentences[0]}</p>
+        <p className="mt-1">{sentences[1]}</p>
       </div>
       <Field label="Verb phrase" htmlFor="f-rl">
         <TextField

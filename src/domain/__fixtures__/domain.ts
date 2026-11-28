@@ -134,6 +134,7 @@ export const workspace = (over: Partial<Workspace> = {}): Workspace => ({
   four_eyes: false,
   infocube: false,
   infodoc: false,
+  catalog_shown: false,
   naming_conventions: null,
   archived_at: null,
   archived_by: null,

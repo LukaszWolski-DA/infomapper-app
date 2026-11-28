@@ -17,6 +17,8 @@ export const inputVariants = cva(FIELD_LOOK, {
       // `min-h`, not `h`: a text area drawn with the same look grows with its text
       md: "min-h-control-md px-2.5 py-[5px] text-body",
       sm: "min-h-control-sm px-2 py-[3px] text-[12.5px] leading-5",
+      // slice 39: InfoCatalog's search field (the prototype's `.pf-sfield`), 52 px, radius 12, room for its magnifier
+      search: "min-h-[52px] rounded-lg pl-11 pr-3 text-[16.5px]",
     },
   },
   defaultVariants: { size: "md" },

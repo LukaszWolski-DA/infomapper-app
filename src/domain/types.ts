@@ -62,8 +62,8 @@ export interface OrganizationMember {
   created_at: Timestamp;
 }
 
-/** The modules an organization may hold a licence for (slice 15a, C-7, AD-35; InfoDocumenter since slice 25). */
-export const LICENSED_MODULES = ["infocube", "infodoc"] as const;
+/** The modules an organization may hold a licence for (slice 15a, C-7, AD-35; InfoDocumenter since slice 25, InfoCatalog since slice 39). */
+export const LICENSED_MODULES = ["infocube", "infodoc", "infocatalog"] as const;
 export type LicensedModule = (typeof LICENSED_MODULES)[number];
 
 /**
@@ -105,6 +105,11 @@ export interface Workspace extends VersionedColumns {
    * any time; its documents are kept while it is off.
    */
   infodoc: boolean;
+  /**
+   * Shown in InfoCatalog to everyone in the organization (slice 39, A2.3): off by default; the workspace's members find
+   * it there either way. No module switch: InfoCatalog has none per workspace.
+   */
+  catalog_shown: boolean;
   archived_at: Timestamp | null;
   archived_by: Uuid | null;
   requirement_key_next: number;

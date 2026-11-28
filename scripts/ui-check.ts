@@ -26,6 +26,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from "@playwri
 import { addSeedDemoData } from "../src/compose/seed";
 import { resetDevData } from "../src/data/local/dev-data";
 import { SEED_IDS } from "../src/data/local/seed";
+import { uuidv7 } from "../src/domain/ids";
 import type { DevDb } from "../src/data/local/schema";
 import { GROUPS, describe, isCutWithoutEllipsis, kinds, overlaps, pastTheEdge, smallTargets, spilling, crowdedTexts, type Control, type KindCount, type TextBox } from "./lib/ui-check-rules";
 
@@ -353,6 +354,27 @@ function screens(ids: Ids, wsTabs: readonly string[], leftTabs: readonly string[
       },
     },
     { id: "editor", path: `${w}/d/${ids.document}`, ready: '[data-testid="page-document-editor"]' },
+    // slice 39: the landing zone and InfoCatalog's search (empty, a search, a long list past the first 200)
+    { id: "landing", path: "/", ready: '[data-testid="page-landing"]' },
+    { id: "catalog-empty", path: `/catalog?org=${SEED_IDS.orgInfoMate}`, ready: '[data-testid="box-catalog-empty"]' },
+    { id: "catalog-search", path: `/catalog?org=${SEED_IDS.orgInfoMate}&q=customer`, ready: '[data-testid="row-catalog-result"]' },
+    { id: "catalog-long", path: `/catalog?org=${SEED_IDS.orgInfoMate}&q=e`, ready: '[data-testid="row-catalog-result"]' },
+    { id: "catalog-workspace", path: `/catalog?org=${SEED_IDS.orgInfoMate}&q=customer&scope=${ids.ws}`, ready: '[data-testid="row-catalog-result"]' },
+    // slice 39, step 6: the details drawer over the results (an entity with its context; a source table's facts)
+    ...(["entity", "source_table"] as const).map((kind) => ({
+      id: `catalog-drawer-${kind === "entity" ? "entity" : "table"}`,
+      path: `/catalog?org=${SEED_IDS.orgInfoMate}&q=customer&scope=${ids.ws}`,
+      ready: '[data-testid="row-catalog-result"]',
+      then: async (page: Page) => {
+        await page.locator(`[data-testid="row-catalog-result"][data-kind="${kind}"]`).first().click();
+        await page.locator('[data-testid="details-catalog-item"]:not([aria-busy])').waitFor();
+        // slid in: its right edge at the window's
+        await page.waitForFunction(() => {
+          const d = document.querySelector('[data-testid="drawer-catalog"]');
+          return !!d && Math.round(d.getBoundingClientRect().right) === window.innerWidth;
+        });
+      },
+    })),
     // slice 37, step 6: the Markdown dialog and the list of section types
     {
       id: "editor-markdown",
@@ -535,7 +557,8 @@ async function signIn(context: BrowserContext, base: string): Promise<Page> {
   const page = await context.newPage();
   await page.goto(`${base}/sign-in`, { timeout: 180_000 });
   await page.getByTestId("button-dev-user").filter({ hasText: "Łukasz" }).click();
-  await page.getByTestId("bar-top").waitFor({ timeout: 120_000 });
+  // slice 39: with InfoCatalog's licence the sign-in lands on the landing zone
+  await page.locator('[data-testid="bar-top"], [data-testid="page-landing"]').first().waitFor({ timeout: 120_000 });
   return page;
 }
 
@@ -786,6 +809,10 @@ async function main() {
   await resetDevData(DATA, (d) => {
     addSeedDemoData(d);
     longNames(d, named(d, "workspace", "Retail Co – DWH").id);
+    // slice 39: InfoMate holds InfoCatalog's licence in the check's own file, for the landing zone and the search
+    const at = new Date().toISOString();
+    const owner = SEED_IDS.userLukasz;
+    d.organization_licence.push({ id: uuidv7(), version: 1, created_at: at, created_by: owner, updated_at: at, updated_by: owner, deleted_at: null, organization_id: SEED_IDS.orgInfoMate, module: "infocatalog" });
     db = d;
   });
   const ids = idsOf(db!);

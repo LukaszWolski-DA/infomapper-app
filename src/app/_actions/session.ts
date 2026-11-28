@@ -10,6 +10,7 @@ import { getDataStore, isPostgresMode, type DataStore } from "@/data";
 import { scryptHasher } from "@/data/password";
 import { normalizeEmail } from "@/domain/commands/organization";
 import { isUuid, type Uuid } from "@/domain/ids";
+import { catalogReadableFor } from "@/compose/catalog";
 import { safeReturnPath } from "@/domain/return-path";
 import { isDevSignInEnabled } from "../_lib/dev-session";
 import { workspaceHref } from "../_lib/paths";
@@ -112,6 +113,8 @@ export async function signInWithPasswordAction(input: {
   const inOrganization = new Set(workspaceIds);
   const back = safeReturnPath(input.next, inOrganization);
   if (back) return { ok: true, value: { href: back } };
+  // slice 39 (S39-01): the landing zone's rule, as `/` has it: with an organization's InfoCatalog read, the landing zone
+  if ((await catalogReadableFor(user.id, new Set(unlocked))).length) return { ok: true, value: { href: "/" } };
   const last = (await cookies()).get(LAST_WORKSPACE_COOKIE)?.value;
   return { ok: true, value: { href: workspaceHref(last && inOrganization.has(last) ? last : workspaceIds[0]!) } };
 }

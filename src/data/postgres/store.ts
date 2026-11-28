@@ -20,6 +20,9 @@ import {
 import { newestBaselineFirst } from "@/domain/baseline/names";
 import type { Baseline, ModuleTable, WritableRows } from "@/domain/types";
 import { shapedBaselineContent } from "../baselines";
+import { catalogReadOf } from "../catalog";
+import { CATALOG_WITH_DELETED, CATALOG_WORKSPACE_TABLES } from "@/domain/catalog/read";
+import { catalogReadable, type CatalogRightsInput } from "@/domain/permissions";
 import { CORE_SCHEMA } from "../local/schema";
 import { newestImportFirst, oldestChangeFirst } from "../order";
 import type { DataStore } from "../ports";
@@ -68,6 +71,26 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
     return rows;
   };
   const inTransaction = <T>(work: (db: Queryable) => Promise<T>) => readTransaction(pool, work);
+
+  /** A table's rows of several workspaces in one statement (slice 39, C1), deleted ones included unless `live`. */
+  const ofWorkspaces = (db: Queryable, table: string, ids: readonly Uuid[], live: boolean) =>
+    readTable(db, schema, table, { where: live ? "workspace_id = any($1::uuid[]) and deleted_at is null" : "workspace_id = any($1::uuid[])", params: [[...ids]] });
+
+  /** What `catalogReadable` reads: the person's memberships and their organizations' licences and workspaces. */
+  const catalogRights = async (db: Queryable, userId: Uuid, unlocked: ReadonlySet<Uuid>): Promise<CatalogRightsInput> => {
+    const memberships = await readTable(db, schema, "organization_member", { where: "user_id = $1", params: [userId] });
+    const orgIds = memberships.map((m) => (m as { organization_id: Uuid }).organization_id);
+    const ofOrgs = (table: string) => readTable(db, schema, table, { where: "organization_id = any($1::uuid[])", params: [orgIds] });
+    return {
+      userId,
+      unlocked,
+      memberships: memberships as never,
+      organizations: (await readTable(db, schema, "organization", { where: "id = any($1::uuid[])", params: [orgIds] })) as never,
+      licences: (await ofOrgs("organization_licence")) as never,
+      workspaces: (await ofOrgs("workspace")) as never,
+      workspaceMembers: (await readTable(db, schema, "workspace_member", { where: "user_id = $1", params: [userId] })) as never,
+    };
+  };
 
   /** The live rows the link guards read: the link table, its owner table and the five targets. */
   const linkRows = (workspaceId: Uuid, owner: "requirement" | "label", links: "requirement_link" | "label_link") =>
@@ -128,6 +151,30 @@ export function createPostgresDataStore(schema: StoreSchema = CORE_SCHEMA): Data
           [workspaceId, baselineId],
         );
         return rows[0] ? shapedBaselineContent(rows[0].snapshot, rows[0].snapshot_schema, schema) : null;
+      },
+    },
+
+    // slice 39 (C1): the rights and the rows in one read-only transaction; the rows of every readable workspace in scope
+    // with one statement per table (`workspace_id = any($1)`), never a workspace the person may not read
+    catalog: {
+      readable: async (userId, unlocked) => inTransaction(async (db) => catalogReadable(await catalogRights(db, userId, unlocked))),
+      read: async (userId, unlocked, scope, tables) => {
+        for (const table of tables) moduleTable(table);
+        return inTransaction(async (db) => {
+          const readable = catalogReadable(await catalogRights(db, userId, unlocked));
+          const organization = readable.find((o) => o.id === scope.organizationId);
+          const ids = organization?.workspaces.map((w) => w.id).filter((id) => scope.workspaceId === null || id === scope.workspaceId) ?? [];
+          if (!ids.length) return catalogReadOf({}, readable, scope, {} as never);
+          const rows: Rows = {
+            workspace: await readTable(db, schema, "workspace", { where: "id = any($1::uuid[])", params: [ids] }),
+            organization: await readTable(db, schema, "organization", { where: "id = $1", params: [scope.organizationId] }),
+            app_user: await readTable(db, schema, "app_user", { where: "id in (select user_id from workspace_member where workspace_id = any($1::uuid[]))", params: [ids] }),
+          };
+          for (const table of CATALOG_WORKSPACE_TABLES) rows[table] = await ofWorkspaces(db, table, ids, !CATALOG_WITH_DELETED.has(table));
+          const modules: Partial<Record<ModuleTable, unknown[]>> = {};
+          for (const table of tables) modules[table] = await ofWorkspaces(db, table, ids, true);
+          return catalogReadOf(rows, readable, scope, modules as never);
+        });
       },
     },
 

@@ -334,6 +334,7 @@ export default async function CanvasPage({
               focusCardId={focusCardId}
               focusLabelId={focusLabelId}
               focusRequirementId={focusRequirementId}
+              centerRequirement={query.from === "catalog"}
               focusNoteId={focusNoteId}
               focusSelection={focusSelection ?? checkArrival?.selection}
               focusCenter={checkArrival?.center}

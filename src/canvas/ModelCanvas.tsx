@@ -192,6 +192,8 @@ export interface ModelCanvasProps {
   focusLabelId?: string | null;
   /** `?req=<id>` (slice 4a): open this requirement's panel on arrival. */
   focusRequirementId?: string | null;
+  /** Slice 39 (S39-05): InfoCatalog's arrival (`from=catalog`) centres the requirement's card when it has one here. */
+  centerRequirement?: boolean;
   /** A note asked for on arrival (the project home's open notes, slice 3a): selected and in view. */
   focusNoteId?: string | null;
   /**
@@ -338,6 +340,7 @@ export function ModelCanvas({
   focusCardId,
   focusLabelId,
   focusRequirementId,
+  centerRequirement,
   focusNoteId,
   focusSelection,
   focusCenter,
@@ -1067,8 +1070,12 @@ export function ModelCanvas({
     if (!ready || !focusRequirementId || focusedRequirement.current) return;
     focusedRequirement.current = true;
     select({ t: "req", id: focusRequirementId });
+    // slice 39 (S39-05): from InfoCatalog, a requirement with a card on this canvas is centred on it, as a card asked for
+    // is; the project home's requirements keep the canvas's view (slice 4a)
+    const card = centerRequirement ? reqNodesOf(rf).find((n) => n.data.card.requirementId === focusRequirementId) : undefined;
+    if (card) centerOnRect({ x: card.position.x, y: card.position.y, w: REQ_CARD.width, h: requirementCardHeight(card.data.card.nameLines) });
     window.history.replaceState(null, "", window.location.pathname);
-  }, [ready, focusRequirementId, select]);
+  }, [ready, focusRequirementId, centerRequirement, select, rf, centerOnRect]);
 
   const focusedSelection = useRef(false);
   useEffect(() => {

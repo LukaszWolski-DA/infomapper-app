@@ -482,6 +482,13 @@ list up to date in each sub-slice):
   - **Times in the browser's zone:** `src/ui/local-time.ts` (pure: `minuteText`, `timeToken` for a tree built on the
     server, `localTimes`), `src/ui/use-minute.ts` (the client hook) and `src/ui/local-minute.tsx` (a time with its
     same-width placeholder). A hook goes in a client file: Next.js refuses one in a file a server page imports.
+- **InfoCatalog's catalog index** (slice 39, C1): the port `catalog` (`readable`, `read`; both adapters through
+  `src/data/catalog.ts`), the rights `catalogReadable` in `src/domain/permissions.ts` (inside the adapter), the items,
+  folding, matching and ranking in `src/domain/catalog/`, the search in `src/modules/infocatalog/domain/search.ts`.
+  **A module's catalog part** is a `CatalogContribution` (`src/domain/catalog/contribution.ts`: its tables, tabs, items,
+  `documentsIncluding`), joined in `src/compose/catalog.ts` and applied after the port's read; the port never takes one.
+  **A later kind** gives its items there; **a later reader of the catalog** goes through the port, never its own filter of
+  workspaces.
 - **A new module** adds its folder, its name to `modules` in `eslint.config.mjs`, its tables to the registry's three
   records (and their baseline flags, slice 35) and a migration, and its pieces to `src/compose/`; InfoMapper's code does not change.
 
@@ -870,6 +877,7 @@ npm run pg:kb -- .data/backups/<copy of a backup>.json   # slice 31: KB from a b
 npm run pg:kb -- --remove     # slice 31: remove KB from infomapper-dev (people and other organizations stay)
 npm run pg:backup        # slice 31: KB's rows from infomapper-dev into a new .data/backups/pg/kb-<yyyymmdd-hhmm>.json (the local file's shape), counts only
 npm run pg:restore -- .data/backups/pg/kb-<yyyymmdd-hhmm>.json   # slice 31: KB back as that backup holds it; KB's undo histories emptied
+npm run pg:licence -- grant "<organization name>" infocatalog   # slice 39: a module's licence in infomapper-dev (devTargetRefusal, grant only, idempotent); on Łukasz's command only
 npx tsx scripts/kb-counts.ts .data/backups/<copy of a backup>.json   # slice 31: a read-only count of KB in a copy of a backup (counts and schema names only)
 npx tsx scripts/pg-auth-check.ts       # Auth on infomapper-dev: Data API off, sign-ups off, admin API, sign-in, getClaims
 npx tsx scripts/pg-snapshot-size.ts    # the editor's snapshot per workspace against Vercel's 4.5 MB

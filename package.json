@@ -29,7 +29,8 @@
     "pg:accounts": "tsx scripts/pg-accounts.ts",
     "pg:kb": "tsx scripts/pg-kb.ts",
     "pg:backup": "tsx scripts/pg-kb.ts --backup",
-    "pg:restore": "tsx scripts/pg-kb.ts --restore"
+    "pg:restore": "tsx scripts/pg-kb.ts --restore",
+    "pg:licence": "tsx scripts/pg-licence.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",

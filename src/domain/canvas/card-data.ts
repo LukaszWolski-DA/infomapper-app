@@ -13,6 +13,7 @@ import type { Canvas, CanvasItem, LiveLevel, NameMode, RowFilter, SourceChange, 
 import type { EntityRole, RowFeed } from "./module-marks";
 import { lineNeedsClip, ROLE_MARK, rowNeedsClip, titleNeedsClip } from "./text-fit";
 import { derivationIndex, derivedRows, derivedRowTitle, rowCounts } from "@/domain/model/derivations";
+import { tableLocation } from "@/domain/catalog/physical";
 
 export type CardKind = "ent" | "src";
 
@@ -320,7 +321,7 @@ export function buildCards(
         kind: "src",
         targetId: table.id,
         name: table.name,
-        line1: `${systemById.get(table.source_system_id)?.name ?? "?"} / ${table.database_name}.${table.schema_name}`,
+        line1: tableLocation(systemById.get(table.source_system_id)?.name, table),
         line1b: "",
         liveTitle: live && item.live_level === "context" ? `Context: the table itself is not labeled ${live.labelName}, only some of its columns or mappings are` : null,
         ...(live ? { liveRemove: live.removeOf({ kind: "source_table", id: table.id }) } : {}),

@@ -1,0 +1,999 @@
+# Slice 39 – InfoCatalog: entry and search: acceptance
+
+Branch `slice/39-infocatalog-entry-and-search`, from `dev` at `b93ebe4`. PRD:
+[slice-39-infocatalog-entry-and-search.md](slice-39-infocatalog-entry-and-search.md).
+
+## Step 1: the check against the code (27 November 2026)
+
+No application code, no migration, no change to any data file. The facts below were read on `dev` at `b93ebe4`
+(**fact**, with file and line); what I inferred is marked **assumption**. Read: CLAUDE.md; `docs/decisions.md` AD-01,
+AD-04, AD-05, AD-19, AD-20 and its notes, AD-33, AD-35, AD-37, D-58 and its notes, D-89, D-90; `docs/data-model-v2.md`
+§§ 3–7 and 15; the prototype's `PLAT` block (L11339–12643) and its `pf-` CSS; the code the PRD names and what it leads
+to; the e2e helpers and the specs that assert the sign-in target and the top bar.
+
+### 0. The files and the number
+
+| Check | Result |
+| --- | --- |
+| `docs/prd/slice-39-infocatalog-entry-and-search.md` | copied from Downloads; `cmp` reports no difference; SHA-256 `93a36fc5cb342b4713353482cc9091355cd624eff2bda12829be6ae11902a685`, as given |
+| `docs/prototype/infomapper-prototype-with-sources.html` | unchanged; SHA-256 `74c70cd919af6e65eb13f560294de42f6be03fd42d0ff082e546b6d9f0029029`, as given |
+| The slice number | 39 is free: no `slice-39` file in `docs/prd/` before this step, no `slice/39…` branch and no `slice-39` tag, local or remote (the last tag is `slice-38`) |
+| The checkout | `dev` fast-forwarded from `a1f5d43` to `origin/dev` `b93ebe4` (PR #100), clean; `fix/s32-user-menu` kept |
+
+### 1. What Łukasz needs to decide before step 2
+
+The first option is my recommendation. The details are in the sections named.
+
+| # | Question | Options |
+| --- | --- | --- |
+| C1 | **How the search reads** (Q1, Q2, § 3). The measurement shows no index is needed. The question is the read's shape. | **(a)** No index, no cache, no stored table: each search is one server request. The port reads the catalog's tables of every readable workspace **in one read-only transaction, one statement per table** (`workspace_id = any($1)`), about 20 statements whatever the number of workspaces. The pure domain builds the items, matches and ranks them, and the server answers the first 200 with the counts per kind. (b) The same with today's `snapshot` per workspace: 37 statements per workspace (296 for 8), measured 0.3 s on a local Postgres at four times KB, more online. (c) The browser receives every item once and searches itself: about 3 MB of JSON at four times KB (**assumption**, about 150 bytes an item), near Vercel's 4.5 MB answer limit, and a reader would receive what the page never shows. |
+| C2 | **The Entities tab and InfoCube's kinds** (Q7, § 7). Facts and dimensions are entities (`entity.model_level`). | **(a)** Entities, Attributes and Relationships hold the logical level only, as InfoMapper's lists do (Q4 of slice 15a). With InfoCube on, Facts and Dimensions get their own tabs, with their attributes, Measures (`cube_measure`), Keys (`cube_key`) and Dimensional mappings (`cube_mapping`). (b) Facts and dimensions also count under Entities. |
+| C3 | **Classifications and stereotypes** (§ 7). Entities and attributes carry **no** classifications. `classification_link` points to a source table or column only (data model § 6, `types.ts:377-381`). | **(a)** One tab "Classifications and stereotypes", as the PRD says. The drawer drops "classifications" for an entity and an attribute; an attribute shows its own Personal data flag (`is_pii`). Classification names are searched on tables and columns. (b) Two tabs. |
+| C4 | **"Documents that include it"** (Q3, § 4). No function answers this today. A document has a scope (projects, concepts, levels, mappings) and sections switched on, so "includes" is not one rule. `canSee` needs a workspace role (`rights.ts:29-30`). | **(a)** A document includes an item when the item is in its scope as the sections read it: entities from `sectionScopeOf`'s `entityIds` and the level drawn; attributes, relationships and mappings through their entity; tables through `tableIds`; requirements through `touchesScope`. That is one pure function in InfoDocumenter's domain, offered through the contribution. A reader without a role in the workspace sees no documents, since in InfoMapper they would see none. (b) Leave documents to slice 40's Impact, as the prototype does (its documents are in Impact only); the tile's third bullet then says "on canvases" only. |
+| C5 | **The landing zone at `/`** (Q4, Q10, § 5). Every e2e sign-in waits for `bar-top` (`e2e/slice-00/helpers.ts:13-17`, about 525 files), and nine spec files assert a workspace URL right after sign-in. | **(a)** No seed grants `infocatalog`: `npm run seed`, the e2e seed, `npm run demo` and `pg:seed` stay as they are, so no earlier spec changes. Slice 39's fixtures grant it as test data; on `infomapper-dev` it is `pg:licence` (C8). The landing zone is `/` itself; "Open InfoMapper" is `/?to=workspace`, which redirects as today. (b) The demo seeds grant it, and every earlier sign-in helper learns to pass the landing zone. |
+| C6 | **"All apps" in the top bar** (Q4, § 5). The prototype puts it after the left toggle and before the brand, and moves it to the navigation row below 1,360 px (L1751-1752, L12654). | **(a)** Always in the top bar, a 28 px `IconButton`, `flex-none`, directly before the organization switcher, and on the phone too. The switchers already shrink to their 56 / 44 px floors; step 4 proves S38-02's 180 px for a cut name at 1,280 and 1,440 px and S6A-10's widths with the licence. (b) As the prototype: into the navigation row below 1,360 px. |
+| C7 | **"← Back to InfoCatalog" and the item's address** (Q4, Q9, § 5). `safeReturnPath` refuses `/catalog` and any free text (`return-path.ts:13-25`). The canvas drops the whole query after an arrival (`ModelCanvas.tsx:1056-1096`). | **(a)** The catalog's state is in its address: `/catalog?q=…&scope=…&kind=…&item={kind}:{workspaceId}:{id}`. An item's own address is the same without `q`. "Open in InfoMapper" stores that address in the tab's `sessionStorage` (`im-catalog-return`, its own validator `safeCatalogPath`) and opens the canvas with its usual arrival parameter plus `from=catalog`. The shell shows "← Back to InfoCatalog" in the navigation row while the tab holds a return address for the workspace shown. It goes when the person opens the catalog again or opens another workspace by hand. (b) The return address in the URL of every InfoMapper page (a parameter carried on every link). |
+| C8 | **The licence online** (Q6, § 6). | **(a)** `npm run pg:licence -- grant "<organization name>" infocatalog`, with `devTargetRefusal` (`scripts/lib/pg-env.ts:62-79`) as `pg:kb` has it: grant only, counts and names of the module only, one transaction, idempotent. (b) An SQL statement Łukasz runs in Supabase's editor. |
+| C9 | **S39-02's demo cases** (Q11, § 8). No demo member lacks a role in a **live** InfoMate workspace (`seed.ts:131-200`). Piotr has no role in Bank X, which is archived; Kasia, a guest in InfoMate, has none in Sales analytics. | **(a)** The seed does not change. The e2e specs make their own test data through the domain (a new InfoMate workspace in which Anna and Piotr have no role). In step 8 Łukasz creates such a workspace in the app as InfoMate's owner. (b) The seed gains a third InfoMate workspace (an earlier spec that counts workspaces or tiles would change). |
+| C10 | **Full runs** (§ 9). "Test runs"' exception: a step that touches the local adapter runs a full run. Step 2 adds a read to both adapters; step 3 adds a column and the file's format step 19. | **(a)** Full runs in steps 2, 3, 4, 7 and 9. (b) As the PRD: 4, 7 and 9. |
+
+Everything else below is a correction or a proposal that I take unless Łukasz says otherwise.
+
+### 2. The measurement (Q1)
+
+**How.** A throwaway script outside the repository (the session's scratchpad, not committed), run from the repository's
+root with `npx tsx`. **The model:** the seed with "Performance test" (`scripts/lib/seed-rows.ts`, which builds it with
+`src/data/local/large-generator.ts`), whose workspace is cloned with every id remapped into further workspaces of
+InfoMate, until the catalog items reach the target. "Performance test" has **2,713 catalog items**: 8 concepts, 41
+entities, 779 attributes, 40 relationships, 60 source tables, 1,449 columns, 300 mappings, 12 requirements, 19
+classifications and 5 stereotypes. **KB's size** = 2 such workspaces (5,426 items); **four times** = 8 (21,704 items).
+That is conservative. KB's 4,871 rows are **rows in all 38 tables** (fact, `slice-31-measurement.md:35`: change events,
+canvas items and others included), so KB has fewer catalog items than 4,871. **Postgres:** a cluster of its own
+(PostgreSQL 18.3 from scoop, `initdb` in the scratchpad, 127.0.0.1:55439), the migrations applied and the rows loaded by
+the contract suite's `preparePostgres` (`tests/contract/shared.ts:204-218`), never `infomapper-dev` and never KB.
+**Times:** the reads through `timedStore` with the timing record (`src/data/timing.ts`, AD-37); the items and the search
+as pure functions (a sketch of the rule step 2 would write: NFD with ł, ß, ø, đ folded, every word must match, five
+tiers). Each figure is the median of 9 after one warm-up.
+
+| What | KB's size, local adapter | KB's size, Postgres | 4 × KB, local adapter | 4 × KB, Postgres |
+| --- | --- | --- | --- | --- |
+| One workspace's `snapshot` (2,713 items) | 6.4 ms | 48.7 ms | 12.2 ms | 45.9 ms |
+| All workspaces' snapshots, one after another | 9.8 ms | 116.9 ms | 67.7 ms | 369.6 ms |
+| All workspaces' snapshots, side by side | 9.7 ms | 80.4 ms | 59.8 ms | 303.0 ms |
+| Timing record of one read of all | 2 calls, read 14.2 ms | 2 calls, **74 statements**, statements 148.4 ms, wait 0.1 ms, read 77.5 ms | 8 calls, read 61.2 ms | 8 calls, **296 statements**, statements 1,604.8 ms, wait 767.9 ms, read 369.8 ms |
+| The items from the snapshots (pure) | 30.6 ms | 19.1 ms | 75.3 ms | 72.3 ms |
+| A search (pure), "customer" / "cust id" / "a" (19,040 results at 4 ×) / "qqqq" | 1.1 / 0.7 / 1.8 / 0.4 ms | 0.7 / 0.8 / 1.1 / 0.4 ms | 3.0 / 2.5 / 5.7 / 1.3 ms | 2.7 / 2.5 / 5.0 / 1.2 ms |
+
+The local adapter's first figures in the 4 × run (one snapshot 13.4 ms, all 101–106 ms) were the same file read before
+its cache settled; the second run's are in the table. One read of the same 8 workspaces' 19 catalog tables as **one
+statement per table** (`workspace_id = any($1)`, `count(*)` in one REPEATABLE READ transaction) took 5.6 ms of server
+time once warm (66 ms cold). That shows the statements are cheap. The cost of a snapshot per workspace is its round
+trips and its rows' parsing, and much of a snapshot is rows the catalog never shows (canvases, frames, labels, people).
+
+**What dominates.** Matching and ranking cost a few milliseconds even at four times KB. On Postgres the reads dominate,
+and with today's `snapshot` they grow with the number of workspaces: 37 statements each, run one after another inside
+each transaction (fact, `postgres/store.ts:65-70`), five connections (`pool.ts:22`). On a local database a round trip
+costs nothing. Online it costs a few milliseconds from Vercel (fact: the thumbnail's 37 statements took 80–202 ms of
+statement time on the preview, `slice-31-measurement.md:57-67`). So 8 workspaces' snapshots online would be about 0.5 to
+1 s of reads alone (**assumption**, from those figures), at the bar. From the laptop (`dev:pg`, every statement a round
+trip to Frankfurt) they would be several seconds. One statement per table keeps the round trips at about 20 for any
+number of workspaces: about 0.1 to 0.2 s online (**assumption**, the same figures).
+
+**Recommendation (C1 a):** no index, no cache and no stored table now. One port read across the readable workspaces, one
+statement per table and only the catalog's tables. The items, the matching and the ranking are pure domain code. The
+server answers the first 200 results and the counts. The browser sends a search 150 ms after the last keystroke and
+drops an answer older than the newest request. The 1 s bar is then met with room at four times KB. Step 7 measures it on
+`dev:pg` and on the preview with the timing record, `<TimingRecord />` or `Server-Timing` on the search's route.
+
+### 3. Q2 – the port's shape
+
+Facts:
+- No port lists an organization's workspaces. `workspaces.listForUser` gives the workspaces with a member row
+  (`ports.ts:103-109`); the only such query is in the loader (`postgres/load.ts:266,270,337`).
+- `organizations.listForUser` includes guests (`postgres/store.ts:106-113`); membership is the `organization_member` row
+  (`types.ts:58-63`, roles owner / admin / member, `types.ts:10`). The PRD's "nothing is stored for the right" holds: the
+  right is derived from stored rows (licence, membership, workspace roles, the switch). But membership itself **is
+  stored**. `isGuest` derives the guest from the missing row (`permissions.ts:179-186`).
+- `model.load` reads 15 tables (`postgres/store.ts:33-49`), `snapshot` about 37. Requirements are not in `WorkspaceModel`
+  (`types.ts:490-518`), only in the snapshot.
+- `readTable` takes any WHERE (`postgres/tables.ts:62-68`). `workspaceModelOf` filters rows by workspace itself
+  (`workspace-model.ts:75-76`), so the rows of many workspaces can be read at once and split in memory.
+
+Proposal (my call, unless Łukasz objects):
+- **The rights:** `catalogReadable(person, organizations, memberships, workspaces, licences, unlocked)` in a new file
+  `src/domain/permissions/…`. `src/domain/permissions` is a file today (`permissions.ts`), so it becomes
+  `src/domain/catalog-rights.ts` beside it, re-exported from `permissions.ts`. It is pure and gives the readable
+  workspaces per licensed organization, each with `hasRole` and `archived`.
+- **The port** `catalog` (on `DataStore`, both adapters):
+  - `catalog.readable(userId, unlocked)`: the licensed organizations in which the person is a member, and per
+    organization its readable workspaces (name, archived, InfoCube's switch, `hasRole`, item counts for the landing
+    tile), by the function above inside the adapter.
+  - `catalog.rows(userId, unlocked, organizationId, workspaceId | null, moduleTables)`: the catalog's rows of every
+    readable workspace in scope (or one), in one read-only transaction, one statement per table, `workspace_id = any($1)`,
+    the rights checked in the same transaction. Unreadable workspaces' rows are never read. It returns rows, as
+    `snapshot` does; the domain builds the items.
+  - `catalog.item(userId, unlocked, workspaceId, …)`: the same read for one workspace (the drawer needs the neighbours,
+    canvases, projects, owners), or `null` when the person may not read it. "Not found" is the only answer either way.
+- **Where the ranking runs:** in the domain (`src/domain/catalog/`: items, words, tiers, highlight ranges), tested once
+  for both adapters. The search itself is `src/compose/catalog.ts` → `src/modules/infocatalog/domain` over the port's
+  rows, as `documentStateFor` builds over a snapshot.
+- **The contract test** (`tests/contract/catalog.test.ts`): the three reads on the same rows on both adapters, for a
+  member with a role, a member without a role with the switch off and on, a guest, an organization without the licence,
+  an archived workspace, a locked organization on the local adapter, and "not found" for an item of an unreadable
+  workspace.
+
+### 4. Q3 – modules' items (AD-33)
+
+Facts:
+- `src/data` may import only `data` and `domain` (`eslint.config.mjs:80`), and only `src/compose` names modules
+  (`:12-16, 29, 89`). `src/compose` is imported only by `src/app` (AD-33, CLAUDE.md).
+- **The PRD is wrong** where it says "the port takes the composed contributions from `src/compose`" (PRD L74-75). The
+  port cannot import `compose`. The precedent is the other way round: the store takes plain table names and rules
+  (`StoreSchema`, `rows.ts:38-43`; `snapshot(ws, tables)`), and compose applies the modules' pure functions over what the
+  port returned (`documentStateFor`, `compose/documents.ts:49-65`; `moduleFeeds`, `compose/view.ts:139-170`).
+- `canSee` (`infodocumenter/domain/rights.ts:29-30`) needs `access.member`, so a reader without a role sees no
+  documents. It does not check `workspace.infodoc`; `openRefusal` does (`rights.ts:84-86`).
+- No function answers "the documents that include X" (C4).
+
+Proposal: `src/compose/catalog.ts` holds `CATALOG_CONTRIBUTIONS`: per module its tables (passed to `catalog.rows` as names,
+as `DOCUMENT_TABLES` is to `snapshot`), its kinds (each kind's tab label, rows → items, searched fields, characteristics,
+neighbours, its canvas place; pure) and InfoDocumenter's `documentsIncluding(item, rows, access)` (C4). The type of a
+contribution is in InfoMapper's domain (`src/domain/catalog/contribution.ts`), as `DocumentContributions` is. InfoCatalog
+gets the joined list from compose through its page (`src/app/catalog/…` → `src/compose/catalog-pages.tsx` → the module's
+`app`, as `documents-pages.tsx`). No module imports another. AD-33 needs a note: a module that **reads** other modules'
+contributions, and the first module without tables (the registry's records and the cascades stay empty for it).
+
+**Guardrail 4 (shared logic into the domain first):** `sectionScopeOf` and `sourceTablesInScope`
+(`infodocumenter/domain/scope.ts:17-61`) stay InfoDocumenter's, offered through its contribution, since only it reads
+documents. What InfoCatalog shares with InfoMapper moves into InfoMapper's domain first: the physical path (today three
+partial forms: `model-index.ts:83`, `card-data.ts:323`, `upgrade-8.ts:98`) as one `physicalName(system, table, column)`;
+the canvas chooser (Q9); the projects and canvases of an entity (`entityImpact`, `impact.ts:73-89`, already domain).
+
+### 5. Q4 – routes and addresses
+
+Facts:
+- After sign-in (`src/app/page.tsx:13-35`): the last used workspace (cookie `infomapper_last_workspace`, written only by
+  the proxy on `/w/…`, `proxy.ts:82-94`) among the unlocked organizations, else the first; none unlocked → that
+  organization's password; none at all → "No workspace yet".
+- The dev list and Supabase sign-in go to `/` (`_actions/session.ts:27-35, 140`). **The organization password goes
+  straight to a workspace** (`session.ts:112-116`): it would never show the landing zone. Joining by a link goes to the
+  workspace (`links.ts:77,94,130`).
+- `/catalog` needs a session with no change to the proxy (it is not public, `proxy.ts:38-57`) and writes no preference
+  cookie (`preferences.ts:38`).
+- `src/app/not-found.tsx` exists (`page-not-found`). `notFound()` is already how the app hides what a person may not
+  open (`shell.ts:82,97,193`).
+- The top bar's order (`top-bar.tsx:50-77`): left toggle (canvas only), brand (above 1,600 px), organization, workspace
+  and project switchers (56–280 px), spacer, working context and Undo / Redo, the save pair, the right toggle, the
+  account. Its room is checked by S38-02 (`:46-63`), S6A-10 (`:13-14, 59-71`), S16-08, S38-06, S30-09-room and S5A-06;
+  none counts the bar's buttons.
+- InfoMapper's shortcuts are mounted by its components (`history-nav.tsx:87-106` in every `AppShell`; `undo.tsx:102-116`
+  on the homes and canvas; the canvas's own in `ModelCanvas.tsx`). There is no `/` or Ctrl+K anywhere. A `/catalog` page
+  without `AppShell` has none of them, so "shortcuts are off on platform pages" needs no code.
+
+Proposals:
+- The landing zone is `/` (C5). "Open InfoMapper" → `/?to=workspace`, today's redirect. The organization password's
+  sign-in goes to `/` when the organization it unlocked holds the licence and the form has no `next`; otherwise as today.
+  Joining by a link keeps landing on the workspace (AD-40).
+- `/catalog` (and `/catalog?…`) answers `notFound()` when no organization of the person (unlocked, as a member) holds
+  the licence; an `org` parameter naming an organization without it, or one the person is a guest in, answers the same.
+- The addresses in C7. The drawer's item parameter is `{kind}:{workspaceId}:{id}`. An item of a workspace the person may
+  not read, or that does not exist, shows the catalog with the toast "That item is not in InfoCatalog." (**assumption**:
+  the PRD's "not found" for an item means no drawer and no hint, not the 404 page, which would lose the search; to
+  decide if Łukasz means the 404 page).
+- "All apps" (C6). With the licence of the **organization shown** (PRD), not of any organization.
+- The catalog's header is its own (the apps button, "InfoCatalog", the organization, the account), not `AppShell`'s top
+  bar; the account menu is the same component (`UserIndicator`), so the theme and sign-out stay one place.
+
+### 6. Q5, Q6 – the switch and the licence
+
+Facts:
+- `LICENSED_MODULES` (`types.ts:66`); **`MODULE_NAMES` is in `src/domain/model/module-switches.ts:8`, not
+  `types.ts`** (PRD L93 and L242).
+- The licence's CHECK is a local rule too (`local/schema.ts:255-259`, from `LICENSED_MODULES`), so the local adapter
+  follows by itself.
+- A module switch is a field of `updateWorkspaceSettings` (`commands/workspace.ts:145-224`, strict Zod), with
+  `workspace.edit_settings` (owner, admin; an archived workspace is refused by `checkPermission`, `permissions.ts:129-131`).
+  It writes one `update` of the `workspace` row with its change event, and `workspace` is **outside undo**
+  (`undo.ts:85-92`). The switch follows the same path: a change event, no undo step (Q5 confirmed).
+- The local file is format 18 (`local/schema.ts:110`). Slice 25 added `infodoc` as format 17 (`file.ts`, "slice 25
+  (F4)"), and tests compare the format (`organization-store.test.ts:90` and others). The switch is **format 19**: every
+  workspace `catalog_shown` false, with `upgrade-19.test.ts`. That touches the local adapter, hence C10.
+- The settings' boxes are always shown, the check box disabled without the licence (AD-35; `compose/settings.tsx:1-2`).
+  **The PRD hides the switch** without the licence, which is a deliberate departure: AD-35 gets a note. The switch is no
+  module switch (AD-35: "a module is on when its workspace's switch is"), since InfoCatalog has none per workspace.
+- A baseline's content holds four workspace settings (`baseline/content.ts:95`). `catalog_shown` is visibility, not
+  model, so it stays **out** of the content (no upgrade step). The workspace's copy and transfer (AD-35's rule for a
+  module's switch) do not exist in the app yet (slice 38, B5), so nothing to do; a note says a copy takes the switch off.
+- `scripts/licence.ts` is local only (`:12, 18, 27`) and `pg-seed.ts` has no target guard; `devTargetRefusal` is used by
+  `pg-kb.ts` and `pg-accounts.ts` only.
+
+Proposals:
+- The column `workspace.catalog_shown boolean not null default false` (the PRD's name; `domain` `catalog_shown`, the
+  input `catalogShown`). The box "InfoCatalog" in the settings after InfoDocumenter's, shown only while the organization
+  holds the licence, through `settingsBoxes` (compose) like the other two. Its text is the PRD's, for Łukasz's wording.
+- `pg:licence` (C8): `scripts/pg-licence.ts`, `npm run pg:licence -- grant "<organization>" <module>`: `loadPgEnv`,
+  `INFOMAPPER_MIGRATION_URL`, `devTargetRefusal` (so never production until slice D), one live organization by name or
+  a refusal, idempotent, the owner as author, no change event (as `licence.ts`), prints "granted" or "held already" and
+  the target's host and database only. It runs only on slice 39's branch until the merge (CLAUDE.md, the `pg:` rule).
+- E2E: slice 39's fixtures grant the licence to InfoMate as test data (as `grantDocLicence`); Retail Co never holds it,
+  which is the "second organization without the licence". The smoke set on Postgres (`e2e/slice-29`) gets no catalog
+  spec in this slice. **Assumption:** the online check is Łukasz's step 8.
+
+### 7. Q7 – the kinds
+
+| Kind | Rows | Name shown | Path (Details column) | Searched besides the name | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Entity | `entity`, logical (C2) | `name` | concept · stereotype's name | `alias`, `definition_text` | no classifications (C3) |
+| Attribute | `attribute` of a logical entity | `name` | `Entity / attribute` · type | `alias`, `definition_text`, `calc_rule` | PK / FK / BK and PII are flags (`types.ts:220-244`) |
+| Relationship | `relationship` | **no name**: `label`, else "From – To" | cardinality sentence | `label`, roles, `description` | `description` is plain text, no `_text` pair |
+| Concept | `concept` | `name` | – | `description_text` | it has a description, not a definition |
+| Source table | `source_table`, `object_type` table / view / file | `name` | `{system} / {db}.{schema}.{table}` | full physical name, `comment`, `note_text`, its classifications | views and files are this kind (fact, `types.ts:276`); "Kind" shows View / File |
+| Source column | `source_column` | `name` | `{system} / {db}.{schema}.{table}.{column}` · type | full physical name, `comment`, `note_text`, its classifications | the PRD's example `CRM / dbo.customers / cust_no` leaves out the database |
+| Mapping | `mapping` | **no name**: "`{columns}` → `{Entity.attribute}`" | kind · status | `rule_expression`, `note_text` | "who approved" is `approved_by`, a person's id (the workspace's people) |
+| Requirement | `requirement` | `{key} {name}` | kind · status · priority | `key`, `description_text`, `expression`, `external_ref` | `owner_name` is plain text (shown "from InfoMapper"); the break-down is `parent_id`; "data quality rules" are requirements of kind `dq_rule` with `expression` and `severity`, not a table of their own |
+| Classification | `classification`, live, not removed | `name` | scope (table / column) | `code`, `definition` | "how many carry it": its live links |
+| Stereotype | `stereotype`, live, not removed | `name` | – | `code`, `definition` | "how many carry it": logical entities with its code (a dimensional entity keeps `object`, unused) |
+| Fact, Dimension (InfoCube) | `entity` dimensional + `cube_entity` | `name` | role, type or history (`historyLabel`) | `alias`, `definition_text` | from the contribution |
+| Measure | `cube_measure` | its attribute's name | `Fact / attribute` · additivity | its attribute's | one per fact attribute |
+| Key | `cube_key` | **no name**: "attribute (fact → dimension)" | – | its attribute's name | read as absent while its attribute is no FK (`cube` types `:88-91`) |
+| Dimensional mapping | `cube_mapping` + inputs | **no name**: inputs → attribute | kind (incl. lookup) · status | `rule_expression`, `note` | – |
+
+Corrections and costs:
+- **Declared foreign keys** are `source_relationship` (+ columns), shown in a table's details (PRD, confirmed).
+- **"Last import"** belongs to the **source system** (`source_import.source_system_id`), not the table: a table's drawer
+  shows its system's last import. It is one more table to read (`source_import`). The open changes to resolve
+  (`source_change`) are not shown in this slice (**assumption**).
+- **Requirements can be on a canvas** (requirement cards, `canvas_item.requirement_id`, data model § 9). The PRD's
+  example of an item on no canvas ("a requirement") is wrong for a requirement with a card.
+- "External reference" exists on requirements only.
+- The kind tabs' order: the PRD's (Entities, Attributes, Relationships, Concepts, Source tables, Source columns,
+  Mappings, Requirements, Classifications and stereotypes, then InfoCube's), with the prototype's "All {n}" first and a
+  kind with no result disabled (L11547-11548, L12464). The PRD does not mention "All"; I take it from the prototype.
+- The drawer reads a mapping's approver and a workspace's owners from its people: the drawer's workspace counts as "the
+  workspace shown" under D-58's note (only its people reach the browser).
+
+### 8. Q8 – matching and limits
+
+Facts: no accent-insensitive search exists in the app. The only NFD is `proposedCode` (`stereotypes.ts:120-131`, which
+maps ł by hand). Every search today is `toLowerCase().includes` on the whole query (`tree-data.ts:306-323`,
+`pick.ts:48-60`). The prototype does not fold accents either (L11446-11465).
+
+Proposals:
+- **Folding:** `toLowerCase` after NFD with the combining marks removed, and `ł→l`, `ß→ss`, `ø→o`, `đ→d`, `æ→ae`,
+  `œ→oe` (NFD decomposes neither ł nor ß), the same on the text and the query. "zrodlo" finds "źródło", "strasse" finds
+  "Straße". One pure function in InfoMapper's domain (`src/domain/text-fold.ts`), tested with Polish and German.
+- **Every word** (split on spaces) must be found in one of the item's searched fields together (the words may be in
+  different fields). The measurement found that this makes "Wide Customer Profile" match 402 items at KB's size when an
+  attribute's searched text includes its entity's name; I propose **not** to search the entity's name in an attribute's
+  fields (the path shows it), so a multi-word query narrows as a person expects.
+- **The tiers** (A3.1): 1 the name equals the query; 2 the alias or the requirement key equals it; 3 the name starts with
+  it; 4 every word in the definition; 5 the rest. **Ties:** the kind tabs' order, then the workspace's name, then the
+  kind's model order (`workspaceModelOf`'s: entities by name, attributes by entity and `sort_order`, tables by name,
+  columns by ordinal; mappings in their stored order, `byCreation`). The PRD's "model order" is per kind only (fact,
+  `workspace-model.ts:48, 75-103`).
+- **The highlight:** each word's matches in the name, the path and the one-line definition, from ranges the domain gives
+  on the folded text mapped back to the original (no `dangerouslySetInnerHTML`). A definition cut to one line starts
+  about 50 characters before its first match when the match is past character 70 (the prototype's rule, L11476-11482),
+  and ends with "…" at 180 characters.
+- **200 drawn:** the server sends the first 200 and the counts. Below them: "{n} more: narrow the search" (the PRD's),
+  where the prototype says "{n} results, the first 200 shown". I take the PRD's.
+
+### 9. Q9 – Open in InfoMapper
+
+Facts:
+- The canvas page selects and centres on arrival with `?card=`, `?map=`, `?row=` (an attribute's or a column's row),
+  `?rel=`, `?entity=`, `?req=`, `?system=`, `?ext=` (`c/[canvasId]/page.tsx:178-183, 384-429`;
+  `ModelCanvas.tsx:1047-1095`). A mapping centres on its source card, else its entity card (`:1077-1090`). A relationship
+  centres on its first end.
+- Every chooser today works within one project: model checks (`project-checks.ts:63-77`), consistency (both ends' cards
+  first, `consistency.ts:109-115`), requirements (`bestCanvasId`, `stats.ts:199-216`). No chooser picks a canvas across
+  the workspace.
+- `?gone=` and `HOME_GONE` give a home's toast (`w/[workspaceId]/page.tsx:134-136`, `compose/home.tsx:45-47`).
+
+Proposals:
+- **The canvas:** a pure `canvasesShowing(item)` in InfoMapper's domain: the canvases with the item's card (an entity's,
+  a table's for a column, a requirement's card); for a mapping or a relationship, those with both ends first, then one
+  end; in project order then tab order (`diagramCanvases`' order). The first is the drawer's first Context line and
+  "Open in InfoMapper"'s target, through the existing arrival parameters (`?row=` for an attribute or a column,
+  `?map=`, `?rel=`, `?card=`, `?req=`, `?ext=` for InfoCube's). A mapping with both ends selects the mapping; with one
+  end it selects that end's row.
+- **On no canvas:** the workspace's home with `?gone=canvas&item={kind}:{id}`, whose toast names the item by its name
+  read on the server: "{name} is not on any canvas." (a `HOME_GONE` entry; the name never travels in the address).
+- **No role:** no button, the line "You have no role in {workspace}. Ask its owner for access: {owners}." with the
+  workspace's Owners by display name, read with the item.
+
+### 10. Q10 – earlier specs and the run
+
+| Step | Earlier specs that change | Why |
+| --- | --- | --- |
+| 2 | none | a new port and the rights; nothing on a screen |
+| 3 | `upgrade-*` and store tests that compare `DEV_DB_FORMAT` (e.g. `organization-store.test.ts:90`; unit tests, not e2e), `tests/table-registry.test.ts` / the schema check for the column | format 19 and the column |
+| 4 | none, if C5 (a) holds: no seed grants the licence, so every earlier spec signs in, lands and sees the top bar as before | the landing zone and "All apps" show only with the licence |
+| 5–6 | none | new routes only; the canvas's arrival parameters are reused unchanged |
+
+The spec files that assert a workspace right after sign-in (`S0-01:12,25`, `S0-06:20`, `S8-01:15`, `S8-04:28,40`,
+`S8-05:17`, `S8-06:16,39`, `fixes/session-change-full-load.spec.ts:18,28,38`; online `S29 fix-smoke-session-full-load`,
+`S33-smoke-people`) and the top bar's room specs (above) run without the licence and stay. **The part:** `e2e/slice-39/`
+joins the last part (part 11, from `slice-27`), by the recut rule. **Its time (assumption):** about 25 specs at 15–25 s,
+6–10 minutes; part 11 is now the longest, so the closing checks the recut rule on the last three full runs.
+
+### 11. Q11 – risks and what the prototype has that the app cannot take
+
+- **The prototype's rights are not the PRD's.** It lists only member workspaces and falls back to "Reader" (L11362-11366):
+  the no-role reader, the switch and the no-role line are the PRD's alone.
+- **"Open in a window", Lineage, Impact, Display, Markdown, ✦ Ask, Catalog editors, the filters row:** out (PRD § 2).
+  The landing's bar title "InfoLabs apps" (L11507) and the sign-in card "One account for InfoMapper and InfoCatalog"
+  (L11495-11503) are not in the PRD; I propose the title "InfoLabs apps" on the landing's bar (it names nothing new) and
+  no change to the sign-in page.
+- **The drawer is a new shared component** (`src/ui/components/drawer.tsx`, from shadcn's Sheet on the tokens, D-89 gets
+  a note). The PRD's "added to the guard's list" is wrong: the guard has no list of components, it refuses a styled
+  control outside `src/ui` (AD-20's note, `tests/lib/control-style.ts`); the drawer is used through its exports. The kind
+  tabs are the existing `tabVariants` with a new quiet density (or `chipVariants` with `aria-pressed`, as the prototype);
+  step 5 picks the one whose look matches the prototype's layout B and says so.
+- **AD-05's note** ("owners and admins … see a workspace's content only with a role") becomes "in InfoMapper"; the
+  catalog is a read-only exception decided in A2.1, and the note says that read is no sixth role. **D-58:** what sign-in
+  opens with the licence is new content. **D-90:** "All apps" and "← Back to InfoCatalog" (its navigation row). All
+  quoted at the closing.
+- **The landing tile's counts:** "{n} workspaces you belong to · last: {name}" counts the unlocked organizations'
+  workspaces with a role (the prototype counts all organizations, L11505); "{n} items in {m} workspaces of {organization}"
+  needs the item count per workspace: `catalog.readable` gives it from a `count(*)` per table (one statement each), not
+  the search's read.
+- **Live updates between windows** (guardrail 5) are not in this slice's criteria: a search is read on each request, so
+  a change made in InfoMapper shows on the next search. The landing's lead line ("A change in one is seen in the other at
+  once") is then true on the next search; I take that unless Łukasz wants a live refresh.
+- **The local adapter's unlocked organizations:** a catalog of an organization the session has not unlocked shows
+  nothing of it; the organization select lists only unlocked ones, and the landing tile counts them only (fact,
+  `session.ts:29-32`; online every organization is unlocked, `:47-48`).
+
+### 12. The plan for steps 2 to 9
+
+Each step ends with lint, typecheck, `npm test`, the touched specs as single files, and the report (CLAUDE.md).
+
+2. **The core and the port.** `src/domain/text-fold.ts`; `src/domain/catalog/` (the items of InfoMapper's kinds, the
+   words, the tiers, the highlight ranges, the contribution's type, `canvasesShowing`, `physicalName`); the rights
+   function; the port `catalog` on both adapters (one statement per table) and `tests/contract/catalog.test.ts`;
+   `src/modules/infocatalog/` with its five parts and `"infocatalog"` in `eslint.config.mjs` and
+   `tests/layer-rules.test.ts`; `src/compose/catalog.ts` with InfoCube's and InfoDocumenter's contributions; a bench
+   `scripts/bench-catalog.ts` (the measurement above on the real code, a reference figure). Draft PR into `dev`. Full
+   run (C10).
+3. **The licence and the switch.** Migration `20261127…_infocatalog.sql` (the CHECK, `workspace.catalog_shown`), format
+   19 with its upgrade test, `LICENSED_MODULES`, `MODULE_NAMES`, `updateWorkspaceSettings`' field, the settings' box,
+   `scripts/licence.ts` for `infocatalog`, `pg:licence`. Full run. ~~Stop for Łukasz's migration~~ **Postponed**
+   (Łukasz, 28 November 2026): the migration on `infomapper-dev` and InfoMate's licence move to just before step 8 (7a
+   below); nothing in steps 4 to 6 needs them, and the migration file may still change until then. **Until then
+   `dev:pg` is not run against `infomapper-dev` from this branch.**
+4. **The landing zone and "All apps".** `/` with the licence, `/?to=workspace`, the password sign-in's target, the button
+   in the top bar, `/catalog`'s `notFound()`, S39-01's and S39-02's specs (the tile's counts, the guest). Full run.
+5. **Search.** `/catalog`, its header, the field, the scope, the kind tabs, the rows, the highlight, the empty state,
+   the 200, the address; S39-03's specs; the timing record on the route.
+6. **The drawer and Open in InfoMapper.** The drawer component, the keyboard, "← Back", the item's address, the Context
+   lines, the documents (C4), Open in InfoMapper and "← Back to InfoCatalog", the no-role line, "not on any canvas";
+   S39-04's and S39-05's specs.
+6a. **S8-06's race, fixed before step 7** (Łukasz, 28 November 2026): on its own branch `fix/s8-06-switcher-ready`
+   from `dev` (`b93ebe4`), the spec waits until the page is ready before it clicks the organization switcher, as PR 98
+   and PR 100 did; only the spec, unless the cause is in the app (then stop). S8-06 ten times alone, the file's specs, a
+   pull request into `dev`; Łukasz gives the merge command.
+7. **The after checks, without `dev:pg`.** `npm run ui:check` on the landing zone, the catalog and the drawer (1,280,
+   1,440 and 1,920 px light and dark, 390 px), the bench, a full run. ~~The timing on `dev:pg`~~ moves to 7b (Łukasz,
+   28 November 2026).
+7a. **Łukasz's migration and licence** (moved from step 3), one command at a time: `pg:backup` from `dev`;
+   `pg:migrate -- --dry-run`, `pg:migrate`, `pg:backup` again and the counts compared (`scripts/kb-counts.ts` on both
+   backups) from this branch; then `pg:licence -- grant "InfoMate" infocatalog` from this branch.
+7b. **The timing on `dev:pg`** (moved from step 7, Łukasz, 28 November 2026), after Łukasz's migration: the demo and
+   "Performance test" with the demo accounts, never KB.
+8. **Łukasz's acceptance** on `dev:pg` with the demo accounts (PRD § 6), with a workspace he makes without Anna and
+   Piotr (C9). **Stop.**
+9. **Close.** D-91 and AD-41 and the notes (AD-05, AD-33, AD-35, D-58, D-89, D-90) quoted in full; CLAUDE.md (the third
+   module, the extension point, the routes, `pg:licence`), `data-model-v2.md`, `inventory-prototype-vs-app.md`,
+   `known-limitations.md`, `ideas.md`, README; one full run on the final commit. Merge and tag `slice-39` only on
+   Łukasz's command; KB's licence a separate command when he decides.
+
+### 13. Ideas (for `docs/ideas.md`, not in this slice)
+
+- A guard in `pg:seed` like `devTargetRefusal` (today only `pg:kb` and `pg:accounts` have one).
+- The database's own search (`unaccent` and trigram indexes) when a model outgrows the read per search; not now.
+
+### Łukasz's answers (27 November 2026)
+
+- **C1 to C10: option (a) each**, as recommended.
+  - **Claude's technical calls**, quoted for Łukasz's approval at the closing: C1 (one read per table across the
+    readable workspaces, no index, no cache), C5 (no seed grants `infocatalog`; the landing zone is `/`), C7 (the
+    catalog's state in its address, the way back in the tab's `sessionStorage`), C8 (`pg:licence` with
+    `devTargetRefusal`) and C10 (full runs in steps 2, 3, 4, 7 and 9).
+  - **Łukasz's own:** C2 (Entities, Attributes and Relationships logical only; InfoCube's kinds in tabs of their own),
+    C3 (one tab "Classifications and stereotypes"; no classifications on entities and attributes), C4 (documents that
+    include an item by their scope, through InfoDocumenter's contribution; a reader without a role sees none), C6 ("All
+    apps" always in the top bar, before the organization switcher) and C9 (no seed change; the specs make their own
+    workspace without a role; Łukasz makes one in step 8).
+- **The smaller corrections are accepted:** `MODULE_NAMES` is in `src/domain/model/module-switches.ts`; the composition
+  root applies the contributions after the port's read (the port never takes them); the control-style guard has no list
+  of components; requirements can be on a canvas as cards; a table's "last import" is its source system's; the
+  landing-zone rule holds for the organization-password sign-in too.
+- **Also accepted:** the "All" tab first, as in the prototype.
+
+## Step 2: the core and the port (28 November 2026)
+
+**Built** (no screen):
+- **The rights:** `catalogReadable` in `src/domain/permissions.ts` (with `CatalogOrganization`, `CatalogWorkspace`,
+  `CatalogRightsInput`): a live, unlocked organization holding the live `infocatalog` licence, the person its member (a
+  guest never), a live workspace with a role in it or its switch on; archived ones kept and marked; organizations and
+  workspaces by name. Tests: `src/domain/permissions-catalog.test.ts`.
+- **InfoMapper's domain** (`src/domain/catalog/`): `fold.ts` (case, accents, ł ß ø đ æ œ ı ς; a whole-string fast path
+  and a per-character fold with each character's original range for the highlight), `physical.ts` (`tableLocation`,
+  `physicalName`; the canvas's card and the left panel's `tablePath` now use it, guardrail 4), `items.ts` (`CatalogItem`,
+  `CORE_TABS`, `coreCatalogItems`), `match.ts` (the five tiers, every word, `highlightRanges`, `definitionLine`),
+  `read.ts` (the tables a catalog read takes, `CatalogScope`, `CatalogRead`, `scopeWorkspaces`), `contribution.ts`
+  (`CatalogContribution`, `CatalogViewer`, `CatalogDocument`).
+- **The port** `catalog` (`src/data/ports.ts`, both adapters, `src/data/catalog.ts` shared): `readable(userId,
+  unlocked)` and `read(userId, unlocked, scope, tables)`. On Postgres one read-only transaction: the rights' five reads,
+  then one statement per table with `workspace_id = any($1)`, **38 statements whatever the number of workspaces**; a
+  workspace the person may not read is never read. Contract test: `tests/contract/catalog.test.ts` (Postgres in its own
+  database `{name}_catalog`).
+- **The module** `src/modules/infocatalog/` (its `domain` part: `search.ts`, the tabs with "All" first, the counts, the
+  first 200 and how many more, the order), `"infocatalog"` in `eslint.config.mjs`, four probes in
+  `tests/layer-rules.test.ts`.
+- **The contributions** (`src/compose/catalog.ts`): InfoCube's five kinds (`src/modules/infocube/domain/catalog.ts`,
+  only where it is on) and InfoDocumenter's `documentsIncluding` (`src/modules/infodocumenter/domain/catalog.ts`, C4).
+  Tests: `tests/catalog.test.ts` on the full demo.
+- **Data:** migration `20261127120000_infocatalog.sql` (`workspace.catalog_shown`, the CHECK with `infocatalog`),
+  `LICENSED_MODULES`, `MODULE_NAMES`, `Workspace.catalog_shown`.
+- **The bench** `scripts/bench-catalog.ts` (reference figures, no bar).
+
+**Deviations from the PRD and from § 12, with the reasons:**
+1. **The data change came forward from step 3.** The port's rights read the licence and the switch, and the contract
+   test needs both on Postgres, where the CHECK refuses `infocatalog` without the migration. So the migration, the
+   column and the licence value are in step 2. Step 3 keeps the settings' box and the command's field, `pg:licence` and
+   the stop for Łukasz's `pg:migrate`. Until then `dev:pg` from this branch would fail on the missing column; nothing
+   runs it before step 3's stop.
+2. **No format 19** (§ 6 proposed it). The local adapter reads a workspace without `catalog_shown` as off, in `readDb`,
+   with no format step, as slice 35 did for baselines (F7): an older file is never written back for it, so KB's archive
+   stays untouched even if a dev server of this branch ever opened it. No format test changes.
+3. **Two reads, not three.** § 3's `catalog.item` is `catalog.read` with one workspace's scope; the drawer's lookups are
+   the domain's (step 6). An unreadable workspace's read answers `null` either way.
+4. **The rights function is in `permissions.ts`**, not a new file beside it (the prompt's place).
+5. **The matching and ranking are InfoMapper's domain** (`src/domain/catalog/match.ts`); the search over a read (tabs,
+   counts, the limit, the order) is InfoCatalog's (`search.ts`). Its parts other than `domain` come with the screens.
+6. **Left for step 6, where they are used:** `canvasesShowing` and the source system's last import (`source_import`,
+   one more table in the read).
+7. **The order of ties:** a tab's kinds before the workspace (in "Classifications and stereotypes" every classification
+   comes before every stereotype), then the workspace's place in the scope (by name, compared by code unit, not by a
+   locale), then the model order.
+8. **Assumption to confirm:** a document **from a baseline** is never listed as including a live item (it shows the
+   baseline's state); only documents from the live model are.
+
+**Łukasz's answers (28 November 2026):** deviations 1 to 7 are accepted, as Claude's technical calls, quoted at the
+closing. The assumption (8) is confirmed: a document made from a baseline is never listed as including a live item;
+only documents from the live model are.
+
+**Figures** (`npx tsx scripts/bench-catalog.ts`, the local adapter and a Postgres cluster on 127.0.0.1, medians of 9;
+the model as in step 1, with the demo's workspaces: 5,626 items at KB's size, 21,904 at four times):
+
+| | KB's size, local | KB's size, Postgres | 4 × KB, local | 4 × KB, Postgres |
+| --- | --- | --- | --- | --- |
+| `catalog.read` | 9.0 ms (6.5 ms in a second run) | 86.2 ms (38 statements) | 71.1 ms (65.4 ms) | 298.7 ms (38 statements) |
+| the index (items, folded) | 25.3 ms | 24.0 ms | 84.9 ms (94.7 ms in a second local run) | 63.4 ms |
+| a search ("customer" / "a" / "qqqq") | 3.9 / 4.3 / 0.4 ms | 2.8 / 3.6 / 0.4 ms | 4.7 / 11.9 / 1.4 ms | 4.2 / 11.0 / 1.4 ms |
+
+On a local cluster the 38 statements take about as long as step 1's 296 (the rows' transfer dominates there); online
+each statement is a round trip, which is where the fewer statements count (step 7 measures it on `dev:pg` and the
+preview). The first fold of the index cost 300 ms at four times KB; the whole-string fast path brought it to 64–85 ms.
+
+**Checks:** lint and typecheck clean; `npm test` 222 files, 2,663 passed, 15 skipped; the whole contract suite on a local
+Postgres 18.3 with `INFOMAPPER_CONTRACT_DB` (54 passed) and `schema:check` (47 tables, 627 columns, RLS on every table).
+
+**Step 2's full run:** [run 46080324317](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46080324317)
+on `e3196cc`: success, 926 passed, 16 skipped, 0 failed, 0 flaky; wall clock 15 min (23:03:55 to 23:19:07 UTC);
+the longest parts 6 and 8 (13.7 min each); part 6's heap peak 1,181 MB of 8,039 MB, no restart.
+
+## Step 3: the switch and the licence (28 November 2026)
+
+**Built:**
+- **The command:** `updateWorkspaceSettings` takes `catalogShown` (Zod, strict) with InfoCatalog's licence state: on only
+  with the licence (`"{organization} has no InfoCatalog licence."`), off at any time; `workspace.edit_settings` (owners,
+  admins), an archived workspace refused; one change event of the workspace row, no undo step (`workspace` is outside
+  undo). The action reads the licence state only when the input has the field (`licenceState`, now shared with
+  InfoDocumenter's). Tests: three cases in `src/domain/commands/workspace.test.ts`.
+- **The box** `src/modules/infocatalog/app/settings-box.tsx`, after InfoDocumenter's through `settingsBoxes`, **only
+  while the organization holds the licence**: the heading "InfoCatalog", the check box "Shown in InfoCatalog to everyone
+  in the organization" (the shared `Check`) and the PRD's line under it, `aria-describedby` to it; enabled for owners
+  and admins outside an archived workspace; on the workspace's save chain (`saveRow`, `useChoice`).
+- **`npm run pg:licence -- grant "<organization name>" infocube|infodoc|infocatalog`** (`scripts/pg-licence.ts`, the
+  grant in `scripts/lib/licence-grant.ts`): `INFOMAPPER_MIGRATION_URL` refused unless it is infomapper-dev
+  (`devTargetRefusal`, before any connection), the organization by its exact name (one live organization or a refusal),
+  one transaction, idempotent, its first owner as the author, no change event; it prints the target as host/database and
+  the outcome only, never the name. Tests: `tests/pg-licence.test.ts` (the arguments; the refused target, by running the
+  script) and `tests/contract/licence.test.ts` (on Postgres in `{name}_licence`: granted once, held the second time, an
+  unknown name and a shared name refused with nothing changed).
+- **E2E:** `e2e/slice-39/` (fixtures, helpers) and `S39-02-switch.spec.ts` (four tests: no box without the licence; an
+  owner on and off with the line, the toasts, the stored value and two change events; read only for a modeler and in an
+  archived workspace; another organization's licence shows the box in its workspaces only).
+
+**Deviations and open words (for Łukasz):**
+1. **The toasts are mine** (the PRD gives the label and the line only): "{workspace} is shown in InfoCatalog to everyone
+   in {organization}." and "{workspace} is shown in InfoCatalog to its members only." The box's heading is
+   "InfoCatalog" with a magnifier, as the modules' boxes have their name and mark.
+2. **A licence that ends while the switch is on** leaves `catalog_shown` stored as on, hidden with the box; without the
+   licence the catalog shows nothing anyway (`catalogReadable`), and the switch reads as on again if the licence comes
+   back.
+3. **S39-02's spec for the switch is its own file** (`S39-02-switch.spec.ts`); what the switch does in the catalog is in
+   S39-02's specs of steps 5 and 6.
+4. **No e2e for `pg:licence`:** a script against infomapper-dev only; its rules are the unit and contract tests above.
+5. `scripts/licence.ts` (the local file's) takes `infocatalog` since step 2 (`LICENSED_MODULES`); only its usage line
+   changed.
+
+**Checks:** lint and typecheck clean; `npm test` 223 files, 2,669 passed, 18 skipped (the Postgres-only suites skip
+without `INFOMAPPER_CONTRACT_DB`); `tests/contract/licence.test.ts` on a local Postgres 18.3 (3 passed); the touched
+specs as single files: `S39-02-switch.spec.ts` (4 passed), `S15-03`, `S25-01`, `S0-07` (6 passed).
+
+**Łukasz's migration** (postponed to step 7a, Łukasz, 28 November 2026): `pg:backup` from `dev`; `pg:migrate -- --dry-run` and `pg:migrate`
+from this branch; `pg:backup` again from this branch; the two backups' counts compared with `scripts/kb-counts.ts`. Then,
+for the acceptance, InfoMate's licence with `pg:licence` from this branch.
+
+**Step 3's full run:** [run 46082916804](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46082916804)
+on `43f7b0b`: success, 930 passed (step 2's 926 and S39-02-switch's 4), 16 skipped, 0 failed, 0 flaky; wall clock
+16.7 min (23:31:00 to 23:47:39 UTC); the longest part 11 (15.2 min, with `slice-39`), then part 2 (13.0 min); part 6's
+heap peak 1,843 MB of 8,039 MB (step 2's run: 1,181 MB), no restart. Part 6's peak is near the "about 2 GB" of the
+heap rule, which counts garbage not yet collected; part 11 is now the longest by more than a minute in this run, so the
+recut rule (the median of the last three full runs) is checked again at steps 4 and 7.
+
+**Łukasz's answers (28 November 2026):** step 3's deviations 1 to 4 are accepted, as Claude's technical calls, quoted
+at the closing. The migration on `infomapper-dev` and InfoMate's licence are postponed to just before step 8 (§ 12, 7a).
+
+## Step 4: the landing zone and "All apps" (28 November 2026)
+
+**Built:**
+- **`/`** (`src/app/page.tsx`): for a person who reads the InfoCatalog of at least one of the unlocked organizations
+  (`store.catalog.readable`), the landing zone (`src/compose/catalog-pages.tsx` → `src/modules/infocatalog/app/landing.tsx`,
+  words in `landing-words.ts`): the bar "InfoLabs apps" (`src/app/_components/platform-bar.tsx`: the apps button, the
+  title, the account with the theme, "Change password…" online and "Sign out"), the greeting by the browser's hour
+  (`greeting.tsx`, hidden until the page runs, so the server's hour is never shown), the lead line and the two tiles with
+  the PRD's texts, bullets (InfoCatalog's third: "Where each item is used, on canvases and in documents") and counts.
+  "Open InfoMapper" is `/?to=workspace` (today's redirect); "Open InfoCatalog" is `/catalog?org={organization}`. Without
+  a readable catalog `/` redirects exactly as before.
+- **The organization-password sign-in** (`signInWithPasswordAction`): without a `next`, `/` when the person reads a
+  catalog with the organizations unlocked now; otherwise as before.
+- **"All apps"** in the top bar (`AllApps` in `top-bar.tsx`, a 28 px link on `iconButtonVariants`), directly before the
+  organization switcher, on the phone too, while the person reads the shown organization's catalog (`ShellData.allApps`,
+  `opensCatalog` in `permissions.ts`: one more read per page, the organization's licences).
+- **`/catalog`** (`src/app/catalog/page.tsx`): `notFound()` (the app's not-found page) without a readable catalog, and for
+  an `?org=` the person does not read; every other address under it has no route and is not found too. With the licence
+  it shows its bar ("InfoCatalog", the organization, the account); step 5 adds the search.
+- **Specs:** `S39-01.spec.ts` (five tests: without the licence; the landing zone, its texts and counts, "All apps" both
+  ways; the password sign-in; a guest; several organizations) and `S39-01-room.spec.ts` (S6A-10's twelve widths, S38-02's
+  long names at 1,280, 1,440 and 1,920 px, and S38-06's 390 px, all with the licence). `S39-02-switch.spec.ts` signs in
+  with the step's helper, which waits for the landing zone or a workspace (`signInTo`). Unit tests: `opensCatalog`, the
+  greeting's hours and the count lines (`tests/catalog-landing.test.ts`).
+
+**The widths with "All apps"** (S39-01-room's print): from 2,560 to 800 px nothing past the bar, no overlap, no scroll;
+the switchers 80–88 px at their smallest (800 to 1,300 px, above their 56 and 44 px); the working context's label 106 px
+at 1,280, 1,440 and 1,920 px; with S38-02's long names a cut name keeps 183 px (the organization at 1,280 px, against
+180), 210 px (workspace and project at 1,280 and 1,440 px); at 390 px the organization switcher 54 px, the workspace's
+79 px, the project's 72 px, no page scroll.
+
+**Deviations (for Łukasz):**
+1. **The landing zone shows when the person reads a catalog** (a licensed organization they are a member of), not on a
+   licence alone: a person who is only a guest in licensed organizations gets no landing zone and goes straight to
+   InfoMapper, since the guest rule leaves their landing zone without the InfoCatalog tile.
+2. **"All apps" follows the same rule for the shown organization** (its licence and the person its member), so a guest
+   in a licensed organization's workspace has none.
+3. **The InfoCatalog tile's count comes from one catalog read** of the organization (its items in the tabs' kinds), not
+   from a count per table (§ 11 proposed counts); one read per landing, measured at 9 ms (local) to 86 ms (local
+   Postgres) at KB's size in step 2.
+4. **The landing zone and the catalog have their own bar** (`bar-platform`, the prototype's `bar()`), not InfoMapper's
+   top bar; its account menu has no workspace role and no workspace links, which these pages have none of. Its title is
+   the prototype's "InfoLabs apps".
+5. **`/catalog` with the licence holds its bar only** until step 5.
+6. "last: {name}" names the last used workspace (the cookie) among the unlocked ones, else the first.
+
+**A flake in an earlier spec:** `S8-06` (the first test) failed once in the batch of the touched specs: its click on the
+organization switcher came right after the full page load that the organization-link form causes, before the page was
+hydrated, so the menu never opened (the spec waits for the address only, not for `hydrated`). It passed three times of
+three on its own (the single-file check), and nothing of this step runs on that path (no licence in that spec). Not
+changed here: a race in an earlier spec is fixed on its own `fix/` branch (The slice cycle, 4); I propose one.
+
+**Checks:** lint and typecheck clean; `npm test` 224 files, 2,672 passed, 18 skipped; the touched specs as single files:
+`S39-01` and `S39-01-room` (8 passed), `S39-02-switch` (4 passed), S0-01, S0-06, S8-01, S8-04, S8-05, S8-06,
+`fixes/session-change-full-load`, S38-02, S6A-10, S16-08, S38-06, S30-09-room and S4P-09 (all passed, S8-06 after the
+flake above, 3 of 3).
+
+**Łukasz's answers (28 November 2026):** step 4's deviations 1 to 6 are accepted, as Claude's technical calls, quoted
+at the closing. **The S8-06 flake stays for its own `fix/` branch after this slice.** What was found: in its first test,
+after the organization-link form for Retail Co (`panel-organization-link`), the spec waits for the address of Sales
+analytics only (`toHaveURL`) and then clicks `switcher-organization`. The form leaves by a full page load
+(`afterSessionChange`, `window.location.assign`), so the address matches as soon as the new document starts, before React
+has hydrated the top bar; a click in that moment reaches a button with no handler yet, the Radix menu never opens, and
+`menu-item-organization` times out after 60 s (the trace's page snapshot: the switcher focused, no menu). The fix is in
+the spec: wait for the page to be hydrated (slice 9's `hydrated`, or slice 8's `landed` with its enabled Back button)
+before the click. It failed once in a batch of 27 tests run together on the laptop and passed alone three times of
+three and in step 4's full run; no code of this slice is on that path (its seed holds no licence).
+
+**Step 4's full run:** [run 46127222726](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46127222726)
+on `f192bef`: success, 938 passed (step 3's 930 and S39-01's 8), 16 skipped, 0 failed, 0 flaky (S8-06 included);
+wall clock 15.5 min (08:44:41 to 09:00:10 UTC); the longest parts 1 (14.1 min), 3 (13.5 min) and 11 (13.4 min); part 6's
+heap peak 1,193 MB of 8,039 MB (step 3's run: 1,843 MB), no restart. Part 11 is not the longest in this run, so the recut
+rule asks nothing yet.
+
+**Łukasz's answers (28 November 2026):** step 4's deviations 1 to 6 are accepted, as Claude's technical calls, quoted
+at the closing; the S8-06 flake stays for its own `fix/` branch after this slice (what was found: above).
+
+## Step 5: search (28 November 2026)
+
+**Built:**
+- **`/catalog`** (`src/app/catalog/page.tsx`) renders the search's first answer on the server from the address
+  (`/catalog?org=…&q=…&scope=…&kind=…`, C7; `src/modules/infocatalog/domain/address.ts`: `stateOf`, read leniently, the
+  query cut at 200 characters, and `addressOf`); an organization or a workspace the person does not read is not found.
+  The browser asks again through `catalogSearchAction` (`src/app/catalog/actions.ts`) 150 ms after the last keystroke, or
+  at once for the scope and a tab; an older answer is dropped; the address follows with `history.replaceState` (no
+  navigation), so a reload shows the same search. Both run `catalogSearchView` (`src/compose/catalog.ts`): the rights in
+  the catalog index, one read, the index, the search and the page's view (`src/modules/infocatalog/domain/view.ts`).
+- **The page** (`src/modules/infocatalog/app/catalog-page.tsx`, layout B): the platform's bar (the apps button,
+  "InfoCatalog" with the organization, or the organization's select when more than one is licensed, the account); one
+  centred column of at most 1,100 px; the search field (the shared `Input`'s new `search` size, 52 px, radius 12, with a
+  magnifier; "/" puts the cursor in it outside a text field); the scope (`Select`: "Whole
+  organization (n workspaces)", "Workspace: {name}", archived ones "· Archived"); the kind tabs (`tabsListVariants` and
+  `tabVariants` with `TAB_COUNT`): "All" first, then InfoMapper's nine, then a module's where it is on in a workspace in
+  scope (`CatalogContribution.on`; InfoCube's five), a kind with no result disabled, the active tab clicked again back to
+  "All"; the results as a plain table (Item with the one-line definition, Kind, Details, Workspace when more than one is
+  in scope, Marks: "Personal data", a status, "Missing", "Retired", "Archived"), the matches as `<mark>` from the domain's
+  ranges, stacked below 900 px; "{n} results" above, "{n} more: narrow the search" below the first 200; an empty field:
+  "What are you looking for?", the prototype's six example searches and "Browse all {kind}" per tab with its count;
+  nothing found: the prototype's "Nothing found" and its line.
+- **Items** carry their kind's label (`CatalogItem.kindLabel`: "Source table", "View", "File", "Dimensional mapping" …).
+- **`ui:check`** (`scripts/ui-check.ts`): its own data file gives InfoMate the licence, the sign-in waits for the landing
+  zone or the top bar, and five screens: `landing`, `catalog-empty`, `catalog-search`, `catalog-long` and
+  `catalog-workspace`.
+- **Specs:** `S39-03.spec.ts` (eight tests: "/" and a search across the layers with the ranking, the highlight and a
+  reload; every word and nothing found; Polish letters; long names at 1,280 and 390 px; the tabs and InfoCube's; the
+  scope; the marks and the empty field; the first 200 and the rest) and `S39-02.spec.ts` (Anna with a role; a member
+  without a role, the switch off, on and off again, by the results, the scope list, the address and the landing tile's
+  count; Kasia the guest). Unit tests: `src/modules/infocatalog/domain/view.test.ts`.
+
+**Deviations (for Łukasz):**
+1. **The search runs on the server per request through a server action** (`catalogSearchAction`), the address kept with
+   `history.replaceState`: C1 and C7 as built. The page itself renders the first answer, so a reload or a link shows the
+   same search without a request from the browser.
+2. **"{n} results" above the table** (the prototype's summary, without its Markdown button) and **"Nothing found"** with
+   the prototype's line; the PRD names neither.
+3. **A kind with no result is disabled and stays in the row** (as Łukasz's step 5 instruction says); the prototype's
+   layout B hides it.
+4. **The example searches are the prototype's six** whatever the model holds; a search that finds nothing in a model
+   says so.
+5. **The rows are not clickable yet:** the drawer is step 6.
+6. **The organization's select reloads the page** with that organization (a new state: no words, the whole
+   organization, "All").
+7. **The shared `Input` has a new size, `search`** (52 px, radius 12), the look of the prototype's search field; layout
+   classes stay at the call.
+8. **`ui:check`'s own data file now holds InfoMate's licence**, so "All apps" shows on every screen it checks (the
+   landing zone and the catalog need it); its sign-in waits for the landing zone or the top bar.
+9. **For the specs** the page's `<main>` says which answer it shows (`data-query`, `data-kind`, `data-scope`): the
+   address changes before the answer arrives, so a spec waits for the answer, not the address.
+
+**The bench** (`npx tsx scripts/bench-catalog.ts`, with `BENCH_PG` a Postgres 18.3 cluster on 127.0.0.1, medians of
+9; the model of step 1: 5,626 items for 4,871, 21,904 for four times that; "the page's search" is `catalogSearchView`,
+what one request of the page runs less the session):
+
+| | 4,871, local | 4,871, Postgres | 4 ×, local | 4 ×, Postgres |
+| --- | --- | --- | --- | --- |
+| `catalog.read` | 6.7 ms | 88.6 ms (38 statements) | 67.4 ms | 292.6 ms (38 statements) |
+| the index | 32.9 ms | 24.2 ms | 64.4 ms | 63.3 ms |
+| a search ("customer" / "a" / "qqqq") | 4.2 / 3.5 / 0.3 ms | 3.0 / 3.8 / 0.4 ms | 4.6 / 12.8 / 1.6 ms | 5.1 / 12.7 / 1.8 ms |
+| **the page's search** ("customer" / "a") | **34.6 / 32.8 ms** | **111.2 / 120.9 ms** | **130.5 / 137.1 ms** | **379.1 / 388.6 ms** |
+
+Within the 1 s bar with room on a local database at four times the size; online each of the 38 statements is a round
+trip (step 7 measures it on `dev:pg` and the preview).
+
+**`ui:check`** (`npm run ui:check -- --label s39-step5 --only landing,catalog --widths 1280,1920,390`, the five screens at
+1,280 and 1,920 px light and dark and at 390 px light, 25 views): the first run found two spills on `catalog-empty` at
+1,280 and 1,920 px ("Browse all classifications and stereotypes" and "Browse all dimensional mappings" wider than their
+170 px cells; fixed: the label wraps) and a timeout on `catalog-long` (the demo has under 200 attributes; the screen is
+now a search for "e" over every kind). The second run: **no overlap, no spill, no crowded words, nothing past the edge,
+no small target, no cut text** on 24 views; `catalog-workspace` at 390 px stopped once on a navigation abort (no finding)
+and was clean on its own run (`s39-step5-390`). Reports: `.data/ui-check/s39-step5-20261128-1042/` and
+`.data/ui-check/s39-step5-390-20261128-1044/`.
+
+**Checks:** lint and typecheck clean; `npm test` 225 files, 2,676 passed, 18 skipped (the own-model guard caught a test
+that used "KB" as an example name; renamed, and the bench names no organization); `e2e/slice-39` as single files: 23
+passed (S39-01 5, S39-01-room 3, S39-02 3, S39-02-switch 4, S39-03 8). No full run in this step (C10): nothing here
+touched the local adapter, the undo, the save chain or the canvas.
+
+**To see the search locally** (the shared checkout on `slice/39-infocatalog-entry-and-search`; the demo's own file
+`.data/demo-db.json`, never `.data/dev-db.json`): `npm run demo` (it seeds the file if it is missing; http://127.0.0.1:3001),
+then in another terminal `npx tsx scripts/licence.ts grant "InfoMate" infocatalog --file .data/demo-db.json`; sign in as
+Łukasz: the landing zone, then "Open InfoCatalog". `npm run demo -- --reset` starts the demo afresh (the licence again
+after it).
+
+**Łukasz (28 November 2026):** step 5's deviations 1 to 9 are accepted; they are Claude's technical calls, quoted at the
+closing.
+
+## Step 6: the drawer and Open in InfoMapper (28 November 2026)
+
+**Łukasz's two corrections within the step:**
+1. **The platform is InfoLabs, not InfoMate.** The landing zone's bar says "InfoLabs apps" (`landing-words.ts`,
+   `platform-bar.tsx`'s comment, `S39-01.spec.ts`, this document: step 1's § 11 and step 4's notes now read "InfoLabs
+   apps"); the catalog's bar says "InfoCatalog" and the organization, as before. The demo organization "InfoMate" and the
+   demo e-mail addresses stay: they are test data. The design system's artifact is now "InfoLabs Design System"; no doc
+   in the repository names it for the current state (slice 37's PRD names it historically and stays, as do the
+   prototype's comments).
+2. **The catalog's pages are white.** The landing zone and `/catalog` have the surface background (`bg-im-surface`, in
+   place of `bg-im-canvas`), as the prototype's layout B shows and the design system's first principle says ("white
+   first, only the canvas grey"); the tiles keep their hairline border, as the cards on InfoMapper's homes do; dark mode
+   follows the same tokens. Checked with `ui:check` at 1,280 px light and dark (below).
+
+**Built:**
+- **InfoMapper's domain first** (guardrail 4):
+  - `src/domain/model/relationship-sentences.ts`: the relationship read as two sentences (`relationshipSentences`,
+    `cardinalityPhrase`, `asRole`), moved out of the relationship panel, which now uses it (the same words);
+  - `src/domain/catalog/canvases.ts`: `canvasesShowing` (step 2's postponed chooser, Q9): the canvases whose cards show
+    the item (its entities', source tables' and, new, requirements' cards: `CatalogItem.anchors.requirements`), every
+    project's, a canvas showing every anchor first (a mapping's both ends, a relationship's both entities), then one
+    showing some ("in part"); the projects in the order made, each in tab order; a canvas in two projects under each;
+    each with the arrival parameters that select the item (`CatalogItem.open`: `?entity=`, `?row=` for an attribute, a
+    column, a measure or a key, `?map=`, `?rel=`, `?card=source:` for a table, `?req=`, `?ext=cube_mapping:`; a concept
+    through its first entity's card);
+  - `src/domain/catalog/details.ts`: `coreCatalogDetails` per kind (§ 7's table): characteristics (a label and its text,
+    links or a time), texts (definition, rule, comment, note) and the items one step away in groups (the first 50,
+    `GROUP_LIMIT`, then "and {n} more"); every link names an item the catalog has, so every link opens. A table's
+    characteristics name its system's last import. A requirement's owner says "from InfoMapper" (A3.4).
+- **InfoCube's kinds' details** through its contribution (`CatalogContribution.details`, `cubeCatalogDetails`): a fact's
+  type, factless, grain, aggregate of, its measures, keys and dimensional mappings; a dimension's kind, history and
+  unknown member; a measure's fact and additivity; a key's fact, dimension and role; a dimensional mapping's inputs,
+  target, kind, lookup, status and approver.
+- **The read** (`src/compose/catalog.ts`, `catalogItemView`): the item's workspace read with its own scope through
+  `store.catalog.read` (the rights inside the port), the item found among the workspace's catalog items, its details,
+  `canvasesShowing`, the documents through `documentsIncluding` (C4: a shared one or the reader's own, never another's
+  private one, none without a role), the workspace's owners by name; for a table one more read, its system's last import
+  (`store.model.listImports`), after the rights. Null, the page's "not found", for an item of a workspace the person may
+  not read, one that does not exist, or a reference that is not one; never another answer.
+- **The item's address** (C7): `/catalog?…&item={kind}:{workspaceId}:{id}` (`src/modules/infocatalog/domain/item.ts`,
+  `parseItemRef`; `CatalogState.item`). The page renders it from the server, so a link opens the drawer in a new page;
+  the browser asks for another item with `catalogItemAction`.
+- **The drawer** (`src/ui/components/drawer.tsx`, a new shared component: `Drawer`, `DRAWER_ROOM`, `DRAWER_HEADING`,
+  `DRAWER_LINK`, `DRAWER_INLINE_LINK`): 560 px from the right under the 48 px bar, the screen's width on a phone; from
+  1,100 px the page's column moves left and keeps clear of it (the results stay clickable), narrower a light scrim covers
+  the page and a click on it closes the drawer. Mounted only while open; it slides in.
+- **The page** (`catalog-page.tsx`, `item-drawer.tsx`): a result's row opens on a click or Enter (the row is focusable,
+  `aria-current` while open); ↑ ↓ or j k move through the results and the drawer follows, outside a text field; Esc
+  closes it; the address follows (`replaceState`). The drawer: "↑ ↓ next item · Esc closes", "← Back" after a connected
+  item, close; the kind, the name (it wraps), the path, the workspace with "(archived)", "From InfoMapper · read only",
+  the marks; "Open in InfoMapper" or, without a role, "You have no role in {workspace}. Ask its owner for access:
+  {owners}."; the texts; "Characteristics from InfoMapper"; the connected groups; "Context": "Canvases that show it"
+  (each opens its canvas with the item selected; "in part" where it shows only some of the item) and "Documents that
+  include it" ("Shared" or "Private, yours"). No Lineage or Impact section.
+- **Open in InfoMapper** (`openHref`): the first canvas of the Context list with its arrival parameters and `from=catalog`;
+  a classification or a stereotype the workspace home's Metadata conventions tab; an item on no canvas the workspace's
+  home with `?gone=off-canvas&item={kind}:{id}`, whose toast "{name} is not on any canvas." reads the name on the server
+  (`offCanvasNotice`; the name never travels in the address; `GoneNotice`'s new `drop` removes `item` with `gone`).
+- **The arrival:** `?req=` with `from=catalog` centres the requirement's card when the canvas has one (`ModelCanvas.tsx`,
+  the requirement's arrival effect, `centerRequirement`); the other parameters are unchanged.
+- **"← Back to InfoCatalog"** (`src/app/_components/catalog-back.tsx` in the navigation row after Back and Forward;
+  `src/ui/catalog-return.ts`): "Open in InfoMapper", a Context canvas or a document keeps the catalog's address and the
+  workspace in the tab's `sessionStorage` (`im-catalog-return`, read back through `safeCatalogPath`: only `/catalog`
+  and its query); the row shows the way back while the page is of that workspace; the catalog opening again, or a page
+  of another workspace, ends it.
+- **Specs:** `S39-04.spec.ts` (eleven tests: the drawer at 1,280 px with the column moved and another result clicked; the
+  scrim at 900 px; Enter, ↓ ↑, j k and Esc; a connected item and "← Back" twice; an item's address in a new page and
+  "not found" for an item without the right, one that does not exist and a reference that is not one; a table's last
+  import and declared key; long names at 1,280 and 390 px; Anna's documents (the shared one and her own, never Łukasz's
+  private S2T), Łukasz's (his own, never Anna's); a reader without a role; a search typed with the drawer open) and
+  `S39-05.spec.ts` (five: an entity on its first canvas, selected and in view, "← Back to InfoCatalog" from another page
+  of the workspace back to the search, tab and item, and gone once the catalog opened again; a mapping and a relationship
+  selected; a column on its table's card and REQ-104 on its card; an item on no canvas; each Context canvas, and a
+  classification's Metadata conventions tab). The fixtures have `seed` "docs" (InfoDocumenter's demo). Unit tests:
+  `tests/catalog-drawer.test.ts` (the chooser and every kind's details on the full demo, every link an item),
+  `src/ui/catalog-return.test.ts` (the way back's address), `view.test.ts` (the item's address).
+
+**Deviations (for Łukasz):**
+1. **"Not found" is the app's not-found page** for an item's address the person may not read, one that does not exist or
+   an odd reference, the same answer as an unreadable `scope` (step 1's § 5 proposed a toast and asked; the page keeps
+   the rule one). In the page, an item that went away meanwhile closes the drawer with "That item is not in
+   InfoCatalog.".
+2. **A classification or a stereotype opens the workspace home's Metadata conventions tab**, where they are listed and
+   edited; they are on no canvas, and "{name} is not on any canvas" would say nothing useful.
+3. **A concept opens on the first canvas that shows one of its entities, that entity's card selected** (a concept has
+   no card or panel of its own on a canvas).
+4. **The connected items** follow § 7 and the PRD, and add each traced kind's "Requirements" (an entity's, an
+   attribute's, a mapping's, a table's, a column's) as the reverse of a requirement's "Traced to"; an empty group is not
+   drawn.
+5. **The item's address replaces the current history entry** (as the search's state does); "← Back" in the drawer is the
+   drawer's own list, lost on a reload.
+6. **The Context's canvases** are links only for a person with a role (a reader without one sees their names); a
+   canvas that shows only part of the item says "in part".
+7. **The relationship panel's sentences moved into the domain** (guardrail 4); the panel's words are unchanged.
+8. **`?req=` centres the requirement's card** when the canvas has one, **only on an arrival from the catalog**
+   (`from=catalog`, `ModelCanvas`'s `centerRequirement`): the project home's requirements keep opening the canvas at its
+   stored view (slice 4a). The first full run (46145963757, `48f9667`) failed S4A-13 when every `?req=` centred: the
+   spec clicks a Customer row at the stored view.
+
+**`ui:check`:**
+- the drawer (`--only catalog-drawer --widths 1280,1920,390`: two new screens, an entity with its context and a source
+  table, at 1,280 and 1,920 px light and dark and at 390 px light, 10 views): **no finding** (report
+  `.data/ui-check/s39-step6-drawer-20261128-1339/`);
+- the landing zone and the search page white (`--only landing,catalog-empty,catalog-search --widths 1280`, light and
+  dark, 6 views): **no finding** (`.data/ui-check/s39-step6-white-20261128-1341/`).
+
+**Checks:** lint and typecheck clean; `npm test` 227 files passed and 2 skipped, 2,688 tests passed and 18 skipped; `e2e/slice-39` and the
+earlier specs this step touched (S1B-06 and RP-04, RP-14: the relationship's sentences; S7B-13, S7B-14 and S38-03: the
+project home's `?req=` and lines) as single files: 54 passed. **A full run** (the step touched the canvas's arrival and
+the shell's navigation row, not the local adapter):
+- run [46145963757](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46145963757) on `48f9667`: S4A-13
+  failed (part 3) because every `?req=` then centred the requirement's card; fixed in `4f34b1d` (deviation 8), S4A-13 and
+  S39-05 passed on their own;
+- run [46147574548](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46147574548) on `4f34b1d`, 19 min 45 s:
+  **964 passed, 1 failed, 16 skipped, 0 expected failures**. The failure is S8-06 (part 5, a click timing out), the flake
+  of step 4 left for its own `fix/` branch; the single-file check
+  [46149275415](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46149275415) passed it in 3 of 3 rounds.
+  Parts' times 11:28, 11:01, 14:59, 12:28, 9:52, 13:25, 11:10, 13:31, 7:17, 5:28, 18:14; heap peaks 1,315, 1,410, 1,168,
+  1,121, 1,231, **1,198 (part 6)**, 1,406, 1,194, 1,187, 1,456, 1,442 MB of 8,039 MB.
+
+**Łukasz (28 November 2026):** step 6's deviations 1 to 8 are accepted. 2, 3, 4 and 6 are Łukasz's; 1, 5, 7 and 8 are
+Claude's technical calls, quoted at the closing. Two changes to the plan (§ 12): S8-06's race is fixed before step 7 on
+its own branch (6a); the timing on `dev:pg` moves after his migration (7b), so step 7 is ui:check, the bench and a full
+run.
+
+## Step 6a: S8-06's race (28 November 2026)
+
+`fix/s8-06-switcher-ready` from `dev` (`b93ebe4`): after the sign-in form's redirect the address is the new page's before
+React has hydrated it, so a click on the organization switcher then opened nothing. Both tests of `S8-06.spec.ts` wait
+for slice 9's `hydrated` first (test only; a note in `slice-08-acceptance.md`). The single-file check, 10 rounds
+(run 46151147885): 10 of 10, both tests in every round. Pull request 102, head
+`0ec5b42268cf340ed72efd366403b82c9be2720b`, merged into `dev` on Łukasz's command as a merge commit,
+`8e8101fe0f9ab88819b2ff9dc29b02e42c889800`, no tag. The repository deletes a merged head branch by itself ("Automatically
+delete head branches"); the branch was pushed back at its head at once, as Łukasz asked it kept. `dev` merged into this
+branch (`2463e76`).
+
+## Step 7: the after checks, without `dev:pg` (28 November 2026)
+
+**`ui:check`** (`npm run ui:check -- --label s39-step7 --only landing,catalog --widths 1280,1440,1920,390`): seven
+screens (`landing`, `catalog-empty`, `catalog-search`, `catalog-long`, `catalog-workspace`, `catalog-drawer-entity`,
+`catalog-drawer-table`) at 1,280, 1,440 and 1,920 px light and dark and at 390 px light, 49 views: **no overlap, no spill,
+no crowded words, nothing past the edge, no small target, no cut text**. Report: `.data/ui-check/s39-step7-20261128-1501/`.
+
+**The bench** (`npx tsx scripts/bench-catalog.ts` with `BENCH_PG` the Postgres 18.3 cluster on 127.0.0.1, medians of 9;
+5,626 items for 4,871 rows, 21,904 for four times that; on `2463e76`):
+
+| | 4,871, local | 4,871, Postgres | 4 ×, local | 4 ×, Postgres |
+| --- | --- | --- | --- | --- |
+| `catalog.read` | 6.3 ms | 89.2 ms (38 statements) | 57.5 ms | 297.8 ms (38 statements) |
+| the index | 26.3 ms | 26.2 ms | 65.8 ms | 66.7 ms |
+| a search ("customer" / "a" / "qqqq") | 3.7 / 5.2 / 0.4 ms | 2.9 / 4.2 / 0.4 ms | 5.4 / 13.7 / 1.7 ms | 4.7 / 14.0 / 1.7 ms |
+| **the page's search** ("customer" / "a") | **34.8 / 37.1 ms** | **113.7 / 112.5 ms** | **130.7 / 141.3 ms** | **373.5 / 385.0 ms** |
+
+Step 5's figures within their spread; the drawer's item is one workspace's read and is not benched (step 7b times it on
+`dev:pg`).
+
+**The full run:** [46152508526](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46152508526) on
+`2463e76`, 18 min 55 s: **965 passed, 0 failed, 0 flaky, 16 skipped, 0 expected failures**. Parts' times 10:04, 9:29,
+12:09, 9:07, 7:42, 8:35, 8:01, 14:00, 5:54, 5:53, 17:22; heap peaks 1,209, 1,548, 1,447, 1,587, 1,661, **1,689 (part 6)**,
+1,571, 1,214, 983, 1,414, 1,444 MB (limits 7,898 to 8,041 MB). Part 11 (with `e2e/slice-39`) is the longest; the recut
+rule is checked at the closing on the last three full runs.
+
+## Step 7a: Łukasz's migration and licence (28 November 2026)
+
+Run by Łukasz, one command at a time:
+- `pg:backup` with the checkout on `dev`: `kb-20261128-1523.json`, 4,894 rows.
+- On this branch, `pg:migrate -- --dry-run` listed only `20261127120000_infocatalog.sql`; `pg:migrate` applied it (26
+  applied before).
+- `pg:backup` again: `kb-20261128-1525.json`, 4,894 rows. All 38 tables have equal counts; the file is 22 bytes larger,
+  the one workspace's `catalog_shown` false.
+- `pg:licence -- grant "InfoMate" infocatalog`: "The organization holds the infocatalog licence now." KB's organization
+  has no licence.
+
+## Step 7b: the timing on `dev:pg` (28 November 2026)
+
+**How:** the timing record (AD-37, step 1's choice): the landing zone and `/catalog` render `<TimingRecord />` last (the
+landing zone's through `LandingPage`'s `timing` slot, after its read); `catalogSearchAction` and `catalogItemAction` log
+one line of numbers each (`withTiming`, routes `catalog-search` and `catalog-item`). The measuring spec
+`e2e/slice-29/S39-measure.spec.ts` (MEASURE=1 only, the Postgres folder, never in the full run) ran against `npm run
+dev:pg` with `INFOMAPPER_TIMING=1` (launch configuration `infomapper-pg-timing`) on `infomapper-dev`, with the demo
+accounts only (`lukasz@infomate.pl`, `anna.nowak@infomate.pl`): 2 tries discarded, then 7 counted. "Shown" is the
+browser's time from the action (the last keystroke, which includes the 150 ms wait, or the click) until the answer is on
+the screen. Nothing was written and no switch changed. `dev:pg` was stopped afterwards; nothing of the measurement is
+running.
+
+| What | Shown, median (fastest–slowest) | The action's request | The server's record |
+| --- | --- | --- | --- |
+| Łukasz: the landing zone | 4,309 ms (3,620–4,876) | | 4,018 ms read, 48 statements |
+| Łukasz: the first search page | 3,840 ms (3,357–4,169) | | 3,503 ms read, 47 statements |
+| Łukasz: "customer" as typed | **3,998 ms** (3,976–4,039) | 3,403 ms | 47 statements, about 3.3 s of them |
+| Łukasz: "a" as typed | **4,072 ms** (3,977–6,573) | 3,588 ms | 47 statements |
+| Łukasz: "customer number" as typed | **3,952 ms** (3,920–4,456) | 3,501 ms | 47 statements |
+| Łukasz: an item in the drawer | 3,152 ms (2,993–4,047) | 2,607 ms | 47 statements, about 2.4 s of them |
+| Łukasz: Open in InfoMapper (the canvas page) | 5,774 ms (5,584–7,566) | | 4,023 ms read, 126 statements |
+| Anna: "customer" as typed | **2,940 ms** (2,903–3,402) | 2,598 ms | 47 statements, about 2.4 s of them |
+| Anna: "a" as typed | **3,098 ms** (2,970–4,004) | 2,685 ms | 47 statements |
+| Anna: "customer number" as typed | **2,925 ms** (2,907–3,454) | 2,647 ms | 47 statements |
+| Anna: an item in the drawer | 3,168 ms (3,143–3,717) | 2,865 ms | 47 statements |
+
+**The 1 s bar (S39-03) is missed on `dev:pg`:** a search shows 2.9 to 4.1 s after the last keystroke.
+
+**What dominates:** the database's round trips from the laptop. Every search and every item makes 47 statements one
+after another (the session and the rights, then the catalog's read of 38 statements). The statements are 95 to 97 % of
+the server's time (`statementMs` 2.4 to 3.6 s of `totalMs` 2.5 to 3.8 s); the index, the search and the answer take the
+rest, as in the bench (25 to 40 ms). A bare `select 1` from the laptop to `infomapper-dev` takes 48 ms (median of 25,
+38–65 ms), and 47 × 48 ms is 2.3 s, nearly all of Anna's 2.45 s. Łukasz's further 0.9 s is the larger rows his read
+carries ("Performance test", where Anna has no role). The bench, on a Postgres on the laptop where a round trip costs
+almost nothing, answers the same search in 0.11 s at KB's size.
+
+**Not measured, an assumption:** on the preview (Vercel `fra1`, beside Supabase's Frankfurt) a round trip is a few
+milliseconds, so a search would answer well within the bar. Only `dev` deploys there, so it can be measured only after
+the merge. Per the slice cycle (6) nothing was optimised; Łukasz decides.
+
+**Options for Łukasz** (none taken):
+- **(a)** Accept `dev:pg`'s figures as the laptop's distance to Frankfurt, and measure on `dev`'s preview right after the
+  merge (the same spec with `PG_BASE_URL=<dev's preview>`), with the bar there; if the preview misses it, (b).
+- **(b)** Fewer round trips: the catalog's read as one statement (each table's rows as JSON in one query) or the tables
+  read in parallel on more than one connection, and the session's and the rights' reads joined. It changes both adapters'
+  shared read path (a contract test exists) and C1's one statement per table.
+- **(c)** A short-lived cache of a scope's read per person: within the bar after the first search, but stale for that
+  time (guardrail 5's live updates), and more to get right.
+
+**Found while measuring:** now that InfoMate holds the licence on `infomapper-dev`, the Postgres smoke set's `signIn`
+(`e2e/slice-29/helpers.ts`, `landed`, which waits for InfoMapper's top bar) stops at the landing zone for Łukasz and
+Anna when run against `dev:pg` or the preview. CI's smoke job is not affected (its local stack has no licence). To fix in
+the closing: `landed` accepts the landing zone, or the smoke specs open `/?to=workspace`.
+
+## Step 8: Łukasz's acceptance (the list)
+
+On `npm run dev:pg` with the checkout on `slice/39-infocatalog-entry-and-search`, at http://localhost:3000, with the
+demo accounts and the demo password; never KB's account. Expect each search to take about 3 s on `dev:pg` (step 7b).
+
+**As Łukasz** (`lukasz@infomate.pl`):
+1. Sign in. You see the landing zone, white: "InfoLabs apps" in the bar, the greeting with "Łukasz", the lead line, and
+   two tiles. InfoMapper says "Model and map" and "{n} workspaces you belong to · last: …". InfoCatalog says "Find and
+   describe", NEW, its third bullet "Where each item is used, on canvases and in documents", and "{n} items in {m}
+   workspaces of InfoMate".
+2. Click "Open InfoMapper". A workspace opens; the top bar has "All apps" (four squares) before the organization's name.
+3. Make the workspace without Anna (C9): click the workspace's name in the top bar. In the menu's last row, type
+   "Lighthouse Źródło programme" in "New workspace, press Enter", pick "Polski" in the select beside it, and press Enter.
+   The new workspace opens, with you as its only member (its owner).
+4. In it, open the tab "Settings". The box "InfoCatalog" has "Shown in InfoCatalog to everyone in the organization",
+   unticked. Leave it off.
+5. Click "All apps", then "Open InfoCatalog". The search page is white. The scope's select has "Whole organization (n
+   workspaces)" and, among the others, "Workspace: Lighthouse Źródło programme" (you have a role there).
+6. Type "customer". The entity Customer is first, the word highlighted; the tabs show counts, "All" first, a tab with 0
+   disabled; InfoCube's tabs (Facts, Dimensions, Measures, Keys, Dimensional mappings) come after InfoMapper's.
+7. Type "zrodlo rekordu". The classification "Źródło rekordu" of Lighthouse Źródło programme is found, "Źródło" and
+   "rekordu" highlighted as written, and the Workspace column names the workspace.
+8. Type "a". 200 rows, then "{n} more: narrow the search". Click the tab "Source columns": only columns.
+9. Pick "Workspace: Retail Co – DWH" in the scope: the Workspace column goes. Reload the page: the same search, tab and
+   scope.
+10. Clear the field: "What are you looking for?", six example searches, and "Browse all …" with counts. Click "Browse
+    all mappings": every mapping with its status.
+11. Search "customer" again and click the row Customer (entity). The drawer opens from the right; the results move left
+    and stay clickable. It shows "Entity", "Customer", its path, "Retail Co – DWH · From InfoMapper · read only", "Open in
+    InfoMapper", the Definition, Characteristics, Attributes, Relationships, Requirements, and Context: "Canvases that show
+    it" and "Documents that include it" (the shared dictionary and your own S2T, never Anna's working dictionary). There is
+    no Lineage or Impact section.
+12. Press ↓ and ↑ (or j and k): the drawer follows the rows. Press Esc: it closes.
+13. Open Customer again, click the attribute "email", then its first mapping, then "← Back" twice: you are back on
+    Customer.
+14. Copy the address and open it in a new tab: the same drawer opens.
+15. In the drawer, click "Open in InfoMapper". "Customer & orders" opens with Customer selected and in view, and the
+    navigation row shows "← Back to InfoCatalog". Click it: the same search, tab, scope and item.
+16. Search "REQ-101", open it and click "Open in InfoMapper": the workspace's home says "REQ-101 Single view of the
+    customer is not on any canvas." "← Back to InfoCatalog" returns.
+17. Make the window narrower than 1,100 px and open an item: a light scrim covers the results, and a click on it closes
+    the drawer.
+
+**As Anna** (`anna.nowak@infomate.pl`; sign out from the account menu first):
+18. You see the landing zone; open InfoCatalog. The scope has Retail Co – DWH and "Bank X – Risk DWH · Archived", not
+    Lighthouse Źródło programme. "zrodlo rekordu" finds nothing of it.
+19. Search "customer" and open Customer: the documents are the shared dictionary and her own working dictionary, never
+    Łukasz's S2T.
+
+**The switch on:**
+20. Sign out and sign in as Łukasz. In Lighthouse Źródło programme, "Settings", tick "Shown in InfoCatalog to everyone in
+    the organization": the toast says it is shown to everyone in InfoMate.
+21. Sign in as Anna again. The scope now has "Workspace: Lighthouse Źródło programme", and "zrodlo rekordu" finds its
+    classification. Its drawer has no "Open in InfoMapper" but "You have no role in Lighthouse Źródło programme. Ask its
+    owner for access: Łukasz.", and no documents. Its address opened in a new tab works too.
+
+**The switch off:**
+22. As Łukasz, untick the switch. As Anna, the workspace is gone from the scope and the results, and its item's address
+    answers "not found".
+
+**As Kasia** (`k.zielinska@retailco.com`, a guest in InfoMate):
+23. Sign in: InfoMapper as before, no landing zone, no "All apps". `/catalog` answers "not found".
+
+**As Marek** (`m.lis@retailco.com`, Retail Co, which has no licence):
+24. Sign in: InfoMapper exactly as before, with no "All apps". `/catalog` answers "not found".

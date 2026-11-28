@@ -1,0 +1,232 @@
+// InfoCube's part of InfoCatalog (slice 39, C2 as answered): facts, dimensions, measures, keys and dimensional mappings,
+// each a tab of its own after InfoMapper's, searched only where InfoCube is on. Pure; joined by `src/compose/catalog.ts`.
+
+import type { CatalogContribution } from "@/domain/catalog/contribution";
+import { detailsKit, type CatalogDetails, type DetailsInput } from "@/domain/catalog/details";
+import type { CatalogItem, CatalogTab } from "@/domain/catalog/items";
+import type { Uuid } from "@/domain/ids";
+import type { WorkspaceSnapshot } from "@/domain/model/workspace-model";
+import { formatAttributeType } from "@/domain/model/type-check";
+import type { ModuleTable } from "@/domain/types";
+import type { CubeEntity, CubeKey, CubeMapping, CubeMappingInput, CubeMeasure, InfoCubeTable } from "./types";
+import { DIM_KIND_NAMES, FACT_TYPE_NAMES, historyLabel } from "./view";
+
+export const CUBE_CATALOG_TABLES = ["cube_entity", "cube_measure", "cube_key", "cube_mapping", "cube_mapping_input"] as const satisfies readonly InfoCubeTable[];
+
+export const CUBE_CATALOG_TABS: readonly CatalogTab[] = [
+  { key: "facts", label: "Facts", kinds: ["fact"] },
+  { key: "dimensions", label: "Dimensions", kinds: ["dimension"] },
+  { key: "measures", label: "Measures", kinds: ["measure"] },
+  { key: "keys", label: "Keys", kinds: ["key"] },
+  { key: "cube-mappings", label: "Dimensional mappings", kinds: ["cube_mapping"] },
+];
+
+const ADDITIVITY: Readonly<Record<string, string>> = { additive: "Additive", semi: "Semi-additive", non: "Non-additive" };
+const present = (...xs: (string | null | undefined)[]): string[] => xs.filter((x): x is string => !!x && x.trim() !== "");
+
+type CubeRows = {
+  cube_entity: readonly CubeEntity[];
+  cube_measure: readonly CubeMeasure[];
+  cube_key: readonly CubeKey[];
+  cube_mapping: readonly CubeMapping[];
+  cube_mapping_input: readonly CubeMappingInput[];
+};
+
+export function cubeCatalogItems(snapshot: WorkspaceSnapshot<ModuleTable>): CatalogItem[] {
+  if (!snapshot.workspace.infocube) return [];
+  const rows = snapshot.modules as unknown as Partial<CubeRows>;
+  const m = snapshot.model;
+  const ws = snapshot.workspace.id;
+  const entities = new Map(m.entities.filter((e) => e.deleted_at === null).map((e) => [e.id, e]));
+  const attributes = new Map(m.attributes.filter((a) => a.deleted_at === null).map((a) => [a.id, a]));
+  const relationships = new Map(m.relationships.filter((r) => r.deleted_at === null).map((r) => [r.id, r]));
+  const concepts = new Map(m.concepts.map((c) => [c.id, c.name]));
+  const cubeOf = new Map((rows.cube_entity ?? []).filter((c) => c.deleted_at === null).map((c) => [c.entity_id, c]));
+  const out: CatalogItem[] = [];
+  const counters = new Map<string, number>();
+  const add = (x: Omit<CatalogItem, "workspaceId" | "order">) => {
+    const order = counters.get(x.kind) ?? 0;
+    counters.set(x.kind, order + 1);
+    out.push({ ...x, workspaceId: ws, order });
+  };
+  const attrName = (id: Uuid) => {
+    const a = attributes.get(id);
+    return a ? `${entities.get(a.entity_id)?.name ?? "?"}.${a.name}` : "?";
+  };
+
+  for (const e of m.entities) {
+    const c = cubeOf.get(e.id);
+    if (!c || e.deleted_at !== null || e.model_level !== "dimensional") continue;
+    const fact = c.role === "fact";
+    add({
+      kind: fact ? "fact" : "dimension",
+      kindLabel: fact ? "Fact" : "Dimension",
+      id: e.id,
+      name: e.name,
+      path: present(concepts.get(e.concept_id), fact ? (c.fact_type ? FACT_TYPE_NAMES[c.fact_type] : null) : historyLabel(c)).join(" · "),
+      definition: e.definition_text,
+      fields: { alias: present(e.alias), definition: present(e.definition_text), other: present(c.grain) },
+      marks: [],
+      anchors: { entities: [e.id], tables: [] },
+      open: { param: "entity", value: e.id },
+    });
+  }
+
+  for (const x of rows.cube_measure ?? []) {
+    const a = attributes.get(x.attribute_id);
+    const owner = a ? entities.get(a.entity_id) : undefined;
+    if (x.deleted_at !== null || !a || !owner) continue;
+    add({
+      kind: "measure",
+      kindLabel: "Measure",
+      id: x.id,
+      name: a.name,
+      path: `${owner.name} · ${ADDITIVITY[x.additivity] ?? x.additivity}`,
+      definition: a.definition_text,
+      fields: { alias: present(a.alias), definition: present(a.definition_text), other: present(x.semi_note) },
+      marks: [],
+      anchors: { entities: [owner.id], tables: [] },
+      open: { param: "row", value: a.id },
+    });
+  }
+
+  for (const k of rows.cube_key ?? []) {
+    const a = attributes.get(k.attribute_id);
+    const r = relationships.get(k.relationship_id);
+    // a key whose attribute is no foreign key reads as absent (slice 15b)
+    if (k.deleted_at !== null || !a || !r || !a.is_foreign_key) continue;
+    const from = entities.get(a.entity_id)?.name ?? "?";
+    const otherId = r.from_entity_id === a.entity_id ? r.to_entity_id : r.from_entity_id;
+    const to = entities.get(otherId)?.name ?? "?";
+    add({
+      kind: "key",
+      kindLabel: "Key",
+      id: k.id,
+      name: `${a.name} (${from} → ${to})`,
+      path: `${from} → ${to}`,
+      definition: a.definition_text,
+      fields: { alias: present(a.alias), definition: present(a.definition_text), other: [] },
+      marks: [],
+      anchors: { entities: [...new Set([a.entity_id, otherId])], tables: [] },
+      open: { param: "row", value: a.id },
+    });
+  }
+
+  const inputsOf = new Map<Uuid, Uuid[]>();
+  for (const i of [...(rows.cube_mapping_input ?? [])].sort((x, y) => x.sort_order - y.sort_order)) {
+    if (i.deleted_at === null) inputsOf.set(i.mapping_id, [...(inputsOf.get(i.mapping_id) ?? []), i.attribute_id]);
+  }
+  for (const x of rows.cube_mapping ?? []) {
+    const a = attributes.get(x.attribute_id);
+    if (x.deleted_at !== null || !a) continue;
+    const inputs = inputsOf.get(x.id) ?? [];
+    const inputEntities = inputs.map((id) => attributes.get(id)?.entity_id).filter((id): id is Uuid => !!id);
+    add({
+      kind: "cube_mapping",
+      kindLabel: "Dimensional mapping",
+      id: x.id,
+      name: `${inputs.map(attrName).join(", ") || "?"} → ${attrName(a.id)}`,
+      path: x.kind === "lookup" ? "Lookup" : x.kind === "transform" ? "Transform" : "Direct",
+      definition: x.note,
+      fields: { alias: [], definition: present(x.note), other: present(x.rule_expression) },
+      marks: [{ t: "status", status: x.status }],
+      anchors: { entities: [...new Set([a.entity_id, ...inputEntities])], tables: [] },
+      open: { param: "ext", value: `cube_mapping:${x.id}` },
+    });
+  }
+  return out;
+}
+
+const STATUS: Readonly<Record<string, string>> = { draft: "Draft", review: "In review", approved: "Approved" };
+
+/** InfoCube's kinds' details in InfoCatalog's drawer (slice 39, S39-04); null for another kind. */
+export function cubeCatalogDetails(snapshot: WorkspaceSnapshot<ModuleTable>, item: CatalogItem, input: DetailsInput): CatalogDetails | null {
+  if (!["fact", "dimension", "measure", "key", "cube_mapping"].includes(item.kind)) return null;
+  const k = detailsKit(input);
+  const rows = snapshot.modules as unknown as Partial<CubeRows>;
+  const m = snapshot.model;
+  const liveRows = <T extends { deleted_at: string | null }>(xs: readonly T[] | undefined): T[] => (xs ?? []).filter((x) => x.deleted_at === null);
+  const attributes = new Map(m.attributes.filter((a) => a.deleted_at === null).map((a) => [a.id, a]));
+  const entityName = (id: Uuid) => m.entities.find((e) => e.id === id)?.name ?? "?";
+  const attrName = (id: Uuid) => {
+    const a = attributes.get(id);
+    return a ? `${entityName(a.entity_id)}.${a.name}` : "?";
+  };
+  const entityKind = (id: Uuid) => (liveRows(rows.cube_entity).find((c) => c.entity_id === id)?.role === "fact" ? "fact" : "dimension");
+  const entityLink = (id: Uuid) => k.link(entityKind(id), id);
+  const keys = liveRows(rows.cube_key);
+  const mappings = liveRows(rows.cube_mapping);
+  const inputs = liveRows(rows.cube_mapping_input).sort((a, b) => a.sort_order - b.sort_order);
+  const mappingsInto = (entityId: Uuid) => mappings.filter((x) => attributes.get(x.attribute_id)?.entity_id === entityId).map((x) => k.link("cube_mapping", x.id, STATUS[x.status]));
+  const person = (id: Uuid | null) => (id ? snapshot.people.find((p) => p.id === id)?.display_name ?? "someone" : null);
+
+  if (item.kind === "fact" || item.kind === "dimension") {
+    const e = m.entities.find((x) => x.id === item.id)!;
+    const c = liveRows(rows.cube_entity).find((x) => x.entity_id === e.id)!;
+    const keysOf = keys.filter((x) => {
+      const r = m.relationships.find((y) => y.id === x.relationship_id);
+      return !!r && (r.from_entity_id === e.id || r.to_entity_id === e.id) && attributes.get(x.attribute_id)?.is_foreign_key;
+    });
+    const common = [k.linked("Concept", [k.link("concept", e.concept_id)]), k.fact("Alias", e.alias), k.fact("Level", "Dimensional")];
+    const facts =
+      item.kind === "fact"
+        ? [
+            ...common,
+            k.fact("Type", c.fact_type ? FACT_TYPE_NAMES[c.fact_type] : null),
+            k.fact("Factless", k.yesNo(c.is_factless)),
+            k.fact("Grain", c.grain),
+            k.linked("Aggregate of", [c.base_fact_entity_id ? k.link("fact", c.base_fact_entity_id) : null]),
+          ]
+        : [...common, k.fact("Kind", c.dim_kind ? DIM_KIND_NAMES[c.dim_kind] : null), k.fact("History", historyLabel(c)), k.fact("Unknown member", c.has_unknown_member === false ? "Off" : "On")];
+    return k.details(facts, [k.text("Definition", e.definition_text)], [
+      item.kind === "fact" ? k.group("Measures", liveRows(rows.cube_measure).filter((x) => attributes.get(x.attribute_id)?.entity_id === e.id).map((x) => k.link("measure", x.id))) : null,
+      k.group("Keys", keysOf.map((x) => k.link("key", x.id))),
+      k.group("Dimensional mappings", mappingsInto(e.id)),
+    ]);
+  }
+  if (item.kind === "measure") {
+    const x = liveRows(rows.cube_measure).find((y) => y.id === item.id)!;
+    const a = attributes.get(x.attribute_id)!;
+    return k.details(
+      [k.linked("Fact", [entityLink(a.entity_id)], entityName(a.entity_id)), k.fact("Type", formatAttributeType(a)), k.fact("Additivity", ADDITIVITY[x.additivity] ?? x.additivity), k.fact("Not additive across", x.semi_note)],
+      [k.text("Definition", a.definition_text)],
+      [k.group("Dimensional mappings", mappings.filter((y) => y.attribute_id === a.id).map((y) => k.link("cube_mapping", y.id, STATUS[y.status])))],
+    );
+  }
+  if (item.kind === "key") {
+    const x = keys.find((y) => y.id === item.id)!;
+    const a = attributes.get(x.attribute_id)!;
+    const r = m.relationships.find((y) => y.id === x.relationship_id)!;
+    const other = r.from_entity_id === a.entity_id ? r.to_entity_id : r.from_entity_id;
+    return k.details(
+      [k.fact("Attribute", attrName(a.id)), k.linked("Fact", [entityLink(a.entity_id)], entityName(a.entity_id)), k.linked("Dimension", [entityLink(other)], entityName(other)), k.fact("Role", r.from_entity_id === other ? r.from_role : r.to_role)],
+      [k.text("Definition", a.definition_text)],
+      [],
+    );
+  }
+  const x = mappings.find((y) => y.id === item.id)!;
+  const target = attributes.get(x.attribute_id)!;
+  return k.details(
+    [
+      k.linked("Source", inputs.filter((i) => i.mapping_id === x.id).map((i) => k.link("attribute", i.attribute_id))),
+      k.fact("Target", attrName(target.id)),
+      k.linked("Into", [entityLink(target.entity_id)]),
+      k.fact("Kind", x.kind === "lookup" ? "Lookup" : x.kind === "transform" ? "Transform" : "Direct"),
+      x.kind === "lookup" ? k.linked("Through", [k.link("relationship", x.lookup_relationship_id)]) : null,
+      x.kind === "lookup" ? k.fact("When there is no match", x.lookup_default) : null,
+      k.fact("Status", STATUS[x.status] ?? x.status),
+      x.approved_by ? { label: "Approved by", text: person(x.approved_by)!, ...(x.approved_at ? { time: x.approved_at } : {}) } : null,
+    ],
+    [k.text("Rule", x.rule_expression, true), k.text("Note", x.note)],
+    [],
+  );
+}
+
+export const CUBE_CATALOG: CatalogContribution = {
+  module: "infocube",
+  tables: CUBE_CATALOG_TABLES,
+  tabs: CUBE_CATALOG_TABS,
+  on: (w) => w.infocube,
+  items: cubeCatalogItems,
+  details: cubeCatalogDetails,
+};

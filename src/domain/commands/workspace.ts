@@ -87,6 +87,7 @@ export function newWorkspaceRows(
     four_eyes: false,
     infocube: false,
     infodoc: false,
+    catalog_shown: false,
     archived_at: null,
     archived_by: null,
     requirement_key_next: 101,
@@ -156,6 +157,8 @@ const updateSettingsInput = z
     infocube: z.boolean().optional(),
     /** InfoDocumenter on or off (slice 25, AD-35): on with the organization's licence, off at any time. */
     infodoc: z.boolean().optional(),
+    /** Shown in InfoCatalog to everyone in the organization (slice 39, A2.3): on with the licence, off at any time. */
+    catalogShown: z.boolean().optional(),
   })
   .strict();
 export type UpdateWorkspaceSettingsInput = z.input<typeof updateSettingsInput>;
@@ -171,8 +174,8 @@ export interface InfoCubeSwitchState {
 }
 
 /**
- * Changes any of name, client, description, documentation language, Data Vault 2.0 mode, four-eyes, InfoCube and
- * InfoDocumenter. InfoCube (slice 15a, C-7): owners and admins (the settings' right), on only with the organization's
+ * Changes any of name, client, description, documentation language, Data Vault 2.0 mode, four-eyes, InfoCube,
+ * InfoDocumenter and whether InfoCatalog shows the workspace to everyone in the organization (slice 39). InfoCube (slice 15a, C-7): owners and admins (the settings' right), on only with the organization's
  * licence, off only while the workspace has no facts or dimensions. InfoDocumenter (slice 25, AD-35's addition): on only
  * with the licence, off at any time, its documents kept. Without a module's state a change of its switch is refused.
  */
@@ -182,6 +185,7 @@ export function updateWorkspaceSettings(
   input: unknown,
   infoCube?: InfoCubeSwitchState,
   infoDoc?: ModuleLicenceState,
+  catalog?: ModuleLicenceState,
 ): CommandResult<{ workspace: Workspace }> {
   const denied = checkPermission(access, "workspace.edit_settings");
   if (denied) return fail(denied);
@@ -211,6 +215,12 @@ export function updateWorkspaceSettings(
     // turning it off deletes nothing (its documents are outside the model), so it is always allowed
     if (p.infodoc && !infoDoc.licensed) return fail(domainError("forbidden", licenceMissingMessage("infodoc", infoDoc.organizationName)));
     patch.infodoc = p.infodoc;
+  }
+  // slice 39 (A2.3): the switch is no module switch; on only with the organization's InfoCatalog licence, off always
+  if (p.catalogShown !== undefined && p.catalogShown !== workspace.catalog_shown) {
+    if (!catalog) return fail(domainError("invalid", "Showing a workspace in InfoCatalog is changed only from the workspace settings."));
+    if (p.catalogShown && !catalog.licensed) return fail(domainError("forbidden", licenceMissingMessage("infocatalog", catalog.organizationName)));
+    patch.catalog_shown = p.catalogShown;
   }
 
   const row = nextVersion(ctx, workspace, patch);
