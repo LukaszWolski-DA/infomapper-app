@@ -29,11 +29,14 @@ import { BaselinesTab } from "./_components/baselines";
 import { Conventions } from "./_components/conventions";
 import { settingsBoxes } from "@/compose/settings";
 import { HOME_GONE, homeTabs } from "@/compose/home";
+import { OFF_CANVAS, offCanvasNotice } from "@/compose/catalog";
 import { baselineExtensions } from "@/compose/baselines-ui";
 import { chosenHomeTab } from "@/ui/home-tabs";
 import { moduleFeeds, STORE_SCHEMA } from "@/compose";
 import { workspacePeople } from "@/app/_lib/people";
 import { tabsListVariants, tabVariants } from "@/ui/components/tabs";
+
+const ITEM_PARAM = ["item"] as const;
 
 export default async function WorkspaceHomePage({ params, searchParams }: PageProps<"/w/[workspaceId]">) {
   const { workspaceId } = await params;
@@ -125,6 +128,9 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     thumbnails = thumbnailHrefs(workspaceId, shown, { items, frames, notes }, { model, requirements, labels, labelLinks, rowFeeds });
   }
 
+  // slice 39 (S39-05): InfoCatalog's "Open in InfoMapper" found the item on no canvas; its name is read here
+  const offCanvas = query.gone === OFF_CANVAS && typeof query.item === "string" ? await offCanvasNotice(workspaceId, query.item) : null;
+
   // slice 38 (B3): the organization's other workspaces this person has, as the workspace switcher lists them
   const otherWorkspaces = shell.workspaces.filter((w) => w.id !== workspace.id);
   // Undo and Redo, buttons and keys, on the person's history of the workspace (slice 12a, D-65)
@@ -134,6 +140,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
       {query.gone === "project" && <GoneNotice message="That project no longer exists." />}
       {/* slice 25 (step 4b): a module's page the person can no longer open sent them back here */}
       {typeof query.gone === "string" && HOME_GONE[query.gone] && <GoneNotice message={HOME_GONE[query.gone]!} />}
+      {offCanvas && <GoneNotice message={offCanvas} drop={ITEM_PARAM} />}
       <div data-testid="page-workspace-home" className="min-h-full bg-im-surface px-[clamp(16px,4vw,48px)] pb-12 pt-6">
         {/* slice 38 (S38-03): up to 1,320 px, centred, the prototype's gutters */}
         <div className="mx-auto max-w-[1320px]">

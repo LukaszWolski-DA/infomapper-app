@@ -1067,8 +1067,11 @@ export function ModelCanvas({
     if (!ready || !focusRequirementId || focusedRequirement.current) return;
     focusedRequirement.current = true;
     select({ t: "req", id: focusRequirementId });
+    // slice 39 (S39-05): a requirement with a card on this canvas is centred on it, as a card asked for is
+    const card = reqNodesOf(rf).find((n) => n.data.card.requirementId === focusRequirementId);
+    if (card) centerOnRect({ x: card.position.x, y: card.position.y, w: REQ_CARD.width, h: requirementCardHeight(card.data.card.nameLines) });
     window.history.replaceState(null, "", window.location.pathname);
-  }, [ready, focusRequirementId, select]);
+  }, [ready, focusRequirementId, select, rf, centerOnRect]);
 
   const focusedSelection = useRef(false);
   useEffect(() => {

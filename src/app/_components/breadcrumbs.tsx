@@ -1,10 +1,12 @@
 // Breadcrumbs under the top bar (D-38, prototype navigation bar): Organization › Workspace › … , each part a link.
 // Back and Forward at the row's left end (slice 6b, D-38, `HistoryNav`), on every page with the row. Canvas pages put
-// the view-state bar at the row's right end (`children`, slice 6a, D-39); the row's height never changes.
+// the view-state bar at the row's right end (`children`, slice 6a, D-39); the row's height never changes. After InfoCatalog's
+// "Open in InfoMapper", "← Back to InfoCatalog" follows Back and Forward (slice 39, `CatalogBack`).
 
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import type { ShellData } from "../_lib/shell";
+import { CatalogBack } from "./catalog-back";
 import { HistoryNav } from "./history-nav";
 import { canvasHref, projectHref, workspaceHref } from "../_lib/paths";
 
@@ -35,6 +37,8 @@ export function Breadcrumbs({ shell, trail, children }: { shell: ShellData; trai
       className="flex h-8 min-w-0 flex-none items-center gap-1.5 overflow-hidden border-b border-im-line bg-im-surface px-2 text-xs [contain:strict]"
     >
       <HistoryNav />
+      {/* slice 39 (S39-05): after "Open in InfoMapper", the way back to the catalog */}
+      <CatalogBack workspaceId={workspace.id} />
       <ol className="flex min-w-0 items-center gap-0.5 overflow-hidden whitespace-nowrap text-im-ink-3">
         {parts.map((part, i) => {
           const current = i === parts.length - 1;

@@ -6,7 +6,8 @@
 import { useEffect, useRef } from "react";
 import { useToast } from "@/ui/components/toast";
 
-export function GoneNotice({ message }: { message: string }) {
+/** `drop`: more of the address's parameters that said what is gone (slice 39: InfoCatalog's `item`). */
+export function GoneNotice({ message, drop = [] }: { message: string; drop?: readonly string[] }) {
   const toast = useToast();
   const shown = useRef(false);
   useEffect(() => {
@@ -15,7 +16,8 @@ export function GoneNotice({ message }: { message: string }) {
     toast(message);
     const url = new URL(window.location.href);
     url.searchParams.delete("gone");
+    for (const p of drop) url.searchParams.delete(p);
     window.history.replaceState(null, "", url.pathname + url.search);
-  }, [toast, message]);
+  }, [toast, message, drop]);
   return null;
 }
