@@ -829,3 +829,41 @@ the shell's navigation row, not the local adapter):
 Claude's technical calls, quoted at the closing. Two changes to the plan (§ 12): S8-06's race is fixed before step 7 on
 its own branch (6a); the timing on `dev:pg` moves after his migration (7b), so step 7 is ui:check, the bench and a full
 run.
+
+## Step 6a: S8-06's race (28 November 2026)
+
+`fix/s8-06-switcher-ready` from `dev` (`b93ebe4`): after the sign-in form's redirect the address is the new page's before
+React has hydrated it, so a click on the organization switcher then opened nothing. Both tests of `S8-06.spec.ts` wait
+for slice 9's `hydrated` first (test only; a note in `slice-08-acceptance.md`). The single-file check, 10 rounds
+(run 46151147885): 10 of 10, both tests in every round. Pull request 102, head
+`0ec5b42268cf340ed72efd366403b82c9be2720b`, merged into `dev` on Łukasz's command as a merge commit,
+`8e8101fe0f9ab88819b2ff9dc29b02e42c889800`, no tag. The repository deletes a merged head branch by itself ("Automatically
+delete head branches"); the branch was pushed back at its head at once, as Łukasz asked it kept. `dev` merged into this
+branch (`2463e76`).
+
+## Step 7: the after checks, without `dev:pg` (28 November 2026)
+
+**`ui:check`** (`npm run ui:check -- --label s39-step7 --only landing,catalog --widths 1280,1440,1920,390`): seven
+screens (`landing`, `catalog-empty`, `catalog-search`, `catalog-long`, `catalog-workspace`, `catalog-drawer-entity`,
+`catalog-drawer-table`) at 1,280, 1,440 and 1,920 px light and dark and at 390 px light, 49 views: **no overlap, no spill,
+no crowded words, nothing past the edge, no small target, no cut text**. Report: `.data/ui-check/s39-step7-20261128-1501/`.
+
+**The bench** (`npx tsx scripts/bench-catalog.ts` with `BENCH_PG` the Postgres 18.3 cluster on 127.0.0.1, medians of 9;
+5,626 items for 4,871 rows, 21,904 for four times that; on `2463e76`):
+
+| | 4,871, local | 4,871, Postgres | 4 ×, local | 4 ×, Postgres |
+| --- | --- | --- | --- | --- |
+| `catalog.read` | 6.3 ms | 89.2 ms (38 statements) | 57.5 ms | 297.8 ms (38 statements) |
+| the index | 26.3 ms | 26.2 ms | 65.8 ms | 66.7 ms |
+| a search ("customer" / "a" / "qqqq") | 3.7 / 5.2 / 0.4 ms | 2.9 / 4.2 / 0.4 ms | 5.4 / 13.7 / 1.7 ms | 4.7 / 14.0 / 1.7 ms |
+| **the page's search** ("customer" / "a") | **34.8 / 37.1 ms** | **113.7 / 112.5 ms** | **130.7 / 141.3 ms** | **373.5 / 385.0 ms** |
+
+Step 5's figures within their spread; the drawer's item is one workspace's read and is not benched (step 7b times it on
+`dev:pg`).
+
+**The full run:** [46152508526](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/46152508526) on
+`2463e76`, 18 min 55 s: **965 passed, 0 failed, 0 flaky, 16 skipped, 0 expected failures**. Parts' times 10:04, 9:29,
+12:09, 9:07, 7:42, 8:35, 8:01, 14:00, 5:54, 5:53, 17:22; heap peaks 1,209, 1,548, 1,447, 1,587, 1,661, **1,689 (part 6)**,
+1,571, 1,214, 983, 1,414, 1,444 MB (limits 7,898 to 8,041 MB). Part 11 (with `e2e/slice-39`) is the longest; the recut
+rule is checked at the closing on the last three full runs.
+
